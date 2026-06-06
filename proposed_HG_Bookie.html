@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Housie Ghar – Agent Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #161820;
+  --bg3: #1e2029;
+  --bg4: #252733;
+  --border: rgba(255,255,255,0.07);
+  --border-active: rgba(255,255,255,0.14);
+  --gold: #f5a623;
+  --gold-dim: rgba(245,166,35,0.15);
+  --gold-border: rgba(245,166,35,0.3);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.12);
+  --green-border: rgba(34,197,94,0.3);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.12);
+  --red-border: rgba(239,68,68,0.3);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,0.12);
+  --text: #f0f0f0;
+  --text-mid: #9ca3af;
+  --text-dim: #6b7280;
+  --wa: #25D366;
+  --radius: 14px;
+  --radius-sm: 9px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── WALLET HEADER ── */
+.wallet-header {
+  background: linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 16px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.wallet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.agent-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--amber));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Baloo 2', cursive;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1a1000;
+}
+
+.agent-name-wrap .name {
+  font-family: 'Baloo 2', cursive;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.agent-name-wrap .role {
+  font-size: 0.65rem;
+  color: var(--gold);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.wallet-balance-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.balance-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 1px;
+}
+.balance-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1;
+}
+.balance-value.low { color: var(--red); animation: pulse-red 1.5s infinite; }
+@keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+.wallet-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.wallet-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+  letter-spacing: 0.2px;
+}
+.tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+.tab .badge-count {
+  position: absolute;
+  top: 8px;
+  right: calc(50% - 18px);
+  background: var(--red);
+  color: white;
+  font-size: 0.55rem;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── SCREENS ── */
+.tab-screen { display: none; padding: 14px 14px 100px; }
+.tab-screen.active { display: block; }
+
+/* ── QUEUE HEADER ── */
+.queue-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.queue-title {
+  font-family: 'Baloo 2', cursive;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.live-dot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.65rem;
+  color: var(--green);
+  font-weight: 600;
+}
+.live-dot::before {
+  content: '';
+  width: 7px; height: 7px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse-green 1.5s infinite;
+}
+@keyframes pulse-green { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+
+/* ── REQUEST CARD ── */
+.request-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+  animation: slideInCard 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideInCard {
+  from { opacity:0; transform:translateY(16px) scale(0.97); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.request-card:hover { border-color: var(--border-active); }
+.request-card.urgent { border-color: var(--red-border); }
+.request-card.new { border-color: var(--gold-border); }
+
+.card-top {
+  padding: 14px 14px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.card-booking-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-weight: 600;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+.card-new-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--green);
+  background: var(--green-dim);
+  border: 1px solid var(--green-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.card-player {
+  font-family: 'Baloo 2', cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.card-game {
+  font-size: 0.7rem;
+  color: var(--text-mid);
+}
+
+.card-amount {
+  text-align: right;
+  flex-shrink: 0;
+}
+.amount-label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.amount-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.card-tickets {
+  padding: 0 14px 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ticket-chip {
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── TIMER BAR ── */
+.timer-bar-wrap {
+  padding: 0 14px 10px;
+}
+.timer-bar-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.timer-bar-row .timer-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+}
+.timer-bar-row .timer-val.urgent { color: var(--red); }
+.timer-track {
+  height: 5px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1s linear, background 0.5s;
+}
+
+/* ── CARD ACTIONS ── */
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+}
+
+.action-btn {
+  padding: 13px 8px;
+  border: none;
+  background: var(--bg3);
+  color: var(--text-mid);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.action-btn:active { transform: scale(0.96); }
+
+.action-btn.wa {
+  color: var(--wa);
+  background: rgba(37,211,102,0.05);
+}
+.action-btn.wa:hover { background: rgba(37,211,102,0.12); }
+
+.action-btn.confirm {
+  color: var(--green);
+  background: rgba(34,197,94,0.05);
+}
+.action-btn.confirm:hover { background: var(--green-dim); }
+
+.action-btn.reject {
+  color: var(--red);
+  background: rgba(239,68,68,0.05);
+}
+.action-btn.reject:hover { background: var(--red-dim); }
+
+.action-btn .icon { font-size: 1.1rem; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-dim);
+}
+.empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state h3 { font-family:'Baloo 2',cursive; font-size:1rem; color:var(--text-mid); margin-bottom:6px; }
+.empty-state p { font-size:0.75rem; line-height:1.6; }
+
+/* ── MY SALES ── */
+.sales-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.summary-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.summary-card .s-label {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+}
+.summary-card .s-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.summary-card .s-sub {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.summary-card.green .s-value { color: var(--green); }
+.summary-card.gold .s-value { color: var(--gold); }
+
+.sales-list { display:flex; flex-direction:column; gap:8px; }
+
+.sale-row {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sale-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--green-dim);
+  border: 1px solid var(--green-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.sale-info .s-name { font-size:0.82rem; font-weight:600; color:var(--text); margin-bottom:1px; }
+.sale-info .s-detail { font-size:0.65rem; color:var(--text-dim); }
+.sale-amount {
+  margin-left:auto;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.9rem;
+  font-weight:700;
+  color:var(--green);
+}
+.sale-time { font-size:0.6rem; color:var(--text-dim); margin-top:1px; text-align:right; }
+
+/* ── WALLET TAB ── */
+.wallet-section { margin-bottom:20px; }
+.ws-title {
+  font-family:'Baloo 2',cursive;
+  font-size:0.85rem;
+  font-weight:700;
+  color:var(--text-mid);
+  text-transform:uppercase;
+  letter-spacing:0.8px;
+  margin-bottom:10px;
+}
+
+.wallet-big-card {
+  background: linear-gradient(135deg, #1a2f1a 0%, #0f1f0f 100%);
+  border: 1px solid var(--green-border);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  margin-bottom:14px;
+  position: relative;
+  overflow: hidden;
+}
+.wallet-big-card::before {
+  content:'';
+  position:absolute;
+  top:-40%;
+  right:-20%;
+  width:200px;
+  height:200px;
+  background: radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%);
+}
+.wbc-label { font-size:0.65rem; color:rgba(34,197,94,0.6); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.wbc-balance {
+  font-family:'JetBrains Mono',monospace;
+  font-size:2.2rem;
+  font-weight:700;
+  color:var(--green);
+  line-height:1;
+  margin-bottom:14px;
+}
+.wbc-stats { display:flex; gap:20px; }
+.wbc-stat .label { font-size:0.6rem; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:2px; }
+.wbc-stat .val { font-family:'JetBrains Mono',monospace; font-size:0.85rem; font-weight:600; color:rgba(255,255,255,0.7); }
+
+.topup-card {
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-bottom:14px;
+}
+.topup-card h3 {
+  font-family:'Baloo 2',cursive;
+  font-size:0.95rem;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:4px;
+}
+.topup-card p {
+  font-size:0.72rem;
+  color:var(--text-dim);
+  line-height:1.5;
+  margin-bottom:14px;
+}
+
+.topup-input-wrap {
+  display:flex;
+  align-items:center;
+  background:var(--bg4);
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  margin-bottom:10px;
+  transition:border-color 0.2s;
+}
+.topup-input-wrap:focus-within { border-color:var(--gold); }
+.topup-prefix {
+  padding:12px 14px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem;
+  font-weight:700;
+  color:var(--gold);
+  background:var(--gold-dim);
+  border-right:1px solid var(--border);
+}
+.topup-input {
+  flex:1;
+  background:none;
+  border:none;
+  padding:12px 14px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem;
+  font-weight:600;
+  color:var(--text);
+  outline:none;
+}
+.topup-input::placeholder { color:var(--text-dim); }
+
+.quick-amounts {
+  display:flex;
+  gap:8px;
+  margin-bottom:14px;
+  flex-wrap:wrap;
+}
+.quick-amt {
+  background:var(--bg4);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:6px 12px;
+  font-size:0.72rem;
+  font-weight:600;
+  color:var(--text-mid);
+  cursor:pointer;
+  transition:all 0.15s;
+  font-family:'JetBrains Mono',monospace;
+}
+.quick-amt:hover { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+.quick-amt.active { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+
+.topup-btn {
+  width:100%;
+  background:linear-gradient(135deg,var(--gold),var(--amber));
+  color:#1a1000;
+  border:none;
+  border-radius:10px;
+  padding:13px;
+  font-family:'Baloo 2',cursive;
+  font-size:0.95rem;
+  font-weight:800;
+  cursor:pointer;
+  transition:all 0.2s;
+  letter-spacing:0.3px;
+}
+.topup-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+
+.ledger-list { display:flex; flex-direction:column; gap:8px; }
+
+.ledger-row {
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.ledger-icon {
+  width:32px; height:32px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.85rem;
+  flex-shrink:0;
+}
+.ledger-icon.credit { background:var(--green-dim); border:1px solid var(--green-border); }
+.ledger-icon.debit { background:var(--red-dim); border:1px solid var(--red-border); }
+.ledger-info .l-title { font-size:0.78rem; font-weight:600; color:var(--text); margin-bottom:1px; }
+.ledger-info .l-time { font-size:0.62rem; color:var(--text-dim); }
+.ledger-amount { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:0.88rem; font-weight:700; }
+.ledger-amount.credit { color:var(--green); }
+.ledger-amount.debit { color:var(--red); }
+
+/* ── CONFIRM MODAL ── */
+.modal-overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);
+  z-index:200;
+  display:flex; align-items:flex-end;
+}
+.modal-sheet {
+  background:var(--bg2);
+  border-radius:20px 20px 0 0;
+  border-top:1px solid var(--border-active);
+  padding:24px 18px 40px;
+  width:100%;
+  animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-handle {
+  width:36px; height:3px;
+  background:var(--bg4);
+  border-radius:99px;
+  margin:0 auto 20px;
+}
+.modal-title {
+  font-family:'Baloo 2',cursive;
+  font-size:1.1rem;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:4px;
+}
+.modal-sub { font-size:0.75rem; color:var(--text-dim); margin-bottom:18px; line-height:1.5; }
+
+.confirm-detail {
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:14px;
+  margin-bottom:16px;
+}
+.cd-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:5px 0;
+  border-bottom:1px solid var(--border);
+  font-size:0.78rem;
+}
+.cd-row:last-child { border-bottom:none; }
+.cd-row .key { color:var(--text-dim); }
+.cd-row .val { font-weight:600; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:0.75rem; }
+.cd-row .val.green { color:var(--green); }
+.cd-row .val.red { color:var(--red); }
+
+.modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+.modal-btn {
+  padding:13px;
+  border-radius:10px;
+  border:none;
+  font-family:'Baloo 2',cursive;
+  font-size:0.9rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.15s;
+}
+.modal-btn.cancel { background:var(--bg4); color:var(--text-mid); }
+.modal-btn.cancel:hover { background:var(--bg3); }
+.modal-btn.go-confirm { background:linear-gradient(135deg,var(--green),#16a34a); color:white; }
+.modal-btn.go-confirm:hover { filter:brightness(1.1); }
+.modal-btn.go-reject { background:linear-gradient(135deg,var(--red),#dc2626); color:white; }
+.modal-btn.go-reject:hover { filter:brightness(1.1); }
+
+/* ── TOAST ── */
+.toast {
+  position:fixed;
+  top:80px;
+  left:50%;
+  transform:translateX(-50%) translateY(-20px);
+  background:var(--bg3);
+  border:1px solid var(--border-active);
+  border-radius:10px;
+  padding:10px 18px;
+  font-size:0.78rem;
+  font-weight:600;
+  color:var(--text);
+  z-index:300;
+  opacity:0;
+  transition:all 0.3s;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.green { border-color:var(--green-border); color:var(--green); }
+.toast.red { border-color:var(--red-border); color:var(--red); }
+
+/* ── PING ANIMATION (new request) ── */
+@keyframes pingRing {
+  0% { box-shadow:0 0 0 0 rgba(245,166,35,0.4); }
+  70% { box-shadow:0 0 0 14px rgba(245,166,35,0); }
+  100% { box-shadow:0 0 0 0 rgba(245,166,35,0); }
+}
+.request-card.new { animation:slideInCard 0.35s ease, pingRing 1s ease 0.4s; }
+
+/* ── SCROLL STYLING ── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- ══ WALLET HEADER ══ -->
+<div class="wallet-header">
+  <div class="wallet-top">
+    <div class="agent-identity">
+      <div class="agent-avatar">RK</div>
+      <div class="agent-name-wrap">
+        <div class="name">Rohan Karki</div>
+        <div class="role">● Agent · Darjeeling Zone</div>
+      </div>
+    </div>
+    <div class="wallet-balance-pill">
+      <div class="balance-label">Wallet</div>
+      <div class="balance-value" id="headerBalance">₹3,850</div>
+    </div>
+  </div>
+  <div class="wallet-bar">
+    <div class="wallet-bar-fill" id="walletBarFill" style="width:77%; background:linear-gradient(90deg,#22c55e,#16a34a);"></div>
+  </div>
+</div>
+
+<!-- ══ TABS ══ -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('queue', this)">
+    Live Queue
+    <span class="badge-count" id="queueBadge">3</span>
+  </div>
+  <div class="tab" onclick="switchTab('sales', this)">My Sales</div>
+  <div class="tab" onclick="switchTab('wallet', this)">Wallet</div>
+</div>
+
+<!-- ══ TAB: LIVE QUEUE ══ -->
+<div class="tab-screen active" id="tab-queue">
+  <div class="queue-meta">
+    <div class="queue-title">Pending Requests</div>
+    <div class="live-dot">Live · Auto-refresh</div>
+  </div>
+  <div id="queueList"></div>
+</div>
+
+<!-- ══ TAB: MY SALES ══ -->
+<div class="tab-screen" id="tab-sales">
+  <div class="sales-summary">
+    <div class="summary-card green">
+      <div class="s-label">Tickets Sold Today</div>
+      <div class="s-value">24</div>
+      <div class="s-sub">↑ 8 from yesterday</div>
+    </div>
+    <div class="summary-card gold">
+      <div class="s-label">Commission Earned</div>
+      <div class="s-value">₹120</div>
+      <div class="s-sub">₹5 per ticket</div>
+    </div>
+  </div>
+  <div class="ws-title" style="margin-bottom:10px;">Today's Confirmed Bookings</div>
+  <div class="sales-list" id="salesList"></div>
+</div>
+
+<!-- ══ TAB: WALLET ══ -->
+<div class="tab-screen" id="tab-wallet">
+
+  <div class="wallet-section">
+    <div class="wallet-big-card">
+      <div class="wbc-label">Available Balance</div>
+      <div class="wbc-balance" id="walletBigBalance">₹3,850</div>
+      <div class="wbc-stats">
+        <div class="wbc-stat">
+          <div class="label">Total Topped Up</div>
+          <div class="val">₹25,000</div>
+        </div>
+        <div class="wbc-stat">
+          <div class="label">Total Sold</div>
+          <div class="val">₹21,150</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="topup-card">
+      <h3>📤 Request Wallet Top-Up</h3>
+      <p>Transfer funds to the MOD bank account, then enter the amount below to request your digital wallet credit.</p>
+      <div class="topup-input-wrap">
+        <div class="topup-prefix">₹</div>
+        <input type="number" class="topup-input" id="topupAmount" placeholder="Enter amount" min="500">
+      </div>
+      <div class="quick-amounts">
+        <div class="quick-amt" onclick="setTopup(1000)">1,000</div>
+        <div class="quick-amt" onclick="setTopup(2000)">2,000</div>
+        <div class="quick-amt" onclick="setTopup(5000)">5,000</div>
+        <div class="quick-amt" onclick="setTopup(10000)">10,000</div>
+      </div>
+      <button class="topup-btn" onclick="submitTopup()">📨 Send Top-Up Request to Admin</button>
+    </div>
+  </div>
+
+  <div class="ws-title">Transaction Ledger</div>
+  <div class="ledger-list" id="ledgerList"></div>
+</div>
+
+<!-- ══ CONFIRM MODAL ══ -->
+<div class="modal-overlay" id="confirmModal" style="display:none" onclick="closeModal()">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Confirm Payment</div>
+    <div class="modal-sub" id="modalSub">Verify the UPI transfer is in your bank before confirming.</div>
+    <div class="confirm-detail" id="modalDetail"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn go-confirm" id="modalActionBtn" onclick="executeAction()">✅ Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ REJECT MODAL ══ -->
+<div class="modal-overlay" id="rejectModal" style="display:none" onclick="closeRejectModal()">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Reject & Release Tickets</div>
+    <div class="modal-sub">This will immediately release the locked tickets back to the public pool. No funds will be deducted from your wallet.</div>
+    <div class="confirm-detail" id="rejectDetail"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeRejectModal()">Cancel</button>
+      <button class="modal-btn go-reject" onclick="executeReject()">✕ Reject & Release</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────
+let walletBalance = 3850;
+const TICKET_PRICE = 50;
+
+let queue = [
+  { id:'BKG-8842', player:'HillBoy99', game:'Sunday Blockbuster', time:'8:00 PM', tickets:[14,22,89], amount:150, secondsLeft:487, isNew:true },
+  { id:'BKG-8843', player:'PawanDa', game:'Sunday Blockbuster', time:'8:00 PM', tickets:[7,33], amount:100, secondsLeft:218, isNew:false },
+  { id:'BKG-8844', player:'Sanju_GTA', game:'Friday Night Fever', time:'9:00 PM', tickets:[55], amount:50, secondsLeft:72, isNew:false },
+];
+
+const salesHistory = [
+  { id:'BKG-8830', player:'Rita_Hills', tickets:[4,18,67], amount:150, time:'5 min ago' },
+  { id:'BKG-8821', player:'DK_Bhai', tickets:[99], amount:50, time:'18 min ago' },
+  { id:'BKG-8810', player:'MayaLama', tickets:[11,44,77,88], amount:200, time:'34 min ago' },
+  { id:'BKG-8798', player:'SunilBro', tickets:[23,65], amount:100, time:'1 hr ago' },
+  { id:'BKG-8785', player:'PriyankaG', tickets:[3,9,41], amount:150, time:'2 hr ago' },
+];
+
+const ledgerHistory = [
+  { type:'credit', desc:'Top-up approved by Admin', amount:5000, time:'Today, 2:00 PM' },
+  { type:'debit', desc:'Booking #8830 Confirmed', amount:150, time:'Today, 3:42 PM' },
+  { type:'debit', desc:'Booking #8821 Confirmed', amount:50, time:'Today, 3:29 PM' },
+  { type:'debit', desc:'Booking #8810 Confirmed', amount:200, time:'Today, 3:13 PM' },
+  { type:'debit', desc:'Booking #8798 Confirmed', amount:100, time:'Today, 2:43 PM' },
+  { type:'credit', desc:'Top-up approved by Admin', amount:10000, time:'Yesterday, 11:00 AM' },
+  { type:'debit', desc:'Booking #8750 Confirmed', amount:250, time:'Yesterday, 8:55 PM' },
+];
+
+// ── STATE ──────────────────────────────────────────────────────────
+let pendingAction = null; // { type:'confirm'|'reject', bookingId }
+let timerInterval = null;
+
+// ── TAB SWITCH ──────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-screen').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── RENDER QUEUE ──────────────────────────────────────────────────────────
+function renderQueue() {
+  const list = document.getElementById('queueList');
+  if (queue.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🕐</div>
+        <h3>Queue is Clear</h3>
+        <p>New booking requests will appear here in real-time.<br>Stay ready — payements come in fast!</p>
+      </div>`;
+    document.getElementById('queueBadge').style.display = 'none';
+    return;
+  }
+  document.getElementById('queueBadge').textContent = queue.length;
+  document.getElementById('queueBadge').style.display = 'flex';
+
+  list.innerHTML = '';
+  queue.forEach(req => {
+    const pct = (req.secondsLeft / 600) * 100;
+    const isUrgent = req.secondsLeft < 120;
+    const m = Math.floor(req.secondsLeft / 60);
+    const s = req.secondsLeft % 60;
+    const timeStr = `${m}:${s.toString().padStart(2,'0')}`;
+    const barColor = isUrgent ? 'var(--red)' : req.secondsLeft < 300 ? 'var(--amber)' : 'var(--green)';
+
+    const card = document.createElement('div');
+    card.className = `request-card ${req.isNew ? 'new' : ''} ${isUrgent ? 'urgent' : ''}`;
+    card.id = `card-${req.id}`;
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <div class="card-id-row">
+            <span class="card-booking-id">#${req.id}</span>
+            ${req.isNew ? '<span class="card-new-badge">NEW</span>' : ''}
+          </div>
+          <div class="card-player">${req.player}</div>
+          <div class="card-game">🎮 ${req.game} · ${req.time}</div>
+        </div>
+        <div class="card-amount">
+          <div class="amount-label">Payable</div>
+          <div class="amount-value">₹${req.amount}</div>
+        </div>
+      </div>
+      <div class="card-tickets">
+        ${req.tickets.map(t => `<span class="ticket-chip">#${t}</span>`).join('')}
+      </div>
+      <div class="timer-bar-wrap">
+        <div class="timer-bar-row">
+          <span>Payment Window</span>
+          <span class="timer-val ${isUrgent ? 'urgent' : ''}" id="timer-${req.id}">${timeStr}</span>
+        </div>
+        <div class="timer-track">
+          <div class="timer-fill" id="fill-${req.id}" style="width:${pct}%; background:${barColor}"></div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="action-btn wa" onclick="openWhatsApp('${req.id}')">
+          <span class="icon">💬</span>WhatsApp
+        </button>
+        <button class="action-btn confirm" onclick="openConfirm('${req.id}')">
+          <span class="icon">✅</span>Confirm
+        </button>
+        <button class="action-btn reject" onclick="openReject('${req.id}')">
+          <span class="icon">✕</span>Reject
+        </button>
+      </div>
+    `;
+    list.appendChild(card);
+
+    // clear new flag after animation
+    if (req.isNew) setTimeout(() => { req.isNew = false; }, 1500);
+  });
+}
+
+// ── RENDER SALES ──────────────────────────────────────────────────────────
+function renderSales() {
+  const list = document.getElementById('salesList');
+  list.innerHTML = salesHistory.map(s => `
+    <div class="sale-row">
+      <div class="sale-icon">✅</div>
+      <div class="sale-info">
+        <div class="s-name">${s.player} · ${s.tickets.length} ticket${s.tickets.length>1?'s':''}</div>
+        <div class="s-detail">#${s.id} · Tickets: ${s.tickets.map(t=>'#'+t).join(', ')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="sale-amount">+₹${s.amount}</div>
+        <div class="sale-time">${s.time}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── RENDER LEDGER ──────────────────────────────────────────────────────────
+function renderLedger() {
+  const list = document.getElementById('ledgerList');
+  list.innerHTML = ledgerHistory.map(l => `
+    <div class="ledger-row">
+      <div class="ledger-icon ${l.type}">${l.type==='credit' ? '⬆️' : '⬇️'}</div>
+      <div class="ledger-info">
+        <div class="l-title">${l.desc}</div>
+        <div class="l-time">${l.time}</div>
+      </div>
+      <div class="ledger-amount ${l.type}">${l.type==='credit'?'+':'-'}₹${l.amount.toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+// ── WHATSAPP ──────────────────────────────────────────────────────────
+function openWhatsApp(id) {
+  const req = queue.find(r => r.id === id);
+  if (!req) return;
+  const msg = encodeURIComponent(
+    `Hi ${req.player}! Please send ₹${req.amount} to my UPI ID: rohan@ybl\n\nBooking ID: #${req.id} | Tickets: ${req.tickets.map(t=>'#'+t).join(', ')}\n\nReply with a screenshot once done! ✅`
+  );
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
+  showToast('💬 WhatsApp message copied!', '');
+}
+
+// ── CONFIRM MODAL ──────────────────────────────────────────────────────────
+function openConfirm(id) {
+  const req = queue.find(r => r.id === id);
+  if (!req) return;
+  pendingAction = { type:'confirm', id };
+
+  const canAfford = walletBalance >= req.amount;
+  document.getElementById('modalTitle').textContent = 'Confirm Payment Received';
+  document.getElementById('modalSub').textContent = canAfford
+    ? 'Are you sure the UPI payment is in your bank? This will deduct from your wallet and confirm the tickets.'
+    : '⚠️ Insufficient wallet balance to confirm this booking.';
+
+  document.getElementById('modalDetail').innerHTML = `
+    <div class="cd-row"><span class="key">Player</span><span class="val">${req.player}</span></div>
+    <div class="cd-row"><span class="key">Booking ID</span><span class="val">#${req.id}</span></div>
+    <div class="cd-row"><span class="key">Tickets</span><span class="val">${req.tickets.map(t=>'#'+t).join(', ')}</span></div>
+    <div class="cd-row"><span class="key">Amount</span><span class="val green">₹${req.amount}</span></div>
+    <div class="cd-row"><span class="key">Wallet After</span><span class="val ${canAfford?'green':'red'}">₹${(walletBalance - req.amount).toLocaleString()}</span></div>
+  `;
+
+  const btn = document.getElementById('modalActionBtn');
+  btn.textContent = canAfford ? '✅ Confirm & Sell Tickets' : '⚠️ Insufficient Balance';
+  btn.disabled = !canAfford;
+  btn.className = `modal-btn go-confirm ${canAfford ? '' : 'cancel'}`;
+
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function executeAction() {
+  if (!pendingAction || pendingAction.type !== 'confirm') return;
+  const req = queue.find(r => r.id === pendingAction.id);
+  if (!req) return;
+
+  walletBalance -= req.amount;
+  updateWalletDisplay();
+
+  // Add to sales
+  salesHistory.unshift({ id: req.id, player: req.player, tickets: req.tickets, amount: req.amount, time: 'Just now' });
+  ledgerHistory.unshift({ type:'debit', desc:`Booking #${req.id} Confirmed`, amount: req.amount, time: 'Just now' });
+
+  // Remove from queue
+  queue = queue.filter(r => r.id !== pendingAction.id);
+
+  closeModal();
+  renderQueue();
+  renderSales();
+  renderLedger();
+  showToast(`✅ Tickets confirmed for ${req.player}!`, 'green');
+}
+
+// ── REJECT MODAL ──────────────────────────────────────────────────────────
+function openReject(id) {
+  const req = queue.find(r => r.id === id);
+  if (!req) return;
+  pendingAction = { type:'reject', id };
+
+  document.getElementById('rejectDetail').innerHTML = `
+    <div class="cd-row"><span class="key">Player</span><span class="val">${req.player}</span></div>
+    <div class="cd-row"><span class="key">Booking ID</span><span class="val">#${req.id}</span></div>
+    <div class="cd-row"><span class="key">Tickets Released</span><span class="val">${req.tickets.map(t=>'#'+t).join(', ')}</span></div>
+    <div class="cd-row"><span class="key">Wallet Impact</span><span class="val green">No deduction</span></div>
+  `;
+  document.getElementById('rejectModal').style.display = 'flex';
+}
+
+function executeReject() {
+  if (!pendingAction) return;
+  const req = queue.find(r => r.id === pendingAction.id);
+  queue = queue.filter(r => r.id !== pendingAction.id);
+  closeRejectModal();
+  renderQueue();
+  showToast(`✕ Booking #${req?.id} rejected — tickets released.`, 'red');
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').style.display = 'none';
+  pendingAction = null;
+}
+function closeRejectModal() {
+  document.getElementById('rejectModal').style.display = 'none';
+  pendingAction = null;
+}
+
+// ── WALLET DISPLAY ──────────────────────────────────────────────────────────
+function updateWalletDisplay() {
+  const isLow = walletBalance < 500;
+  const formatted = '₹' + walletBalance.toLocaleString();
+  document.getElementById('headerBalance').textContent = formatted;
+  document.getElementById('headerBalance').className = 'balance-value' + (isLow ? ' low' : '');
+  document.getElementById('walletBigBalance').textContent = formatted;
+  const pct = Math.min(100, (walletBalance / 5000) * 100);
+  const fill = document.getElementById('walletBarFill');
+  fill.style.width = pct + '%';
+  fill.style.background = isLow
+    ? 'linear-gradient(90deg,var(--red),#dc2626)'
+    : 'linear-gradient(90deg,var(--green),#16a34a)';
+}
+
+// ── TOP-UP ──────────────────────────────────────────────────────────
+function setTopup(val) {
+  document.getElementById('topupAmount').value = val;
+  document.querySelectorAll('.quick-amt').forEach(el => {
+    el.classList.toggle('active', parseInt(el.textContent.replace(',','')) === val);
+  });
+}
+function submitTopup() {
+  const val = parseInt(document.getElementById('topupAmount').value);
+  if (!val || val < 500) { showToast('⚠️ Minimum top-up is ₹500', 'red'); return; }
+  showToast(`📨 Top-up request of ₹${val.toLocaleString()} sent to Admin!`, 'green');
+  document.getElementById('topupAmount').value = '';
+  document.querySelectorAll('.quick-amt').forEach(el => el.classList.remove('active'));
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ── LIVE COUNTDOWN TICKS ──────────────────────────────────────────────────────────
+function tickTimers() {
+  let needsRender = false;
+  queue.forEach(req => {
+    req.secondsLeft--;
+    if (req.secondsLeft <= 0) {
+      // Auto-expire
+      showToast(`⏱ Booking #${req.id} auto-expired — tickets released.`, '');
+      queue = queue.filter(r => r.id !== req.id);
+      needsRender = true;
+      return;
+    }
+    // Update timer display in-place
+    const timerEl = document.getElementById(`timer-${req.id}`);
+    const fillEl = document.getElementById(`fill-${req.id}`);
+    if (timerEl && fillEl) {
+      const m = Math.floor(req.secondsLeft / 60);
+      const s = req.secondsLeft % 60;
+      timerEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+      const pct = (req.secondsLeft / 600) * 100;
+      const isUrgent = req.secondsLeft < 120;
+      timerEl.className = `timer-val ${isUrgent ? 'urgent' : ''}`;
+      fillEl.style.width = pct + '%';
+      fillEl.style.background = isUrgent ? 'var(--red)' : req.secondsLeft < 300 ? 'var(--amber)' : 'var(--green)';
+      const card = document.getElementById(`card-${req.id}`);
+      if (card) {
+        if (isUrgent) card.classList.add('urgent');
+      }
+    }
+  });
+  if (needsRender) renderQueue();
+}
+
+// ── SIMULATE NEW REQUEST ──────────────────────────────────────────────────────────
+setTimeout(() => {
+  queue.unshift({ id:'BKG-8845', player:'KanchaDa', game:'Sunday Blockbuster', time:'8:00 PM', tickets:[12,56,78], amount:150, secondsLeft:598, isNew:true });
+  renderQueue();
+  showToast('🔔 New booking request from KanchaDa!', 'green');
+}, 6000);
+
+// ── INIT ──────────────────────────────────────────────────────────
+renderQueue();
+renderSales();
+renderLedger();
+timerInterval = setInterval(tickTimers, 1000);
+</script>
+</body>
+</html>

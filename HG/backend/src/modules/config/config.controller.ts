@@ -1,0 +1,86 @@
+/**
+ * Platform Config Controller
+ * Key-value platform settings, editable only by a Superadmin.
+ */
+
+import { Response } from 'express';
+import pool from '../../db';
+import { AuthenticatedRequest } from '../../middleware/auth';
+import { logAuditEvent } from '../../services/audit.service';
+
+/**
+ * Read the entire platform configuration (Superadmin)
+ */
+export async function getConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT config_key, config_value, description, updated_at
+       FROM Platform_Config
+       ORDER BY config_key ASC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error reading platform config:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Update one or more config keys (Superadmin)
+ * Body: { "lock_duration_minutes": "12", "marquee_text": "..." }
+ */
+export async function updateConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const updates = req.body;
+  const actor = req.user!;
+
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates) || Object.keys(updates).length === 0) {
+    res.status(400).json({ message: 'Request body must be a non-empty object of config_key: value pairs' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const [key, value] of Object.entries(updates)) {
+      // Only update keys that already exist — config keys are not free-form
+      const result = await client.query(
+        `UPDATE Platform_Config
+         SET config_value = $1, updated_by = $2, updated_at = NOW()
+         WHERE config_key = $3
+         RETURNING config_key`,
+        [String(value), actor.userId, key]
+      );
+
+      if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ message: `Unknown config key: ${key}` });
+        return;
+      }
+    }
+
+    await client.query('COMMIT');
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'UPDATE_PLATFORM_CONFIG',
+      targetType: 'Platform_Config',
+      targetDescription: `Updated keys: ${Object.keys(updates).join(', ')}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    const refreshed = await pool.query(
+      `SELECT config_key, config_value, description, updated_at FROM Platform_Config ORDER BY config_key ASC`
+    );
+    res.json({ message: 'Configuration updated', config: refreshed.rows });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error updating platform config:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}

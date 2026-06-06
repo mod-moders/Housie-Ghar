@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Housie Ghar – Superadmin Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0a0d0f;
+  --ink2: #12181e;
+  --ink3: #1a2430;
+  --ink4: #212d3a;
+  --ink5: #2a3848;
+  --border: rgba(255,255,255,0.06);
+  --border-hi: rgba(255,255,255,0.12);
+  --gold: #c9962a;
+  --gold2: #e8b84b;
+  --gold3: #f5d27a;
+  --gold-glow: rgba(201,150,42,0.18);
+  --gold-border: rgba(201,150,42,0.3);
+  --cream: #f0e6d0;
+  --cream2: #e8d8b8;
+  --green: #2ecc71;
+  --green-dim: rgba(46,204,113,0.1);
+  --green-border: rgba(46,204,113,0.25);
+  --red: #e74c3c;
+  --red-dim: rgba(231,76,60,0.1);
+  --red-border: rgba(231,76,60,0.25);
+  --blue: #3498db;
+  --blue-dim: rgba(52,152,219,0.1);
+  --blue-border: rgba(52,152,219,0.25);
+  --amber: #f39c12;
+  --amber-dim: rgba(243,156,18,0.1);
+  --text: #e8e0d0;
+  --text-mid: #8899aa;
+  --text-dim: #445566;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.4);
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+
+body {
+  font-family:'Outfit', sans-serif;
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* grain */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:0;
+}
+
+/* ── LAYOUT ── */
+.app { display:flex; min-height:100vh; position:relative; z-index:1; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width:240px;
+  background:linear-gradient(180deg, var(--ink2) 0%, var(--ink) 100%);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:fixed; top:0; left:0; bottom:0;
+  z-index:100;
+  overflow-y:auto;
+}
+
+.sidebar-crown {
+  padding:24px 20px 20px;
+  border-bottom:1px solid var(--border);
+  position:relative;
+  overflow:hidden;
+}
+.sidebar-crown::after {
+  content:'';
+  position:absolute; top:0; left:0; right:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.crown-logo {
+  font-family:'Playfair Display', serif;
+  font-size:1.4rem;
+  font-weight:900;
+  color:var(--gold2);
+  letter-spacing:-0.5px;
+  line-height:1;
+  margin-bottom:4px;
+}
+.crown-logo span { color:rgba(240,230,208,0.5); }
+.crown-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  background:var(--gold-glow);
+  border:1px solid var(--gold-border);
+  border-radius:4px;
+  padding:3px 8px;
+  font-size:0.58rem;
+  color:var(--gold2);
+  font-weight:700;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+}
+
+.nav-section {
+  padding:16px 12px 4px;
+  font-size:0.55rem;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  color:var(--text-dim);
+  font-weight:700;
+}
+
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px;
+  border-radius:10px;
+  margin:1px 8px;
+  cursor:pointer;
+  font-size:0.8rem;
+  font-weight:500;
+  color:var(--text-mid);
+  transition:all 0.2s;
+  position:relative;
+}
+.nav-item:hover { background:var(--ink3); color:var(--text); }
+.nav-item.active {
+  background:var(--gold-glow);
+  color:var(--gold2);
+  border:1px solid var(--gold-border);
+}
+.nav-item .ni-icon { font-size:1rem; width:22px; text-align:center; flex-shrink:0; }
+.nav-item .ni-badge {
+  margin-left:auto;
+  background:var(--red);
+  color:white;
+  font-size:0.55rem;
+  font-weight:700;
+  padding:1px 5px;
+  border-radius:99px;
+  min-width:16px;
+  text-align:center;
+}
+
+.sidebar-footer {
+  margin-top:auto;
+  padding:16px;
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.sf-avatar {
+  width:36px; height:36px; border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Playfair Display',serif;
+  font-size:0.9rem; font-weight:700;
+  color:var(--ink); flex-shrink:0;
+}
+.sf-info .sf-name { font-size:0.78rem; font-weight:600; color:var(--text); }
+.sf-info .sf-role { font-size:0.6rem; color:var(--gold); margin-top:1px; }
+
+/* ── MAIN ── */
+.main { margin-left:240px; flex:1; padding:28px 28px 60px; }
+
+/* ── SCREENS ── */
+.screen { display:none; animation:fadeUp 0.3s ease; }
+.screen.active { display:block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── PAGE HEADER ── */
+.page-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  margin-bottom:28px;
+}
+.ph-title {
+  font-family:'Playfair Display', serif;
+  font-size:1.8rem;
+  font-weight:900;
+  color:var(--cream);
+  line-height:1.1;
+  margin-bottom:4px;
+}
+.ph-sub { font-size:0.75rem; color:var(--text-mid); }
+
+/* ── METRICS RIBBON ── */
+.metrics-ribbon {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+  margin-bottom:28px;
+}
+.metric-card {
+  background:var(--ink2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:18px 16px;
+  position:relative;
+  overflow:hidden;
+  transition:border-color 0.2s;
+}
+.metric-card:hover { border-color:var(--border-hi); }
+.metric-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--accent,var(--gold)), transparent);
+  opacity:0.6;
+}
+.mc-icon { font-size:1.3rem; margin-bottom:10px; }
+.mc-value {
+  font-family:'JetBrains Mono', monospace;
+  font-size:1.6rem;
+  font-weight:700;
+  color:var(--cream);
+  line-height:1;
+  margin-bottom:4px;
+}
+.mc-label { font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.8px; font-weight:600; }
+.mc-delta { font-size:0.68rem; margin-top:5px; font-weight:600; }
+.mc-delta.up { color:var(--green); }
+.mc-delta.warn { color:var(--amber); }
+
+/* ── CHARTS ── */
+.chart-row { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:24px; }
+.chart-card {
+  background:var(--ink2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px;
+}
+.cc-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.cc-title { font-family:'Playfair Display',serif; font-size:1rem; font-weight:700; color:var(--cream); }
+.cc-tabs { display:flex; gap:4px; }
+.cc-tab {
+  padding:4px 10px; border-radius:6px;
+  font-size:0.65rem; font-weight:600;
+  cursor:pointer; color:var(--text-dim);
+  transition:all 0.15s;
+}
+.cc-tab.active { background:var(--gold-glow); color:var(--gold2); border:1px solid var(--gold-border); }
+
+/* SVG Chart */
+.chart-svg-wrap { overflow:hidden; }
+.chart-svg { width:100%; height:130px; }
+
+/* Profit Distribution */
+.profit-card { display:flex; flex-direction:column; }
+.profit-total {
+  font-family:'JetBrains Mono',monospace;
+  font-size:1.6rem;
+  font-weight:700;
+  color:var(--gold2);
+  margin-bottom:4px;
+}
+.profit-sub { font-size:0.68rem; color:var(--text-mid); margin-bottom:16px; }
+.member-rows { display:flex; flex-direction:column; gap:8px; flex:1; }
+.member-row { }
+.mr-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.mr-name { font-size:0.75rem; font-weight:600; color:var(--text); }
+.mr-amount { font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--gold2); }
+.mr-bar { height:4px; background:var(--ink4); border-radius:99px; overflow:hidden; }
+.mr-fill { height:100%; border-radius:99px; transition:width 0.8s ease; }
+
+/* ── TABLES ── */
+.table-card {
+  background:var(--ink2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  margin-bottom:24px;
+}
+.tc-header {
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.tc-title { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:700; color:var(--cream); }
+table { width:100%; border-collapse:collapse; }
+thead th {
+  padding:10px 16px;
+  text-align:left;
+  font-size:0.6rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.8px;
+  color:var(--text-dim);
+  background:var(--ink3);
+  border-bottom:1px solid var(--border);
+}
+tbody tr { border-bottom:1px solid var(--border); transition:background 0.15s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--ink3); }
+tbody td { padding:12px 16px; font-size:0.78rem; color:var(--text-mid); vertical-align:middle; }
+.td-primary { font-weight:600; color:var(--text); }
+.td-mono { font-family:'JetBrains Mono',monospace; font-size:0.72rem; }
+
+/* status pills */
+.pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 8px; border-radius:99px;
+  font-size:0.62rem; font-weight:700; letter-spacing:0.3px;
+}
+.pill::before { content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.pill-active { background:var(--green-dim); color:var(--green); border:1px solid var(--green-border); }
+.pill-active::before { background:var(--green); }
+.pill-suspended { background:var(--red-dim); color:var(--red); border:1px solid var(--red-border); }
+.pill-suspended::before { background:var(--red); }
+.pill-pending { background:var(--amber-dim); color:var(--amber); border:1px solid rgba(243,156,18,0.25); }
+.pill-pending::before { background:var(--amber); }
+
+/* ── BUTTONS ── */
+.btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 16px; border-radius:9px; border:none;
+  font-family:'Outfit',sans-serif; font-size:0.78rem; font-weight:600;
+  cursor:pointer; transition:all 0.18s; letter-spacing:0.2px;
+}
+.btn-gold { background:linear-gradient(135deg,var(--gold),var(--gold2)); color:var(--ink); }
+.btn-gold:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.btn-ghost { background:var(--ink4); color:var(--text-mid); border:1px solid var(--border-hi); }
+.btn-ghost:hover { background:var(--ink5); color:var(--text); }
+.btn-danger { background:var(--red-dim); color:var(--red); border:1px solid var(--red-border); }
+.btn-danger:hover { background:var(--red); color:white; }
+.btn-green { background:var(--green-dim); color:var(--green); border:1px solid var(--green-border); }
+.btn-green:hover { background:var(--green); color:white; }
+.btn-sm { padding:5px 11px; font-size:0.7rem; }
+
+/* ── THEME SWITCHER ── */
+.theme-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+.theme-card {
+  border-radius:var(--radius-sm);
+  overflow:hidden;
+  border:2px solid var(--border);
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.theme-card:hover { border-color:var(--gold-border); transform:translateY(-2px); }
+.theme-card.active { border-color:var(--gold); box-shadow:0 0 20px var(--gold-glow); }
+.theme-preview {
+  height:70px;
+  display:flex; flex-direction:column;
+  padding:10px;
+  gap:4px;
+}
+.tp-bar { height:6px; border-radius:3px; width:70%; }
+.tp-bar2 { height:4px; border-radius:3px; width:45%; opacity:0.6; }
+.theme-label {
+  background:var(--ink3);
+  padding:8px 10px;
+  font-size:0.68rem;
+  font-weight:600;
+  color:var(--text-mid);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.theme-label .active-tag { color:var(--gold); font-size:0.6rem; }
+
+/* Theme presets */
+.t-default .theme-preview { background:linear-gradient(135deg,#1a3a2a,#24503a); }
+.t-default .tp-bar { background:#f0a500; }
+.t-default .tp-bar2 { background:#fdf6e3; }
+.t-dark .theme-preview { background:linear-gradient(135deg,#0a0a0a,#1a1a1a); }
+.t-dark .tp-bar { background:#6366f1; }
+.t-dark .tp-bar2 { background:#a5b4fc; }
+.t-festive .theme-preview { background:linear-gradient(135deg,#7c1d1d,#c2410c); }
+.t-festive .tp-bar { background:#fbbf24; }
+.t-festive .tp-bar2 { background:#fed7aa; }
+.t-classic .theme-preview { background:linear-gradient(135deg,#1e3a5f,#1e40af); }
+.t-classic .tp-bar { background:#e2e8f0; }
+.t-classic .tp-bar2 { background:#94a3b8; }
+
+/* ── AUDIO MATRIX ── */
+.audio-grid {
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:6px;
+  margin-bottom:16px;
+}
+.audio-cell {
+  aspect-ratio:1;
+  border-radius:9px;
+  border:1.5px solid var(--border);
+  background:var(--ink3);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:2px;
+  cursor:pointer;
+  transition:all 0.18s;
+  position:relative;
+  overflow:hidden;
+}
+.audio-cell:hover { border-color:var(--gold-border); background:var(--gold-glow); }
+.audio-cell.uploaded { border-color:var(--green-border); background:var(--green-dim); }
+.audio-cell.playing { border-color:var(--gold); background:var(--gold-glow); animation:audioPulse 0.6s ease infinite alternate; }
+@keyframes audioPulse { from{box-shadow:0 0 0 0 var(--gold-glow)} to{box-shadow:0 0 12px 4px var(--gold-glow)} }
+.ac-num {
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.72rem; font-weight:700;
+  color:var(--text-mid);
+  line-height:1;
+}
+.audio-cell.uploaded .ac-num { color:var(--green); }
+.audio-cell.playing .ac-num { color:var(--gold2); }
+.ac-icon { font-size:0.6rem; }
+
+.audio-legend {
+  display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap;
+}
+.al-item { display:flex; align-items:center; gap:6px; font-size:0.68rem; color:var(--text-dim); }
+.al-dot { width:10px; height:10px; border-radius:3px; }
+
+.batch-upload {
+  background:var(--ink3);
+  border:2px dashed var(--border-hi);
+  border-radius:var(--radius-sm);
+  padding:24px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.batch-upload:hover { border-color:var(--gold-border); background:var(--gold-glow); }
+.bu-icon { font-size:2rem; margin-bottom:8px; }
+.bu-title { font-size:0.82rem; font-weight:600; color:var(--text); margin-bottom:3px; }
+.bu-sub { font-size:0.68rem; color:var(--text-dim); }
+
+/* ── AUDIT LOG ── */
+.audit-row {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 16px;
+  border-bottom:1px solid var(--border);
+  font-size:0.75rem;
+  transition:background 0.15s;
+}
+.audit-row:last-child { border-bottom:none; }
+.audit-row:hover { background:var(--ink3); }
+.ar-time {
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.65rem; color:var(--text-dim);
+  white-space:nowrap; flex-shrink:0; width:90px;
+}
+.ar-user {
+  font-weight:600; color:var(--text);
+  flex-shrink:0; width:110px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ar-role {
+  flex-shrink:0; width:70px;
+}
+.ar-action { flex:1; color:var(--text-mid); }
+.ar-action strong { color:var(--text); }
+.ar-ip { font-family:'JetBrains Mono',monospace; font-size:0.62rem; color:var(--text-dim); flex-shrink:0; }
+
+/* ── GLOBAL VARS ── */
+.vars-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+.var-field label {
+  display:block; font-size:0.65rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.8px;
+  color:var(--text-dim); margin-bottom:5px;
+}
+.var-input {
+  width:100%;
+  background:var(--ink3);
+  border:1.5px solid var(--border);
+  border-radius:9px;
+  padding:10px 13px;
+  font-family:'Outfit',sans-serif;
+  font-size:0.82rem; color:var(--text);
+  outline:none; transition:border-color 0.2s;
+}
+.var-input:focus { border-color:var(--gold-border); }
+.var-textarea { resize:vertical; min-height:70px; font-family:'Outfit',sans-serif; }
+
+/* ── WORKFORCE GRID ── */
+.workforce-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+.wf-card {
+  background:var(--ink2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:16px;
+  transition:all 0.18s;
+}
+.wf-card:hover { border-color:var(--border-hi); }
+.wf-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.wf-avatar {
+  width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Playfair Display',serif;
+  font-size:0.9rem; font-weight:700;
+  flex-shrink:0;
+}
+.wf-info .wf-name { font-size:0.82rem; font-weight:600; color:var(--text); margin-bottom:1px; }
+.wf-info .wf-role { font-size:0.62rem; color:var(--text-dim); }
+.wf-stats { display:flex; gap:8px; margin-bottom:12px; }
+.wf-stat {
+  flex:1; background:var(--ink3); border-radius:7px; padding:8px;
+  text-align:center;
+}
+.wf-stat .ws-val { font-family:'JetBrains Mono',monospace; font-size:0.82rem; font-weight:700; color:var(--text); }
+.wf-stat .ws-label { font-size:0.58rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
+.wf-actions { display:flex; gap:6px; }
+
+/* ── EMERGENCY CONSOLE ── */
+.emergency-card {
+  background:linear-gradient(135deg, #1a0a0a 0%, #0d0505 100%);
+  border:1px solid var(--red-border);
+  border-radius:var(--radius);
+  padding:22px;
+  margin-bottom:24px;
+  position:relative;
+  overflow:hidden;
+}
+.emergency-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--red), transparent);
+}
+.ec-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+.ec-icon { font-size:1.5rem; }
+.ec-title { font-family:'Playfair Display',serif; font-size:1rem; font-weight:700; color:var(--red); }
+.ec-sub { font-size:0.7rem; color:rgba(231,76,60,0.6); margin-top:1px; }
+.ec-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.ec-btn {
+  padding:10px 18px; border-radius:9px; border:none;
+  font-family:'Outfit',sans-serif; font-size:0.78rem; font-weight:700;
+  cursor:pointer; transition:all 0.18s;
+  display:flex; align-items:center; gap:7px;
+}
+.ec-btn-pause { background:rgba(243,156,18,0.15); color:var(--amber); border:1px solid rgba(243,156,18,0.3); }
+.ec-btn-pause:hover { background:var(--amber); color:var(--ink); }
+.ec-btn-terminate { background:var(--red-dim); color:var(--red); border:1px solid var(--red-border); }
+.ec-btn-terminate:hover { background:var(--red); color:white; }
+.ec-btn-refund { background:var(--blue-dim); color:var(--blue); border:1px solid var(--blue-border); }
+.ec-btn-refund:hover { background:var(--blue); color:white; }
+
+/* ── MODAL ── */
+.modal-backdrop {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(6px);
+  z-index:300;
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+}
+.modal {
+  background:var(--ink2);
+  border:1px solid var(--border-hi);
+  border-radius:var(--radius);
+  width:100%; max-width:460px;
+  max-height:85vh; overflow-y:auto;
+  box-shadow:var(--shadow-lg);
+  animation:modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes modalPop { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
+.modal-head {
+  padding:18px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.modal-head h3 { font-family:'Playfair Display',serif; font-size:1rem; font-weight:700; color:var(--cream); }
+.modal-close-btn {
+  width:28px; height:28px; border-radius:50%;
+  background:none; border:1px solid var(--border);
+  color:var(--text-dim); cursor:pointer; font-size:0.9rem;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.modal-close-btn:hover { background:var(--ink4); color:var(--text); }
+.modal-body { padding:18px 20px; }
+.modal-footer { padding:12px 20px 18px; display:flex; gap:8px; justify-content:flex-end; }
+
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:5px; }
+.field-input {
+  width:100%;
+  background:var(--ink3); border:1.5px solid var(--border);
+  border-radius:9px; padding:10px 13px;
+  font-family:'Outfit',sans-serif; font-size:0.82rem; color:var(--text);
+  outline:none; transition:border-color 0.2s;
+}
+.field-input:focus { border-color:var(--gold-border); }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* ── TOAST ── */
+.toast {
+  position:fixed; bottom:24px; right:24px;
+  background:var(--ink2);
+  border:1px solid var(--border-hi);
+  border-radius:var(--radius-sm);
+  padding:12px 18px;
+  font-size:0.78rem; font-weight:500;
+  color:var(--text); z-index:500;
+  opacity:0; transform:translateY(12px);
+  transition:all 0.3s; pointer-events:none;
+  box-shadow:var(--shadow);
+  max-width:300px; line-height:1.4;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+.toast.gold { border-color:var(--gold-border); color:var(--gold2); }
+.toast.green { border-color:var(--green-border); color:var(--green); }
+.toast.red { border-color:var(--red-border); color:var(--red); }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--ink5); border-radius:2px; }
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px) {
+  .sidebar { width:56px; }
+  .crown-logo,.crown-badge,.nav-section,.nav-item span:not(.ni-icon),.sf-info { display:none; }
+  .nav-item { justify-content:center; padding:12px; margin:1px 4px; }
+  .main { margin-left:56px; padding:16px; }
+  .metrics-ribbon,.chart-row,.vars-grid,.workforce-cards { grid-template-columns:1fr 1fr; }
+  .audio-grid { grid-template-columns:repeat(9,1fr); }
+  .theme-grid { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+  <div class="sidebar-crown">
+    <div class="crown-logo">Housie<span>Ghar</span></div>
+    <div class="crown-badge">👑 Superadmin</div>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <div class="nav-item active" onclick="nav('dashboard',this)"><span class="ni-icon">📊</span><span>Executive HUD</span></div>
+
+  <div class="nav-section">Platform</div>
+  <div class="nav-item" onclick="nav('theme',this)"><span class="ni-icon">🎨</span><span>Theme & Branding</span></div>
+  <div class="nav-item" onclick="nav('globalvars',this)"><span class="ni-icon">⚙️</span><span>Global Config</span></div>
+
+  <div class="nav-section">People</div>
+  <div class="nav-item" onclick="nav('workforce',this)"><span class="ni-icon">👥</span><span>Workforce</span></div>
+  <div class="nav-item" onclick="nav('wallets',this)"><span class="ni-icon">💰</span><span>Wallet Hub <span class="ni-badge">3</span></span></div>
+
+  <div class="nav-section">Content</div>
+  <div class="nav-item" onclick="nav('audio',this)"><span class="ni-icon">🎵</span><span>Audio Matrix</span></div>
+
+  <div class="nav-section">Security</div>
+  <div class="nav-item" onclick="nav('audit',this)"><span class="ni-icon">📋</span><span>Audit Logs</span></div>
+  <div class="nav-item" onclick="nav('emergency',this)"><span class="ni-icon">🚨</span><span>Emergency</span></div>
+
+  <div class="sidebar-footer">
+    <div class="sf-avatar">SK</div>
+    <div class="sf-info">
+      <div class="sf-name">Suraj Karki</div>
+      <div class="sf-role">👑 Superadmin · MOD</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- ════ DASHBOARD ════ -->
+  <div class="screen active" id="s-dashboard">
+    <div class="page-header">
+      <div>
+        <div class="ph-title">Executive Dashboard</div>
+        <div class="ph-sub">Wednesday, 23 April 2025 · Real-time platform overview</div>
+      </div>
+      <button class="btn btn-gold" onclick="nav('emergency',document.querySelector('.nav-item:last-of-type'))">🚨 Emergency Console</button>
+    </div>
+
+    <div class="metrics-ribbon">
+      <div class="metric-card" style="--accent:var(--green)">
+        <div class="mc-icon">🔴</div>
+        <div class="mc-value" id="m-live">2</div>
+        <div class="mc-label">Active Live Games</div>
+        <div class="mc-delta up">↑ 1 started 12min ago</div>
+      </div>
+      <div class="metric-card" style="--accent:var(--blue)">
+        <div class="mc-icon">👥</div>
+        <div class="mc-value" id="m-players">1,247</div>
+        <div class="mc-label">Concurrent Players</div>
+        <div class="mc-delta up">↑ 312 in last 10 min</div>
+      </div>
+      <div class="metric-card" style="--accent:var(--gold)">
+        <div class="mc-icon">💰</div>
+        <div class="mc-value" id="m-volume">₹62.4K</div>
+        <div class="mc-label">Today's Gross Volume</div>
+        <div class="mc-delta up">↑ 28% from yesterday</div>
+      </div>
+      <div class="metric-card" style="--accent:var(--amber)">
+        <div class="mc-icon">🏦</div>
+        <div class="mc-value">₹38.2K</div>
+        <div class="mc-label">Total Wallet Liability</div>
+        <div class="mc-delta warn">⚠ 2 agents low balance</div>
+      </div>
+    </div>
+
+    <!-- Chart Row -->
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="cc-header">
+          <div class="cc-title">Ticket Sales Volume</div>
+          <div class="cc-tabs">
+            <div class="cc-tab active" onclick="chartTab(this,'7d')">7D</div>
+            <div class="cc-tab" onclick="chartTab(this,'30d')">30D</div>
+            <div class="cc-tab" onclick="chartTab(this,'90d')">90D</div>
+          </div>
+        </div>
+        <div class="chart-svg-wrap">
+          <svg class="chart-svg" id="salesChart" viewBox="0 0 600 130" preserveAspectRatio="none"></svg>
+        </div>
+        <div id="chartLabels" style="display:flex;justify-content:space-between;padding:6px 0 0;font-size:0.6rem;color:var(--text-dim);"></div>
+      </div>
+
+      <div class="chart-card profit-card">
+        <div class="cc-header">
+          <div class="cc-title">MOD Profit Split</div>
+        </div>
+        <div class="profit-total" id="profitTotal">₹18,720</div>
+        <div class="profit-sub">Net profit this month · 5 founders</div>
+        <div class="member-rows" id="memberRows"></div>
+      </div>
+    </div>
+
+    <!-- Recent Audit -->
+    <div class="table-card">
+      <div class="tc-header">
+        <div class="tc-title">Recent Activity</div>
+        <button class="btn btn-ghost btn-sm" onclick="nav('audit',null)">View Full Audit Log →</button>
+      </div>
+      <div id="recentAudit"></div>
+    </div>
+  </div>
+
+  <!-- ════ THEME ════ -->
+  <div class="screen" id="s-theme">
+    <div class="page-header">
+      <div><div class="ph-title">Theme & Branding</div><div class="ph-sub">Change the visual appearance of the public player interface instantly</div></div>
+      <button class="btn btn-gold" onclick="applyTheme()">✅ Apply Selected Theme</button>
+    </div>
+    <div class="theme-grid">
+      <div class="theme-card t-default active" onclick="selectTheme(this,'Default')">
+        <div class="theme-preview"><div class="tp-bar"></div><div class="tp-bar2"></div></div>
+        <div class="theme-label">Default — Forest Gold <span class="active-tag">● Active</span></div>
+      </div>
+      <div class="theme-card t-dark" onclick="selectTheme(this,'Dark Mode')">
+        <div class="theme-preview"><div class="tp-bar"></div><div class="tp-bar2"></div></div>
+        <div class="theme-label">Dark Mode</div>
+      </div>
+      <div class="theme-card t-festive" onclick="selectTheme(this,'Festive')">
+        <div class="theme-preview"><div class="tp-bar"></div><div class="tp-bar2"></div></div>
+        <div class="theme-label">Festive — Dashain</div>
+      </div>
+      <div class="theme-card t-classic" onclick="selectTheme(this,'Classic Hall')">
+        <div class="theme-preview"><div class="tp-bar"></div><div class="tp-bar2"></div></div>
+        <div class="theme-label">Classic Hall</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="tc-header"><div class="tc-title">Marquee & Announcements</div></div>
+      <div style="padding:18px;">
+        <div class="field">
+          <label>Live Marquee Text (scrolling banner on public site)</label>
+          <input class="field-input" value="🏆 Sunday Blockbuster – Full House Winner: HillBoy99 wins ₹8,000! | 🎉 Next Mega Draw: Saturday 8:00 PM – Only 42 tickets left!">
+        </div>
+        <button class="btn btn-gold">💾 Save Marquee</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ GLOBAL CONFIG ════ -->
+  <div class="screen" id="s-globalvars">
+    <div class="page-header">
+      <div><div class="ph-title">Global Configuration</div><div class="ph-sub">Platform-wide settings and text strings</div></div>
+      <button class="btn btn-gold" onclick="saveConfig()">💾 Save All Changes</button>
+    </div>
+    <div class="table-card" style="margin-bottom:16px;">
+      <div class="tc-header"><div class="tc-title">Platform Identity</div></div>
+      <div style="padding:18px;">
+        <div class="vars-grid">
+          <div class="var-field"><label>Platform Name</label><input class="var-input" value="Housie Ghar"></div>
+          <div class="var-field"><label>Support Email</label><input class="var-input" value="support@housieghar.com"></div>
+          <div class="var-field"><label>Support Phone</label><input class="var-input" value="+91 98000 00000"></div>
+          <div class="var-field"><label>MOD Organization Name</label><input class="var-input" value="Mission for Operations & Development"></div>
+        </div>
+        <div class="var-field"><label>Default Terms & Conditions</label><textarea class="var-input var-textarea">By booking tickets on Housie Ghar, you agree to the rules of the game. All draws are automated and cryptographically secured. Payments are made directly to verified Agents via UPI. The platform is operated by MOD. Prize payouts are processed within 24 hours of game completion.</textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ WORKFORCE ════ -->
+  <div class="screen" id="s-workforce">
+    <div class="page-header">
+      <div><div class="ph-title">Workforce Management</div><div class="ph-sub">All platform personnel — Admins, Operators, and Agents</div></div>
+      <button class="btn btn-gold" onclick="openCreateUser()">➕ Create Account</button>
+    </div>
+    <div class="workforce-cards" id="workforceCards"></div>
+    <div class="table-card">
+      <div class="tc-header"><div class="tc-title">Full User Directory</div></div>
+      <table>
+        <thead><tr>
+          <th>Name</th><th>Role</th><th>Contact</th><th>Last Login</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="userTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════ WALLET HUB ════ -->
+  <div class="screen" id="s-wallets">
+    <div class="page-header">
+      <div><div class="ph-title">Wallet Hub</div><div class="ph-sub">Central bank — review and approve all top-up requests</div></div>
+    </div>
+    <div id="walletReqList"></div>
+  </div>
+
+  <!-- ════ AUDIO MATRIX ════ -->
+  <div class="screen" id="s-audio">
+    <div class="page-header">
+      <div><div class="ph-title">Audio Matrix</div><div class="ph-sub">Upload custom voiceovers for numbers 1–90 in local dialect</div></div>
+      <div style="font-size:0.72rem;color:var(--text-mid);margin-top:6px;"><span style="color:var(--green);font-weight:600;" id="uploadedCount">43</span> / 90 numbers have custom audio</div>
+    </div>
+
+    <div class="audio-legend">
+      <div class="al-item"><div class="al-dot" style="background:var(--ink5);border:1px solid var(--border-hi)"></div>No audio</div>
+      <div class="al-item"><div class="al-dot" style="background:var(--green-dim);border:1px solid var(--green-border)"></div>Custom audio uploaded</div>
+      <div class="al-item"><div class="al-dot" style="background:var(--gold-glow);border:1px solid var(--gold-border)"></div>Currently playing</div>
+    </div>
+
+    <div class="audio-grid" id="audioGrid"></div>
+
+    <div class="batch-upload" onclick="showToast('📁 Batch ZIP upload — drag & drop a .zip with 1.mp3 to 90.mp3 files','gold')">
+      <div class="bu-icon">📦</div>
+      <div class="bu-title">Batch Upload — Drop a .zip file here</div>
+      <div class="bu-sub">Name files exactly: 1.mp3, 2.mp3 ... 90.mp3 · Max 500KB each</div>
+    </div>
+  </div>
+
+  <!-- ════ AUDIT LOG ════ -->
+  <div class="screen" id="s-audit">
+    <div class="page-header">
+      <div><div class="ph-title">Master Audit Trail</div><div class="ph-sub">Immutable log of every admin and operator action on the platform</div></div>
+      <button class="btn btn-ghost" onclick="showToast('📥 Audit log exported as CSV','green')">📥 Export CSV</button>
+    </div>
+    <div class="table-card">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;">
+        <input class="field-input" style="max-width:220px;padding:7px 12px;font-size:0.78rem" placeholder="🔍 Search logs..." oninput="filterAudit(this.value)">
+        <select class="field-input" style="max-width:140px;padding:7px 12px;font-size:0.78rem">
+          <option>All Roles</option>
+          <option>Admin</option>
+          <option>Operator</option>
+          <option>Superadmin</option>
+        </select>
+      </div>
+      <div id="auditLog"></div>
+    </div>
+  </div>
+
+  <!-- ════ EMERGENCY ════ -->
+  <div class="screen" id="s-emergency">
+    <div class="page-header">
+      <div><div class="ph-title">Emergency Console</div><div class="ph-sub">Override controls for live game crises — use with extreme caution</div></div>
+    </div>
+    <div class="emergency-card">
+      <div class="ec-header">
+        <div class="ec-icon">🚨</div>
+        <div><div class="ec-title">Live Game Override</div><div class="ec-sub">Sunday Blockbuster · Draw in progress · Number 42 drawn</div></div>
+      </div>
+      <div class="ec-actions">
+        <button class="ec-btn ec-btn-pause" onclick="showToast('⏸ RNG Conductor force-paused. Players see hold screen.','')">⏸ Force Pause RNG</button>
+        <button class="ec-btn ec-btn-terminate" onclick="confirmTerminate()">🛑 Terminate Game</button>
+        <button class="ec-btn ec-btn-refund" onclick="showToast('💸 Bulk refund triggered — ticket values returned to agent wallets.','gold')">💸 Trigger Bulk Refund</button>
+      </div>
+    </div>
+    <div class="table-card" style="margin-bottom:20px;">
+      <div class="tc-header"><div class="tc-title">Manual Number Push</div></div>
+      <div style="padding:18px;display:flex;gap:12px;align-items:flex-end;">
+        <div class="field" style="margin:0;flex:1">
+          <label>Push specific number to all players (emergency only)</label>
+          <input class="field-input" id="manualNum" type="number" min="1" max="90" placeholder="Enter number 1–90">
+        </div>
+        <button class="btn btn-danger" onclick="pushManualNumber()">📡 Broadcast Number</button>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="tc-header"><div class="tc-title">Kill Switch — Instant Account Suspension</div></div>
+      <div style="padding:18px;">
+        <p style="font-size:0.75rem;color:var(--text-mid);margin-bottom:14px;line-height:1.6;">Suspending an account instantly invalidates their JWT session token, logging them out of all devices within milliseconds.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;" id="killSwitchBtns"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── CREATE USER MODAL ── -->
+<div class="modal-backdrop" id="createUserModal" style="display:none" onclick="closeModal('createUserModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3>👤 Create Platform Account</h3>
+      <button class="modal-close-btn" onclick="closeModal('createUserModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field"><label>Full Name</label><input class="field-input" id="cu-name" placeholder="Full name"></div>
+        <div class="field"><label>Role</label>
+          <select class="field-input" id="cu-role">
+            <option>Admin</option><option>Operator</option><option>Agent</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Email</label><input class="field-input" id="cu-email" type="email" placeholder="user@email.com"></div>
+        <div class="field"><label>Phone</label><input class="field-input" id="cu-phone" placeholder="+91 98000 00000"></div>
+      </div>
+      <div class="field"><label>Zone / Region</label><input class="field-input" id="cu-zone" placeholder="e.g. Darjeeling North"></div>
+      <div style="background:var(--blue-dim);border:1px solid var(--blue-border);border-radius:9px;padding:10px 14px;font-size:0.72rem;color:var(--blue);line-height:1.5;">
+        🔐 A secure temporary password will be auto-generated and emailed to the user upon account creation.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('createUserModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="createUser()">✅ Create Account</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────
+const modMembers = [
+  { name:'Suraj Karki', share:25, color:'#c9962a' },
+  { name:'Bikash Gurung', share:22, color:'#2ecc71' },
+  { name:'Priya Tamang', share:20, color:'#3498db' },
+  { name:'Rohan Subba', share:18, color:'#e74c3c' },
+  { name:'Anish Rai', share:15, color:'#9b59b6' },
+];
+const netProfit = 18720;
+
+const workforce = [
+  { name:'Admin Mohan', initials:'AM', role:'Admin', contact:'+91 97000 11111', lastLogin:'2 min ago', status:'Active', color:'#3498db' },
+  { name:'Op. Sanjay Kumar', initials:'SK', role:'Operator', contact:'+91 98111 22222', lastLogin:'8 min ago', status:'Active', color:'#2ecc71' },
+  { name:'Op. Deepika Rai', initials:'DR', role:'Operator', contact:'+91 99222 33333', lastLogin:'34 min ago', status:'Active', color:'#e67e22' },
+  { name:'Rohan Karki', initials:'RK', role:'Agent', contact:'+91 98123 45678', lastLogin:'1 min ago', status:'Active', color:'#e07b00' },
+  { name:'Sunita Tamang', initials:'ST', role:'Agent', contact:'+91 97654 32100', lastLogin:'22 min ago', status:'Active', color:'#1d4ed8' },
+  { name:'Bikash Gurung', initials:'BG', role:'Agent', contact:'+91 99887 76543', lastLogin:'5 min ago', status:'Active', color:'#15803d' },
+];
+
+const walletRequests = [
+  { id:1, name:'Rohan Karki', initials:'RK', role:'Agent', amount:5000, time:'10 min ago', color:'#e07b00', proof:'UPI_ref_RK_001.jpg' },
+  { id:2, name:'Sunita Tamang', initials:'ST', role:'Agent', amount:2000, time:'35 min ago', color:'#1d4ed8', proof:'UPI_ref_ST_002.jpg' },
+  { id:3, name:'Admin Mohan', initials:'AM', role:'Admin', amount:10000, time:'1 hr ago', color:'#3498db', proof:'NEFT_ref_AM_003.jpg' },
+];
+
+const auditEntries = [
+  { time:'18:12:44', user:'Admin Mohan', role:'Admin', action:'Created Game <strong>#1045 Sunday Blockbuster</strong>', ip:'192.168.1.102' },
+  { time:'18:08:31', user:'Op. Sanjay', role:'Operator', action:'Started Game <strong>#1044 Wednesday Flash</strong> — RNG locked', ip:'192.168.1.105' },
+  { time:'17:55:02', user:'Suraj Karki', role:'Superadmin', action:'Approved wallet top-up <strong>₹5,000 → Rohan Karki</strong>', ip:'192.168.1.100' },
+  { time:'17:43:18', user:'Admin Mohan', role:'Admin', action:'Suspended Agent <strong>Priya Chettri</strong> — fraud report', ip:'192.168.1.102' },
+  { time:'17:30:55', user:'Op. Deepika', role:'Operator', action:'Paused Game <strong>#1043</strong> — connection issue at number 27', ip:'192.168.1.108' },
+  { time:'16:59:41', user:'Suraj Karki', role:'Superadmin', action:'Uploaded audio file <strong>42.mp3</strong> — custom dialect', ip:'192.168.1.100' },
+  { time:'16:45:12', user:'Admin Mohan', role:'Admin', action:'Created Operator account <strong>Op. Bikram Limbu</strong>', ip:'192.168.1.102' },
+  { time:'16:22:08', user:'Op. Sanjay', role:'Operator', action:'Set draw speed to <strong>5s Fast</strong> during game #1044', ip:'192.168.1.105' },
+  { time:'15:58:33', user:'Suraj Karki', role:'Superadmin', action:'Applied theme <strong>Festive — Dashain</strong> to player frontend', ip:'192.168.1.100' },
+  { time:'15:34:19', user:'Admin Mohan', role:'Admin', action:'Force-assigned Booking <strong>#BKG-8801</strong> — rogue agent bypass', ip:'192.168.1.102' },
+];
+
+// ── CHART DATA ──────────────────────────────────────────────────────────
+const chartData = {
+  '7d': { vals:[320,480,290,610,820,540,980], labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+  '30d': { vals:[4200,3800,5100,4600,6200,5800,7100,6500,8200,7800,9100,8600,10200,9500,11000,10200,12100,11400,13200,12600,14100,13500,15200,14600,16100,15500,17200,16600,18100,17500], labels:['1','5','10','15','20','25','30'] },
+  '90d': { vals:[12000,15000,11000,18000,22000,19000,25000,28000,24000,31000,35000,32000,38000,42000,39000,45000,49000,46000,52000,56000,53000,59000,63000,60000,66000,70000,67000,73000,77000,74000,80000,84000,81000,87000,91000,88000,94000,98000,95000,101000,105000,102000,108000,112000,109000,115000,119000,116000,122000,126000,123000,129000,133000,130000,136000,140000,137000,143000,147000,144000,150000,154000,151000,157000,161000,158000,164000,168000,165000,171000,175000,172000,178000,182000,179000,185000,189000,186000,192000,196000,193000,199000,203000,200000,206000,210000,207000,213000,217000,214000], labels:['Jan','Feb','Mar','Apr'] },
+};
+let activeChartRange = '7d';
+
+// ── AUDIO STATE ──────────────────────────────────────────────────────────
+const uploadedNums = new Set([1,3,5,7,8,9,11,13,14,16,17,21,22,25,28,30,33,34,36,38,40,42,44,45,47,49,50,52,55,57,60,63,66,67,69,70,72,74,77,80,82,85,88,90]);
+let playingNum = null;
+let selectedTheme = 'Default';
+
+// ── NAV ──────────────────────────────────────────────────────────
+function nav(id, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  if (el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+  renderScreen(id);
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────
+function renderScreen(id) {
+  if (id === 'dashboard') { renderChart('7d'); renderProfit(); renderRecentAudit(); }
+  if (id === 'workforce') { renderWorkforce(); }
+  if (id === 'wallets') { renderWallets(); }
+  if (id === 'audio') { renderAudioGrid(); }
+  if (id === 'audit') { renderAuditLog(auditEntries); }
+  if (id === 'emergency') { renderKillSwitches(); }
+}
+
+// ── CHART ──────────────────────────────────────────────────────────
+function renderChart(range) {
+  activeChartRange = range;
+  const { vals, labels } = chartData[range];
+  const svg = document.getElementById('salesChart');
+  const w = 600, h = 130, pad = 20;
+  const max = Math.max(...vals);
+  const min = Math.min(...vals);
+  const step = (w - pad*2) / (vals.length - 1);
+
+  const pts = vals.map((v, i) => {
+    const x = pad + i * step;
+    const y = pad + (1 - (v - min) / (max - min || 1)) * (h - pad*2);
+    return `${x},${y}`;
+  });
+
+  const areaPath = `M${pts[0]} L${pts.join(' L')} L${pad + (vals.length-1)*step},${h} L${pad},${h} Z`;
+  const linePath = `M${pts[0]} L${pts.join(' L')}`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#c9962a" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="#c9962a" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${areaPath}" fill="url(#chartGrad)"/>
+    <path d="${linePath}" fill="none" stroke="#c9962a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map((p,i) => i % Math.ceil(vals.length/7) === 0 ? `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="#c9962a"/>` : '').join('')}
+  `;
+
+  const labelWrap = document.getElementById('chartLabels');
+  labelWrap.innerHTML = labels.map(l => `<span>${l}</span>`).join('');
+}
+
+function chartTab(el, range) {
+  document.querySelectorAll('.cc-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderChart(range);
+}
+
+// ── PROFIT ──────────────────────────────────────────────────────────
+function renderProfit() {
+  document.getElementById('profitTotal').textContent = '₹' + netProfit.toLocaleString();
+  document.getElementById('memberRows').innerHTML = modMembers.map(m => {
+    const amt = Math.round(netProfit * m.share / 100);
+    return `
+      <div class="member-row">
+        <div class="mr-top">
+          <span class="mr-name">${m.name}</span>
+          <span class="mr-amount">₹${amt.toLocaleString()} (${m.share}%)</span>
+        </div>
+        <div class="mr-bar"><div class="mr-fill" style="width:${m.share*4}%;background:${m.color}"></div></div>
+      </div>`;
+  }).join('');
+}
+
+// ── RECENT AUDIT ──────────────────────────────────────────────────────────
+function renderRecentAudit() {
+  document.getElementById('recentAudit').innerHTML = auditEntries.slice(0,5).map(e => auditRow(e)).join('');
+}
+
+function auditRow(e) {
+  const roleColor = { Superadmin:'var(--gold2)', Admin:'var(--blue)', Operator:'var(--green)' };
+  return `<div class="audit-row">
+    <div class="ar-time">${e.time}</div>
+    <div class="ar-user">${e.user}</div>
+    <div class="ar-role"><span class="pill pill-active" style="background:${roleColor[e.role]||'var(--text-dim)'}18;color:${roleColor[e.role]||'var(--text-dim)'};border-color:${roleColor[e.role]||'var(--text-dim)'}44">${e.role}</span></div>
+    <div class="ar-action">${e.action}</div>
+    <div class="ar-ip">${e.ip}</div>
+  </div>`;
+}
+
+function renderAuditLog(data) {
+  document.getElementById('auditLog').innerHTML = data.map(e => auditRow(e)).join('');
+}
+
+function filterAudit(val) {
+  const filtered = auditEntries.filter(e =>
+    e.user.toLowerCase().includes(val.toLowerCase()) ||
+    e.action.toLowerCase().includes(val.toLowerCase())
+  );
+  renderAuditLog(filtered);
+}
+
+// ── WORKFORCE ──────────────────────────────────────────────────────────
+function renderWorkforce() {
+  // Summary cards
+  const roles = ['Admin','Operator','Agent'];
+  document.getElementById('workforceCards').innerHTML = roles.map(r => {
+    const members = workforce.filter(w => w.role === r);
+    return `<div class="wf-card">
+      <div class="wf-top">
+        <div class="wf-avatar" style="background:${members[0]?.color||'#444'}22;color:${members[0]?.color||'#888'};border:1.5px solid ${members[0]?.color||'#444'}44">${r[0]}</div>
+        <div class="wf-info"><div class="wf-name">${r}s</div><div class="wf-role">${members.length} active</div></div>
+      </div>
+      <div class="wf-stats">
+        <div class="wf-stat"><div class="ws-val">${members.length}</div><div class="ws-label">Total</div></div>
+        <div class="wf-stat"><div class="ws-val">${members.filter(m=>m.status==='Active').length}</div><div class="ws-label">Active</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Full table
+  document.getElementById('userTable').innerHTML = workforce.map(w => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${w.color}22;color:${w.color};border:1px solid ${w.color}44;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0">${w.initials}</div>
+        <div class="td-primary">${w.name}</div>
+      </div></td>
+      <td><span class="pill pill-active">${w.role}</span></td>
+      <td class="td-mono">${w.contact}</td>
+      <td>${w.lastLogin}</td>
+      <td><span class="pill ${w.status==='Active'?'pill-active':'pill-suspended'}">${w.status}</span></td>
+      <td><div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="showToast('✏️ Edit user — coming soon','')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="suspendUser('${w.name}')">Suspend</button>
+      </div></td>
+    </tr>
+  `).join('');
+}
+
+function suspendUser(name) {
+  if(confirm(`Suspend ${name}? Their session will be invalidated immediately.`)) {
+    showToast(`🔒 ${name}'s account suspended. JWT invalidated instantly.`, 'red');
+  }
+}
+
+// ── WALLETS ──────────────────────────────────────────────────────────
+function renderWallets() {
+  document.getElementById('walletReqList').innerHTML = walletRequests.map(r => `
+    <div class="table-card" style="margin-bottom:14px;padding:0" id="wreq-${r.id}">
+      <div style="padding:18px;display:flex;align-items:center;gap:16px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:${r.color}18;border:1.5px solid ${r.color}44;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.9rem;font-weight:700;color:${r.color};flex-shrink:0">${r.initials}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:0.88rem;color:var(--text);margin-bottom:2px">${r.name} <span style="font-size:0.65rem;color:var(--text-dim)">(${r.role})</span></div>
+          <div style="font-size:0.68rem;color:var(--text-mid)">Requested ${r.time} · Proof: ${r.proof}</div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--cream);margin-right:12px">₹${r.amount.toLocaleString()}</div>
+        <div style="display:flex;flex-direction:column;gap:7px;align-items:flex-end">
+          <button class="btn btn-green btn-sm" onclick="approveWallet(${r.id},'${r.name}',${r.amount})">✅ Approve & Credit</button>
+          <button class="btn btn-danger btn-sm" onclick="declineWallet(${r.id})">✕ Decline</button>
+          <button class="btn btn-ghost btn-sm" onclick="showToast('📎 Opening proof screenshot...','')">📎 View Proof</button>
+        </div>
+      </div>
+      <div style="padding:12px 18px;border-top:1px solid var(--border);background:var(--ink3);border-radius:0 0 var(--radius) var(--radius)">
+        <div style="font-size:0.68rem;color:var(--text-dim)">⚠️ Verify that ₹${r.amount.toLocaleString()} has cleared in the MOD bank account before approving. This is an ACID transaction — wallet will be credited atomically.</div>
+      </div>
+    </div>
+  `).join('') || '<div style="text-align:center;padding:40px;color:var(--text-dim)">✅ No pending wallet requests</div>';
+}
+
+function approveWallet(id, name, amount) {
+  showToast(`✅ ₹${amount.toLocaleString()} credited to ${name}'s wallet! ACID transaction complete.`, 'green');
+  document.getElementById(`wreq-${id}`)?.remove();
+}
+function declineWallet(id) {
+  showToast('✕ Wallet request declined.', 'red');
+  document.getElementById(`wreq-${id}`)?.remove();
+}
+
+// ── AUDIO GRID ──────────────────────────────────────────────────────────
+function renderAudioGrid() {
+  const grid = document.getElementById('audioGrid');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 90; i++) {
+    const isUploaded = uploadedNums.has(i);
+    const cell = document.createElement('div');
+    cell.className = `audio-cell ${isUploaded ? 'uploaded' : ''}`;
+    cell.id = `ac-${i}`;
+    cell.innerHTML = `<div class="ac-num">${i}</div><div class="ac-icon">${isUploaded ? '🔊' : '+'}</div>`;
+    cell.onclick = () => handleAudioCell(i, isUploaded);
+    grid.appendChild(cell);
+  }
+  document.getElementById('uploadedCount').textContent = uploadedNums.size;
+}
+
+function handleAudioCell(num, isUploaded) {
+  if (isUploaded) {
+    // Play preview
+    if (playingNum && playingNum !== num) {
+      document.getElementById(`ac-${playingNum}`)?.classList.remove('playing');
+    }
+    const cell = document.getElementById(`ac-${num}`);
+    cell.classList.add('playing');
+    playingNum = num;
+    showToast(`🔊 Playing audio for number ${num}...`, 'gold');
+    setTimeout(() => {
+      cell.classList.remove('playing');
+      if (playingNum === num) playingNum = null;
+    }, 2000);
+  } else {
+    // Upload
+    showToast(`📁 Upload dialog for number ${num} — accepts .mp3/.wav (max 500KB)`, '');
+    setTimeout(() => {
+      uploadedNums.add(num);
+      const cell = document.getElementById(`ac-${num}`);
+      cell.className = 'audio-cell uploaded';
+      cell.innerHTML = `<div class="ac-num">${num}</div><div class="ac-icon">🔊</div>`;
+      cell.onclick = () => handleAudioCell(num, true);
+      document.getElementById('uploadedCount').textContent = uploadedNums.size;
+      showToast(`✅ Audio uploaded for number ${num}!`, 'green');
+    }, 1500);
+  }
+}
+
+// ── KILL SWITCHES ──────────────────────────────────────────────────────────
+function renderKillSwitches() {
+  document.getElementById('killSwitchBtns').innerHTML = workforce.map(w => `
+    <button class="btn btn-danger" onclick="killSwitch('${w.name}')">
+      🔒 Suspend ${w.name}
+    </button>
+  `).join('');
+}
+
+function killSwitch(name) {
+  if (confirm(`KILL SWITCH: Suspend ${name} immediately?\nThis will invalidate their session token and lock all API access.`)) {
+    showToast(`🔒 ${name} suspended. JWT invalidated. All sessions terminated.`, 'red');
+  }
+}
+
+// ── THEME ──────────────────────────────────────────────────────────
+function selectTheme(el, name) {
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.classList.remove('active');
+    c.querySelector('.theme-label').innerHTML = c.querySelector('.theme-label').textContent.replace(' ● Active','');
+  });
+  el.classList.add('active');
+  selectedTheme = name;
+  el.querySelector('.theme-label').innerHTML += ' <span class="active-tag">● Active</span>';
+}
+
+function applyTheme() {
+  showToast(`🎨 Theme "${selectedTheme}" applied to live player frontend!`, 'gold');
+}
+
+// ── CONFIG ──────────────────────────────────────────────────────────
+function saveConfig() {
+  showToast('💾 Global configuration saved successfully!', 'green');
+}
+
+// ── WORKFORCE MODAL ──────────────────────────────────────────────────────────
+function openCreateUser() { document.getElementById('createUserModal').style.display='flex'; }
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+function createUser() {
+  const name = document.getElementById('cu-name').value.trim();
+  const role = document.getElementById('cu-role').value;
+  if (!name) { showToast('⚠️ Enter a name','red'); return; }
+  showToast(`✅ ${role} "${name}" created! Credentials emailed.`, 'green');
+  closeModal('createUserModal');
+}
+
+// ── EMERGENCY ──────────────────────────────────────────────────────────
+function confirmTerminate() {
+  if (confirm('TERMINATE GAME: This will end the draw immediately. All unclaimed prizes will be logged. Agents wallets will NOT be auto-refunded unless you also trigger Bulk Refund.')) {
+    showToast('🛑 Game terminated. Final state saved to database.', 'red');
+  }
+}
+
+function pushManualNumber() {
+  const n = parseInt(document.getElementById('manualNum').value);
+  if (!n || n < 1 || n > 90) { showToast('⚠️ Enter a number between 1–90','red'); return; }
+  showToast(`📡 Number ${n} manually broadcast to all ${1247} connected players.`, 'gold');
+}
+
+// ── LIVE METRIC FLICKER ──────────────────────────────────────────────────────────
+setInterval(() => {
+  const base = 1247;
+  const v = base + Math.floor(Math.random()*60)-20;
+  document.getElementById('m-players').textContent = v.toLocaleString();
+}, 4000);
+
+// ── TOAST ──────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.className='toast', 3500);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+renderChart('7d');
+renderProfit();
+renderRecentAudit();
+</script>
+</body>
+</html>

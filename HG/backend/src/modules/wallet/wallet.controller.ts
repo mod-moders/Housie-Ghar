@@ -1,0 +1,239 @@
+/**
+ * Wallet Controller
+ * Agent wallet balances and top-up request lifecycle.
+ */
+
+import { Response } from 'express';
+import pool from '../../db';
+import { io } from '../../server';
+import { AuthenticatedRequest } from '../../middleware/auth';
+import { logAuditEvent } from '../../services/audit.service';
+
+/**
+ * List all agent wallet balances with any pending top-up requests (Admin+)
+ */
+export async function listAgentWallets(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const agentsRes = await pool.query(
+      `SELECT user_id, full_name, email, phone, current_balance, status
+       FROM Users
+       WHERE role_id = 4
+       ORDER BY full_name ASC`
+    );
+
+    const pendingRes = await pool.query(
+      `SELECT request_id, agent_id, requested_amount, payment_reference, payment_method, requested_at
+       FROM TopUp_Requests
+       WHERE request_status = 'Pending'
+       ORDER BY requested_at ASC`
+    );
+
+    const pendingByAgent: Record<string, any[]> = {};
+    for (const r of pendingRes.rows) {
+      (pendingByAgent[r.agent_id] ||= []).push({
+        request_id: r.request_id,
+        requested_amount: parseFloat(r.requested_amount),
+        payment_reference: r.payment_reference,
+        payment_method: r.payment_method,
+        requested_at: r.requested_at,
+      });
+    }
+
+    res.json(
+      agentsRes.rows.map((a) => ({
+        agent_id: a.user_id,
+        full_name: a.full_name,
+        email: a.email,
+        phone: a.phone,
+        status: a.status,
+        current_balance: parseFloat(a.current_balance),
+        pending_requests: pendingByAgent[a.user_id] || [],
+      }))
+    );
+  } catch (error) {
+    console.error('Error listing agent wallets:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Agent submits a wallet top-up request (Agent)
+ */
+export async function requestTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { requested_amount, payment_reference, payment_method, proof_screenshot_url } = req.body;
+  const agent = req.user!;
+
+  const amount = parseFloat(requested_amount);
+  if (!amount || isNaN(amount) || amount <= 0) {
+    res.status(400).json({ message: 'requested_amount must be a positive number' });
+    return;
+  }
+  if (!payment_reference) {
+    res.status(400).json({ message: 'payment_reference is required' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO TopUp_Requests (agent_id, requested_amount, payment_reference, payment_method, proof_screenshot_url, request_status)
+       VALUES ($1, $2, $3, $4, $5, 'Pending')
+       RETURNING request_id, requested_at`,
+      [agent.userId, amount, payment_reference, payment_method || null, proof_screenshot_url || null]
+    );
+
+    const request = result.rows[0];
+
+    // Notify staff dashboards (admins listening on the shared admin room)
+    io.to('admin-room').emit('topup_request_received', {
+      request_id: request.request_id,
+      agent_name: agent.fullName,
+      amount,
+    });
+
+    res.status(201).json({ request_id: request.request_id, message: 'Top-up request submitted for approval' });
+  } catch (error) {
+    console.error('Error creating top-up request:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Approve a top-up request: credit the agent wallet and record a ledger entry (Admin+)
+ */
+export async function approveTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { reviewer_notes } = req.body;
+  const actor = req.user!;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Lock the request row
+    const requestRes = await client.query(
+      `SELECT request_id, agent_id, requested_amount, request_status
+       FROM TopUp_Requests
+       WHERE request_id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (requestRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Top-up request not found' });
+      return;
+    }
+
+    const request = requestRes.rows[0];
+    if (request.request_status !== 'Pending') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: `Request already ${request.request_status}` });
+      return;
+    }
+
+    const amount = parseFloat(request.requested_amount);
+
+    // 2. Lock and credit the agent's balance
+    const agentRes = await client.query(
+      `SELECT current_balance FROM Users WHERE user_id = $1 FOR UPDATE`,
+      [request.agent_id]
+    );
+    const newBalance = parseFloat(agentRes.rows[0].current_balance) + amount;
+
+    await client.query(`UPDATE Users SET current_balance = $1 WHERE user_id = $2`, [
+      newBalance,
+      request.agent_id,
+    ]);
+
+    // 3. Record the ledger entry (Credit)
+    await client.query(
+      `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
+       VALUES ($1, 'Credit', $2, $3, 'TopUp', $4, $5, $6)`,
+      [
+        request.agent_id,
+        amount,
+        newBalance,
+        request.request_id,
+        `Top-up approved by ${actor.fullName}`,
+        actor.userId,
+      ]
+    );
+
+    // 4. Mark the request approved
+    await client.query(
+      `UPDATE TopUp_Requests
+       SET request_status = 'Approved', reviewed_by = $1, reviewed_at = NOW(), reviewer_notes = $2
+       WHERE request_id = $3`,
+      [actor.userId, reviewer_notes || null, id]
+    );
+
+    await client.query('COMMIT');
+
+    // 5. Push wallet update to the agent in real time
+    io.to(`agent-${request.agent_id}`).emit('wallet_credited', {
+      new_balance: newBalance,
+      amount,
+    });
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'APPROVE_TOPUP',
+      targetType: 'TopUp_Request',
+      targetId: String(id),
+      targetDescription: `Credited ₹${amount} to agent ${request.agent_id}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Top-up approved', new_balance: newBalance });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error approving top-up:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Reject a top-up request (Admin+)
+ */
+export async function rejectTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { reviewer_notes } = req.body;
+  const actor = req.user!;
+
+  try {
+    const result = await pool.query(
+      `UPDATE TopUp_Requests
+       SET request_status = 'Rejected', reviewed_by = $1, reviewed_at = NOW(), reviewer_notes = $2
+       WHERE request_id = $3 AND request_status = 'Pending'
+       RETURNING request_id, agent_id`,
+      [actor.userId, reviewer_notes || null, id]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Pending top-up request not found' });
+      return;
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'REJECT_TOPUP',
+      targetType: 'TopUp_Request',
+      targetId: String(id),
+      targetDescription: reviewer_notes || 'Top-up request rejected',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Top-up request rejected' });
+  } catch (error) {
+    console.error('Error rejecting top-up:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
