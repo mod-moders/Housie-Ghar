@@ -427,6 +427,10 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     res.status(400).json({ message: 'game_id, ticket_ids, and housie_name are required' });
     return;
   }
+  if (ticket_ids.length > 6) {
+    res.status(400).json({ message: 'A maximum of 6 tickets can be purchased per sale' });
+    return;
+  }
   if (housie_name.length < 3 || housie_name.length > 20) {
     res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
     return;
@@ -441,7 +445,7 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
       `SELECT game_id, title, ticket_price, game_status FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
-    if (gameRes.rowCount === 0) {
+    if (gameRes.rows.length === 0) {
       await client.query('ROLLBACK');
       res.status(404).json({ message: 'Game not found' });
       return;
@@ -461,7 +465,7 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
        FOR UPDATE`,
       [ticket_ids, game_id]
     );
-    if (ticketsRes.rowCount !== ticket_ids.length) {
+    if (ticketsRes.rows.length !== ticket_ids.length) {
       await client.query('ROLLBACK');
       res.status(400).json({ message: 'Some tickets do not exist in this game' });
       return;
