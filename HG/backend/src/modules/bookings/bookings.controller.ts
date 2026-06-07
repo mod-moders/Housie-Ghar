@@ -5,6 +5,7 @@
 import { Request, Response } from 'express';
 import pool from '../../db';
 import { io } from '../../server';
+import { AuthenticatedRequest } from '../../middleware/auth';
 
 /**
  * Lock tickets and initiate the WhatsApp P2P workflow
@@ -408,6 +409,136 @@ export async function rejectBooking(req: any, res: Response): Promise<void> {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error rejecting booking:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Agent-initiated direct sale — atomically lock + confirm tickets in one transaction
+ */
+export async function directSale(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { game_id, ticket_ids, housie_name } = req.body;
+  const agentId = req.user!.userId;
+
+  if (!game_id || !Array.isArray(ticket_ids) || ticket_ids.length === 0 || !housie_name) {
+    res.status(400).json({ message: 'game_id, ticket_ids, and housie_name are required' });
+    return;
+  }
+  if (housie_name.length < 3 || housie_name.length > 20) {
+    res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify game accepts sales
+    const gameRes = await client.query(
+      `SELECT game_id, title, ticket_price, game_status FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    if (gameRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+    const game = gameRes.rows[0];
+    if (!['Scheduled', 'Live'].includes(game.game_status)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Game is not accepting sales' });
+      return;
+    }
+
+    // 2. Lock ticket rows and verify availability
+    const ticketsRes = await client.query(
+      `SELECT ticket_id, ticket_number, status
+       FROM Tickets
+       WHERE ticket_id = ANY($1) AND game_id = $2
+       FOR UPDATE`,
+      [ticket_ids, game_id]
+    );
+    if (ticketsRes.rowCount !== ticket_ids.length) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Some tickets do not exist in this game' });
+      return;
+    }
+    const unavailable = ticketsRes.rows.filter((t) => t.status !== 'Available');
+    if (unavailable.length > 0) {
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        message: `Tickets ${unavailable.map((t) => `#${t.ticket_number}`).join(', ')} are not available`,
+      });
+      return;
+    }
+
+    // 3. Check agent wallet balance
+    const agentRes = await client.query(
+      `SELECT current_balance FROM Users WHERE user_id = $1 FOR UPDATE`,
+      [agentId]
+    );
+    const balance = parseFloat(agentRes.rows[0].current_balance);
+    const ticketPrice = parseFloat(game.ticket_price);
+    const totalAmount = ticketPrice * ticket_ids.length;
+    if (balance < totalAmount) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Insufficient wallet balance' });
+      return;
+    }
+
+    // 4. Create Booking — immediately Sold
+    const now = new Date();
+    const bookingRes = await client.query(
+      `INSERT INTO Bookings (
+         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
+         booking_status, locked_at, locked_until, confirmed_at, confirmed_by
+       ) VALUES ($1, $2, $3, $4, $5, 'Sold', $6, $6, $6, $4)
+       RETURNING booking_id`,
+      [game_id, ticket_ids, housie_name, agentId, totalAmount, now]
+    );
+    const bookingId = bookingRes.rows[0].booking_id;
+
+    // 5. Mark tickets Sold
+    await client.query(
+      `UPDATE Tickets
+       SET status = 'Sold',
+           owner_housie_name = $1,
+           confirmed_at = $2,
+           locked_by_booking = $3,
+           locked_until = NULL
+       WHERE ticket_id = ANY($4)`,
+      [housie_name, now, bookingId, ticket_ids]
+    );
+
+    // 6. Deduct agent balance and record ledger entry
+    const newBalance = balance - totalAmount;
+    await client.query(
+      `UPDATE Users SET current_balance = $1 WHERE user_id = $2`,
+      [newBalance, agentId]
+    );
+    await client.query(
+      `INSERT INTO Wallet_Ledger (
+         agent_id, transaction_type, amount, balance_after,
+         reference_type, reference_id, description, performed_by
+       ) VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
+      [
+        agentId, totalAmount, newBalance, bookingId,
+        `Direct sale #${bookingId.substring(0, 8).toUpperCase()} for ${housie_name}`,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      booking_id: bookingId,
+      total_amount: totalAmount,
+      balance_after: newBalance,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Direct sale error:', error);
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
