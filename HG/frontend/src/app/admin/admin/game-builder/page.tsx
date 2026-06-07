@@ -26,8 +26,9 @@ const INITIAL: WizardState = {
 function validateStep1(s: WizardState): string | null {
   if (!s.title.trim()) return "Title is required";
   if (!s.scheduled_at) return "Scheduled time is required";
+  if (new Date(s.scheduled_at) <= new Date()) return "Scheduled time must be in the future";
   if (!s.ticket_price || parseFloat(s.ticket_price) <= 0) return "Ticket price must be greater than 0";
-  if (!s.total_tickets || parseInt(s.total_tickets) <= 0) return "Total tickets must be greater than 0";
+  if (!s.total_tickets || parseInt(s.total_tickets, 10) <= 0) return "Total tickets must be greater than 0";
   return null;
 }
 
@@ -37,7 +38,9 @@ function validateStep2(s: WizardState): string | null {
     if (!p.pattern_name) return "Select a pattern for each prize";
     if (!p.prize_amount || parseFloat(p.prize_amount) <= 0) return "Each prize amount must be greater than 0";
   }
-  const gross = parseFloat(s.ticket_price) * parseInt(s.total_tickets);
+  const patterns = s.prizes.map((p) => p.pattern_name);
+  if (new Set(patterns).size !== patterns.length) return "Each prize pattern can only be used once";
+  const gross = parseFloat(s.ticket_price) * parseInt(s.total_tickets, 10);
   const cap = gross * 0.80;
   const total = s.prizes.reduce((sum, p) => sum + parseFloat(p.prize_amount || "0"), 0);
   if (total > cap) return `Total prizes ₹${total.toLocaleString()} exceeds the 80% cap of ₹${cap.toFixed(2)}`;
@@ -80,18 +83,20 @@ export default function GameBuilderPage() {
       .catch(() => {});
   }, []);
 
-  const gross = parseFloat(form.ticket_price || "0") * parseInt(form.total_tickets || "0");
+  const gross = parseFloat(form.ticket_price || "0") * parseInt(form.total_tickets || "0", 10);
   const cap = gross * 0.80;
   const totalPrize = form.prizes.reduce((s, p) => s + parseFloat(p.prize_amount || "0"), 0);
   const capPct = cap > 0 ? Math.min((totalPrize / cap) * 100, 100) : 0;
   const usedPatterns = new Set(form.prizes.map((p) => p.pattern_name));
   const availablePatterns = PRIZE_PATTERNS.filter((p) => !usedPatterns.has(p));
 
-  const addPrize = () => {
-    const next = availablePatterns[0];
-    if (!next) return;
-    setForm((f) => ({ ...f, prizes: [...f.prizes, { pattern_name: next, prize_amount: "" }] }));
-  };
+  const addPrize = () =>
+    setForm((f) => {
+      const used = new Set(f.prizes.map((p) => p.pattern_name));
+      const next = PRIZE_PATTERNS.find((pat) => !used.has(pat));
+      if (!next) return f;
+      return { ...f, prizes: [...f.prizes, { pattern_name: next, prize_amount: "" }] };
+    });
 
   const removePrize = (i: number) =>
     setForm((f) => ({ ...f, prizes: f.prizes.filter((_, idx) => idx !== i) }));
@@ -118,7 +123,7 @@ export default function GameBuilderPage() {
           title: form.title.trim(),
           scheduled_at: form.scheduled_at,
           ticket_price: parseFloat(form.ticket_price),
-          total_tickets: parseInt(form.total_tickets),
+          total_tickets: parseInt(form.total_tickets, 10),
           operator_id: form.operator_id || undefined,
           prizes: form.prizes.map((p) => ({
             pattern_name: p.pattern_name,
@@ -293,7 +298,7 @@ export default function GameBuilderPage() {
             <ReviewRow label="Title" value={form.title} />
             <ReviewRow label="Scheduled At" value={new Date(form.scheduled_at).toLocaleString("en-IN")} />
             <ReviewRow label="Ticket Price" value={`₹${parseFloat(form.ticket_price).toLocaleString()}`} />
-            <ReviewRow label="Total Tickets" value={parseInt(form.total_tickets).toLocaleString()} />
+            <ReviewRow label="Total Tickets" value={parseInt(form.total_tickets, 10).toLocaleString()} />
             <ReviewRow label="Gross Revenue" value={`₹${gross.toLocaleString()}`} />
             {form.operator_id && (
               <ReviewRow
