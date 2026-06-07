@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAgentStore } from "@/lib/stores/agentStore";
 
 interface Game {
   game_id: string; title: string; ticket_price: number;
@@ -14,10 +14,8 @@ interface Sale {
   booking_id: string; housie_name: string; game_title: string;
   ticket_numbers: number[]; total_amount: number; confirmed_at: string;
 }
-interface MeResponse { user: { current_balance?: number; [key: string]: unknown } }
-
 export default function AgentSalesPage() {
-  const { setUser } = useAuthStore();
+  const { setBalance } = useAgentStore();
 
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -33,11 +31,6 @@ export default function AgentSalesPage() {
     const data = await apiFetch<Sale[]>("/api/bookings/agent/sales").catch(() => []);
     setSales(data);
   }, []);
-
-  const loadWallet = useCallback(async () => {
-    const me = await apiFetch<MeResponse>("/api/auth/me").catch(() => null);
-    if (me) setUser(me.user);
-  }, [setUser]);
 
   const loadTickets = useCallback(async (game: Game) => {
     const data = await apiFetch<{ tickets: Ticket[] }>(`/api/games/${game.game_id}/tickets`).catch(() => ({ tickets: [] }));
@@ -59,6 +52,7 @@ export default function AgentSalesPage() {
     setHousieName("");
     setSaleError("");
     setSaleSuccess("");
+    setTickets([]);
     await loadTickets(game);
   };
 
@@ -90,7 +84,8 @@ export default function AgentSalesPage() {
       );
       setSelected([]);
       setHousieName("");
-      await Promise.all([loadSales(), loadWallet(), loadTickets(selectedGame)]);
+      setBalance(result.balance_after);
+      await Promise.all([loadSales(), loadTickets(selectedGame)]);
     } catch (e) {
       setSaleError(e instanceof Error ? e.message : "Sale failed. Try again.");
     } finally { setSaleLoading(false); }
