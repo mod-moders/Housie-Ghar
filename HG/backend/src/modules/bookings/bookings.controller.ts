@@ -419,7 +419,8 @@ export async function rejectBooking(req: any, res: Response): Promise<void> {
  * Agent-initiated direct sale — atomically lock + confirm tickets in one transaction
  */
 export async function directSale(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { game_id, ticket_ids, housie_name } = req.body;
+  const { game_id, ticket_ids } = req.body;
+  const housie_name: string = (req.body.housie_name ?? '').trim();
   const agentId = req.user!.userId;
 
   if (!game_id || !Array.isArray(ticket_ids) || ticket_ids.length === 0 || !housie_name) {
@@ -479,6 +480,11 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
       `SELECT current_balance FROM Users WHERE user_id = $1 FOR UPDATE`,
       [agentId]
     );
+    if (agentRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Agent user not found' });
+      return;
+    }
     const balance = parseFloat(agentRes.rows[0].current_balance);
     const ticketPrice = parseFloat(game.ticket_price);
     const totalAmount = ticketPrice * ticket_ids.length;
@@ -530,6 +536,15 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     );
 
     await client.query('COMMIT');
+
+    // Notify all connected clients that these tickets are now Sold
+    for (const ticketId of ticket_ids) {
+      io.emit('ticket_status_change', {
+        event: 'ticket_status_change',
+        ticket_id: ticketId,
+        new_status: 'Sold',
+      });
+    }
 
     res.status(201).json({
       booking_id: bookingId,
