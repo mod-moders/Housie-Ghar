@@ -559,3 +559,43 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     client.release();
   }
 }
+
+/**
+ * Get all confirmed sales for the authenticated Agent
+ */
+export async function getAgentSales(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const agentId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.ticket_ids,
+              g.title AS game_title
+       FROM Bookings b
+       JOIN Scheduled_Games g ON b.game_id = g.game_id
+       WHERE b.confirmed_by = $1 AND b.booking_status = 'Sold'
+       ORDER BY b.confirmed_at DESC`,
+      [agentId]
+    );
+
+    const sales = [];
+    for (const row of result.rows) {
+      const ticketsRes = await pool.query(
+        `SELECT ticket_number FROM Tickets WHERE ticket_id = ANY($1) ORDER BY ticket_number ASC`,
+        [row.ticket_ids]
+      );
+      sales.push({
+        booking_id: row.booking_id,
+        housie_name: row.housie_name,
+        game_title: row.game_title,
+        ticket_numbers: ticketsRes.rows.map((t) => t.ticket_number),
+        total_amount: parseFloat(row.total_amount),
+        confirmed_at: row.confirmed_at,
+      });
+    }
+
+    res.json(sales);
+  } catch (error) {
+    console.error('Error fetching agent sales:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
