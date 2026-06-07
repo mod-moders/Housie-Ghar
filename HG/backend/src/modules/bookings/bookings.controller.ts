@@ -567,31 +567,29 @@ export async function getAgentSales(req: AuthenticatedRequest, res: Response): P
   const agentId = req.user!.userId;
 
   try {
+    // confirmed_by = agentId: returns sales *this agent confirmed*, not just assigned to them
     const result = await pool.query(
-      `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.ticket_ids,
-              g.title AS game_title
+      `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at,
+              g.title AS game_title,
+              array_agg(t.ticket_number ORDER BY t.ticket_number) AS ticket_numbers
        FROM Bookings b
        JOIN Scheduled_Games g ON b.game_id = g.game_id
+       JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
        WHERE b.confirmed_by = $1 AND b.booking_status = 'Sold'
-       ORDER BY b.confirmed_at DESC`,
+       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, g.title
+       ORDER BY b.confirmed_at DESC
+       LIMIT 200`,
       [agentId]
     );
 
-    const sales = [];
-    for (const row of result.rows) {
-      const ticketsRes = await pool.query(
-        `SELECT ticket_number FROM Tickets WHERE ticket_id = ANY($1) ORDER BY ticket_number ASC`,
-        [row.ticket_ids]
-      );
-      sales.push({
-        booking_id: row.booking_id,
-        housie_name: row.housie_name,
-        game_title: row.game_title,
-        ticket_numbers: ticketsRes.rows.map((t) => t.ticket_number),
-        total_amount: parseFloat(row.total_amount),
-        confirmed_at: row.confirmed_at,
-      });
-    }
+    const sales = result.rows.map((row) => ({
+      booking_id: row.booking_id,
+      housie_name: row.housie_name,
+      game_title: row.game_title,
+      ticket_numbers: row.ticket_numbers as number[],
+      total_amount: parseFloat(row.total_amount),
+      confirmed_at: row.confirmed_at,
+    }));
 
     res.json(sales);
   } catch (error) {
