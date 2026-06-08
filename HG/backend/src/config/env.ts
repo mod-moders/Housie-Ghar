@@ -4,10 +4,23 @@
  */
 
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 
-// Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Load .env from the project root (HG/.env). Resolve it across all the ways
+// the app is launched — ts-node dev, the compiled dist (whatever its nesting),
+// and from either the backend/ or HG/ working directory. In Docker the vars are
+// injected directly, so a missing file is fine (existing process.env wins).
+const ENV_CANDIDATES = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '..', '.env'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../../../../../.env'),
+];
+const envPath = ENV_CANDIDATES.find((p) => fs.existsSync(p));
+if (envPath) {
+  dotenv.config({ path: envPath });
+}
 
 function requireEnv(key: string): string {
   const value = process.env[key];
