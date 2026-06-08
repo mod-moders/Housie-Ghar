@@ -7,6 +7,7 @@ interface AuthUser {
   role_id: number;
   role_name: "Superadmin" | "Admin" | "Operator" | "Agent";
   current_balance?: number;
+  is_cfo?: boolean;
 }
 
 interface AuthStore {
