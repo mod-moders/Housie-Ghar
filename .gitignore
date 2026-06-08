@@ -58,3 +58,9 @@ Thumbs.db
 ruflo/
 
 .superpowers/
+
+# Compiled shared types (build artifacts)
+HG/shared/types/*.js
+HG/shared/types/*.js.map
+HG/shared/types/*.d.ts
+HG/shared/types/*.d.ts.map
