@@ -6,6 +6,8 @@ import { Request, Response } from 'express';
 import pool from '../../db';
 import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { selectAgentForBooking } from '../../services/bookingRouter';
+import { buildWaLink } from '../../utils/waLink';
 
 /**
  * Lock tickets and initiate the WhatsApp P2P workflow
@@ -61,80 +63,148 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     const ticketPrice = parseFloat(game.ticket_price);
     const totalAmount = ticketPrice * ticket_ids.length;
 
-    // 4. Fetch all active Agents for Round-Robin assignment
-    // Role 4 represents Agent
+    // 4. Liquidity-Aware Round-Robin: only route to a bookie who can fund the order.
+    // Role 4 represents Agent (Bookie).
     const agentsRes = await client.query(
       `SELECT user_id, full_name, phone, current_balance
        FROM Users
        WHERE role_id = 4 AND status = 'Active'
        ORDER BY user_id`
     );
+    const agents = agentsRes.rows.map((a) => ({
+      user_id: a.user_id as string,
+      full_name: a.full_name as string,
+      phone: (a.phone as string) ?? '',
+      current_balance: parseFloat(a.current_balance),
+    }));
 
-    if (agentsRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      res.status(503).json({ message: 'No active booking agents are online. Please try again later.' });
+    // Round-robin cursor: continue after the last *bookie-assigned* booking.
+    const lastBookingRes = await client.query(
+      `SELECT assigned_agent_id FROM Bookings
+       WHERE is_overflow = FALSE
+       ORDER BY locked_at DESC LIMIT 1`
+    );
+    const lastAgentId: string | null = lastBookingRes.rows[0]?.assigned_agent_id ?? null;
+
+    const { assigned, skipped } = selectAgentForBooking(agents, lastAgentId, totalAmount);
+
+    // Log every skipped bookie for the FOMO alert + Financial Officer view.
+    for (const s of skipped) {
+      await client.query(
+        `INSERT INTO Skip_Alerts (agent_id, game_id, booking_amount, agent_balance)
+         VALUES ($1, $2, $3, $4)`,
+        [s.user_id, game_id, totalAmount, s.current_balance]
+      );
+    }
+
+    const lockDurationMinutes = 10;
+    const lockedUntil = new Date(Date.now() + lockDurationMinutes * 60 * 1000);
+    const ticketNumbers = lockTicketsRes.rows.map((t) => t.ticket_number);
+    const ticketNumbersList = ticketNumbers.join(', ');
+
+    // Notify skipped bookies (after commit). Captured here, emitted post-COMMIT.
+    const emitSkips = () => {
+      for (const s of skipped) {
+        io.to(`agent-${s.user_id}`).emit('booking_skipped', {
+          event: 'booking_skipped',
+          game_id,
+          booking_amount: totalAmount,
+          agent_balance: s.current_balance,
+        });
+      }
+    };
+
+    const makeBookingWaLink = (phone: string, fullName: string, bookingId: string): string => {
+      const msg = `Hi ${fullName}, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: #${bookingId.substring(0, 8).toUpperCase()}. Amount: ₹${totalAmount}.`;
+      return buildWaLink(phone, msg);
+    };
+
+    // 5. Overflow Failsafe: no bookie had sufficient inventory → route to the Operator.
+    if (!assigned) {
+      const opRes = await client.query(
+        `SELECT u.user_id, u.full_name, u.phone, u.status
+         FROM Scheduled_Games g
+         JOIN Users u ON u.user_id = g.operator_id
+         WHERE g.game_id = $1`,
+        [game_id]
+      );
+      const operator = opRes.rows[0];
+      if (!operator || operator.status !== 'Active' || !operator.phone) {
+        await client.query('ROLLBACK');
+        res.status(503).json({
+          message:
+            'All booking agents are low on balance and no operator is available to fulfil this order. Please try again shortly.',
+        });
+        return;
+      }
+
+      const overflowRes = await client.query(
+        `INSERT INTO Bookings (
+           game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
+           booking_status, locked_at, locked_until, is_overflow
+         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE)
+         RETURNING booking_id`,
+        [game_id, ticket_ids, housie_name, operator.user_id, totalAmount, lockedUntil]
+      );
+      const overflowBookingId = overflowRes.rows[0].booking_id;
+
+      await client.query(
+        `UPDATE Tickets SET status = 'Locked', locked_by_booking = $1, locked_until = $2
+         WHERE ticket_id = ANY($3)`,
+        [overflowBookingId, lockedUntil, ticket_ids]
+      );
+
+      await client.query('COMMIT');
+      emitSkips();
+
+      io.to(`operator-${operator.user_id}`).emit('overflow_booking', {
+        event: 'overflow_booking',
+        booking_id: overflowBookingId,
+        housie_name,
+        game_title: game.title,
+        ticket_numbers: ticketNumbers,
+        total_amount: totalAmount,
+        locked_until: lockedUntil.toISOString(),
+      });
+
+      res.json({
+        booking_id: overflowBookingId,
+        locked_until: lockedUntil.toISOString(),
+        agent_name: operator.full_name,
+        agent_phone: operator.phone,
+        total_amount: totalAmount,
+        whatsapp_link: makeBookingWaLink(operator.phone, operator.full_name, overflowBookingId),
+        is_overflow: true,
+      });
       return;
     }
 
-    const agents = agentsRes.rows;
-
-    // Check last assigned agent to continue the round-robin loop
-    const lastBookingRes = await client.query(
-      `SELECT assigned_agent_id FROM Bookings ORDER BY locked_at DESC LIMIT 1`
-    );
-
-    let assignedAgent = agents[0]; // default to first agent
-    if (lastBookingRes.rows.length > 0) {
-      const lastAgentId = lastBookingRes.rows[0].assigned_agent_id;
-      const lastIndex = agents.findIndex((a) => a.user_id === lastAgentId);
-      if (lastIndex !== -1) {
-        // Assign the next agent in the list
-        const nextIndex = (lastIndex + 1) % agents.length;
-        assignedAgent = agents[nextIndex];
-      }
-    }
-
-    // 5. Create Booking record
-    const lockDurationMinutes = 10;
-    const lockedUntil = new Date(Date.now() + lockDurationMinutes * 60 * 1000);
-
+    // 6. Normal path: assign to the selected bookie.
     const bookingRes = await client.query(
       `INSERT INTO Bookings (
         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
         booking_status, locked_at, locked_until
       ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6)
-      RETURNING booking_id, booking_status`,
-      [game_id, ticket_ids, housie_name, assignedAgent.user_id, totalAmount, lockedUntil]
+      RETURNING booking_id`,
+      [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil]
     );
-
     const bookingId = bookingRes.rows[0].booking_id;
 
-    // 6. Update Tickets statuses
     await client.query(
       `UPDATE Tickets
-       SET status = 'Locked',
-           locked_by_booking = $1,
-           locked_until = $2
+       SET status = 'Locked', locked_by_booking = $1, locked_until = $2
        WHERE ticket_id = ANY($3)`,
       [bookingId, lockedUntil, ticket_ids]
     );
 
     await client.query('COMMIT');
+    emitSkips();
 
-    // 7. Format ticket numbers list for WhatsApp message
-    const ticketNumbersList = lockTicketsRes.rows.map((t) => t.ticket_number).join(', ');
-
-    // 8. Generate WhatsApp Deep Link
-    const formattedPhone = assignedAgent.phone.replace(/[^0-9+]/g, ''); // ensure only digits + sign
-    const textMsg = `Hi ${assignedAgent.full_name}, I want to book tickets: [${ticketNumbersList}] for "${game.title}". Booking ID: #${bookingId.substring(0, 8).toUpperCase()}. Amount: ₹${totalAmount}. Please approve.`;
-    const whatsappLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(textMsg)}`;
-
-    // 9. Notify Agent via WebSocket
-    io.to(`agent-${assignedAgent.user_id}`).emit('new_booking_request', {
+    io.to(`agent-${assigned.user_id}`).emit('new_booking_request', {
       booking_id: bookingId,
       housie_name,
       game_title: game.title,
-      ticket_numbers: lockTicketsRes.rows.map((t) => t.ticket_number),
+      ticket_numbers: ticketNumbers,
       total_amount: totalAmount,
       locked_at: new Date().toISOString(),
       locked_until: lockedUntil.toISOString(),
@@ -143,10 +213,11 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     res.json({
       booking_id: bookingId,
       locked_until: lockedUntil.toISOString(),
-      agent_phone: assignedAgent.phone,
-      agent_name: assignedAgent.full_name,
+      agent_phone: assigned.phone,
+      agent_name: assigned.full_name,
       total_amount: totalAmount,
-      whatsapp_link: whatsappLink,
+      whatsapp_link: makeBookingWaLink(assigned.phone, assigned.full_name, bookingId),
+      is_overflow: false,
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -598,6 +669,165 @@ export async function getAgentSales(req: AuthenticatedRequest, res: Response): P
     res.json(sales);
   } catch (error) {
     console.error('Error fetching agent sales:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Operator Overflow Queue — bookings routed to this Operator because every
+ * active bookie lacked sufficient wallet balance (the failsafe).
+ */
+export async function getOperatorOverflowQueue(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const operatorId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT b.booking_id, b.housie_name, b.total_amount, b.locked_at, b.locked_until, b.ticket_ids,
+              g.title AS game_title, g.scheduled_at AS game_time
+       FROM Bookings b
+       JOIN Scheduled_Games g ON b.game_id = g.game_id
+       WHERE b.assigned_agent_id = $1
+         AND b.is_overflow = TRUE
+         AND b.booking_status = 'Locked'
+         AND b.locked_until > NOW()
+       ORDER BY b.locked_at ASC`,
+      [operatorId]
+    );
+
+    const bookings = [];
+    for (const row of result.rows) {
+      const ticketsRes = await pool.query(
+        `SELECT ticket_number FROM Tickets WHERE ticket_id = ANY($1) ORDER BY ticket_number`,
+        [row.ticket_ids]
+      );
+      bookings.push({
+        booking_id: row.booking_id,
+        housie_name: row.housie_name,
+        game_title: row.game_title,
+        game_time: row.game_time,
+        ticket_numbers: ticketsRes.rows.map((t) => t.ticket_number),
+        total_amount: parseFloat(row.total_amount),
+        locked_at: row.locked_at,
+        locked_until: row.locked_until,
+        time_remaining_ms: new Date(row.locked_until).getTime() - Date.now(),
+      });
+    }
+
+    res.json(bookings);
+  } catch (error) {
+    console.error('Error fetching operator overflow queue:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Force Confirm (Operator) — a direct-to-platform sale for an overflow booking.
+ * Locks the tickets as Sold WITHOUT any wallet deduction (the Operator is an
+ * internal staff member acting as the ultimate backstop).
+ */
+export async function forceConfirmBooking(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { booking_id } = req.params;
+  const operatorId = req.user!.userId;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const bookingRes = await client.query(
+      `SELECT booking_id, ticket_ids, booking_status, housie_name, is_overflow
+       FROM Bookings
+       WHERE booking_id = $1 AND assigned_agent_id = $2
+       FOR UPDATE`,
+      [booking_id, operatorId]
+    );
+
+    if (bookingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Overflow booking not found or not assigned to you' });
+      return;
+    }
+
+    const booking = bookingRes.rows[0];
+    if (!booking.is_overflow) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'This booking is not an overflow booking' });
+      return;
+    }
+    if (booking.booking_status !== 'Locked') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: `Booking cannot be force-confirmed from status: ${booking.booking_status}` });
+      return;
+    }
+
+    await client.query(
+      `UPDATE Bookings
+       SET booking_status = 'Sold', confirmed_at = NOW(), confirmed_by = $1
+       WHERE booking_id = $2`,
+      [operatorId, booking_id]
+    );
+
+    await client.query(
+      `UPDATE Tickets
+       SET status = 'Sold', owner_housie_name = $1, confirmed_at = NOW(),
+           locked_until = NULL, locked_by_booking = NULL
+       WHERE ticket_id = ANY($2)`,
+      [booking.housie_name, booking.ticket_ids]
+    );
+
+    await client.query('COMMIT');
+
+    for (const ticketId of booking.ticket_ids) {
+      io.emit('ticket_status_change', {
+        event: 'ticket_status_change',
+        ticket_id: ticketId,
+        new_status: 'Sold',
+      });
+    }
+
+    res.json({ message: 'Overflow booking force-confirmed. Tickets sold direct-to-platform.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error force-confirming booking:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Skip Alerts (Agent) — returns the bookie's unseen FOMO skip events and marks
+ * them seen. Powers the dashboard "you missed a booking" banner on reload.
+ */
+export async function getSkipAlerts(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const agentId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT alert_id, booking_amount, agent_balance, created_at
+       FROM Skip_Alerts
+       WHERE agent_id = $1 AND seen = FALSE
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [agentId]
+    );
+
+    if (result.rows.length > 0) {
+      await pool.query(
+        `UPDATE Skip_Alerts SET seen = TRUE WHERE alert_id = ANY($1)`,
+        [result.rows.map((r) => r.alert_id)]
+      );
+    }
+
+    res.json(
+      result.rows.map((r) => ({
+        alert_id: r.alert_id,
+        booking_amount: parseFloat(r.booking_amount),
+        agent_balance: parseFloat(r.agent_balance),
+        created_at: r.created_at,
+      }))
+    );
+  } catch (error) {
+    console.error('Error fetching skip alerts:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }
