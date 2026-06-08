@@ -20,7 +20,8 @@ export async function login(req: Request, res: Response): Promise<void> {
   try {
     // 1. Fetch user
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.password_hash, u.temp_password_required, u.status, r.role_name
+      `SELECT u.user_id, u.full_name, u.email, u.password_hash, u.temp_password_required, u.status,
+              u.role_id, u.current_balance, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        WHERE u.email = $1`,
@@ -79,11 +80,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     res.json({
       user: {
-        userId: user.user_id,
-        fullName: user.full_name,
-        roleName: user.role_name,
+        user_id: user.user_id,
+        full_name: user.full_name,
+        role_id: user.role_id,
+        role_name: user.role_name,
         email: user.email,
-        tempPasswordRequired: user.temp_password_required,
+        current_balance: parseFloat(user.current_balance),
+        temp_password_required: user.temp_password_required,
       },
     });
   } catch (error) {
@@ -102,5 +105,39 @@ export function logout(req: Request, res: Response): void {
 }
 
 export async function getCurrentProfile(req: any, res: Response): Promise<void> {
-  res.json({ user: req.user });
+  try {
+    const result = await pool.query(
+      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.status,
+              u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, r.role_name
+       FROM Users u
+       JOIN Roles r ON u.role_id = r.role_id
+       WHERE u.user_id = $1`,
+      [req.user.userId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const u = result.rows[0];
+    res.json({
+      user: {
+        user_id: u.user_id,
+        full_name: u.full_name,
+        email: u.email,
+        phone: u.phone,
+        upi_id: u.upi_id,
+        status: u.status,
+        role_id: u.role_id,
+        role_name: u.role_name,
+        current_balance: parseFloat(u.current_balance),
+        temp_password_required: u.temp_password_required,
+        is_cfo: u.is_cfo === true,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 }
