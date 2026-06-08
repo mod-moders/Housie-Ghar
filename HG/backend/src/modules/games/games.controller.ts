@@ -80,6 +80,68 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * Get a single game by id (Player + staff)
+ */
+export async function getGameById(req: Request, res: Response): Promise<void> {
+  const { game_id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT game_id, title, scheduled_at, ticket_price, total_tickets, game_status
+       FROM Scheduled_Games
+       WHERE game_id = $1`,
+      [game_id]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+
+    const game = result.rows[0];
+    const soldRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game_id]);
+    const lockedRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Locked'`, [game_id]);
+    const soldCount = parseInt(soldRes.rows[0].count, 10);
+    const lockedCount = parseInt(lockedRes.rows[0].count, 10);
+    const totalCount = parseInt(game.total_tickets, 10);
+
+    const prizesRes = await pool.query(
+      `SELECT prize_id, pattern_name, prize_amount, claimed, winner_housie_name, claimed_at, split_count, amount_per_winner
+       FROM Prize_Pool
+       WHERE game_id = $1
+       ORDER BY prize_id ASC`,
+      [game_id]
+    );
+
+    res.json({
+      game_id: game.game_id,
+      title: game.title,
+      scheduled_at: game.scheduled_at,
+      ticket_price: parseFloat(game.ticket_price),
+      total_tickets: totalCount,
+      sold_count: soldCount,
+      locked_count: lockedCount,
+      available_count: totalCount - (soldCount + lockedCount),
+      fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
+      game_status: game.game_status,
+      prize_pool: prizesRes.rows.map((row) => ({
+        prize_id: row.prize_id,
+        pattern_name: row.pattern_name,
+        prize_amount: parseFloat(row.prize_amount),
+        claimed: row.claimed,
+        winner_housie_name: row.winner_housie_name,
+        claimed_at: row.claimed_at,
+        split_count: row.split_count,
+        amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching game:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Create a new game, its prize pool, and pre-generate tickets (Admin+)
  * Body: { title, scheduled_at, ticket_price, total_tickets, operator_id?, prizes: [{ pattern_name, prize_amount }] }
  */

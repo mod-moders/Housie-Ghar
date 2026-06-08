@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getGames,
+  getGameById,
   createGame,
   handleStartGame,
   handlePauseGame,
@@ -20,6 +21,7 @@ router.get('/', getGames);
 router.post('/', authenticateToken, requireRole(['Admin', 'Superadmin']), createGame);
 router.get('/:game_id/drawn', getDrawnNumbers);
 router.get('/:game_id/live-stream', liveStream);
+router.get('/:game_id', getGameById);
 
 // Staff control endpoints (Authenticated Operator or higher)
 router.post('/:game_id/start', authenticateToken, requireRole(['Operator', 'Admin', 'Superadmin']), handleStartGame);
