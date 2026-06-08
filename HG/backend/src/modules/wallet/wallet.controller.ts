@@ -365,6 +365,83 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
 }
 
 /**
+ * Financial HUD aggregates for the FO ribbon.
+ */
+export async function getFinancialHud(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [liability, gross, pending] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(current_balance), 0) AS total FROM Users WHERE role_id = 4`),
+      pool.query(
+        `SELECT COALESCE(SUM(amount), 0) AS total
+         FROM Wallet_Ledger
+         WHERE transaction_type = 'Credit' AND created_at::date = CURRENT_DATE`
+      ),
+      pool.query(`SELECT COUNT(*) AS c FROM TopUp_Requests WHERE request_status = 'Pending'`),
+    ]);
+
+    res.json({
+      total_liability: parseFloat(liability.rows[0].total),
+      daily_gross_processed: parseFloat(gross.rows[0].total),
+      pending_count: parseInt(pending.rows[0].c, 10),
+    });
+  } catch (error) {
+    console.error('Error building financial HUD:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Master Bookie Ledger: every bookie with balance, lifetime top-ups, last
+ * recharge timestamp, and any pending recharge requests.
+ */
+export async function getMasterLedger(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const agentsRes = await pool.query(
+      `SELECT u.user_id, u.full_name, u.phone, u.status, u.current_balance,
+              COALESCE(SUM(CASE WHEN w.transaction_type = 'Credit' AND w.reference_type = 'TopUp' THEN w.amount END), 0) AS lifetime_topups,
+              MAX(CASE WHEN w.transaction_type = 'Credit' AND w.reference_type = 'TopUp' THEN w.created_at END) AS last_recharge_at
+       FROM Users u
+       LEFT JOIN Wallet_Ledger w ON w.agent_id = u.user_id
+       WHERE u.role_id = 4
+       GROUP BY u.user_id
+       ORDER BY u.full_name ASC`
+    );
+
+    const pendingRes = await pool.query(
+      `SELECT request_id, agent_id, requested_amount, payment_reference, requested_at
+       FROM TopUp_Requests
+       WHERE request_status = 'Pending'
+       ORDER BY requested_at ASC`
+    );
+    const pendingByAgent: Record<string, any[]> = {};
+    for (const r of pendingRes.rows) {
+      (pendingByAgent[r.agent_id] ||= []).push({
+        request_id: r.request_id,
+        requested_amount: parseFloat(r.requested_amount),
+        payment_reference: r.payment_reference,
+        requested_at: r.requested_at,
+      });
+    }
+
+    res.json(
+      agentsRes.rows.map((a) => ({
+        agent_id: a.user_id,
+        full_name: a.full_name,
+        phone: a.phone,
+        status: a.status,
+        current_balance: parseFloat(a.current_balance),
+        lifetime_topups: parseFloat(a.lifetime_topups),
+        last_recharge_at: a.last_recharge_at,
+        pending_requests: pendingByAgent[a.user_id] || [],
+      }))
+    );
+  } catch (error) {
+    console.error('Error building master ledger:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Reject a top-up request (Admin+)
  */
 export async function rejectTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {

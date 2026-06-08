@@ -7,6 +7,8 @@ import {
   approveTopUp,
   rejectTopUp,
   manualAdjust,
+  getFinancialHud,
+  getMasterLedger,
 } from './wallet.controller';
 import { authenticateToken, requireRole, requireFinancialOfficer } from '../../middleware/auth';
 
@@ -26,5 +28,7 @@ router.post('/topup/:id/reject', authenticateToken, requireRole(['Admin', 'Super
 
 // Financial Officer hub
 router.post('/agents/:agentId/adjust', authenticateToken, requireFinancialOfficer, manualAdjust);
+router.get('/hud', authenticateToken, requireFinancialOfficer, getFinancialHud);
+router.get('/master-ledger', authenticateToken, requireFinancialOfficer, getMasterLedger);
 
 export default router;
