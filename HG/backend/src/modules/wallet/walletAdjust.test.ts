@@ -39,3 +39,13 @@ test('debit that would go negative is rejected', () => {
   const r = computeBalanceAfter(30, 'Debit', 40);
   assert.equal(r.ok, false);
 });
+
+test('debit exactly equal to balance is allowed (zeroes the wallet)', () => {
+  const r = computeBalanceAfter(50, 'Debit', 50);
+  assert.deepEqual(r, { ok: true, balance_after: 0 });
+});
+
+test('rejects an absent reason', () => {
+  const v = validateAdjust({ type: 'Credit', amount: 100 });
+  assert.equal(v.ok, false);
+});

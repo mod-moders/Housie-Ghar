@@ -305,7 +305,7 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
       `SELECT current_balance, role_id FROM Users WHERE user_id = $1 FOR UPDATE`,
       [agentId]
     );
-    if (agentRes.rowCount === 0) {
+    if ((agentRes.rowCount ?? 0) === 0) {
       await client.query('ROLLBACK');
       res.status(404).json({ message: 'Agent not found' });
       return;
