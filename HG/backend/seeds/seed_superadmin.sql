@@ -1,11 +1,9 @@
 -- Seed default Superadmin and theme config
--- Default password: ChangeMe123! (hashed using bcrypt work factor 12)
--- Bcrypt hash for 'ChangeMe123!' with salt round 12 is:
--- $2b$12$R.S91584c3K3r4J9W8D9N.DkWJp.E4o3u4d4u4d4u4d4u4d4u4d4u
--- Let's use a pre-calculated hash: $2b$12$ZpUoeFfL7u72F4HkZ9P8QOeR4p1K1I4D.1d4e4f4g4h4i4j4k4l4m
+-- Default password: ChangeMe123! (real bcrypt hash, work factor 12)
+-- Regenerate with: node -e "require('bcrypt').hash('ChangeMe123!',12).then(console.log)"
 
 INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status) VALUES
-(1, 'Super Admin', 'superadmin@housieghar.local', '+919999999999', '$2b$12$ZpUoeFfL7u72F4HkZ9P8QOeR4p1K1I4D.1d4e4f4g4h4i4j4k4l4m', TRUE, 'Active')
+(1, 'Super Admin', 'superadmin@housieghar.local', '+919999999999', '$2b$12$zV/8efOtowujRPNCN5nH0uGvtaPnC6J1qxUeZrwh9amOrWAJ2RlRm', TRUE, 'Active')
 ON CONFLICT (email) DO NOTHING;
 
 -- Seed default themes
