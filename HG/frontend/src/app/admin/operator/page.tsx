@@ -119,7 +119,7 @@ export default function OperatorPage() {
         <div className="space-y-4">
           <p className="text-xs text-[#9ca3af] mb-1">
             These bookings reached you because every active bookie was low on wallet balance.
-            Verify the player's payment in your banking app, then Force Confirm.
+            Verify the player&apos;s payment in your banking app, then Force Confirm.
           </p>
           {overflow.length === 0 ? (
             <div className="bg-bg2 border border-dashed border-border rounded-2xl p-12 text-center text-[#6b7280] text-sm">

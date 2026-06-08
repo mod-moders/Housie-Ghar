@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 import { useAgentStore } from "@/lib/stores/agentStore";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
+import Link from "next/link";
 import { useCountdown } from "@/lib/hooks/useCountdown";
 
 interface BookingRequest {
@@ -94,6 +95,7 @@ export default function AgentQueuePage() {
     { event: "join_agent_room", arg: user?.user_id }
   );
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { reload(); loadSkipAlerts(); }, []);
 
   return (
@@ -116,9 +118,9 @@ export default function AgentQueuePage() {
               </p>
             ))}
           </div>
-          <a href="/admin/agent/wallet" className="inline-block mt-2 text-xs bg-danger text-white font-bold px-4 py-2 rounded-xl hover:opacity-90 transition-all">
+          <Link href="/admin/agent/wallet" className="inline-block mt-2 text-xs bg-danger text-white font-bold px-4 py-2 rounded-xl hover:opacity-90 transition-all">
             Recharge Wallet →
-          </a>
+          </Link>
         </div>
       )}
 
@@ -131,9 +133,9 @@ export default function AgentQueuePage() {
             <p className="text-warning text-xs mt-1 font-medium">⚠ Low balance — request a top-up</p>
           )}
         </div>
-        <a href="/admin/agent/wallet" className="text-xs border border-border text-[#9ca3af] hover:text-white px-4 py-2 rounded-xl transition-all">
+        <Link href="/admin/agent/wallet" className="text-xs border border-border text-[#9ca3af] hover:text-white px-4 py-2 rounded-xl transition-all">
           Wallet →
-        </a>
+        </Link>
       </div>
 
       {/* Queue */}
@@ -142,7 +144,7 @@ export default function AgentQueuePage() {
       </h2>
       {queue.length === 0 ? (
         <div className="bg-bg2 border border-dashed border-border rounded-2xl p-12 text-center text-[#6b7280] text-sm">
-          No pending bookings. You're all caught up!
+          No pending bookings. You&apos;re all caught up!
         </div>
       ) : (
         <div className="space-y-4">

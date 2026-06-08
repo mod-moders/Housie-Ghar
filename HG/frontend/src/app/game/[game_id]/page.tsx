@@ -30,6 +30,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     setTickets(t.tickets);
   }, [game_id]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, [loadData]);
 
   // poll booking status when locked

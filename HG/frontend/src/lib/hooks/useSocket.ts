@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -26,7 +26,7 @@ export function useSocket(
 ) {
   const socketRef = useRef<Socket | null>(null);
   const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
+  useLayoutEffect(() => { handlerRef.current = onEvent; });
 
   const joinEvent = join?.event;
   const joinArg = join?.arg;

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/authStore";
 
 export default function LoginPage() {
@@ -59,7 +60,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="text-center text-xs text-[#6b7280] mt-4">
-          <a href="/" className="hover:text-gold transition-colors">← Back to public site</a>
+          <Link href="/" className="hover:text-gold transition-colors">← Back to public site</Link>
         </p>
       </div>
     </div>
