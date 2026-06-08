@@ -10,6 +10,7 @@ import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { buildWaLink } from '../../utils/waLink';
 import { buildRechargeMessage } from './rechargeContact';
+import { validateAdjust, computeBalanceAfter } from './walletAdjust';
 
 /**
  * Get the authenticated Agent's own wallet ledger (Agent)
@@ -276,6 +277,87 @@ export async function approveTopUp(req: AuthenticatedRequest, res: Response): Pr
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error approving top-up:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Manual ledger adjustment by the Financial Officer (credit or debit with a
+ * mandatory reason). ACID; debits cannot drive the balance negative.
+ */
+export async function manualAdjust(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { agentId } = req.params;
+  const actor = req.user!;
+
+  const v = validateAdjust(req.body);
+  if (!v.ok) {
+    res.status(400).json({ message: v.error });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const agentRes = await client.query(
+      `SELECT current_balance, role_id FROM Users WHERE user_id = $1 FOR UPDATE`,
+      [agentId]
+    );
+    if (agentRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Agent not found' });
+      return;
+    }
+    if (agentRes.rows[0].role_id !== 4) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Manual adjustments apply only to Bookie wallets' });
+      return;
+    }
+
+    const current = parseFloat(agentRes.rows[0].current_balance);
+    const calc = computeBalanceAfter(current, v.type!, v.amount!);
+    if (!calc.ok) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: calc.error });
+      return;
+    }
+
+    await client.query(`UPDATE Users SET current_balance = $1 WHERE user_id = $2`, [
+      calc.balance_after,
+      agentId,
+    ]);
+
+    await client.query(
+      `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, description, performed_by)
+       VALUES ($1, $2, $3, $4, 'Manual', $5, $6)`,
+      [agentId, v.type, v.amount, calc.balance_after, v.reason, actor.userId]
+    );
+
+    await client.query('COMMIT');
+
+    io.to(`agent-${agentId}`).emit(v.type === 'Credit' ? 'wallet_credited' : 'wallet_debited', {
+      new_balance: calc.balance_after,
+      amount: v.amount,
+    });
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'MANUAL_ADJUST',
+      targetType: 'User',
+      targetId: String(agentId),
+      targetDescription: `${v.type} ₹${v.amount} — ${v.reason}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Adjustment applied', new_balance: calc.balance_after });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error applying manual adjustment:', error);
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
