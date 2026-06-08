@@ -18,7 +18,7 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
   try {
     const result = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.status,
-              u.current_balance, u.last_login, r.role_name,
+              u.current_balance, u.last_login, u.role_id, u.is_cfo, r.role_name,
               (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
@@ -30,6 +30,8 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
         user_id: row.user_id,
         full_name: row.full_name,
         role_name: row.role_name,
+        role_id: row.role_id,
+        is_cfo: row.is_cfo === true,
         email: row.email,
         phone: row.phone,
         upi_id: row.upi_id,
@@ -184,5 +186,69 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Designate (or revoke) an Admin as the Financial Officer (Superadmin only).
+ * Single-FO model: designating one Admin clears the flag from every other.
+ */
+export async function designateCfo(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const actor = req.user!;
+  const makeCfo = req.body?.is_cfo !== false; // default: designate
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const target = await client.query(
+      `SELECT user_id, full_name, role_id FROM Users WHERE user_id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (target.rowCount === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    if (target.rows[0].role_id !== 2) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Only an Admin can be designated as Financial Officer' });
+      return;
+    }
+
+    if (makeCfo) {
+      await client.query(`UPDATE Users SET is_cfo = FALSE WHERE is_cfo = TRUE AND user_id <> $1`, [id]);
+      await client.query(`UPDATE Users SET is_cfo = TRUE WHERE user_id = $1`, [id]);
+    } else {
+      await client.query(`UPDATE Users SET is_cfo = FALSE WHERE user_id = $1`, [id]);
+    }
+
+    await client.query('COMMIT');
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: makeCfo ? 'DESIGNATE_CFO' : 'REVOKE_CFO',
+      targetType: 'User',
+      targetId: String(id),
+      targetDescription: `${makeCfo ? 'Designated' : 'Revoked'} ${target.rows[0].full_name} as Financial Officer`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      message: makeCfo
+        ? `${target.rows[0].full_name} is now the Financial Officer`
+        : `${target.rows[0].full_name} is no longer the Financial Officer`,
+      is_cfo: makeCfo,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error designating CFO:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
   }
 }
