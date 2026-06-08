@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import Link from "next/link";
+import { useAuthStore } from "@/lib/stores/authStore";
+import FinancialHub from "./FinancialHub";
 
 interface Game { game_id: string; title: string; scheduled_at: string; game_status: string; fill_percentage: number; sold_count: number; total_tickets: number; }
-interface Agent { user_id: string; full_name: string; current_balance: number; status: string; }
+interface Agent { agent_id: string; full_name: string; current_balance: number; status: string; }
 interface TopUpRequest { request_id: string; agent_name: string; amount: number; status: string; }
 
 export default function AdminDashboard() {
@@ -12,6 +14,7 @@ export default function AdminDashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
   const [tab, setTab] = useState<"games" | "agents" | "topups">("games");
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     apiFetch<Game[]>("/api/games").then(setGames).catch(() => {});
@@ -24,6 +27,10 @@ export default function AdminDashboard() {
     catch (e: any) { alert(e.message); }
     apiFetch<TopUpRequest[]>("/api/wallet/topup/pending").then(setTopUps).catch(() => {});
   };
+
+  if (user?.is_cfo) {
+    return <FinancialHub />;
+  }
 
   return (
     <div className="max-w-5xl">
@@ -81,7 +88,7 @@ export default function AdminDashboard() {
       {tab === "agents" && (
         <div className="space-y-3">
           {agents.map((a) => (
-            <div key={a.user_id} className="bg-bg2 border border-border rounded-2xl p-4 flex items-center justify-between">
+            <div key={a.agent_id} className="bg-bg2 border border-border rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-white text-sm">{a.full_name}</p>
                 <p className={`text-[10px] font-mono ${a.status === "Active" ? "text-success" : "text-danger"}`}>{a.status}</p>
