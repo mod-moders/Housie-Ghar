@@ -8,6 +8,71 @@ import pool from '../../db';
 import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
+import { buildWaLink } from '../../utils/waLink';
+import { buildRechargeMessage } from './rechargeContact';
+
+/**
+ * Get the authenticated Agent's own wallet ledger (Agent)
+ */
+export async function getMyLedger(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const agentId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT entry_id, transaction_type, amount, balance_after, description, created_at
+       FROM Wallet_Ledger
+       WHERE agent_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [agentId]
+    );
+
+    res.json(
+      result.rows.map((row) => ({
+        entry_id: row.entry_id,
+        transaction_type: row.transaction_type,
+        amount: parseFloat(row.amount),
+        balance_after: parseFloat(row.balance_after),
+        notes: row.description,
+        created_at: row.created_at,
+      }))
+    );
+  } catch (error) {
+    console.error('Error fetching wallet ledger:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * List all pending top-up requests across agents (Admin+)
+ */
+export async function listPendingTopUps(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT t.request_id, t.requested_amount, t.payment_reference, t.payment_method,
+              t.request_status, t.requested_at, u.full_name AS agent_name
+       FROM TopUp_Requests t
+       JOIN Users u ON t.agent_id = u.user_id
+       WHERE t.request_status = 'Pending'
+       ORDER BY t.requested_at ASC`
+    );
+
+    res.json(
+      result.rows.map((row) => ({
+        request_id: row.request_id,
+        agent_name: row.agent_name,
+        amount: parseFloat(row.requested_amount),
+        payment_reference: row.payment_reference,
+        payment_method: row.payment_method,
+        status: row.request_status,
+        requested_at: row.requested_at,
+      }))
+    );
+  } catch (error) {
+    console.error('Error listing pending top-ups:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
 
 /**
  * List all agent wallet balances with any pending top-up requests (Admin+)
@@ -83,6 +148,22 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
 
     const request = result.rows[0];
 
+    // Resolve the recharge contact: the Active Admin designated CFO, else an
+    // Active Superadmin. Used to redirect the Bookie to that person's WhatsApp.
+    const contactRes = await pool.query(
+      `SELECT full_name, phone
+       FROM Users
+       WHERE status = 'Active' AND phone IS NOT NULL
+         AND ((role_id = 2 AND is_cfo = TRUE) OR role_id = 1)
+       ORDER BY (role_id = 2 AND is_cfo = TRUE) DESC, role_id ASC
+       LIMIT 1`
+    );
+    let recharge_wa_link: string | null = null;
+    if (contactRes.rowCount && contactRes.rows[0].phone) {
+      const msg = buildRechargeMessage(agent.fullName, amount, payment_reference);
+      recharge_wa_link = buildWaLink(contactRes.rows[0].phone, msg);
+    }
+
     // Notify staff dashboards (admins listening on the shared admin room)
     io.to('admin-room').emit('topup_request_received', {
       request_id: request.request_id,
@@ -90,7 +171,11 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
       amount,
     });
 
-    res.status(201).json({ request_id: request.request_id, message: 'Top-up request submitted for approval' });
+    res.status(201).json({
+      request_id: request.request_id,
+      message: 'Top-up request submitted for approval',
+      recharge_wa_link,
+    });
   } catch (error) {
     console.error('Error creating top-up request:', error);
     res.status(500).json({ message: 'Internal server error' });
