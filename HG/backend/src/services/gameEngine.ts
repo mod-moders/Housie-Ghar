@@ -51,13 +51,13 @@ export async function initGameEngineSubscription(): Promise<void> {
       sseManager.broadcast(gameId, payload);
       io.to(`game-${gameId}`).emit('winner_announced', payload);
     } else if (payload.event === 'game_paused') {
-      sseManager.broadcast(gameId, payload);
+      sseManager.broadcast(gameId, { ...payload, event: 'paused' });
       io.to(`game-${gameId}`).emit('paused', payload);
     } else if (payload.event === 'game_resumed') {
-      sseManager.broadcast(gameId, payload);
+      sseManager.broadcast(gameId, { ...payload, event: 'resumed' });
       io.to(`game-${gameId}`).emit('resumed', payload);
     } else if (payload.event === 'game_completed') {
-      sseManager.broadcast(gameId, payload);
+      sseManager.broadcast(gameId, { ...payload, event: 'completed' });
       io.to(`game-${gameId}`).emit('completed', payload);
     }
   });
