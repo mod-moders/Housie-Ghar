@@ -2,12 +2,17 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useAgentStore } from "@/lib/stores/agentStore";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { useCountdown } from "@/lib/hooks/useCountdown";
 
 interface BookingRequest {
   booking_id: string; housie_name: string; game_title: string;
   ticket_numbers: number[]; total_amount: number; locked_until: string;
+}
+
+interface SkipAlert {
+  alert_id?: number; booking_amount: number; agent_balance: number; created_at?: string;
 }
 
 function QueueCard({ req, onAction }: { req: BookingRequest; onAction: () => void }) {
@@ -55,6 +60,8 @@ function QueueCard({ req, onAction }: { req: BookingRequest; onAction: () => voi
 
 export default function AgentQueuePage() {
   const { queue, walletBalance, setQueue, setBalance } = useAgentStore();
+  const user = useAuthStore((s) => s.user);
+  const [fomo, setFomo] = useState<SkipAlert[]>([]);
 
   const reload = async () => {
     try {
@@ -67,15 +74,54 @@ export default function AgentQueuePage() {
     } catch {}
   };
 
-  useSocket((event) => {
-    if (event === "new_booking_request" || event === "booking_expired") reload();
-    if (event === "wallet_credited") reload();
-  });
+  // Pull any FOMO "you missed a booking" alerts accrued while we were away.
+  const loadSkipAlerts = async () => {
+    try {
+      const alerts = await apiFetch<SkipAlert[]>("/api/bookings/agent/skip-alerts");
+      if (alerts.length) setFomo((prev) => [...alerts, ...prev]);
+    } catch {}
+  };
 
-  useEffect(() => { reload(); }, []);
+  useSocket(
+    (event, data) => {
+      if (event === "new_booking_request" || event === "booking_expired") reload();
+      if (event === "wallet_credited") reload();
+      if (event === "booking_skipped") {
+        setFomo((prev) => [data as SkipAlert, ...prev]);
+        reload();
+      }
+    },
+    { event: "join_agent_room", arg: user?.user_id }
+  );
+
+  useEffect(() => { reload(); loadSkipAlerts(); }, []);
 
   return (
     <div className="max-w-2xl">
+      {/* FOMO skip alerts — you missed a booking because your wallet was too low */}
+      {fomo.length > 0 && (
+        <div className="bg-danger/10 border border-danger/40 rounded-2xl p-4 mb-6">
+          <div className="flex items-start justify-between">
+            <p className="text-danger font-bold text-sm">⚠ You missed {fomo.length} booking{fomo.length > 1 ? "s" : ""}!</p>
+            <button onClick={() => setFomo([])} className="text-danger/70 hover:text-danger text-xs">Dismiss</button>
+          </div>
+          <p className="text-xs text-[#fca5a5] mt-1">
+            Your wallet balance was too low to fulfil {fomo.length > 1 ? "these orders" : "this order"}.
+            Recharge immediately to resume receiving sales.
+          </p>
+          <div className="mt-2 space-y-1">
+            {fomo.slice(0, 3).map((f, i) => (
+              <p key={f.alert_id ?? i} className="text-[11px] font-mono text-[#9ca3af]">
+                Order ₹{f.booking_amount} · your balance was ₹{f.agent_balance}
+              </p>
+            ))}
+          </div>
+          <a href="/admin/agent/wallet" className="inline-block mt-2 text-xs bg-danger text-white font-bold px-4 py-2 rounded-xl hover:opacity-90 transition-all">
+            Recharge Wallet →
+          </a>
+        </div>
+      )}
+
       {/* Wallet strip */}
       <div className="bg-bg2 border border-border rounded-2xl p-5 mb-6 flex items-center justify-between">
         <div>

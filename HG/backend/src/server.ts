@@ -38,6 +38,12 @@ io.on('connection', (socket) => {
     console.log(`🔌 Agent ${socket.id} joined room agent-${agentId}`);
   });
 
+  // Operators join their own room to receive overflow-failsafe booking requests
+  socket.on('join_operator_room', (operatorId: string) => {
+    socket.join(`operator-${operatorId}`);
+    console.log(`🔌 Operator ${socket.id} joined room operator-${operatorId}`);
+  });
+
   // Admins/Superadmins join a shared room to receive top-up requests and platform events
   socket.on('join_admin_room', () => {
     socket.join('admin-room');
