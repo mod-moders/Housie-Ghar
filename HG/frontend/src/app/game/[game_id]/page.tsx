@@ -1,12 +1,17 @@
 "use client";
 import { use, useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import { useBookingStore } from "@/lib/stores/bookingStore";
 import { useCountdown } from "@/lib/hooks/useCountdown";
 import Link from "next/link";
 
 interface TicketSquare { ticket_id: number; ticket_number: number; status: "Available"|"Locked"|"Sold"; }
 interface Game { game_id: string; title: string; ticket_price: number; total_tickets: number; fill_percentage: number; game_status: string; }
+interface LockResponse {
+  booking_id: string; agent_phone?: string; agent_name?: string;
+  total_amount: number; locked_until: string; whatsapp_link?: string;
+}
 
 export default function GameRoom({ params }: { params: Promise<{ game_id: string }> }) {
   const { game_id } = use(params);
@@ -57,7 +62,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     if (!housieName.trim() || selected.length === 0) return;
     setLoading(true); setError("");
     try {
-      const data = await apiFetch<any>("/api/bookings/lock", {
+      const data = await apiFetch<LockResponse>("/api/bookings/lock", {
         method: "POST",
         body: JSON.stringify({ game_id, ticket_ids: selected, housie_name: housieName.trim() }),
       });
@@ -68,8 +73,8 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
         lockedUntil: data.locked_until, whatsappLink: data.whatsapp_link,
       });
       setPhase("locked");
-    } catch (e: any) {
-      setError(e.message ?? "Booking failed. Try again.");
+    } catch (e) {
+      setError(errMsg(e) || "Booking failed. Try again.");
     } finally { setLoading(false); }
   };
 

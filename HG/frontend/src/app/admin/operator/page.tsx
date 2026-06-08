@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { useCountdown } from "@/lib/hooks/useCountdown";
@@ -22,7 +23,7 @@ function OverflowCard({ req, onAction }: { req: OverflowReq; onAction: () => voi
     try {
       await apiFetch(`/api/bookings/operator/${req.booking_id}/force-confirm`, { method: "POST" });
       onAction();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
     finally { setLoading(false); }
   };
 

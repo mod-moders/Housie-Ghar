@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import { useAgentStore } from "@/lib/stores/agentStore";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAuthStore, type AuthUser } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
 import Link from "next/link";
 import { useCountdown } from "@/lib/hooks/useCountdown";
@@ -25,7 +26,7 @@ function QueueCard({ req, onAction }: { req: BookingRequest; onAction: () => voi
     try {
       await apiFetch(`/api/bookings/agent/${req.booking_id}/${action}`, { method: "POST" });
       onAction();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
     finally { setLoading(false); }
   };
 
@@ -70,7 +71,7 @@ export default function AgentQueuePage() {
       setQueue(data);
     } catch {}
     try {
-      const me = await apiFetch<{ user: any }>("/api/auth/me");
+      const me = await apiFetch<{ user: AuthUser }>("/api/auth/me");
       setBalance(me.user?.current_balance ?? 0);
     } catch {}
   };

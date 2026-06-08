@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 
 interface User {
   user_id: string; full_name: string; email: string;
@@ -21,7 +22,7 @@ export default function UsersPage() {
         body: JSON.stringify({ status: currentStatus === "Active" ? "Suspended" : "Active" }),
       });
       reload();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
   };
 
   const toggleCfo = async (userId: string, isCfo: boolean) => {
@@ -31,7 +32,7 @@ export default function UsersPage() {
         body: JSON.stringify({ is_cfo: !isCfo }),
       });
       reload();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
   };
 
   return (

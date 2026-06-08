@@ -1,10 +1,12 @@
 "use client";
 import { use, useEffect, useState, useRef } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { useSSE } from "@/lib/hooks/useSSE";
 
-interface Game { game_id: string; title: string; game_status: string; }
+type GameStatus = "Scheduled" | "Live" | "Paused" | "Completed";
+interface Game { game_id: string; title: string; game_status: GameStatus; }
 
 export default function OperatorConsole({ params }: { params: Promise<{ game_id: string }> }) {
   const { game_id } = use(params);
@@ -17,7 +19,7 @@ export default function OperatorConsole({ params }: { params: Promise<{ game_id:
   useSSE(game_id);
 
   useEffect(() => {
-    apiFetch<Game>(`/api/games/${game_id}`).then((g) => { setGame(g); setStatus(g.game_status as any); }).catch(() => {});
+    apiFetch<Game>(`/api/games/${game_id}`).then((g) => { setGame(g); setStatus(g.game_status); }).catch(() => {});
   }, [game_id]);
 
   const pushLog = (msg: string) => setLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
@@ -26,7 +28,7 @@ export default function OperatorConsole({ params }: { params: Promise<{ game_id:
     try {
       await apiFetch(`/api/games/${game_id}/${action}`, { method: "POST" });
       pushLog(`${action.charAt(0).toUpperCase() + action.slice(1)} command sent`);
-    } catch (e: any) { pushLog(`Error: ${e.message}`); }
+    } catch (e) { pushLog(`Error: ${errMsg(e)}`); }
   };
 
   const changeSpeed = async (ms: number) => {

@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import Link from "next/link";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAuthStore, type AuthUser } from "@/lib/stores/authStore";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true); setError("");
     try {
-      const data = await apiFetch<{ user: any }>("/api/auth/login", {
+      const data = await apiFetch<{ user: AuthUser }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -28,8 +29,8 @@ export default function LoginPage() {
         : role === "Operator" ? "/admin/operator"
         : "/admin/agent";
       router.push(dest);
-    } catch (e: any) {
-      setError(e.message ?? "Login failed");
+    } catch (e) {
+      setError(errMsg(e) || "Login failed");
     } finally { setLoading(false); }
   };
 

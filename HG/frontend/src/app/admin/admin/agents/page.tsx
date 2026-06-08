@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 
 interface PendingRequest { request_id: string; requested_amount: number; payment_reference: string; }
 interface AgentWallet {
@@ -19,13 +20,13 @@ export default function AgentsPage() {
 
   const approve = async (id: string) => {
     try { await apiFetch(`/api/wallet/topup/${id}/approve`, { method: "POST" }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     reload();
   };
 
   const reject = async (id: string) => {
     try { await apiFetch(`/api/wallet/topup/${id}/reject`, { method: "POST" }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     reload();
   };
 

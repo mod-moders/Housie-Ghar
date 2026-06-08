@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
+import type { AuthUser } from "@/lib/stores/authStore";
 
 interface LedgerEntry { entry_id: number; transaction_type: string; amount: number; created_at: string; notes: string | null; }
 
@@ -12,7 +14,7 @@ export default function WalletPage() {
   const [msg, setMsg] = useState("");
 
   const loadLedger = () => {
-    apiFetch<{ user: any }>("/api/auth/me").then((d) => setBalance(d.user?.current_balance ?? 0)).catch(() => {});
+    apiFetch<{ user: AuthUser }>("/api/auth/me").then((d) => setBalance(d.user?.current_balance ?? 0)).catch(() => {});
     apiFetch<LedgerEntry[]>("/api/wallet/ledger").then(setLedger).catch(() => {});
   };
 
@@ -41,7 +43,7 @@ export default function WalletPage() {
       }
       setAmount(""); setReference("");
       loadLedger();
-    } catch (e: any) { setMsg(e.message); }
+    } catch (e) { setMsg(errMsg(e)); }
   };
 
   return (

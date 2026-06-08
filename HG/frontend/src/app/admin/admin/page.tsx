@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/authStore";
 import FinancialHub from "./FinancialHub";
@@ -24,7 +25,7 @@ export default function AdminDashboard() {
 
   const approveTopUp = async (id: string) => {
     try { await apiFetch(`/api/wallet/topup/${id}/approve`, { method: "POST" }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     apiFetch<TopUpRequest[]>("/api/wallet/topup/pending").then(setTopUps).catch(() => {});
   };
 

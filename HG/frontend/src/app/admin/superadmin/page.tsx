@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 
 interface User { user_id: string; full_name: string; email: string; role_name: string; status: string; current_balance?: number; }
 interface AuditEntry { log_id: number; user_name: string; action: string; target_type: string; target_description: string; timestamp: string; }
@@ -20,7 +21,7 @@ export default function SuperadminPage() {
 
   const setTheme = async (id: number) => {
     try { await apiFetch("/api/themes/active", { method: "PUT", body: JSON.stringify({ theme_id: id }) }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     apiFetch<Theme[]>("/api/themes").then(setThemes).catch(() => {});
   };
 
@@ -28,7 +29,7 @@ export default function SuperadminPage() {
     try {
       await apiFetch(`/api/users/${userId}`, { method: "PATCH", body: JSON.stringify({ status: currentStatus === "Active" ? "Suspended" : "Active" }) });
       apiFetch<User[]>("/api/users").then(setUsers).catch(() => {});
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
   };
 
   const roles = ["Superadmin", "Admin", "Operator", "Agent"];

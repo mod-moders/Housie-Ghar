@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 
 interface Hud { total_liability: number; daily_gross_processed: number; pending_count: number; }
 interface PendingReq { request_id: string; requested_amount: number; payment_reference: string; requested_at: string; }
@@ -29,12 +30,12 @@ export default function FinancialHub() {
 
   const approve = async (id: string) => {
     try { await apiFetch(`/api/wallet/topup/${id}/approve`, { method: "POST" }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     reload();
   };
   const reject = async (id: string) => {
     try { await apiFetch(`/api/wallet/topup/${id}/reject`, { method: "POST", body: JSON.stringify({ reviewer_notes: "Rejected by FO" }) }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     reload();
   };
 
@@ -143,7 +144,7 @@ function ManualAdjustModal({ agent, onClose, onDone }: { agent: LedgerRow; onClo
         body: JSON.stringify({ type, amount: parseFloat(amount), reason: reason.trim() }),
       });
       onDone();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(errMsg(e)); }
   };
 
   return (

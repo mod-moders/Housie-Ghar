@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAuthStore, type AuthUser } from "@/lib/stores/authStore";
 import { apiFetch } from "@/lib/api";
 import { useEffect } from "react";
 
@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!user && pathname !== "/admin/login") {
-      apiFetch<{ user: any }>("/api/auth/me").then((d) => setUser(d.user)).catch(() => router.push("/admin/login"));
+      apiFetch<{ user: AuthUser }>("/api/auth/me").then((d) => setUser(d.user)).catch(() => router.push("/admin/login"));
     }
   }, []);
 

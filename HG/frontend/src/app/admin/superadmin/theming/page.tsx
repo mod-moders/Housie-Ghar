@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { errMsg } from "@/lib/errMsg";
 
 interface Theme { theme_id: number; theme_name: string; css_class?: string; is_active: boolean; }
 
@@ -12,7 +13,7 @@ export default function ThemingPage() {
 
   const setTheme = async (id: number) => {
     try { await apiFetch("/api/themes/active", { method: "PUT", body: JSON.stringify({ theme_id: id }) }); }
-    catch (e: any) { alert(e.message); }
+    catch (e) { alert(errMsg(e)); }
     reload();
   };
 
