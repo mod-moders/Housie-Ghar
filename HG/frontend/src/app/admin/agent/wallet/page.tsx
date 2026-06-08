@@ -8,19 +8,39 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  const [reference, setReference] = useState("");
   const [msg, setMsg] = useState("");
 
-  useEffect(() => {
+  const loadLedger = () => {
     apiFetch<{ user: any }>("/api/auth/me").then((d) => setBalance(d.user?.current_balance ?? 0)).catch(() => {});
     apiFetch<LedgerEntry[]>("/api/wallet/ledger").then(setLedger).catch(() => {});
-  }, []);
+  };
+
+  useEffect(() => { loadLedger(); }, []);
 
   const requestTopUp = async () => {
-    if (!amount) return;
+    if (!amount || !reference.trim()) return;
+    setMsg("");
     try {
-      await apiFetch("/api/wallet/topup/request", { method: "POST", body: JSON.stringify({ amount: Number(amount), notes: note }) });
-      setMsg("Top-up request sent to Admin!"); setAmount(""); setNote("");
+      const res = await apiFetch<{ request_id: string; recharge_wa_link: string | null }>(
+        "/api/wallet/topup/request",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            requested_amount: Number(amount),
+            payment_reference: reference.trim(),
+            payment_method: "UPI",
+          }),
+        }
+      );
+      if (res.recharge_wa_link) {
+        window.open(res.recharge_wa_link, "_blank", "noopener,noreferrer");
+        setMsg("Request sent — opening the Financial Officer's WhatsApp…");
+      } else {
+        setMsg("Request submitted. No Financial Officer is set yet — please contact an admin.");
+      }
+      setAmount(""); setReference("");
+      loadLedger();
     } catch (e: any) { setMsg(e.message); }
   };
 
@@ -36,9 +56,10 @@ export default function WalletPage() {
         <div className="space-y-3">
           <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
             placeholder="Amount (₹)" className="w-full bg-bg3 border border-border rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold/50 focus:outline-none font-mono" />
-          <input value={note} onChange={(e) => setNote(e.target.value)}
-            placeholder="Note (optional)" className="w-full bg-bg3 border border-border rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold/50 focus:outline-none" />
-          <button onClick={requestTopUp} className="w-full bg-gold text-forest font-black text-sm py-3 rounded-xl hover:bg-gold-light transition-all">
+          <input value={reference} onChange={(e) => setReference(e.target.value)}
+            placeholder="Payment reference / UPI txn ID" className="w-full bg-bg3 border border-border rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold/50 focus:outline-none" />
+          <button onClick={requestTopUp} disabled={!amount || !reference.trim()}
+            className="w-full bg-gold text-forest font-black text-sm py-3 rounded-xl hover:bg-gold-light transition-all disabled:opacity-50">
             Request Top-up
           </button>
           {msg && <p className="text-xs text-success font-mono">{msg}</p>}
