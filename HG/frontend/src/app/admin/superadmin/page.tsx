@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 interface User { user_id: string; full_name: string; email: string; role_name: string; status: string; current_balance?: number; }
-interface AuditEntry { log_id: number; actor_name: string; action: string; target_entity: string; created_at: string; }
+interface AuditEntry { log_id: number; user_name: string; action: string; target_type: string; target_description: string; timestamp: string; }
 interface Theme { theme_id: number; theme_name: string; is_active: boolean; }
 
 export default function SuperadminPage() {
@@ -14,7 +14,7 @@ export default function SuperadminPage() {
 
   useEffect(() => {
     apiFetch<User[]>("/api/users").then(setUsers).catch(() => {});
-    apiFetch<AuditEntry[]>("/api/audit?limit=20").then(setAudit).catch(() => {});
+    apiFetch<{ entries: AuditEntry[] }>("/api/audit?limit=20").then((d) => setAudit(d.entries)).catch(() => {});
     apiFetch<Theme[]>("/api/themes").then(setThemes).catch(() => {});
   }, []);
 
@@ -106,10 +106,10 @@ export default function SuperadminPage() {
             <tbody>
               {audit.map((e) => (
                 <tr key={e.log_id} className="border-b border-border last:border-0 hover:bg-bg3 transition-colors">
-                  <td className="px-4 py-3 text-[#6b7280]">{new Date(e.created_at).toLocaleTimeString("en-IN")}</td>
-                  <td className="px-4 py-3 text-white">{e.actor_name}</td>
+                  <td className="px-4 py-3 text-[#6b7280]">{new Date(e.timestamp).toLocaleTimeString("en-IN")}</td>
+                  <td className="px-4 py-3 text-white">{e.user_name}</td>
                   <td className="px-4 py-3 text-gold">{e.action}</td>
-                  <td className="px-4 py-3 text-[#9ca3af]">{e.target_entity}</td>
+                  <td className="px-4 py-3 text-[#9ca3af]">{e.target_description ?? e.target_type}</td>
                 </tr>
               ))}
               {audit.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-[#6b7280]">No audit entries yet.</td></tr>}
