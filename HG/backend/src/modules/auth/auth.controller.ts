@@ -107,7 +107,7 @@ export function logout(req: Request, res: Response): void {
 export async function getCurrentProfile(req: any, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.status,
+      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.town, u.status,
               u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
@@ -128,6 +128,7 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
         email: u.email,
         phone: u.phone,
         upi_id: u.upi_id,
+        town: u.town,
         status: u.status,
         role_id: u.role_id,
         role_name: u.role_name,

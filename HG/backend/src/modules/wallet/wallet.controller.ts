@@ -11,6 +11,7 @@ import { logAuditEvent } from '../../services/audit.service';
 import { buildWaLink } from '../../utils/waLink';
 import { buildRechargeMessage } from './rechargeContact';
 import { validateAdjust, computeBalanceAfter } from './walletAdjust';
+import { deriveTrust } from '../../utils/trust';
 
 /**
  * Get the authenticated Agent's own wallet ledger (Agent)
@@ -81,10 +82,13 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
 export async function listAgentWallets(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const agentsRes = await pool.query(
-      `SELECT user_id, full_name, email, phone, current_balance, status
-       FROM Users
-       WHERE role_id = 4
-       ORDER BY full_name ASC`
+      `SELECT u.user_id, u.full_name, u.email, u.phone, u.town, u.current_balance, u.status,
+              COUNT(b.booking_id) FILTER (WHERE b.booking_status = 'Sold')::INTEGER AS sold_count
+       FROM Users u
+       LEFT JOIN Bookings b ON b.assigned_agent_id = u.user_id
+       WHERE u.role_id = 4
+       GROUP BY u.user_id
+       ORDER BY u.full_name ASC`
     );
 
     const pendingRes = await pool.query(
@@ -111,8 +115,10 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
         full_name: a.full_name,
         email: a.email,
         phone: a.phone,
+        town: a.town,
         status: a.status,
         current_balance: parseFloat(a.current_balance),
+        trust: deriveTrust(a.sold_count),
         pending_requests: pendingByAgent[a.user_id] || [],
       }))
     );
@@ -397,9 +403,11 @@ export async function getFinancialHud(_req: AuthenticatedRequest, res: Response)
 export async function getMasterLedger(_req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const agentsRes = await pool.query(
-      `SELECT u.user_id, u.full_name, u.phone, u.status, u.current_balance,
+      `SELECT u.user_id, u.full_name, u.phone, u.town, u.status, u.current_balance,
               COALESCE(SUM(CASE WHEN w.transaction_type = 'Credit' AND w.reference_type = 'TopUp' THEN w.amount END), 0) AS lifetime_topups,
-              MAX(CASE WHEN w.transaction_type = 'Credit' AND w.reference_type = 'TopUp' THEN w.created_at END) AS last_recharge_at
+              MAX(CASE WHEN w.transaction_type = 'Credit' AND w.reference_type = 'TopUp' THEN w.created_at END) AS last_recharge_at,
+              (SELECT COUNT(*) FROM Bookings b
+               WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold')::INTEGER AS sold_count
        FROM Users u
        LEFT JOIN Wallet_Ledger w ON w.agent_id = u.user_id
        WHERE u.role_id = 4
@@ -428,10 +436,12 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
         agent_id: a.user_id,
         full_name: a.full_name,
         phone: a.phone,
+        town: a.town,
         status: a.status,
         current_balance: parseFloat(a.current_balance),
         lifetime_topups: parseFloat(a.lifetime_topups),
         last_recharge_at: a.last_recharge_at,
+        trust: deriveTrust(a.sold_count),
         pending_requests: pendingByAgent[a.user_id] || [],
       }))
     );

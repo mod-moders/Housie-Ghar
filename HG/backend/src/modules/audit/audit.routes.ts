@@ -4,6 +4,6 @@ import { authenticateToken, requireRole } from '../../middleware/auth';
 
 const router = Router();
 
-router.get('/', authenticateToken, requireRole(['Superadmin']), getAuditLog);
+router.get('/', authenticateToken, requireRole(['Superadmin', 'Admin']), getAuditLog);
 
 export default router;

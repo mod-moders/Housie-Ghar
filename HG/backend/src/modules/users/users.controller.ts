@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
+import { deriveTrust } from '../../utils/trust';
 
 const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 
@@ -17,9 +18,11 @@ const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 export async function listUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.status,
+      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.town, u.status,
               u.current_balance, u.last_login, u.role_id, u.is_cfo, r.role_name,
-              (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count
+              (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count,
+              (SELECT COUNT(*) FROM Bookings b
+               WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold')::INTEGER AS sold_count
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        ORDER BY u.role_id ASC, u.created_at ASC`
@@ -35,9 +38,11 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
         email: row.email,
         phone: row.phone,
         upi_id: row.upi_id,
+        town: row.town,
         status: row.status,
         current_balance: parseFloat(row.current_balance),
         assigned_games_count: parseInt(row.assigned_games_count, 10),
+        trust: row.role_id === 4 ? deriveTrust(row.sold_count) : null,
         last_login: row.last_login,
       }))
     );
@@ -52,7 +57,7 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
  * Admins may create Operators and Agents; only a Superadmin may create Admins.
  */
 export async function createUser(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { full_name, email, phone, upi_id, role_id, password } = req.body;
+  const { full_name, email, phone, upi_id, town, role_id, password } = req.body;
   const actor = req.user!;
 
   if (!full_name || !email || !role_id || !password) {
@@ -80,8 +85,8 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
     const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await pool.query(
-      `INSERT INTO Users (role_id, full_name, email, phone, upi_id, password_hash, temp_password_required, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, TRUE, 'Active', $7)
+      `INSERT INTO Users (role_id, full_name, email, phone, upi_id, town, password_hash, temp_password_required, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'Active', $8)
        RETURNING user_id, full_name, email, role_id, status`,
       [
         Number(role_id),
@@ -89,6 +94,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
         email.toLowerCase().trim(),
         phone || null,
         upi_id || null,
+        town || null,
         passwordHash,
         actor.userId,
       ]
@@ -124,7 +130,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function updateUser(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { id } = req.params;
-  const { full_name, phone, upi_id, status } = req.body;
+  const { full_name, phone, upi_id, town, status } = req.body;
   const actor = req.user!;
 
   if (status && !['Active', 'Suspended'].includes(status)) {
@@ -164,10 +170,11 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
        SET full_name = COALESCE($1, full_name),
            phone     = COALESCE($2, phone),
            upi_id    = COALESCE($3, upi_id),
-           status    = COALESCE($4, status)
-       WHERE user_id = $5
+           town      = COALESCE($4, town),
+           status    = COALESCE($5, status)
+       WHERE user_id = $6
        RETURNING user_id, full_name, status`,
-      [full_name ?? null, phone ?? null, upi_id ?? null, status ?? null, id]
+      [full_name ?? null, phone ?? null, upi_id ?? null, town ?? null, status ?? null, id]
     );
 
     await logAuditEvent({

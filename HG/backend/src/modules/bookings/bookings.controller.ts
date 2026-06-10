@@ -66,7 +66,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     // 4. Liquidity-Aware Round-Robin: only route to a bookie who can fund the order.
     // Role 4 represents Agent (Bookie).
     const agentsRes = await client.query(
-      `SELECT user_id, full_name, phone, current_balance
+      `SELECT user_id, full_name, phone, town, current_balance
        FROM Users
        WHERE role_id = 4 AND status = 'Active'
        ORDER BY user_id`
@@ -75,6 +75,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       user_id: a.user_id as string,
       full_name: a.full_name as string,
       phone: (a.phone as string) ?? '',
+      town: (a.town as string) ?? null,
       current_balance: parseFloat(a.current_balance),
     }));
 
@@ -122,7 +123,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     // 5. Overflow Failsafe: no bookie had sufficient inventory → route to the Operator.
     if (!assigned) {
       const opRes = await client.query(
-        `SELECT u.user_id, u.full_name, u.phone, u.status
+        `SELECT u.user_id, u.full_name, u.phone, u.town, u.status
          FROM Scheduled_Games g
          JOIN Users u ON u.user_id = g.operator_id
          WHERE g.game_id = $1`,
@@ -172,6 +173,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
         locked_until: lockedUntil.toISOString(),
         agent_name: operator.full_name,
         agent_phone: operator.phone,
+        agent_town: operator.town ?? null,
         total_amount: totalAmount,
         whatsapp_link: makeBookingWaLink(operator.phone, operator.full_name, overflowBookingId),
         is_overflow: true,
@@ -215,6 +217,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       locked_until: lockedUntil.toISOString(),
       agent_phone: assigned.phone,
       agent_name: assigned.full_name,
+      agent_town: assigned.town,
       total_amount: totalAmount,
       whatsapp_link: makeBookingWaLink(assigned.phone, assigned.full_name, bookingId),
       is_overflow: false,

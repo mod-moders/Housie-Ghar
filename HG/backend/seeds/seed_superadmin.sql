@@ -1,19 +1,10 @@
--- Seed default Superadmin and theme config
+-- Seed default Superadmin and platform config
 -- Default password: ChangeMe123! (real bcrypt hash, work factor 12)
 -- Regenerate with: node -e "require('bcrypt').hash('ChangeMe123!',12).then(console.log)"
 
 INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status) VALUES
 (1, 'Super Admin', 'superadmin@housieghar.local', '+919999999999', '$2b$12$zV/8efOtowujRPNCN5nH0uGvtaPnC6J1qxUeZrwh9amOrWAJ2RlRm', TRUE, 'Active')
 ON CONFLICT (email) DO NOTHING;
-
--- Seed default themes
-INSERT INTO Themes (theme_name, css_class, is_active) VALUES
-('Default', 'theme-default', TRUE),
-('Dark', 'theme-dark', FALSE),
-('Festive', 'theme-festive', FALSE),
-('Classic Hall', 'theme-classic-hall', FALSE)
-ON CONFLICT (theme_name) DO UPDATE SET
-  css_class = EXCLUDED.css_class;
 
 -- Seed platform config
 INSERT INTO Platform_Config (config_key, config_value, description) VALUES

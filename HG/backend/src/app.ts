@@ -18,7 +18,7 @@ import usersRoutes from './modules/users/users.routes';
 import walletRoutes from './modules/wallet/wallet.routes';
 import configRoutes from './modules/config/config.routes';
 import auditRoutes from './modules/audit/audit.routes';
-import themesRoutes from './modules/themes/themes.routes';
+import statsRoutes from './modules/stats/stats.routes';
 
 const app = express();
 
@@ -65,7 +65,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/audit', auditRoutes);
-app.use('/api/themes', themesRoutes);
+app.use('/api/stats', statsRoutes);
 app.use('/api', ticketsRoutes); // Exposes /api/tickets/:ticket_id and /api/games/:game_id/tickets
 
 // Default Health check

@@ -54,11 +54,6 @@ export interface GamePostponedEvent {
   new_time: string;
 }
 
-export interface ThemeChangeEvent {
-  event: 'theme_change';
-  theme_class: string;
-}
-
 export interface EmojiReactionEvent {
   event: 'emoji_reaction';
   emoji: string;
@@ -73,7 +68,6 @@ export type SSEEvent =
   | GameCompletedEvent
   | TicketStatusChangeEvent
   | GamePostponedEvent
-  | ThemeChangeEvent
   | EmojiReactionEvent;
 
 // ============================================================

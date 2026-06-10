@@ -16,6 +16,7 @@ async function seed(): Promise<void> {
     'seed_roles.sql',
     'seed_superadmin.sql',
     'seed_sample_game.sql',
+    'seed_sample_staff.sql', // after sample_game: assigns the seeded operator to it
   ];
 
   for (const file of seedFiles) {

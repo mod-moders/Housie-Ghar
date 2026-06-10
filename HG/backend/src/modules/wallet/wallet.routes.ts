@@ -16,15 +16,15 @@ const router = Router();
 
 // Admin oversight
 router.get('/agents', authenticateToken, requireRole(['Admin', 'Superadmin']), listAgentWallets);
-router.get('/topup/pending', authenticateToken, requireRole(['Admin', 'Superadmin']), listPendingTopUps);
 
 // Agent self-service
 router.get('/ledger', authenticateToken, requireRole(['Agent']), getMyLedger);
 router.post('/topup/request', authenticateToken, requireRole(['Agent']), requestTopUp);
 
-// Admin review
-router.post('/topup/:id/approve', authenticateToken, requireRole(['Admin', 'Superadmin']), approveTopUp);
-router.post('/topup/:id/reject', authenticateToken, requireRole(['Admin', 'Superadmin']), rejectTopUp);
+// Financial Officer review
+router.get('/topup/pending', authenticateToken, requireFinancialOfficer, listPendingTopUps);
+router.post('/topup/:id/approve', authenticateToken, requireFinancialOfficer, approveTopUp);
+router.post('/topup/:id/reject', authenticateToken, requireFinancialOfficer, rejectTopUp);
 
 // Financial Officer hub
 router.post('/agents/:agentId/adjust', authenticateToken, requireFinancialOfficer, manualAdjust);
