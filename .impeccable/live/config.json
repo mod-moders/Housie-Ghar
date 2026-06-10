@@ -1,0 +1,8 @@
+{
+  "files": ["HG/frontend/src/app/layout.tsx"],
+  "insertBefore": "</body>",
+  "commentSyntax": "jsx",
+  "framework": "nextjs-app-router",
+  "devServerUrl": "http://localhost:3000",
+  "cspChecked": true
+}

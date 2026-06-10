@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion, AnimatePresence } from "motion/react";
 import { useSSE } from "@/lib/hooks/useSSE";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { apiFetch } from "@/lib/api";
@@ -13,10 +14,14 @@ interface Game {
   prize_pool: Array<{ prize_id: number; pattern_name: string; prize_amount: number; claimed: boolean; winner_housie_name: string | null }>;
 }
 
+const ease = [0.23, 1, 0.32, 1] as const;
+const spring = { type: "spring" as const, duration: 0.25, bounce: 0 };
+
 export default function HomePage() {
   const [games, setGames] = useState<Game[]>([]);
   const [liveGame, setLiveGame] = useState<Game | null>(null);
   const { drawnNumbers, lastDrawn } = useGameStore();
+  const reduced = useReducedMotion();
 
   useSSE(liveGame?.game_id ?? null);
 
@@ -34,198 +39,428 @@ export default function HomePage() {
   const upcoming = games.filter((g) => g.game_status === "Scheduled" || g.game_status === "Live");
 
   return (
-    <div className="min-h-screen bg-cream font-body text-[#1a1a1a] overflow-x-hidden">
+    <div className="min-h-[100dvh] font-body text-[#1a1a1a] overflow-x-hidden">
+
       {/* ── NAV ── */}
-      <nav className="sticky top-0 z-50 bg-forest h-[60px] flex items-center justify-between px-5 shadow-lg">
-        <a href="#hero" className="font-display text-2xl font-black text-gold tracking-tight">
-          Housie <span className="text-cream">Ghar</span>
+      <nav className="sticky top-0 z-50 bg-forest h-[64px] flex items-center justify-between px-6 shadow-lg">
+        <a href="#hero" className="font-display text-2xl font-black text-gold tracking-tight leading-none">
+          Housie <span className="text-cream/80">Ghar</span>
         </a>
-        <ul className="hidden sm:flex gap-1">
-          {["#games", "#how-to-play", "#live"].map((href) => (
+        <ul className="hidden sm:flex gap-0.5">
+          {[["#games", "Games"], ["#how-to-play", "How to Play"], ["#live", "Live Draw"]].map(([href, label]) => (
             <li key={href}>
-              <a href={href} className="text-cream/75 hover:text-gold text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gold/10 transition-all">
-                {href.replace("#", "").replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+              <a href={href} className="text-cream/65 hover:text-gold text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gold/10 transition-colors duration-200">
+                {label}
               </a>
             </li>
           ))}
         </ul>
-        <Link href="/admin/login" className="border border-gold/40 text-gold text-xs px-3 py-1.5 rounded-lg hover:bg-gold/10 transition-all">
+        <Link href="/admin/login" className="border border-gold/40 text-gold text-xs font-semibold px-3.5 py-1.5 rounded-lg hover:bg-gold/10 transition-colors duration-200">
           Staff Login
         </Link>
       </nav>
 
       {/* ── HERO ── */}
-      <section id="hero" className="bg-gradient-to-br from-forest via-forest-mid to-[#1a4a35] text-center py-16 px-5 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_110%,rgba(240,165,0,0.18),transparent)]" />
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 bg-gold/15 border border-gold/35 rounded-full px-4 py-1 text-gold-light text-xs font-semibold tracking-widest uppercase mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
-            MOD Certified Fair Play
-          </span>
-          <h1 className="font-display text-4xl sm:text-6xl font-black text-cream leading-tight mb-3">
-            Play Together,<br /><span className="text-gold">Win Together</span>
-          </h1>
-          <p className="text-cream/65 text-sm max-w-xs mx-auto mb-8 leading-relaxed">
-            Housie Ghar digitizes the beloved community game with a cryptographically fair draw. Join from your phone — no app needed.
-          </p>
-          <a href="#games" className="inline-block bg-gold hover:bg-gold-light text-forest font-black text-sm px-8 py-3 rounded-xl transition-all shadow-lg shadow-gold/20">
-            Browse Games →
-          </a>
+      <section id="hero" className="relative bg-forest min-h-[100svh] flex items-center justify-center overflow-hidden">
+        {/* Housie-board grid pattern */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg,rgba(240,165,0,0.05) 0px,transparent 1px,transparent 48px)," +
+              "repeating-linear-gradient(90deg,rgba(240,165,0,0.05) 0px,transparent 1px,transparent 48px)",
+          }}
+        />
+        {/* Layered radial glows — bottom warm bloom + top cool depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_110%,rgba(240,165,0,0.15),transparent)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_45%_at_50%_0%,rgba(36,80,58,0.55),transparent)] pointer-events-none" />
+
+        <div className="relative text-center px-6 max-w-4xl mx-auto">
+          {liveGame && (
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease }}
+              className="inline-flex items-center gap-2 mb-8"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+              </span>
+              <span className="text-green-400 text-xs font-mono font-semibold tracking-[0.12em]">
+                Live now · {liveGame.title}
+              </span>
+            </motion.div>
+          )}
+
+          <motion.h1
+            initial={reduced ? false : { opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06, duration: 0.65, ease }}
+            className="font-display font-black text-cream leading-[0.88] mb-7 text-balance"
+            style={{ fontSize: "clamp(2.75rem, 9vw, 5.5rem)" }}
+          >
+            Play Together,
+            <br />
+            <span className="text-gold">Win Together</span>
+          </motion.h1>
+
+          <motion.p
+            initial={reduced ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.7, ease }}
+            className="text-cream/60 text-base sm:text-lg max-w-xl mx-auto mb-10 leading-relaxed text-pretty"
+          >
+            Housie Ghar digitizes the beloved community game with a cryptographically fair draw.
+            Join from your phone, no app needed.
+          </motion.p>
+
+          <motion.div
+            initial={reduced ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.36, duration: 0.6, ease }}
+            className="flex flex-wrap gap-3 justify-center"
+          >
+            <motion.a
+              href="#games"
+              className="bg-gold text-forest font-black text-sm px-8 py-3.5 rounded-full shadow-lg shadow-gold/30 inline-flex items-center"
+              whileHover={reduced ? {} : { scale: 1.04, y: -3 }}
+              whileTap={reduced ? {} : { scale: 0.97 }}
+              transition={spring}
+            >
+              Browse Games
+            </motion.a>
+            {liveGame ? (
+              <motion.a
+                href="#live"
+                className="border-2 border-cream/30 text-cream font-bold text-sm px-8 py-3.5 rounded-full"
+                whileHover={reduced ? {} : { y: -3, borderColor: "rgba(253,246,227,0.55)" }}
+                whileTap={reduced ? {} : { scale: 0.97 }}
+                transition={spring}
+              >
+                Watch Live Draw
+              </motion.a>
+            ) : (
+              <motion.a
+                href="#how-to-play"
+                className="border-2 border-cream/30 text-cream font-bold text-sm px-8 py-3.5 rounded-full"
+                whileHover={reduced ? {} : { y: -3, borderColor: "rgba(253,246,227,0.55)" }}
+                whileTap={reduced ? {} : { scale: 0.97 }}
+                transition={spring}
+              >
+                How it works
+              </motion.a>
+            )}
+          </motion.div>
         </div>
       </section>
 
-      {/* ── GAMES LOBBY ── */}
-      <section id="games" className="py-14 px-5 max-w-5xl mx-auto">
-        <h2 className="font-display text-2xl font-bold text-forest mb-6">Upcoming Games</h2>
-        {upcoming.length === 0 ? (
-          <p className="text-[#888] text-sm">No games scheduled right now. Check back soon!</p>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {upcoming.map((g) => (
-              <GameCard key={g.game_id} game={g} />
-            ))}
+      {/* ── GAME LOBBY ── */}
+      <section id="games" className="py-20 px-6 bg-cream">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-baseline justify-between mb-10">
+            <h2 className="font-display text-3xl font-bold text-forest text-balance">
+              Upcoming Games
+            </h2>
+            {upcoming.length > 0 && (
+              <span className="font-mono text-xs text-[#999]">
+                {upcoming.length} available
+              </span>
+            )}
           </div>
-        )}
+
+          {upcoming.length === 0 ? (
+            <div className="text-center py-24 border-2 border-dashed border-forest/10 rounded-2xl">
+              <p className="font-display text-5xl font-black text-forest/10 mb-3">—</p>
+              <p className="text-[#666] text-sm">No games scheduled right now. Check back soon.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {upcoming.map((g, i) => (
+                <GameCard key={g.game_id} game={g} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── HOW TO PLAY ── */}
-      <section id="how-to-play" className="bg-cream-dark py-14 px-5">
+      <section id="how-to-play" className="bg-forest py-20 px-6">
         <div className="max-w-3xl mx-auto">
-          <h2 className="font-display text-2xl font-bold text-forest mb-8 text-center">How To Play</h2>
-          <ol className="space-y-4">
+          <h2 className="font-display text-3xl font-bold text-cream mb-16 text-balance">
+            How to Play
+          </h2>
+          <ol className="space-y-10">
             {[
-              ["Browse & pick your game", "Choose from upcoming games in the lobby above."],
+              ["Browse and pick your game", "Choose from upcoming games in the lobby above."],
               ["Select up to 6 tickets", "Each ticket has a unique 3×9 grid of numbers."],
-              ["Enter your Housie Name", "Your anonymous nickname for the game."],
-              ["Pay your Agent via UPI/WhatsApp", "A local Agent confirms your payment and locks your ticket."],
-              ["Watch the live draw", "Numbers highlight on your ticket in real-time!"],
-              ["Claim your prize", "Win automatically detected — collect from the Agent."],
+              ["Enter your Housie Name", "Your anonymous nickname for the draw — no account needed."],
+              ["Pay your Agent via UPI or WhatsApp", "A local Agent confirms your payment and locks your tickets."],
+              ["Watch the live draw", "Numbers highlight on your ticket in real time."],
+              ["Claim your prize", "Wins are detected automatically. Collect from the Agent."],
             ].map(([title, desc], i) => (
-              <li key={i} className="flex gap-4 items-start">
-                <span className="w-8 h-8 rounded-full bg-forest text-gold font-display font-black text-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                  {i + 1}
+              <motion.li
+                key={i}
+                initial={reduced ? false : { opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ delay: i * 0.05, duration: 0.35, ease }}
+                className="flex gap-7 items-start"
+              >
+                <span
+                  className="font-display font-black text-gold/20 leading-none flex-shrink-0 tabular-nums select-none"
+                  style={{ fontSize: "clamp(2.5rem, 5vw, 3.5rem)" }}
+                >
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                <div>
-                  <p className="font-semibold text-forest-mid text-sm">{title}</p>
-                  <p className="text-[#888] text-xs leading-relaxed">{desc}</p>
+                <div className="pt-1.5">
+                  <p className="font-semibold text-cream text-base mb-1">{title}</p>
+                  <p className="text-cream/50 text-sm leading-relaxed text-pretty">{desc}</p>
                 </div>
-              </li>
+              </motion.li>
             ))}
           </ol>
         </div>
       </section>
 
-      {/* ── LIVE SECTION ── */}
-      <section id="live" className="py-14 px-5 max-w-5xl mx-auto">
-        <h2 className="font-display text-2xl font-bold text-forest mb-6">Live Draw</h2>
-        {liveGame ? (
-          <div className="grid sm:grid-cols-2 gap-8">
-            <div className="bg-forest rounded-2xl p-8 text-center shadow-xl">
-              <p className="text-gold text-xs font-mono tracking-widest uppercase mb-3">Current Number</p>
-              <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-gold to-gold-light flex items-center justify-center mx-auto shadow-lg shadow-gold/20">
-                <span className="font-display text-5xl font-black text-forest">{lastDrawn ?? "--"}</span>
+      {/* ── LIVE DRAW ── */}
+      <section id="live" className="py-20 px-6 bg-cream">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="font-display text-3xl font-bold text-forest mb-10 text-balance">
+            Live Draw
+          </h2>
+          {liveGame ? (
+            <div className="grid sm:grid-cols-2 gap-8 items-start">
+              {/* Current number */}
+              <div className="bg-forest rounded-2xl p-10 text-center shadow-xl shadow-forest/15">
+                <p className="text-gold/50 text-xs font-mono tracking-[0.15em] uppercase mb-6">Current Number</p>
+                <div className="relative w-36 h-36 mx-auto mb-6">
+                  <div
+                    className="absolute inset-0 rounded-full bg-gold/15 animate-ping"
+                    style={{ animationDuration: "2.4s" }}
+                  />
+                  <motion.div
+                    key={lastDrawn}
+                    initial={reduced ? false : { scale: 1.4, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", duration: 0.45, bounce: 0.2 }}
+                    className="relative w-36 h-36 rounded-full bg-gradient-to-br from-gold to-gold-light flex items-center justify-center shadow-xl shadow-gold/30"
+                  >
+                    <span className="font-display text-6xl font-black text-forest">{lastDrawn ?? "--"}</span>
+                  </motion.div>
+                </div>
+                <p className="text-cream/35 text-xs font-mono">{drawnNumbers.length} of 90 drawn</p>
               </div>
-              <p className="text-cream/60 text-xs font-mono mt-4">{drawnNumbers.length} / 90 drawn</p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-forest mb-3">Numbers Board</p>
-              <div className="grid grid-cols-10 gap-1">
-                {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
-                  <div key={n} className={`h-7 rounded text-[10px] font-mono font-bold flex items-center justify-center transition-all ${drawnNumbers.includes(n) ? "bg-gold text-forest scale-105" : "bg-cream-dark text-[#888]"}`}>
-                    {n}
-                  </div>
-                ))}
+              {/* Numbers board */}
+              <div>
+                <p className="text-sm font-semibold text-forest mb-4">Numbers Board</p>
+                <div className="grid grid-cols-10 gap-1">
+                  {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
+                    <div
+                      key={n}
+                      className={`h-7 rounded text-[10px] font-mono font-bold flex items-center justify-center transition-[background-color,color,transform] duration-200 ${
+                        drawnNumbers.includes(n)
+                          ? "bg-gold text-forest scale-105"
+                          : "bg-cream-dark text-[#aaa]"
+                      }`}
+                    >
+                      {n}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="bg-cream-dark rounded-2xl p-10 text-center text-[#888] text-sm">
-            No game is live right now. Check the lobby for upcoming games!
-          </div>
-        )}
+          ) : (
+            <div className="border-2 border-dashed border-forest/10 rounded-2xl p-16 text-center">
+              <p className="text-[#666] text-sm">No draw is live right now. Check the lobby for upcoming games.</p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="bg-forest text-cream/40 text-xs text-center py-6 font-mono">
-        © 2026 Housie Ghar · Powered by MOD · Fair play guaranteed
+      <footer className="bg-forest text-cream/30 text-xs text-center py-8 font-mono tracking-wider">
+        © 2026 Housie Ghar · Cryptographically fair play
       </footer>
     </div>
   );
 }
 
-function GameCard({ game }: { game: Game }) {
+function GameCard({ game, index }: { game: Game; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const reduced = useReducedMotion();
   const fill = game.fill_percentage;
   const isLive = game.game_status === "Live";
   const isSoldOut = fill >= 100;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-md border-2 transition-all ${isLive ? "border-success" : "border-cream-dark"}`}>
-      <div className="p-5">
-        <div className="flex items-center justify-between mb-2">
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ delay: index * 0.05, duration: 0.38, ease }}
+      whileHover={reduced ? {} : { y: -6 }}
+      whileTap={reduced ? {} : { scale: 0.99 }}
+      style={{ willChange: "transform" }}
+      className={`group relative rounded-2xl overflow-hidden cursor-default ${
+        isLive
+          ? "bg-forest shadow-xl shadow-forest/25"
+          : "bg-white border-2 border-cream-dark hover:border-forest/20 hover:shadow-lg hover:shadow-forest/8"
+      }`}
+    >
+      {/* Card body */}
+      <div className="p-5 pb-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
           {isLive ? (
-            <span className="bg-success/10 text-success border border-success/30 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full animate-pulse">
-              LIVE NOW
+            <span className="inline-flex items-center gap-1.5 bg-green-500/15 text-green-400 border border-green-400/25 text-[10px] font-mono font-bold px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              LIVE
             </span>
           ) : (
-            <span className="bg-forest/10 text-forest text-[10px] font-mono px-2 py-0.5 rounded-full">
-              {new Date(game.scheduled_at).toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" })}
+            <span className="text-[11px] font-mono text-[#888] bg-forest/5 border border-forest/8 px-2.5 py-1 rounded-full">
+              {new Date(game.scheduled_at).toLocaleDateString("en-IN", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
             </span>
           )}
-          <span className="text-xs font-mono text-[#888]">₹{game.ticket_price}/ticket</span>
+          <span
+            className={`font-display font-black text-2xl leading-none tabular-nums ${
+              isLive ? "text-gold" : "text-forest"
+            }`}
+          >
+            ₹{game.ticket_price}
+          </span>
         </div>
-        <h3 className="font-display text-lg font-bold text-forest">{game.title}</h3>
+
+        <h3
+          className={`font-display text-lg font-bold leading-tight mb-5 ${
+            isLive ? "text-cream" : "text-forest"
+          }`}
+        >
+          {game.title}
+        </h3>
 
         {/* Fill bar */}
-        <div className="mt-3 mb-1">
-          <div className="h-2 bg-cream-dark rounded-full overflow-hidden">
+        <div>
+          <div
+            className={`h-1 rounded-full overflow-hidden ${
+              isLive ? "bg-cream/10" : "bg-cream-dark"
+            }`}
+          >
             <div
-              className={`h-full rounded-full transition-all ${fill >= 80 ? "bg-rust" : "bg-forest-light"}`}
+              className={`h-full rounded-full transition-[width] duration-700 ${
+                fill >= 80 ? "bg-rust" : isLive ? "bg-gold" : "bg-forest-light"
+              }`}
               style={{ width: `${Math.min(fill, 100)}%` }}
             />
           </div>
-          <p className="text-[10px] text-[#888] font-mono mt-1">
-            {fill >= 100 ? "Sold Out" : fill >= 80 ? `Fast Filling! ${fill}%` : `${fill}% filled`}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="mt-4 flex gap-2">
-          {isLive ? (
-            <a href="#live" className="flex-1 text-center bg-success text-white text-xs font-bold py-2 rounded-xl transition-all hover:opacity-90">
-              Watch Live
-            </a>
-          ) : isSoldOut ? (
-            <button disabled className="flex-1 bg-cream-dark text-[#888] text-xs font-bold py-2 rounded-xl cursor-not-allowed">
-              Sold Out
-            </button>
-          ) : (
-            <Link href={`/game/${game.game_id}`} className="flex-1 text-center bg-forest hover:bg-forest-mid text-gold text-xs font-bold py-2 rounded-xl transition-all">
-              Book Now
-            </Link>
-          )}
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="px-3 py-2 text-xs text-[#888] hover:text-forest border border-cream-dark rounded-xl transition-all"
+          <p
+            className={`text-[10px] font-mono mt-1.5 ${
+              isLive ? "text-cream/35" : "text-[#aaa]"
+            }`}
           >
-            {expanded ? "▲" : "▼"} Prizes
-          </button>
+            {fill >= 100
+              ? "Sold out"
+              : fill >= 80
+              ? `Filling fast · ${fill}%`
+              : `${fill}% booked`}
+          </p>
         </div>
       </div>
 
+      {/* Ticket-stub perforated separator */}
+      <div
+        className={`mx-5 border-t-2 border-dashed ${
+          isLive ? "border-cream/10" : "border-cream-dark"
+        }`}
+      />
+
+      {/* Actions */}
+      <div className="p-4 flex gap-2">
+        {isLive ? (
+          <a
+            href="#live"
+            className="flex-1 text-center bg-gold text-forest text-xs font-black py-2.5 rounded-xl transition-colors duration-200 hover:bg-gold-light"
+          >
+            Watch Live Draw
+          </a>
+        ) : isSoldOut ? (
+          <button
+            disabled
+            className="flex-1 bg-cream-dark text-[#bbb] text-xs font-bold py-2.5 rounded-xl cursor-not-allowed"
+          >
+            Sold Out
+          </button>
+        ) : (
+          <Link
+            href={`/game/${game.game_id}`}
+            className="flex-1 text-center bg-forest hover:bg-forest-mid text-gold text-xs font-black py-2.5 rounded-xl transition-colors duration-200"
+          >
+            Book Tickets
+          </Link>
+        )}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse prize pool" : "View prize pool"}
+          className={`px-3 py-2.5 text-xs rounded-xl border transition-colors duration-200 ${
+            isLive
+              ? "text-cream/45 border-cream/10 hover:text-gold hover:border-gold/30"
+              : "text-[#999] border-cream-dark hover:text-forest hover:border-forest/20"
+          }`}
+        >
+          {expanded ? "▲" : "▼"}
+        </button>
+      </div>
+
       {/* Prize dropdown */}
-      {expanded && (
-        <div className="border-t border-cream-dark px-5 py-3 space-y-1.5">
-          {game.prize_pool.map((p) => (
-            <div key={p.prize_id} className="flex justify-between text-xs">
-              <span className={p.claimed ? "text-[#888] line-through" : "text-forest-mid font-medium"}>
-                {p.pattern_name}
-              </span>
-              <span className="font-mono font-bold text-amber">₹{p.prize_amount}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.12, ease } }}
+            className={`border-t px-5 py-4 space-y-2.5 ${
+              isLive ? "border-cream/10" : "border-cream-dark"
+            }`}
+          >
+            <p
+              className={`text-[10px] font-mono uppercase tracking-wider mb-3 ${
+                isLive ? "text-cream/25" : "text-[#ccc]"
+              }`}
+            >
+              Prize Pool
+            </p>
+            {game.prize_pool.map((p) => (
+              <div key={p.prize_id} className="flex justify-between items-baseline">
+                <span
+                  className={
+                    p.claimed
+                      ? "text-[#999] line-through text-xs"
+                      : `text-xs font-medium ${isLive ? "text-cream/70" : "text-forest-mid"}`
+                  }
+                >
+                  {p.pattern_name}
+                  {p.claimed && p.winner_housie_name && (
+                    <span className="ml-1.5 text-[10px] font-mono text-[#aaa]">
+                      · {p.winner_housie_name}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`font-mono font-bold text-xs tabular-nums ${
+                    p.claimed ? "text-[#aaa]" : "text-amber"
+                  }`}
+                >
+                  ₹{p.prize_amount}
+                </span>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
