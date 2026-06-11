@@ -7,7 +7,7 @@ import { Server } from 'socket.io';
 import app from './app';
 import { env } from './config/env';
 import { connectRedis } from './db/redis';
-import { initGameEngineSubscription } from './services/gameEngine';
+import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
 
 const server = http.createServer(app);
@@ -71,7 +71,10 @@ async function boot() {
     // 3. Start Game Engine Redis pub/sub listener
     await initGameEngineSubscription();
 
-    // 4. Start Auto-Expiry Sweeper cron job
+    // 4. Resume any games that were Live when the process last died
+    await resumeInterruptedGames();
+
+    // 5. Start Auto-Expiry Sweeper cron job
     startExpirySweeper();
 
     // 5. Start listening

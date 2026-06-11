@@ -504,3 +504,30 @@ export async function completeGame(gameId: string): Promise<void> {
 
   console.log(`🏁 Game ${gameId} Completed! leaderboard:`, leaderboard);
 }
+
+/**
+ * On boot, find any games that were Live when the process last died,
+ * flip them to Paused (so startGame's status gate passes), then restart
+ * the conductor loop — restoring draw progress from Game_Logs.
+ */
+export async function resumeInterruptedGames(): Promise<void> {
+  const res = await pool.query<{ game_id: string; title: string }>(
+    `SELECT game_id, title FROM Scheduled_Games WHERE game_status = 'Live'`
+  );
+  if (res.rowCount === 0) return;
+
+  console.log(`🔄 Resuming ${res.rowCount} interrupted game(s)…`);
+
+  for (const row of res.rows) {
+    try {
+      await pool.query(
+        `UPDATE Scheduled_Games SET game_status = 'Paused' WHERE game_id = $1`,
+        [row.game_id]
+      );
+      await startGame(row.game_id, 'system-boot');
+      console.log(`✅ Resumed: ${row.title} (${row.game_id})`);
+    } catch (err) {
+      console.error(`⚠️  Could not resume game ${row.game_id}:`, err);
+    }
+  }
+}
