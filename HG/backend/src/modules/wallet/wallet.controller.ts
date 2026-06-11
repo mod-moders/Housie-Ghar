@@ -194,7 +194,7 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
  */
 export async function approveTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { id } = req.params;
-  const { reviewer_notes } = req.body;
+  const { reviewer_notes } = req.body ?? {};
   const actor = req.user!;
 
   const client = await pool.connect();
@@ -297,7 +297,7 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
   const { agentId } = req.params;
   const actor = req.user!;
 
-  const v = validateAdjust(req.body);
+  const v = validateAdjust(req.body ?? {});
   if (!v.ok) {
     res.status(400).json({ message: v.error });
     return;
@@ -456,7 +456,7 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
  */
 export async function rejectTopUp(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { id } = req.params;
-  const { reviewer_notes } = req.body;
+  const { reviewer_notes } = req.body ?? {};
   const actor = req.user!;
 
   try {

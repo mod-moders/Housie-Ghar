@@ -21,7 +21,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     // 1. Fetch user
     const result = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.password_hash, u.temp_password_required, u.status,
-              u.role_id, u.current_balance, r.role_name
+              u.role_id, u.current_balance, u.is_cfo, u.town, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        WHERE u.email = $1`,
@@ -87,6 +87,8 @@ export async function login(req: Request, res: Response): Promise<void> {
         email: user.email,
         current_balance: parseFloat(user.current_balance),
         temp_password_required: user.temp_password_required,
+        is_cfo: user.is_cfo === true,
+        town: user.town ?? null,
       },
     });
   } catch (error) {
