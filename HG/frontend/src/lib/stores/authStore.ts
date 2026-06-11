@@ -8,6 +8,7 @@ export interface AuthUser {
   role_name: "Superadmin" | "Admin" | "Operator" | "Agent";
   current_balance?: number;
   is_cfo?: boolean;
+  town?: string | null;
 }
 
 interface AuthStore {

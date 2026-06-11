@@ -1,198 +1,264 @@
 "use client";
-import { use, useEffect, useState, useCallback } from "react";
-import { apiFetch } from "@/lib/api";
-import { errMsg } from "@/lib/errMsg";
-import { useBookingStore } from "@/lib/stores/bookingStore";
-import { useCountdown } from "@/lib/hooks/useCountdown";
-import Link from "next/link";
+/** Game Room — number grid, ticket previews, housie-name entry, booking handoff. */
 
-interface TicketSquare { ticket_id: number; ticket_number: number; status: "Available"|"Locked"|"Sold"; }
-interface Game { game_id: string; title: string; ticket_price: number; total_tickets: number; fill_percentage: number; game_status: string; }
-interface LockResponse {
-  booking_id: string; agent_phone?: string; agent_name?: string;
-  total_amount: number; locked_until: string; whatsapp_link?: string;
+import { use, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import { money } from "@/lib/money";
+import { useBookingStore } from "@/lib/stores/bookingStore";
+import { PublicShell } from "@/components/PublicShell";
+import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
+import { BookingModal } from "@/components/BookingModal";
+import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
+import type { GameSummary, LockResponse, TicketDetail, TicketListItem, TicketListResponse } from "@/lib/types";
+
+const BANNED = ["idiot", "fool", "damn", "hell", "stupid"];
+
+function validateName(name: string): { ok: boolean; msg: string } {
+  const v = name.trim();
+  if (!v) return { ok: false, msg: "" };
+  if (v.length < 3) return { ok: false, msg: "At least 3 characters" };
+  if (v.length > 18) return { ok: false, msg: "Keep it under 18 characters" };
+  if (/\s/.test(v)) return { ok: false, msg: "No spaces — try an underscore" };
+  if (BANNED.some((b) => v.toLowerCase().includes(b))) return { ok: false, msg: "Keep it clean, please 😊" };
+  return { ok: true, msg: "Looking good!" };
 }
 
 export default function GameRoom({ params }: { params: Promise<{ game_id: string }> }) {
   const { game_id } = use(params);
-  const [game, setGame] = useState<Game | null>(null);
-  const [tickets, setTickets] = useState<TicketSquare[]>([]);
-  const [selected, setSelected] = useState<number[]>([]);
-  const [housieName, setHousieName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [phase, setPhase] = useState<"select" | "locked" | "sold" | "expired">("select");
+  const router = useRouter();
+
+  const [game, setGame] = useState<GameSummary | null>(null);
+  const [tickets, setTickets] = useState<TicketListItem[]>([]);
+  const [selected, setSelected] = useState<number[]>([]); // ticket_numbers
+  const [name, setName] = useState("");
+  const [matrices, setMatrices] = useState<Record<number, TicketMatrix>>({});
+  const [lock, setLock] = useState<LockResponse | null>(null);
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [locking, setLocking] = useState(false);
+  const requestedMatrices = useRef<Set<number>>(new Set());
+  const restoredLock = useRef(false);
 
   const booking = useBookingStore();
-  const { display: countdown, secondsLeft } = useCountdown(booking.lockedUntil);
 
-  const loadData = useCallback(async () => {
-    const [g, t] = await Promise.all([
-      apiFetch<Game>(`/api/games/${game_id}`).catch(() => null),
-      apiFetch<{ tickets: TicketSquare[] }>(`/api/games/${game_id}/tickets`).catch(() => ({ tickets: [] })),
-    ]);
-    if (g) setGame(g);
-    setTickets(t.tickets);
+  // Load game meta once; refresh the ticket grid every 5s so locks/sales appear live.
+  // On the first tickets load, restore an in-flight lock for this game after a reload.
+  useEffect(() => {
+    let alive = true;
+    apiFetch<GameSummary>(`/api/games/${game_id}`)
+      .then((g) => { if (alive) setGame(g); })
+      .catch(() => {});
+    const loadTickets = () =>
+      apiFetch<TicketListResponse>(`/api/games/${game_id}/tickets`)
+        .then((res) => {
+          if (!alive) return;
+          setTickets(res.tickets);
+          const b = useBookingStore.getState();
+          if (
+            !restoredLock.current &&
+            b.bookingId &&
+            b.gameId === game_id &&
+            b.status === "locked" &&
+            b.lockedUntil &&
+            new Date(b.lockedUntil).getTime() > Date.now()
+          ) {
+            restoredLock.current = true;
+            setLock({
+              booking_id: b.bookingId,
+              locked_until: b.lockedUntil,
+              agent_name: b.agentName,
+              agent_phone: b.agentPhone,
+              agent_town: null,
+              total_amount: b.totalAmount,
+              whatsapp_link: b.whatsappLink,
+              is_overflow: false,
+            });
+            setName(b.housieName);
+            setSelected(
+              b.ticketIds
+                .map((id) => res.tickets.find((t) => t.ticket_id === id)?.ticket_number ?? 0)
+                .filter(Boolean)
+            );
+          }
+        })
+        .catch(() => {});
+    loadTickets();
+    const id = setInterval(loadTickets, 5000);
+    return () => { alive = false; clearInterval(id); };
   }, [game_id]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadData(); }, [loadData]);
+  const fetchMatrix = useCallback((ticketId: number, ticketNumber: number) => {
+    if (requestedMatrices.current.has(ticketNumber)) return;
+    requestedMatrices.current.add(ticketNumber);
+    apiFetch<TicketDetail>(`/api/tickets/${ticketId}`)
+      .then((d) => setMatrices((m) => ({ ...m, [ticketNumber]: gridToMatrix(d.grid_data) })))
+      .catch(() => { requestedMatrices.current.delete(ticketNumber); });
+  }, []);
 
-  // poll booking status when locked
-  useEffect(() => {
-    if (phase !== "locked" || !booking.bookingId) return;
-    const id = setInterval(async () => {
-      try {
-        const d = await apiFetch<{ booking_status: string }>(`/api/bookings/status/${booking.bookingId}`);
-        if (d.booking_status === "Sold") { setPhase("sold"); clearInterval(id); }
-        else if (d.booking_status === "Expired" || d.booking_status === "Cancelled") { setPhase("expired"); clearInterval(id); booking.clear(); }
-      } catch {}
-    }, 3000);
-    return () => clearInterval(id);
-  }, [phase, booking.bookingId]);
-
-  const toggle = (id: number) => {
+  const toggle = (t: TicketListItem) => {
+    if (t.status !== "Available") return;
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) :
-      prev.length >= 6 ? prev : [...prev, id]
+      prev.includes(t.ticket_number)
+        ? prev.filter((x) => x !== t.ticket_number)
+        : [...prev, t.ticket_number].sort((a, b) => a - b)
     );
+    fetchMatrix(t.ticket_id, t.ticket_number);
   };
 
-  const handleBook = async () => {
-    if (!housieName.trim() || selected.length === 0) return;
-    setLoading(true); setError("");
+  const nameState = validateName(name);
+  const price = game?.ticket_price ?? 0;
+  const total = selected.length * price;
+  const canBook = selected.length > 0 && nameState.ok && !locking;
+
+  const bookNow = async () => {
+    if (!game) return;
+    setLocking(true);
+    setLockError(null);
+    const ticketIds = selected
+      .map((n) => tickets.find((t) => t.ticket_number === n)?.ticket_id)
+      .filter((x): x is number => x != null);
     try {
-      const data = await apiFetch<LockResponse>("/api/bookings/lock", {
+      const res = await apiFetch<LockResponse>("/api/bookings/lock", {
         method: "POST",
-        body: JSON.stringify({ game_id, ticket_ids: selected, housie_name: housieName.trim() }),
+        body: JSON.stringify({ game_id, ticket_ids: ticketIds, housie_name: name.trim() }),
       });
       booking.setBooking({
-        bookingId: data.booking_id, housieName: housieName.trim(), gameId: game_id,
-        ticketIds: selected, status: "locked", agentPhone: data.agent_phone,
-        agentName: data.agent_name, totalAmount: data.total_amount,
-        lockedUntil: data.locked_until, whatsappLink: data.whatsapp_link,
+        bookingId: res.booking_id,
+        housieName: name.trim(),
+        gameId: game_id,
+        ticketIds,
+        status: "locked",
+        agentPhone: res.agent_phone,
+        agentName: res.agent_name,
+        totalAmount: res.total_amount,
+        lockedUntil: res.locked_until,
+        whatsappLink: res.whatsapp_link,
       });
-      setPhase("locked");
+      setLock(res);
     } catch (e) {
-      setError(errMsg(e) || "Booking failed. Try again.");
-    } finally { setLoading(false); }
+      setLockError(e instanceof Error ? e.message : "Could not reserve tickets — please try again.");
+    } finally {
+      setLocking(false);
+    }
   };
 
-  if (!game) return <div className="min-h-screen bg-cream flex items-center justify-center text-[#888]">Loading...</div>;
+  const when = game
+    ? `${new Date(game.scheduled_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${new Date(game.scheduled_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`
+    : "";
 
   return (
-    <div className="min-h-screen bg-cream font-body">
-      {/* Header */}
-      <div className="bg-forest text-cream px-5 py-4 flex items-center gap-4">
-        <Link href="/" className="text-gold text-xl">←</Link>
-        <div>
-          <h1 className="font-display text-xl font-bold">{game.title}</h1>
-          <p className="text-cream/60 text-xs font-mono">₹{game.ticket_price}/ticket · {game.fill_percentage}% filled</p>
-        </div>
-      </div>
-
-      {/* Sold phase */}
-      {phase === "sold" && (
-        <div className="max-w-md mx-auto mt-16 text-center px-5">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="font-display text-2xl font-bold text-forest">Booking Confirmed!</h2>
-          <p className="text-[#888] text-sm mt-2 mb-6">Your tickets are locked. Head to the live draw!</p>
-          <Link href="/#live" className="bg-forest text-gold font-bold text-sm px-8 py-3 rounded-xl inline-block">
-            Watch Live Draw
-          </Link>
-        </div>
-      )}
-
-      {/* Expired phase */}
-      {phase === "expired" && (
-        <div className="max-w-md mx-auto mt-16 text-center px-5">
-          <div className="text-6xl mb-4">⏱</div>
-          <h2 className="font-display text-2xl font-bold text-rust">Booking Expired</h2>
-          <p className="text-[#888] text-sm mt-2 mb-6">Your reservation timed out. Please select tickets again.</p>
-          <button onClick={() => setPhase("select")} className="bg-forest text-gold font-bold text-sm px-8 py-3 rounded-xl">
-            Try Again
+    <PublicShell>
+      <div className="hg-screen hg-screen-room">
+        <div className="hg-room-head">
+          <button className="hg-back" onClick={() => router.push("/")} aria-label="Back to lobby">
+            <Icon name="arrowL" size={20} />
           </button>
-        </div>
-      )}
-
-      {/* Lock modal overlay */}
-      {phase === "locked" && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
-            <div className="text-center mb-4">
-              <p className="text-xs font-mono text-[#888] uppercase tracking-widest">Tickets Reserved</p>
-              <div className="font-display text-5xl font-black text-forest my-3">{countdown}</div>
-              <p className="text-sm text-[#888]">Pay within this window to confirm</p>
-            </div>
-            <div className="bg-cream rounded-xl p-4 mb-4 text-sm">
-              <p className="text-[#888]">Agent: <strong className="text-forest">{booking.agentName}</strong></p>
-              <p className="text-[#888] mt-1">Amount due: <strong className="text-amber font-mono text-lg">₹{booking.totalAmount}</strong></p>
-            </div>
-            <a
-              href={booking.whatsappLink}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-wa text-white font-bold py-3 rounded-xl text-sm mb-3"
-            >
-              💬 Open WhatsApp to Pay
-            </a>
-            <p className="text-center text-[10px] text-[#888]">Booking ID: {booking.bookingId?.slice(0, 8).toUpperCase()}</p>
-            {secondsLeft === 0 && <p className="text-center text-xs text-rust mt-2">Timer expired — waiting for server confirmation...</p>}
+          <div className="hg-room-titles">
+            <h1>{game?.title ?? "Loading…"}</h1>
+            {game && <span>{when} · {money(game.ticket_price)}/ticket</span>}
           </div>
         </div>
-      )}
 
-      {/* Select phase */}
-      {phase === "select" && (
-        <div className="max-w-5xl mx-auto px-5 py-6">
-          <p className="text-sm text-[#888] mb-4">Select up to 6 tickets. Tap to toggle.</p>
-          <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 gap-2 mb-8">
-            {tickets.map((t) => {
-              const sel = selected.includes(t.ticket_id);
-              return (
-                <button
-                  key={t.ticket_id}
-                  disabled={t.status !== "Available"}
-                  onClick={() => toggle(t.ticket_id)}
-                  className={`h-11 rounded-xl border-2 text-xs font-mono font-bold transition-all ${
-                    sel ? "bg-forest border-forest text-gold scale-105 shadow-md" :
-                    t.status === "Sold" ? "bg-cream-dark border-cream-dark text-[#ccc] cursor-not-allowed" :
-                    t.status === "Locked" ? "bg-warning/10 border-warning/30 text-warning cursor-not-allowed" :
-                    "bg-white border-cream-dark text-[#888] hover:border-forest hover:text-forest"
-                  }`}
-                >
-                  {t.status === "Sold" ? "✕" : t.status === "Locked" ? "🔒" : t.ticket_number}
-                </button>
-              );
-            })}
-          </div>
+        <div className="hg-legend">
+          <span><i className="lg-dot lg-avail" />Available</span>
+          <span><i className="lg-dot lg-lock"><Icon name="lock" size={9} strokeWidth={2.6} /></i>Locked</span>
+          <span><i className="lg-dot lg-sold"><Icon name="x" size={9} strokeWidth={3} /></i>Sold</span>
+          <span className="hg-legend-tip">Tap a number to preview its ticket</span>
+        </div>
 
-          {/* Sticky footer */}
-          {selected.length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-cream-dark p-4 shadow-xl">
-              <div className="max-w-5xl mx-auto flex flex-col sm:flex-row gap-3 items-end">
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#888] block mb-1">Your Housie Name</label>
-                  <input
-                    type="text" value={housieName} onChange={(e) => setHousieName(e.target.value)}
-                    placeholder="e.g. LuckyStar7"
-                    maxLength={20}
-                    className="w-full border-2 border-cream-dark rounded-xl px-4 py-2.5 text-sm font-mono focus:border-forest focus:outline-none"
-                  />
-                  {error && <p className="text-rust text-xs mt-1">{error}</p>}
+        <div className="hg-numgrid">
+          {tickets.map((t) => {
+            const st = t.status.toLowerCase() as "available" | "locked" | "sold";
+            const isSel = selected.includes(t.ticket_number);
+            return (
+              <button
+                key={t.ticket_id}
+                className={`hg-num hg-num-${st}${isSel ? " is-sel" : ""}`}
+                onClick={() => toggle(t)}
+                disabled={st !== "available"}
+              >
+                {st === "locked" ? (
+                  <Icon name="lock" size={13} strokeWidth={2.4} />
+                ) : st === "sold" ? (
+                  <span className="hg-num-sold">{t.ticket_number}</span>
+                ) : (
+                  t.ticket_number
+                )}
+                {st === "locked" && <span className="hg-num-spin" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {selected.length > 0 && (
+          <div className="hg-previews">
+            <div className="hg-previews-head">
+              <h2 className="hg-section-title">Your tickets ({selected.length})</h2>
+              <button className="hg-clear" onClick={() => setSelected([])}>Clear all</button>
+            </div>
+            <div className="hg-previews-scroll">
+              {selected.map((n) => (
+                <div key={n} className="hg-preview-item">
+                  <button
+                    className="hg-preview-x"
+                    onClick={() => setSelected((prev) => prev.filter((x) => x !== n))}
+                    aria-label="Remove"
+                  >
+                    <Icon name="x" size={13} strokeWidth={2.6} />
+                  </button>
+                  {matrices[n] ? (
+                    <HousieTicket matrix={matrices[n]} label={`#${n}`} compact />
+                  ) : (
+                    <div className="hg-ticket hg-ticket-compact"><div className="hg-ticket-tag">#{n}</div></div>
+                  )}
                 </div>
-                <button
-                  onClick={handleBook}
-                  disabled={!housieName.trim() || loading}
-                  className="w-full sm:w-auto bg-forest text-gold font-black text-sm px-6 py-3 rounded-xl disabled:opacity-50 transition-all hover:bg-forest-mid shadow-lg"
-                >
-                  {loading ? "Booking..." : `Book ${selected.length} ticket${selected.length > 1 ? "s" : ""} — ₹${(game.ticket_price * selected.length).toLocaleString()}`}
-                </button>
-              </div>
+              ))}
             </div>
-          )}
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+
+        <div style={{ height: selected.length > 0 ? 168 : 24 }} />
+
+        {selected.length > 0 && (
+          <div className="hg-action-foot">
+            <div className="hg-name-field">
+              <input
+                className={`hg-name-input${name && !nameState.ok ? " is-bad" : ""}${nameState.ok ? " is-good" : ""}`}
+                placeholder="Your Housie name (e.g. MomoMaster99)"
+                value={name}
+                maxLength={18}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <span className={`hg-name-hint${nameState.ok ? " is-good" : " is-bad"}`}>
+                {name ? nameState.msg : "Pick a fun local nickname — builds the hall spirit!"}
+              </span>
+            </div>
+            {lockError && <p className="hg-sec-err">{lockError}</p>}
+            <div className="hg-action-row">
+              <div className="hg-total">
+                <span className="hg-dim">{selected.length} × {money(price)}</span>
+                <strong>{money(total)}</strong>
+              </div>
+              <Button variant="cta" size="lg" disabled={!canBook} icon="ticket" onClick={bookNow}>
+                {locking ? "Reserving…" : "Book Now"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {lock && game && (
+          <BookingModal
+            lock={lock}
+            housieName={name.trim()}
+            gameTitle={game.title}
+            ticketNumbers={selected}
+            matrices={matrices}
+            onClose={() => { setLock(null); setSelected([]); }}
+            goLive={() => router.push(`/game/${game_id}/live`)}
+          />
+        )}
+      </div>
+    </PublicShell>
   );
 }
