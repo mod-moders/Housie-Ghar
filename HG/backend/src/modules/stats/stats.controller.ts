@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { CONSTANTS } from '../../config/constants';
 
 /**
  * Platform KPIs for the staff Overview section (Superadmin/Admin).
@@ -85,6 +86,91 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
     );
   } catch (error) {
     console.error('Error fetching hall of fame:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+const LUCKY_CYCLE_MS = CONSTANTS.LUCKY_NUMBER_CYCLE_DAYS * 24 * 60 * 60 * 1000;
+
+interface LuckyNumberBody {
+  lucky_number: number | null;
+  refreshes_at: string;
+}
+
+// Pure function of the DB per cycle, so this cache is only an optimization —
+// restarts and parallel instances all recompute the identical value.
+let luckyMemo: { cycleIndex: number; body: LuckyNumberBody } | null = null;
+
+/**
+ * Public Lucky Number — most frequent winning ticket number across the 60
+ * games completed most recently before the current 12-day cycle started.
+ */
+export async function getLuckyNumber(req: Request, res: Response): Promise<void> {
+  try {
+    const cycleIndex = Math.max(
+      0,
+      Math.floor((Date.now() - CONSTANTS.LUCKY_NUMBER_EPOCH_MS) / LUCKY_CYCLE_MS)
+    );
+    if (luckyMemo && luckyMemo.cycleIndex === cycleIndex) {
+      res.json(luckyMemo.body);
+      return;
+    }
+
+    const cycleStartMs = CONSTANTS.LUCKY_NUMBER_EPOCH_MS + cycleIndex * LUCKY_CYCLE_MS;
+    const result = await pool.query(
+      `SELECT t.ticket_number, p.claimed_at
+       FROM (
+         SELECT game_id
+         FROM Scheduled_Games
+         WHERE game_status = 'Completed' AND completed_at < $1
+         ORDER BY completed_at DESC
+         LIMIT $2
+       ) g
+       JOIN Prize_Pool p ON p.game_id = g.game_id
+                        AND p.claimed = TRUE
+                        AND p.winner_ticket_id IS NOT NULL
+       JOIN Tickets t    ON t.ticket_id = p.winner_ticket_id`,
+      [new Date(cycleStartMs), CONSTANTS.LUCKY_NUMBER_SAMPLE_GAMES]
+    );
+
+    const tallies = new Map<number, { count: number; latestWinMs: number }>();
+    for (const row of result.rows) {
+      const n: number = row.ticket_number;
+      const winMs = row.claimed_at ? new Date(row.claimed_at).getTime() : 0;
+      const tally = tallies.get(n);
+      if (tally) {
+        tally.count += 1;
+        if (winMs > tally.latestWinMs) tally.latestWinMs = winMs;
+      } else {
+        tallies.set(n, { count: 1, latestWinMs: winMs });
+      }
+    }
+
+    // Mode with a total tie-break (count DESC, latest win DESC, lower number)
+    // so the result is always exactly one number.
+    let luckyNumber: number | null = null;
+    let best: { count: number; latestWinMs: number } | null = null;
+    for (const [n, tally] of tallies) {
+      if (
+        luckyNumber === null || best === null ||
+        tally.count > best.count ||
+        (tally.count === best.count &&
+          (tally.latestWinMs > best.latestWinMs ||
+            (tally.latestWinMs === best.latestWinMs && n < luckyNumber)))
+      ) {
+        luckyNumber = n;
+        best = tally;
+      }
+    }
+
+    const body: LuckyNumberBody = {
+      lucky_number: luckyNumber,
+      refreshes_at: new Date(cycleStartMs + LUCKY_CYCLE_MS).toISOString(),
+    };
+    luckyMemo = { cycleIndex, body };
+    res.json(body);
+  } catch (error) {
+    console.error('Error fetching lucky number:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

@@ -34,6 +34,11 @@ export const CONSTANTS = {
   EXPIRY_SWEEPER_INTERVAL: '*/30 * * * * *',  // Every 30 seconds
   BACKUP_SCHEDULE: '0 3 * * *',                 // 3:00 AM IST daily
 
+  // Lucky Number (public lobby announcement)
+  LUCKY_NUMBER_EPOCH_MS: Date.UTC(2026, 5, 1),   // 2026-06-01T00:00:00Z — fixed cycle anchor
+  LUCKY_NUMBER_CYCLE_DAYS: 12,                   // display refresh contract
+  LUCKY_NUMBER_SAMPLE_GAMES: 60,                 // most recent completed games per cycle
+
   // Prize Patterns
   PRIZE_PATTERNS: [
     'Early Five',
