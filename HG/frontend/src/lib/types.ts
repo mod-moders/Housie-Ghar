@@ -82,6 +82,11 @@ export interface OverviewStats {
   pending_topups: number;
 }
 
+export interface LuckyNumberResponse {
+  lucky_number: number | null;
+  refreshes_at: string;
+}
+
 export type TrustTier = "veteran" | "trusted" | "new";
 
 export interface StaffUser {
