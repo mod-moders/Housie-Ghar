@@ -18,6 +18,7 @@
   --font-head: var(--font-space-grotesk), "Space Grotesk", sans-serif;
   --font-body: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
+  --font-serif: var(--font-dm-serif-display), "DM Serif Display", serif;
 }
 
 /* ---- Palettes ---- */
@@ -65,7 +66,7 @@ body{background:var(--bg);font-family:var(--font-body);-webkit-font-smoothing:an
   scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;}
 .hg-frame::-webkit-scrollbar{width:7px}
 .hg-frame::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
-.hg-frame-wide{max-width:1240px;height:100vh;height:100dvh}
+.hg-frame-wide{max-width:none;width:100%;height:100vh;height:100dvh}
 .hg-screen{display:flex;flex-direction:column;min-height:100%}
 
 /* ---- Headings ---- */
@@ -85,8 +86,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-nav-link:hover{color:var(--text);background:var(--surface-2)}
 .hg-nav-link.is-active{color:var(--accent)}
 .hg-nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.hg-staff-btn{display:grid;place-items:center;width:36px;height:36px;color:var(--text-dim);cursor:pointer}
-.hg-staff-btn:hover{color:var(--text);border-color:var(--border-2)}
+.hg-staff-btn,.hg-theme-btn{display:grid;place-items:center;width:36px;height:36px;color:var(--text-dim);cursor:pointer}
+.hg-player-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;cursor:pointer;
+  background:var(--surface);border:1.5px solid var(--border-2);color:var(--text-dim);
+  font:600 12px var(--font-head);white-space:nowrap}
+.hg-player-chip:hover{border-color:var(--ink);color:var(--text);box-shadow:0 3px 0 -1px var(--ink)}
+.hg-staff-btn:hover,.hg-theme-btn:hover{color:var(--text)}
 .hg-burger{display:grid;place-items:center;width:36px;height:36px;color:var(--text);cursor:pointer}
 .hg-nav-sheet{position:absolute;top:100%;left:0;right:0;display:flex;flex-direction:column;
   padding:8px;gap:2px;background:var(--surface)}
@@ -126,6 +131,87 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.18) 3px,rgba(0,0,0,.18) 6px)}
 .hg-prog-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim)}
 .hg-prog-pct{font-weight:700;color:var(--text);font-family:var(--font-head)}
+
+/* ============ LOBBY v2 (banner → live → upcoming) ============ */
+/* Banner fills the screen below the sticky nav; --nav-h is the nav's height. */
+.hg-banner{--nav-h:70px;position:relative;min-height:calc(100dvh - var(--nav-h));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:18px;padding:40px 22px;
+  border-bottom:1.5px solid var(--card-line);
+  background:
+    radial-gradient(90% 70% at 17% 10%, color-mix(in oklch, oklch(0.88 0.17 96) 24%, transparent), transparent 60%),
+    radial-gradient(85% 74% at 84% 26%, color-mix(in oklch, oklch(0.78 0.13 205) 22%, transparent), transparent 62%),
+    radial-gradient(115% 80% at 50% 110%, color-mix(in oklch, oklch(0.70 0.24 350) 26%, transparent), transparent 64%),
+    var(--bg)}
+/* 30px grid overlay — sits above the banner background, behind the text */
+.hg-banner::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.14;
+  background-image:
+    linear-gradient(to right, var(--text) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--text) 1px, transparent 1px);
+  background-size:30px 30px;
+  -webkit-mask-image:radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%);
+  mask-image:radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%)}
+/* Shine — a diagonal yellow/ocean/pink highlight that sweeps along the grid lines */
+.hg-banner::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.1;
+  background:linear-gradient(115deg,
+    transparent 40%,
+    oklch(0.98 0.12 96 / 0.9) 47%,
+    oklch(0.90 0.13 205 / 0.85) 50%,
+    oklch(0.82 0.22 350 / 0.85) 53%,
+    transparent 60%);
+  background-size:300% 300%;
+  animation:hg-grid-shine 7s ease-in-out infinite;
+  -webkit-mask:
+    linear-gradient(to right, #000 1px, transparent 1px) 0 0/30px 30px,
+    linear-gradient(to bottom, #000 1px, transparent 1px) 0 0/30px 30px;
+  mask:
+    radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%) 0 0/100% 100%,
+    linear-gradient(to right, #000 1px, transparent 1px) 0 0/30px 30px,
+    linear-gradient(to bottom, #000 1px, transparent 1px) 0 0/30px 30px;
+  mask-composite:intersect, add, add}
+@keyframes hg-grid-shine{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}}
+@media (prefers-reduced-motion: reduce){
+  .hg-banner::after{animation:none;background-position:50% 50%}}
+.hg-banner > *{position:relative;z-index:1}
+.hg-banner-logo img{display:block;width:148px;height:148px;object-fit:contain}
+.hg-banner-quote{margin:0;min-height:1.3em;max-width:24ch;font-family:var(--font-head);
+  font-weight:700;font-size:26px;line-height:1.22;letter-spacing:-.015em;color:var(--text);text-wrap:balance}
+.hg-banner-cue{display:inline-flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;
+  background:none;border:0;border-radius:999px;padding:8px 14px;
+  font:700 11.5px var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);
+  transition:color .15s ease, background .15s ease}
+.hg-banner-cue:hover{color:var(--accent);background:var(--accent-soft)}
+.hg-banner-cue svg{transform:rotate(90deg);animation:hg-cue 1.8s ease-in-out infinite}
+@keyframes hg-cue{0%,100%{transform:rotate(90deg) translateX(0)}50%{transform:rotate(90deg) translateX(4px)}}
+
+/* Light mode banner — same yellow / pink / ocean trio, dialed up for the lighter ground */
+.hg-root[data-theme='light'] .hg-banner{
+  background:
+    radial-gradient(92% 70% at 16% 8%, color-mix(in oklch, oklch(0.87 0.16 96) 46%, transparent), transparent 58%),
+    radial-gradient(86% 72% at 86% 24%, color-mix(in oklch, oklch(0.80 0.12 205) 42%, transparent), transparent 60%),
+    radial-gradient(118% 82% at 50% 112%, color-mix(in oklch, oklch(0.72 0.22 350) 44%, transparent), transparent 62%),
+    var(--bg2)}
+
+.hg-lobby-v2{display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
+.hg-section-live{display:inline-flex;align-items:center;gap:9px}
+.hg-feature .hg-hero-card{background:var(--surface);border:1.5px solid var(--card-line);
+  box-shadow:var(--card-shadow);border-radius:var(--radius-lg);padding:24px}
+.hg-card.is-live{border-color:var(--accent)}
+
+/* ============ LUCKY NUMBER ============ */
+.hg-lucky{display:flex;align-items:center;gap:16px;padding:16px 18px;
+  background:var(--surface);border:1.5px solid var(--card-line);
+  box-shadow:var(--card-shadow);border-radius:var(--radius-lg)}
+.hg-lucky-ball{width:74px;height:74px;flex:none;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--font-mono);font-weight:700;font-size:30px;color:var(--accent-ink);
+  background:radial-gradient(circle at 35% 30%, color-mix(in srgb,var(--accent) 70%,#fff), var(--accent));
+  border:2px solid var(--ink);box-shadow:0 5px 0 -1px var(--ink)}
+.hg-lucky-ball.is-wide{font-size:22px}
+.hg-lucky-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin:0;line-height:1.1}
+.hg-lucky-refresh{display:block;margin-top:3px;font-size:11.5px;color:var(--text-dim);font-weight:600}
 
 /* ============ HERO ============ */
 .hg-hero{position:relative;overflow:hidden}
@@ -458,6 +544,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-login-foot{font-size:11px;color:var(--text-mute);letter-spacing:.04em}
 .hg-login-foot strong{color:var(--text-dim);letter-spacing:.1em}
 .hg-login-err{font-size:12px;color:var(--danger);text-align:center}
+.hg-login-switch{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;cursor:pointer;
+  background:var(--surface);border:1.5px solid var(--border-2);color:var(--text-dim);
+  font:600 12px var(--font-head)}
+.hg-login-switch:hover{border-color:var(--ink);color:var(--text);box-shadow:0 3px 0 -1px var(--ink)}
 .hg-login-cred{display:flex;flex-direction:column;gap:3px;padding:12px 16px;border-radius:16px;
   background:var(--surface-2);border:1.5px dashed var(--border-2);font-size:12px;color:var(--text-dim);text-align:center}
 .hg-login-cred code{font-family:var(--font-mono);color:var(--text);font-weight:600}
@@ -497,7 +587,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-avatar-lg{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);
   font-weight:700;font-size:18px;background:var(--accent);color:var(--accent-ink)}
 .hg-dash-content{padding:20px 18px 40px;flex:1}
-.hg-sec{display:flex;flex-direction:column;gap:16px;max-width:980px}
+.hg-sec{display:flex;flex-direction:column;gap:16px;max-width:none}
 .hg-sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .hg-sec-sub{font-size:13px;color:var(--text-dim);margin:0}
 .hg-sec-err{font-size:12.5px;color:var(--danger);margin:0}
@@ -737,16 +827,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-wa-btn{margin:12px;border-radius:999px}
 
 /* round chrome buttons */
-.hg-burger,.hg-staff-btn,.hg-back,.hg-mute{border-radius:999px;
+.hg-burger,.hg-staff-btn,.hg-theme-btn,.hg-back,.hg-mute{border-radius:999px;
   border:1.5px solid var(--card-line);background:var(--surface);box-shadow:var(--card-shadow-sm)}
-.hg-burger:active,.hg-staff-btn:active,.hg-back:active,.hg-mute:active{transform:translateY(2px);box-shadow:none}
+.hg-burger:active,.hg-staff-btn:active,.hg-theme-btn:active,.hg-back:active,.hg-mute:active{transform:translateY(2px);box-shadow:none}
 .hg-nav-sheet{border:1.5px solid var(--card-line);border-radius:0 0 var(--radius-lg) var(--radius-lg);
   box-shadow:var(--card-shadow)}
 .hg-nav{background:color-mix(in srgb,var(--bg) 86%,transparent);padding:14px 18px}
 
-/* wordmark */
-.hg-logo-word{font-family:var(--font-head);font-weight:700;font-size:17px;letter-spacing:-.01em;color:var(--text)}
-.hg-logo-word b{color:var(--accent)}
+/* logo image — intrinsic sizing via height prop, width:auto */
+.hg-logo img{display:block}
 
 /* section labels — uppercase, airy */
 .hg-section-title{text-transform:uppercase;letter-spacing:.13em;font-size:11.5px;color:var(--text-dim);font-weight:700}
@@ -788,3 +877,169 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-btn span{white-space:nowrap}
 .hg-logo-word,.hg-login-secure,.hg-footer-mod,.hg-live-badge{white-space:nowrap}
 .hg-logo{white-space:nowrap}
+
+/* ====================================================================
+   DESKTOP LAYER — public pages reflow into a centered, contained
+   multi-column canvas at >=900px. Below that, nothing here applies and
+   the original phone layout is used verbatim.
+
+   The desktop column-wrappers (.hg-*-body / -main / -aside / -left /
+   -right) are display:contents on mobile, so they add no box and the
+   phone DOM flows exactly as before. The media query re-materialises
+   them as grid/flex containers on desktop.
+   ==================================================================== */
+.hg-lobby-body,.hg-lobby-feed-col,
+.hg-room-body,.hg-room-main,.hg-room-aside,
+.hg-live-body,.hg-live-left,.hg-live-right{display:contents}
+.hg-room-aside-hint{display:none}  /* desktop-rail placeholder only */
+
+@media(min-width:900px){
+  /* ---- de-phone the chrome: the page fills the viewport, the frame
+     stops being a bordered floating device and becomes a centered
+     content column scrolling with the document ---- */
+  .hg-stage:not(.hg-stage-wide){
+    align-items:flex-start;
+    background:radial-gradient(125% 65% at 50% -15%, var(--bg2), transparent 55%), var(--bg);
+  }
+  .hg-frame:not(.hg-frame-wide):not(:has(.hg-staff-login)){
+    max-width:none;width:100%;height:auto;min-height:100dvh;overflow:visible;
+    background:transparent;border:0;
+  }
+  .hg-reactions{max-width:none}
+  .hg-nav{
+    padding:16px 40px;
+    background:color-mix(in srgb,var(--bg) 78%,transparent);
+    border-bottom:1.5px solid var(--card-line);
+  }
+  .hg-nav-links{margin-left:14px}
+  .hg-nav-link{font-size:14.5px;padding:8px 14px}
+  .hg-staff-btn,.hg-theme-btn{width:40px;height:40px}
+  /* cards lift on hover — a desktop affordance phones don't get */
+  .hg-card{transition:transform .12s ease, box-shadow .12s ease}
+  .hg-card:not(.is-sold):hover{transform:translateY(-3px);box-shadow:0 8px 0 -1px var(--ink)}
+
+  /* ---------- LOBBY ---------- */
+  .hg-lobby-body{
+    display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);
+    gap:40px;padding:28px 40px 0;align-items:start;
+  }
+  .hg-banner{--nav-h:82px;padding:56px 32px;gap:24px}
+  .hg-banner-logo img{width:200px;height:200px}
+  .hg-banner-quote{font-size:40px;max-width:20ch}
+  .hg-banner-cue{font-size:12.5px;margin-top:16px}
+  .hg-lobby-v2{max-width:1180px;width:100%;margin:0 auto;gap:34px;padding:44px 40px 0;scroll-margin-top:82px}
+  .hg-lucky{padding:22px 26px;gap:22px}
+  .hg-lucky-ball{width:92px;height:92px;font-size:38px}
+  .hg-lucky-ball.is-wide{font-size:27px}
+  .hg-lucky-title{font-size:22px}
+  .hg-lucky-refresh{font-size:12.5px}
+  .hg-feature{margin:0 auto;max-width:640px;width:100%}
+  .hg-feature .hg-hero-card{padding:34px 36px}
+  .hg-lobby-feed-col{display:block;min-width:0}
+  .hg-hero{position:sticky;top:88px;padding:0}
+  .hg-hero-card{padding:36px 32px;border-radius:var(--radius-lg)}
+  .hg-hero-kicker{font-size:12px;margin-bottom:16px}
+  .hg-hero-title{font-size:42px;line-height:1.02}
+  .hg-hero-when{font-size:15px;margin-top:8px}
+  .hg-hero-line{font-size:15px;margin:16px 0 24px}
+  .hg-trust2{justify-content:flex-start;gap:14px 22px;padding:24px 4px 0}
+  .hg-feed{padding:2px 0 10px}
+  .hg-feed-head{margin:4px 2px 20px}
+  .hg-feed-list{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));
+    gap:26px;align-items:start;
+  }
+  .hg-card{padding:26px;gap:16px}
+  .hg-card-title{font-size:23px}
+  .hg-card-prizepool{padding:16px}
+  .hg-pp-amt{font-size:22px}
+  .hg-section-title{font-size:24px}
+
+  /* ---------- GAME ROOM ---------- */
+  .hg-room-head{position:static;padding:16px 40px}
+  .hg-room-body{
+    display:grid;grid-template-columns:minmax(0,1fr) 360px;
+    gap:40px;padding:14px 40px 60px;align-items:start;
+  }
+  .hg-room-main{display:flex;flex-direction:column;min-width:0}
+  .hg-room-main .hg-legend{padding:6px 0 10px}
+  .hg-room-main .hg-numgrid{
+    padding:8px 0 0;gap:10px;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));
+  }
+  .hg-room-aside{
+    display:flex;flex-direction:column;gap:16px;
+    position:sticky;top:88px;
+  }
+  .hg-room-aside-hint{
+    display:block;border:1.5px solid var(--card-line);border-radius:var(--radius);
+    background:var(--surface);box-shadow:var(--card-shadow);
+  }
+  .hg-room-aside-hint .hg-empty{padding:34px 24px}
+  /* "Your tickets" lives under the number grid; on desktop the previews tile
+     into aligned rows (~5 across) instead of a horizontal scroller. */
+  .hg-room-main .hg-previews{padding:22px 0 0}
+  .hg-room-main .hg-previews-head{margin-bottom:14px}
+  /* tile previews in equal columns; each ticket stretches to fill its track */
+  .hg-room-main .hg-previews-scroll{
+    display:grid;grid-template-columns:repeat(3,1fr);
+    gap:18px 16px;overflow:visible;padding-bottom:0;
+  }
+  .hg-room-main .hg-preview-item{min-width:0}
+  /* ticket stretches to fill the column track */
+  .hg-room-main .hg-preview-item .hg-ticket-compact{display:block;width:100%}
+  /* cells are grid items inside repeat(9,1fr) so they size from the container;
+     drop the px floor so they can grow/shrink with the track */
+  .hg-room-main .hg-preview-item .hg-ticket-compact .hg-cell{min-width:0;min-height:0}
+  .hg-room-spacer{display:none}
+  .hg-room-aside .hg-action-foot{
+    position:static;padding:18px;border:1.5px solid var(--card-line);
+    border-radius:var(--radius);background:var(--surface);box-shadow:var(--card-shadow);
+    backdrop-filter:none;-webkit-backdrop-filter:none;
+  }
+
+  /* ---------- LIVE BOARD ---------- */
+  .hg-live-top{padding:14px 40px}
+  .hg-wakelock{padding:4px 40px 12px}
+  .hg-live-body{
+    display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);
+    gap:40px;padding:16px 40px 0;align-items:start;
+  }
+  .hg-live-left{
+    display:flex;flex-direction:column;gap:8px;position:sticky;top:76px;
+    padding:24px;border-radius:var(--radius-lg);
+    border:1.5px solid var(--card-line);background:var(--surface);box-shadow:var(--card-shadow);
+  }
+  .hg-live-right{display:flex;flex-direction:column;min-width:0}
+  .hg-live-left .hg-cage{padding:14px 16px 8px}
+  .hg-live-left .hg-recent{justify-content:center;padding:0 0 4px}
+  .hg-prizeboard,.hg-mytickets{padding:10px 0 16px}
+  .hg-board90{padding:0 0 18px;gap:6px}
+  .hg-mytickets-row{flex-wrap:wrap;overflow:visible}
+  .hg-live-spacer{height:40px}
+
+  /* ---------- WINNERS ---------- */
+  .hg-page-head{text-align:center;padding:46px 24px 14px}
+  .hg-page-title{font-size:34px}
+  .hg-podium{max-width:600px;margin:0 auto}
+  .hg-leaderboard{
+    max-width:940px;margin:0 auto;display:grid;
+    grid-template-columns:1fr 1fr;gap:12px;
+  }
+
+  /* ---------- HOW TO PLAY ---------- */
+  .hg-steps{
+    max-width:940px;margin:0 auto;display:grid;
+    grid-template-columns:1fr 1fr;gap:14px;
+  }
+  .hg-patterns{max-width:940px;margin:0 auto}
+  .hg-patterns-grid{grid-template-columns:repeat(4,1fr)}
+  .hg-cta-block{max-width:440px;margin:0 auto;width:100%}
+
+  .hg-footer{padding-top:36px;padding-bottom:40px}
+}
+
+/* Roomier spacing on large desktops */
+@media(min-width:1340px){
+  .hg-lobby-body,.hg-room-body,.hg-live-body{padding-left:56px;padding-right:56px}
+  .hg-room-main .hg-numgrid{grid-template-columns:repeat(auto-fill,minmax(58px,1fr))}
+}
