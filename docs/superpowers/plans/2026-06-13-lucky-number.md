@@ -20,12 +20,14 @@ PSQL() { psql "$(grep -m1 '^DATABASE_URL=' /Users/monk/1/HG/.env | sed 's/^DATAB
 
 ### Task 1: Backend — constants + `GET /api/stats/lucky-number`
 
+> **Execution note (run 2026-06-12 ~21:30 UTC):** "today = Jun 13" was the *local* (IST) date; UTC was still Jun 12, so the active cycle was **0** (window `completed_at < 2026-06-01`), not 1. The fixture's June dates fell outside that window — root-caused via systematic debugging (endpoint behavior was correct per spec throughout). Fix: all fixture timestamps shifted **−14 days** into May. Expected `refreshes_at` for every phase of this run is therefore `2026-06-13T00:00:00.000Z`, and the organic "Welcome Mega Draw" (completed Jun 11) is outside the window, so Phase 4 must return exactly `null`.
+
 **Files:**
 - Modify: `HG/backend/src/config/constants.ts` (insert before the `// Prize Patterns` block)
 - Modify: `HG/backend/src/modules/stats/stats.controller.ts` (append after `getHallOfFame`)
 - Modify: `HG/backend/src/modules/stats/stats.routes.ts`
 
-- [ ] **Step 1: Write the Phase-1 fixture (the "failing test" data)**
+- [x] **Step 1: Write the Phase-1 fixture (the "failing test" data)**
 
 Ticket numbers 7777/7778 are impossible in organic data (fixture games declare `total_tickets 9000`), and the target's 8 wins exceed the 6-prizes-per-game organic maximum, so assertions are exact even with seeded data present. Prize rows leave `winner_housie_name` NULL so the hall of fame is not polluted. `completed_at` values are before the current cycle boundary `2026-06-13T00:00:00Z`.
 
@@ -74,7 +76,7 @@ SQL
 
 Expected totals: **7777 → 8 wins, 7778 → 4 wins** ⇒ lucky number 7777. (G3/t3b stay empty until Task 2.)
 
-- [ ] **Step 2: Run the "failing test" — endpoint must 404 before implementation**
+- [x] **Step 2: Run the "failing test" — endpoint must 404 before implementation**
 
 Run (with a backend up on port 4000):
 ```bash
@@ -82,7 +84,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4000/api/stats/lucky-n
 ```
 Expected: `404`
 
-- [ ] **Step 3: Add constants**
+- [x] **Step 3: Add constants**
 
 In `HG/backend/src/config/constants.ts`, insert directly above the `// Prize Patterns` line:
 
@@ -94,7 +96,7 @@ In `HG/backend/src/config/constants.ts`, insert directly above the `// Prize Pat
 
 ```
 
-- [ ] **Step 4: Implement the handler**
+- [x] **Step 4: Implement the handler**
 
 In `HG/backend/src/modules/stats/stats.controller.ts`, add to the imports:
 
@@ -191,7 +193,7 @@ export async function getLuckyNumber(req: Request, res: Response): Promise<void>
 }
 ```
 
-- [ ] **Step 5: Register the route (public, like hall-of-fame)**
+- [x] **Step 5: Register the route (public, like hall-of-fame)**
 
 Replace the full contents of `HG/backend/src/modules/stats/stats.routes.ts` with:
 
@@ -211,7 +213,7 @@ export default router;
 
 (No `app.ts` change — the stats router is already mounted at `/api/stats`.)
 
-- [ ] **Step 6: Run the test — expect green**
+- [x] **Step 6: Run the test — expect green**
 
 Restart the backend (see memo caveat), then:
 ```bash
@@ -219,7 +221,7 @@ curl -s http://localhost:4000/api/stats/lucky-number
 ```
 Expected (when run 2026-06-13 → 2026-06-24): `{"lucky_number":7777,"refreshes_at":"2026-06-25T00:00:00.000Z"}`
 
-- [ ] **Step 7: Type-check build + commit**
+- [x] **Step 7: Type-check build + commit**
 
 ```bash
 cd /Users/monk/1/HG/backend && npm run build
@@ -234,7 +236,7 @@ Expected: build exits 0; commit created.
 
 **Files:** none modified (verification only; fix-forward in `stats.controller.ts` if a phase fails, then re-commit).
 
-- [ ] **Step 1: Phase 2 — tie broken by recency**
+- [x] **Step 1: Phase 2 — tie broken by recency** *(executed with −14d dates per Task 1 note → claims 2026-05-29; returned 7778 ✓)*
 
 Give 7778 four more wins in G3 with the most recent `claimed_at` (totals become 8 vs 8; 7778's latest win is newer):
 
@@ -257,7 +259,7 @@ SQL
 Restart backend, then `curl -s http://localhost:4000/api/stats/lucky-number`.
 Expected: `{"lucky_number":7778,...}` (8 = 8, recency wins).
 
-- [ ] **Step 2: Phase 3 — full tie falls back to lower number**
+- [x] **Step 2: Phase 3 — full tie falls back to lower number** *(claims equalized at 2026-05-27T12:00Z; returned 7777 ✓)*
 
 ```bash
 PSQL -c "UPDATE Prize_Pool SET claimed_at='2026-06-10T12:00:00Z' WHERE game_id IN (SELECT game_id FROM Scheduled_Games WHERE title LIKE 'LUCKY_SMOKE%');"
@@ -266,7 +268,7 @@ PSQL -c "UPDATE Prize_Pool SET claimed_at='2026-06-10T12:00:00Z' WHERE game_id I
 Restart backend, then `curl -s http://localhost:4000/api/stats/lucky-number`.
 Expected: `{"lucky_number":7777,...}` (8 = 8, identical latest win ⇒ lower ticket number).
 
-- [ ] **Step 3: Phase 4 — cleanup and empty/baseline state**
+- [x] **Step 3: Phase 4 — cleanup and empty/baseline state** *(cycle-0 window excludes the Jun-11 organic game → returned exactly null ✓)*
 
 ```bash
 PSQL -c "SELECT t.ticket_number, COUNT(*) FROM Scheduled_Games g JOIN Prize_Pool p ON p.game_id=g.game_id AND p.claimed=TRUE AND p.winner_ticket_id IS NOT NULL JOIN Tickets t ON t.ticket_id=p.winner_ticket_id WHERE g.game_status='Completed' AND g.title NOT LIKE 'LUCKY_SMOKE%' GROUP BY 1 ORDER BY 2 DESC;"
@@ -280,6 +282,8 @@ Expected: if the first query returned no rows → `{"lucky_number":null,...}`; o
 ---
 
 ### Task 3: Frontend — type, lobby card, CSS
+
+> **Execution note:** `page.tsx` and `globals.css` already carried the user's uncommitted player-login WIP at session start, and the lucky-number additions land in the **same diff hunks** as that WIP — they can't be split by hunk selection. Code is implemented, lint+build pass, and the card was visually verified, but Step 7's commit is **deferred to the user** to avoid bundling unrelated WIP. `types.ts` was clean (only the new interface). Visual check required getting past the new `/login` player gate (proxy.ts): registered a throwaway player via `POST /api/players/login`, drove headless Chrome over CDP to set the `hg_player_token` cookie, navigated `/`, and confirmed the rendered card (`.hg-lucky-ball`=7777 wide, title "Lucky Number", refresh copy, aria-label). Throwaway player + fixtures deleted afterward.
 
 **Files:**
 - Modify: `HG/frontend/src/lib/types.ts` (append after `OverviewStats`, ~line 83)
@@ -333,7 +337,7 @@ SQL
 
 Restart the backend, then confirm `curl -s http://localhost:4000/api/stats/lucky-number` → `lucky_number: 7777`.
 
-- [ ] **Step 2: Add the response type**
+- [x] **Step 2: Add the response type**
 
 In `HG/frontend/src/lib/types.ts`, after the `OverviewStats` interface:
 
@@ -344,7 +348,7 @@ export interface LuckyNumberResponse {
 }
 ```
 
-- [ ] **Step 3: Wire the lobby**
+- [x] **Step 3: Wire the lobby**
 
 In `HG/frontend/src/app/page.tsx`:
 
@@ -397,7 +401,7 @@ e. Directly inside `<div className="hg-lobby-v2" ref={lobbyRef}>`, **above** the
 )}
 ```
 
-- [ ] **Step 4: Styles**
+- [x] **Step 4: Styles**
 
 In `HG/frontend/src/app/globals.css`, insert above the `/* ============ HERO ============ */` line (~203) — ball mirrors `.hg-cage-num`, card mirrors `.hg-hero-card`, shadow is the system's sticker offset:
 
@@ -426,22 +430,22 @@ Then in the desktop media block, directly after the rule
   .hg-lucky-refresh{font-size:12.5px}
 ```
 
-- [ ] **Step 5: Lint + build**
+- [x] **Step 5: Lint + build** *(both exit 0)*
 
 ```bash
 cd /Users/monk/1/HG/frontend && npm run lint && npm run build
 ```
 Expected: both exit 0 (React Compiler rules pass — no setState in effect body, no ref writes in render).
 
-- [ ] **Step 6: Visual smoke**
+- [x] **Step 6: Visual smoke** *(via CDP past the player gate — see execution note; card confirmed)*
 
 With backend + `npm run dev` frontend running and the fixture applied, load `http://localhost:3000`: scrolling past the banner shows the Lucky Number card (ball "7777" in wide variant, "Lucky Number" headline, "fresh number in N days"). If available, use the `run` skill to launch and screenshot instead of checking by hand. Then stop the backend and reload — the card must disappear and the lobby otherwise render normally.
 
-- [ ] **Step 7: Cleanup fixture + commit**
+- [x] **Step 7: Cleanup fixture** — fixtures + throwaway player deleted; backend restarted (endpoint returns organic `null`). **Commit DEFERRED** (entanglement note above). Recommended sequence once the user decides:
 
 ```bash
-PSQL -c "DELETE FROM Scheduled_Games WHERE title LIKE 'LUCKY_SMOKE%';"
-cd /Users/monk/1 && git add HG/frontend/src/lib/types.ts HG/frontend/src/app/page.tsx HG/frontend/src/app/globals.css
+# Option B (cleanest): user commits their player-login WIP first, then:
+cd /Users/monk/1 && git add HG/frontend/src/lib/types.ts HG/frontend/src/app/page.tsx HG/frontend/src/app/globals.css CLAUDE.md
 git commit -m "feat(frontend): lucky-number announcement card below the lobby banner"
 ```
 
@@ -452,7 +456,7 @@ git commit -m "feat(frontend): lucky-number announcement card below the lobby ba
 **Files:**
 - Modify: `/Users/monk/1/CLAUDE.md`
 
-- [ ] **Step 1: Record the feature**
+- [x] **Step 1: Record the feature** *(CLAUDE.md edited in working tree; commit bundled with the frontend delta above)*
 
 In the **Authentication & RBAC** section, change the sentence
 `/api/stats/hall-of-fame is public.` to `/api/stats/hall-of-fame and /api/stats/lucky-number are public.`
@@ -460,8 +464,4 @@ In the **Authentication & RBAC** section, change the sentence
 In **Current State → Done and verified end-to-end**, add the bullet:
 `- Lucky Number announcement: public /api/stats/lucky-number (12-day cycles, mode of winning ticket numbers over last 60 completed games, memoized per cycle) + lobby card below the banner (hidden when null)`
 
-- [ ] **Step 2: Commit**
-
-```bash
-cd /Users/monk/1 && git add CLAUDE.md && git commit -m "docs: record lucky-number endpoint + lobby card in CLAUDE.md"
-```
+- [x] **Step 2: Commit** — folded into the deferred frontend commit above (CLAUDE.md is staged with the feature delta).
