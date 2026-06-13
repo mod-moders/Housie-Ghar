@@ -1,14 +1,36 @@
 "use client";
-/** Public lobby — hero with the next draw + games feed. */
+/** Public lobby — full-screen banner with a rotating hook, then Live Now + Upcoming. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
-import type { GameSummary } from "@/lib/types";
+import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
+import type { GameSummary, LuckyNumberResponse } from "@/lib/types";
+
+// Rotated on the banner every 5s, starting from a random hook each page load.
+const HOOKS = [
+  "The whole town's playing — don't miss your number.",
+  "Mark your numbers. Match the call. Win the house.",
+  "Tambola night, every night — straight from the hills.",
+];
+
+// Decorative 3×9 ticket grid behind the hero. null = empty cell.
+type BannerCell = { n: number; tone: "yellow" | "ocean" | "pink" | "plain"; daub?: "pink" | "ocean" } | null;
+const GRID_CELLS: BannerCell[] = [
+  null, { n: 12, tone: "yellow" }, null, null, { n: 44, tone: "plain", daub: "pink" }, null, { n: 61, tone: "ocean" }, null, null,
+  null, null, { n: 27, tone: "pink" }, null, null, null, { n: 75, tone: "yellow" }, null, null,
+  null, null, { n: 9, tone: "ocean" }, null, null, null, { n: 58, tone: "plain", daub: "ocean" }, null, { n: 83, tone: "pink" },
+];
+
+// Scattered sticker coins (size/colour/position come from .hg-banner-coin--N in CSS).
+const COINS = [33, 7, 62, 88];
+
+const emptySubscribe = () => () => {};
 
 function formatWhen(iso: string): { date: string; time: string } {
   const d = new Date(iso);
@@ -16,6 +38,13 @@ function formatWhen(iso: string): { date: string; time: string } {
     date: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }),
     time: d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }),
   };
+}
+
+function refreshCopy(refreshesAt: string): string {
+  const daysLeft = Math.ceil((new Date(refreshesAt).getTime() - Date.now()) / 86_400_000);
+  if (daysLeft > 1) return `fresh number in ${daysLeft} days`;
+  if (daysLeft === 1) return "fresh number tomorrow";
+  return "refreshes today";
 }
 
 function cardStatus(g: GameSummary): "sold" | "fast" | "filling" | "open" {
@@ -26,7 +55,8 @@ function cardStatus(g: GameSummary): "sold" | "fast" | "filling" | "open" {
   return "open";
 }
 
-function GameCard({ game, go }: { game: GameSummary; go: (id: string) => void }) {
+function GameCard({ game, go, goLive }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void }) {
+  const isLive = game.game_status === "Live" || game.game_status === "Paused";
   const status = cardStatus(game);
   const sold = status === "sold";
   const top = game.prize_pool[game.prize_pool.length - 1] ?? game.prize_pool[0];
@@ -34,17 +64,21 @@ function GameCard({ game, go }: { game: GameSummary; go: (id: string) => void })
   const when = formatWhen(game.scheduled_at);
 
   return (
-    <article className={`hg-card${sold ? " is-sold" : ""}`}>
-      {sold && <div className="hg-sold-stamp"><span>SOLD OUT</span></div>}
+    <article className={`hg-card${sold && !isLive ? " is-sold" : ""}${isLive ? " is-live" : ""}`}>
+      {sold && !isLive && <div className="hg-sold-stamp"><span>SOLD OUT</span></div>}
       <div className="hg-card-head">
         <div>
           <h3 className="hg-card-title">{game.title}</h3>
           <div className="hg-card-when">
-            <Icon name="clock" size={13} strokeWidth={2} />
-            {when.date} · {when.time}
+            <Icon name={isLive ? "play" : "clock"} size={13} strokeWidth={2} />
+            {isLive ? (game.game_status === "Paused" ? "Paused mid-draw" : "Drawing now") : `${when.date} · ${when.time}`}
           </div>
         </div>
-        <GameStatusBadge status={status} />
+        {isLive ? (
+          <Badge tone="hot" icon="play">{game.game_status === "Paused" ? "Paused" : "Live"}</Badge>
+        ) : (
+          <GameStatusBadge status={status} />
+        )}
       </div>
 
       {top && (
@@ -68,7 +102,9 @@ function GameCard({ game, go }: { game: GameSummary; go: (id: string) => void })
           <span className="hg-dim">Ticket</span>
           <strong>{money(game.ticket_price)}</strong>
         </div>
-        {sold ? (
+        {isLive ? (
+          <Button variant="cta" size="md" iconRight="chevR" onClick={() => goLive(game.game_id)}>Watch Live</Button>
+        ) : sold ? (
           <Button variant="ghost" size="md" disabled>Sold Out</Button>
         ) : (
           <Button variant="cta" size="md" iconRight="chevR" onClick={() => go(game.game_id)}>Get Tickets</Button>
@@ -82,6 +118,25 @@ export default function Lobby() {
   const router = useRouter();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
+
+  // The quote rotates through HOOKS every 5s. A client-only random start (via
+  // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
+  // first quote fresh each visit; `step` advances on a timer; `key={step}` on the
+  // <p> replays the fade-in. React Compiler safe: setState lives in the interval
+  // callback, never synchronously in the effect body.
+  const startRef = useRef<number | null>(null);
+  const start = useSyncExternalStore(
+    emptySubscribe,
+    () => (startRef.current ??= Math.floor(Math.random() * HOOKS.length)),
+    (): number | null => null,
+  );
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => s + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+  const quote = start === null ? "" : HOOKS[(start + step) % HOOKS.length];
 
   useEffect(() => {
     let alive = true;
@@ -94,67 +149,144 @@ export default function Lobby() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  // One-shot fetch: the lucky number only changes every 12 days, so no polling.
+  // Any failure simply leaves the card hidden.
+  useEffect(() => {
+    let alive = true;
+    apiFetch<LuckyNumberResponse>("/api/stats/lucky-number")
+      .then((l) => { if (alive) setLucky(l); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const go = (id: string) => router.push(`/game/${id}`);
-  const upcoming = (games ?? []).filter((g) => g.game_status !== "Completed");
-  const featured =
-    upcoming.find((g) => g.game_status === "Live") ??
-    upcoming.find((g) => g.game_status === "Scheduled" && g.available_count > 0) ??
-    upcoming[0];
+  const goLive = (id: string) => router.push(`/game/${id}/live`);
+
+  const lobbyRef = useRef<HTMLDivElement>(null);
+  const scrollToGames = () => lobbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const all = games ?? [];
+  const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused");
+  const scheduled = all
+    .filter((g) => g.game_status === "Scheduled")
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+
+  // With nothing live, promote the soonest upcoming game to a featured hero so
+  // the page still has a focal point; otherwise the whole list is a flat grid.
+  const featuredNext = inProgress.length === 0 ? scheduled[0] : undefined;
+  const gridGames = featuredNext ? scheduled.slice(1) : scheduled;
+  const nothingToShow = games !== null && inProgress.length === 0 && scheduled.length === 0;
 
   return (
     <PublicShell>
       <div className="hg-screen">
-        {featured && (
-          <section className="hg-hero">
-            <div className="hg-hero-card">
-              <div className="hg-hero-kicker">
-                <span className="hg-live-dot" /> {featured.game_status === "Live" ? "LIVE NOW" : "NEXT DRAW"}
-              </div>
-              <h1 className="hg-hero-title">{featured.title}</h1>
-              <div className="hg-hero-when">
-                {formatWhen(featured.scheduled_at).date} · {formatWhen(featured.scheduled_at).time}
-              </div>
-              {featured.game_status === "Scheduled" && (
-                <CountdownPills targetTs={new Date(featured.scheduled_at).getTime()} />
-              )}
-              <div className="hg-hero-line">
-                {featured.prize_pool.length > 0 && (
-                  <>
-                    {featured.prize_pool[featured.prize_pool.length - 1].pattern_name}{" "}
-                    <b>{money(featured.prize_pool[featured.prize_pool.length - 1].prize_amount)}</b>
-                    <span className="sep">·</span>
-                  </>
+        {/* Banner — game-night hero: bloom + ticket grid + coins behind a logo/quote/CTAs hook */}
+        <section className="hg-banner">
+          <div className="hg-banner-bloom" aria-hidden="true" />
+          <div className="hg-banner-grid" aria-hidden="true">
+            {GRID_CELLS.map((c, i) => (
+              <span key={i} className="hg-banner-cell">
+                {c && (
+                  <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
+                    {c.n}
+                    {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
+                  </span>
                 )}
-                <b>{money(featured.ticket_price)}</b> per ticket
-              </div>
-              {featured.game_status === "Live" ? (
-                <Button variant="cta" size="lg" full iconRight="chevR" onClick={() => router.push(`/game/${featured.game_id}/live`)}>
-                  Watch the Live Board
-                </Button>
-              ) : (
-                <Button variant="cta" size="lg" full iconRight="chevR" onClick={() => go(featured.game_id)}>
-                  Pick Your Tickets
-                </Button>
-              )}
-            </div>
-          </section>
-        )}
-
-        <TrustBadges />
-
-        <section className="hg-feed">
-          <div className="hg-feed-head">
-            <h2 className="hg-section-title">Upcoming Games</h2>
-            <span className="hg-feed-count">{upcoming.length} live now</span>
+              </span>
+            ))}
           </div>
-          {error && <p className="hg-sec-err">Could not load games: {error}</p>}
-          {games && upcoming.length === 0 && (
-            <EmptyHint icon="grid" title="No games scheduled yet" sub="Check back soon — new draws are announced here first." />
-          )}
-          <div className="hg-feed-list">
-            {upcoming.map((g) => <GameCard key={g.game_id} game={g} go={go} />)}
+          <div className="hg-banner-fade" aria-hidden="true" />
+          {COINS.map((n, i) => (
+            <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
+          ))}
+          <div className="hg-banner-hook">
+            <div className="hg-banner-logo">
+              <Image src="/hg-logo-2.png" alt="Housie Ghar" width={185} height={185} priority />
+            </div>
+            <p className="hg-banner-quote" key={step}>{quote || " "}</p>
+            <div className="hg-banner-actions">
+              <button className="hg-banner-btn hg-banner-btn--primary" onClick={scrollToGames}>Browse games</button>
+              <Link className="hg-banner-btn hg-banner-btn--secondary" href="/how-to-play">How to play</Link>
+            </div>
           </div>
         </section>
+
+        <div className="hg-lobby-v2" ref={lobbyRef}>
+          {lucky && lucky.lucky_number !== null && (
+            <section
+              className="hg-lucky"
+              aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
+            >
+              <div className={`hg-lucky-ball${String(lucky.lucky_number).length > 2 ? " is-wide" : ""}`}>
+                {lucky.lucky_number}
+              </div>
+              <div className="hg-lucky-meta">
+                <h2 className="hg-lucky-title">Lucky Number</h2>
+                <span className="hg-lucky-refresh">{refreshCopy(lucky.refreshes_at)}</span>
+              </div>
+            </section>
+          )}
+
+          {error && <p className="hg-sec-err">Could not load games: {error}</p>}
+
+          {/* Live Now — only when something is actually drawing */}
+          {inProgress.length > 0 && (
+            <section className="hg-feed">
+              <div className="hg-feed-head">
+                <h2 className="hg-section-title hg-section-live"><span className="hg-live-dot" /> Live Now</h2>
+                <span className="hg-feed-count">{inProgress.length} playing</span>
+              </div>
+              <div className="hg-feed-list">
+                {inProgress.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
+              </div>
+            </section>
+          )}
+
+          {/* Promoted next draw (only when nothing is live) */}
+          {featuredNext && (
+            <section className="hg-feature">
+              <div className="hg-hero-card">
+                <div className="hg-hero-kicker"><span className="hg-live-dot" /> NEXT DRAW</div>
+                <h1 className="hg-hero-title">{featuredNext.title}</h1>
+                <div className="hg-hero-when">
+                  {formatWhen(featuredNext.scheduled_at).date} · {formatWhen(featuredNext.scheduled_at).time}
+                </div>
+                <CountdownPills targetTs={new Date(featuredNext.scheduled_at).getTime()} />
+                <div className="hg-hero-line">
+                  {featuredNext.prize_pool.length > 0 && (
+                    <>
+                      {featuredNext.prize_pool[featuredNext.prize_pool.length - 1].pattern_name}{" "}
+                      <b>{money(featuredNext.prize_pool[featuredNext.prize_pool.length - 1].prize_amount)}</b>
+                      <span className="sep">·</span>
+                    </>
+                  )}
+                  <b>{money(featuredNext.ticket_price)}</b> per ticket
+                </div>
+                <Button variant="cta" size="lg" full iconRight="chevR" onClick={() => go(featuredNext.game_id)}>
+                  Pick Your Tickets
+                </Button>
+              </div>
+            </section>
+          )}
+
+          <TrustBadges />
+
+          {/* Upcoming Games */}
+          <section className="hg-feed">
+            <div className="hg-feed-head">
+              <h2 className="hg-section-title">Upcoming Games</h2>
+              <span className="hg-feed-count">{scheduled.length} scheduled</span>
+            </div>
+            {nothingToShow && (
+              <EmptyHint icon="grid" title="No games scheduled yet" sub="Check back soon — new draws are announced here first." />
+            )}
+            {gridGames.length > 0 && (
+              <div className="hg-feed-list">
+                {gridGames.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
+              </div>
+            )}
+          </section>
+        </div>
 
         <Footer />
       </div>
