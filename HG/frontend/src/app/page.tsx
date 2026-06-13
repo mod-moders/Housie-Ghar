@@ -4,7 +4,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
@@ -206,7 +205,6 @@ export default function Lobby() {
             <p className="hg-banner-quote" key={step}>{quote || " "}</p>
             <div className="hg-banner-actions">
               <button className="hg-banner-btn hg-banner-btn--primary" onClick={scrollToGames}>Browse games</button>
-              <Link className="hg-banner-btn hg-banner-btn--secondary" href="/how-to-play">How to play</Link>
             </div>
           </div>
         </section>
