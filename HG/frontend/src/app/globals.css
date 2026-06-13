@@ -132,68 +132,156 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-prog-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim)}
 .hg-prog-pct{font-weight:700;color:var(--text);font-family:var(--font-head)}
 
-/* ============ LOBBY v2 (banner → live → upcoming) ============ */
-/* Banner fills the screen below the sticky nav; --nav-h is the nav's height. */
-.hg-banner{--nav-h:70px;position:relative;min-height:calc(100dvh - var(--nav-h));
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  text-align:center;gap:18px;padding:40px 22px;
-  border-bottom:1.5px solid var(--card-line);
-  background:
-    radial-gradient(90% 70% at 17% 10%, color-mix(in oklch, oklch(0.88 0.17 96) 24%, transparent), transparent 60%),
-    radial-gradient(85% 74% at 84% 26%, color-mix(in oklch, oklch(0.78 0.13 205) 22%, transparent), transparent 62%),
-    radial-gradient(115% 80% at 50% 110%, color-mix(in oklch, oklch(0.70 0.24 350) 26%, transparent), transparent 64%),
-    var(--bg)}
-/* 30px grid overlay — sits above the banner background, behind the text */
-.hg-banner::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.14;
-  background-image:
-    linear-gradient(to right, var(--text) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--text) 1px, transparent 1px);
-  background-size:30px 30px;
-  -webkit-mask-image:radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%);
-  mask-image:radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%)}
-/* Shine — a diagonal yellow/ocean/pink highlight that sweeps along the grid lines */
-.hg-banner::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.1;
-  background:linear-gradient(115deg,
-    transparent 40%,
-    oklch(0.98 0.12 96 / 0.9) 47%,
-    oklch(0.90 0.13 205 / 0.85) 50%,
-    oklch(0.82 0.22 350 / 0.85) 53%,
-    transparent 60%);
-  background-size:300% 300%;
-  animation:hg-grid-shine 7s ease-in-out infinite;
-  -webkit-mask:
-    linear-gradient(to right, #000 1px, transparent 1px) 0 0/30px 30px,
-    linear-gradient(to bottom, #000 1px, transparent 1px) 0 0/30px 30px;
-  mask:
-    radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%) 0 0/100% 100%,
-    linear-gradient(to right, #000 1px, transparent 1px) 0 0/30px 30px,
-    linear-gradient(to bottom, #000 1px, transparent 1px) 0 0/30px 30px;
-  mask-composite:intersect, add, add}
-@keyframes hg-grid-shine{
-  0%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-  100%{background-position:0% 50%}}
-@media (prefers-reduced-motion: reduce){
-  .hg-banner::after{animation:none;background-position:50% 50%}}
-.hg-banner > *{position:relative;z-index:1}
-.hg-banner-logo img{display:block;width:148px;height:148px;object-fit:contain}
-.hg-banner-quote{margin:0;min-height:1.3em;max-width:24ch;font-family:var(--font-head);
-  font-weight:700;font-size:26px;line-height:1.22;letter-spacing:-.015em;color:var(--text);text-wrap:balance}
-.hg-banner-cue{display:inline-flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;
-  background:none;border:0;border-radius:999px;padding:8px 14px;
-  font:700 11.5px var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);
-  transition:color .15s ease, background .15s ease}
-.hg-banner-cue:hover{color:var(--accent);background:var(--accent-soft)}
-.hg-banner-cue svg{transform:rotate(90deg);animation:hg-cue 1.8s ease-in-out infinite}
-@keyframes hg-cue{0%,100%{transform:rotate(90deg) translateX(0)}50%{transform:rotate(90deg) translateX(4px)}}
+/* ============ LOBBY v2 — BANNER (game-night hero) ============ */
+/* Fills the screen below the sticky nav (--nav-h). Layers back-to-front:
+   ground → bloom → ticket grid → fade → coins → hook. */
+.hg-banner{
+  --nav-h:70px;
+  /* banner-local palette — dark defaults; [data-theme='light'] overrides at the end */
+  --bn-ground:var(--bg);
+  --bn-bloom-y:oklch(0.88 0.17 96 / .18);
+  --bn-bloom-o:oklch(0.78 0.13 205 / .16);
+  --bn-bloom-p:oklch(0.70 0.24 350 / .20);
+  --bn-bloom-v:oklch(0.58 0.25 290 / .15);
+  --bn-grid-line:rgba(255,255,255,.12);
+  --bn-grid-opacity:.38;
+  --bn-num-yellow:oklch(0.88 0.17 96);
+  --bn-num-ocean:oklch(0.78 0.13 205);
+  --bn-num-pink:oklch(0.70 0.24 350);
+  --bn-num-plain:var(--text);
+  --bn-fade:oklch(0.16 0.01 120 / .92);
+  --bn-quote-ink:#e6e3ee;
+  --bn-logo-shadow:drop-shadow(0 0 30px rgba(14,13,18,.85));
 
-/* Light mode banner — same yellow / pink / ocean trio, dialed up for the lighter ground */
-.hg-root[data-theme='light'] .hg-banner{
+  position:relative;overflow:hidden;
+  min-height:calc(100dvh - var(--nav-h));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px 22px;
+  border-bottom:1.5px solid var(--card-line);
+  background:var(--bn-ground);
+}
+
+/* bloom — four soft brand glows, slowly drifting */
+.hg-banner-bloom{position:absolute;inset:-12%;z-index:0;pointer-events:none;
   background:
-    radial-gradient(92% 70% at 16% 8%, color-mix(in oklch, oklch(0.87 0.16 96) 46%, transparent), transparent 58%),
-    radial-gradient(86% 72% at 86% 24%, color-mix(in oklch, oklch(0.80 0.12 205) 42%, transparent), transparent 60%),
-    radial-gradient(118% 82% at 50% 112%, color-mix(in oklch, oklch(0.72 0.22 350) 44%, transparent), transparent 62%),
-    var(--bg2)}
+    radial-gradient(70% 55% at 12% 10%, var(--bn-bloom-y), transparent 60%),
+    radial-gradient(66% 60% at 88% 16%, var(--bn-bloom-o), transparent 62%),
+    radial-gradient(82% 72% at 50% 110%, var(--bn-bloom-p), transparent 64%),
+    radial-gradient(56% 60% at 80% 88%, var(--bn-bloom-v), transparent 62%);
+  animation:hg-bloom-drift 22s ease-in-out infinite}
+
+/* tilted 3×9 ticket grid */
+.hg-banner-grid{position:absolute;inset:-8% -4%;z-index:0;pointer-events:none;
+  transform:rotate(-4deg);display:grid;
+  grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(3,1fr);
+  opacity:var(--bn-grid-opacity)}
+.hg-banner-cell{border:1px solid var(--bn-grid-line);display:flex;align-items:center;justify-content:center}
+.hg-banner-num{position:relative;font:700 16px var(--font-head)}
+.hg-banner-num--yellow{color:var(--bn-num-yellow)}
+.hg-banner-num--ocean{color:var(--bn-num-ocean)}
+.hg-banner-num--pink{color:var(--bn-num-pink)}
+.hg-banner-num--plain{color:var(--bn-num-plain)}
+.hg-banner-daub{position:absolute;inset:-8px -10px;border-radius:50%;border:2.5px solid transparent}
+.hg-banner-daub--pink{--daub-rot:-8deg;border-color:var(--bn-num-pink);transform:rotate(var(--daub-rot));
+  animation:hg-daub 3s ease-in-out infinite}
+.hg-banner-daub--ocean{--daub-rot:6deg;border-color:var(--bn-num-ocean);transform:rotate(var(--daub-rot));
+  animation:hg-daub 3s ease-in-out infinite .8s}
+
+/* fade — quiets the grid + bloom under the hero */
+.hg-banner-fade{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(58% 56% at 50% 48%, var(--bn-fade), transparent 80%)}
+
+/* sticker coins */
+.hg-banner-coin{position:absolute;z-index:2;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--font-head);font-weight:700;color:var(--ink);
+  border:2px solid var(--ink);pointer-events:none;
+  transform:translateY(var(--bob)) rotate(var(--coin-rot))}
+.hg-banner-coin--1{--coin-rot:-9deg;top:11%;left:9%;width:44px;height:44px;font-size:16px;
+  background:oklch(0.88 0.17 96);border-width:2.5px;
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 20px oklch(0.88 0.17 96 / .25);
+  animation:hg-coin-bob 4s ease-in-out infinite}
+.hg-banner-coin--2{--coin-rot:7deg;top:64%;left:14%;width:28px;height:28px;font-size:11px;
+  background:oklch(0.78 0.13 205);
+  box-shadow:0 3px 0 -1px var(--ink), 0 0 16px oklch(0.78 0.13 205 / .30);
+  animation:hg-coin-bob 4.8s ease-in-out infinite .4s}
+.hg-banner-coin--3{--coin-rot:11deg;top:15%;right:10%;width:36px;height:36px;font-size:13px;
+  background:oklch(0.70 0.24 350);color:#fff;border-width:2.5px;
+  box-shadow:0 3px 0 -1px var(--ink), 0 0 18px oklch(0.70 0.24 350 / .30);
+  animation:hg-coin-bob 3.6s ease-in-out infinite .2s}
+.hg-banner-coin--4{--coin-rot:-6deg;top:71%;right:15%;width:20px;height:20px;font-size:9px;
+  background:oklch(0.88 0.17 96);
+  box-shadow:0 2px 0 -1px var(--ink), 0 0 12px oklch(0.88 0.17 96 / .30);
+  animation:hg-coin-bob 4.2s ease-in-out infinite .6s}
+
+/* hook — logo, rotating quote, CTAs */
+.hg-banner-hook{position:relative;z-index:3;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px}
+.hg-banner-logo img{display:block;width:185px;height:185px;object-fit:contain;filter:var(--bn-logo-shadow)}
+.hg-banner-quote{margin:0;max-width:22ch;min-height:2.3em;
+  font-family:var(--font-serif);font-style:italic;font-weight:400;
+  font-size:27px;line-height:1.15;color:var(--bn-quote-ink);text-wrap:balance;
+  animation:hg-quote-in .5s ease}
+.hg-banner-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:4px}
+.hg-banner-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+  padding:11px 20px;border-radius:999px;font-family:var(--font-head);font-size:13px;
+  cursor:pointer;text-decoration:none;white-space:nowrap;
+  transition:filter .15s ease, background .15s ease, border-color .15s ease, color .15s ease}
+.hg-banner-btn--primary{background:#f5f3f8;color:#16151a;border:0;font-weight:700}
+.hg-banner-btn--primary:hover{filter:brightness(1.04)}
+.hg-banner-btn--secondary{background:rgba(255,255,255,.05);color:#cfcdd6;
+  border:1px solid rgba(255,255,255,.25);font-weight:600}
+.hg-banner-btn--secondary:hover{border-color:rgba(255,255,255,.5);color:#fff}
+
+@property --bob{syntax:"<length>";inherits:false;initial-value:0px}
+@keyframes hg-coin-bob{50%{--bob:-6px}}
+@keyframes hg-bloom-drift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(1.5%,-1.5%,0) scale(1.05)}}
+@keyframes hg-daub{0%,100%{opacity:.55;transform:scale(.98) rotate(var(--daub-rot,0deg))}50%{opacity:1;transform:scale(1.02) rotate(var(--daub-rot,0deg))}}
+@keyframes hg-quote-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion: reduce){
+  .hg-banner-bloom,.hg-banner-coin,.hg-banner-daub,.hg-banner-quote{animation:none}
+}
+
+/* responsive */
+@media (max-width:899px){
+  .hg-banner-logo img{width:160px;height:160px}
+  .hg-banner-quote{font-size:23px}
+}
+@media (max-width:559px){
+  .hg-banner-logo img{width:130px;height:130px}
+  .hg-banner-quote{font-size:20px}
+  .hg-banner-coin--1{top:9%;left:6%;width:36px;height:36px;font-size:13px}
+  .hg-banner-coin--2{top:62%;left:8%;width:22px;height:22px;font-size:9px}
+  .hg-banner-coin--3{top:12%;right:6%;width:30px;height:30px;font-size:11px}
+  .hg-banner-coin--4{display:none}
+}
+
+/* light theme — pastel bloom on a near-white ground, ink grid, sticker buttons */
+.hg-root[data-theme='light'] .hg-banner{
+  --bn-ground:oklch(0.95 0.012 320);
+  --bn-bloom-y:oklch(0.87 0.16 96 / .34);
+  --bn-bloom-o:oklch(0.74 0.13 205 / .30);
+  --bn-bloom-p:oklch(0.72 0.22 350 / .26);
+  --bn-bloom-v:oklch(0.58 0.25 290 / .18);
+  --bn-grid-line:rgba(38,37,28,.14);
+  --bn-grid-opacity:.62;
+  --bn-num-yellow:oklch(0.62 0.13 80);
+  --bn-num-ocean:oklch(0.58 0.12 215);
+  --bn-num-pink:oklch(0.62 0.22 0);
+  --bn-num-plain:#26222e;
+  --bn-fade:oklch(0.97 0.008 320 / .94);
+  --bn-quote-ink:#26222e;
+  --bn-logo-shadow:drop-shadow(0 8px 18px rgba(14,13,17,.18));
+}
+.hg-root[data-theme='light'] .hg-banner-coin--1{box-shadow:0 4px 0 -1px var(--ink)}
+.hg-root[data-theme='light'] .hg-banner-coin--2{box-shadow:0 3px 0 -1px var(--ink)}
+.hg-root[data-theme='light'] .hg-banner-coin--3{box-shadow:0 3px 0 -1px var(--ink)}
+.hg-root[data-theme='light'] .hg-banner-coin--4{box-shadow:0 2px 0 -1px var(--ink)}
+.hg-root[data-theme='light'] .hg-banner-btn--primary{background:var(--accent);color:var(--accent-ink);
+  border:2.5px solid var(--ink);box-shadow:var(--card-shadow-sm);font-weight:800}
+.hg-root[data-theme='light'] .hg-banner-btn--secondary{background:var(--surface);color:var(--text);
+  border:2px solid var(--ink);box-shadow:var(--card-shadow-sm);font-weight:700}
+.hg-root[data-theme='light'] .hg-banner-btn--secondary:hover{background:var(--surface-2);border-color:var(--ink);color:var(--text)}
 
 .hg-lobby-v2{display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
 .hg-section-live{display:inline-flex;align-items:center;gap:9px}
@@ -923,10 +1011,9 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
     display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);
     gap:40px;padding:28px 40px 0;align-items:start;
   }
-  .hg-banner{--nav-h:82px;padding:56px 32px;gap:24px}
+  .hg-banner{--nav-h:82px;padding:56px 32px}
   .hg-banner-logo img{width:200px;height:200px}
-  .hg-banner-quote{font-size:40px;max-width:20ch}
-  .hg-banner-cue{font-size:12.5px;margin-top:16px}
+  .hg-banner-quote{font-size:30px}
   .hg-lobby-v2{max-width:1180px;width:100%;margin:0 auto;gap:34px;padding:44px 40px 0;scroll-margin-top:82px}
   .hg-lucky{padding:22px 26px;gap:22px}
   .hg-lucky-ball{width:92px;height:92px;font-size:38px}
