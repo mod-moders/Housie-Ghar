@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useBookingStore } from "@/lib/stores/bookingStore";
+import { usePlayerStore } from "@/lib/stores/playerStore";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
@@ -39,6 +40,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const [locking, setLocking] = useState(false);
   const requestedMatrices = useRef<Set<number>>(new Set());
   const restoredLock = useRef(false);
+  const prefilledName = useRef(false);
 
   const booking = useBookingStore();
 
@@ -80,6 +82,11 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                 .map((id) => res.tickets.find((t) => t.ticket_id === id)?.ticket_number ?? 0)
                 .filter(Boolean)
             );
+          } else if (!prefilledName.current) {
+            // Logged-in players get their username as the default housie name.
+            prefilledName.current = true;
+            const p = usePlayerStore.getState().player;
+            if (p) setName((prev) => prev || p.username);
           }
         })
         .catch(() => {});
@@ -160,6 +167,8 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
           </div>
         </div>
 
+        <div className="hg-room-body">
+        <div className="hg-room-main">
         <div className="hg-legend">
           <span><i className="lg-dot lg-avail" />Available</span>
           <span><i className="lg-dot lg-lock"><Icon name="lock" size={9} strokeWidth={2.6} /></i>Locked</span>
@@ -217,8 +226,20 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             </div>
           </div>
         )}
+        </div>
 
-        <div style={{ height: selected.length > 0 ? 168 : 24 }} />
+        <div className="hg-room-aside">
+        {selected.length === 0 && (
+          <div className="hg-room-aside-hint">
+            <div className="hg-empty">
+              <div className="hg-empty-ic"><Icon name="ticket" size={22} /></div>
+              <strong>Pick your numbers</strong>
+              <span>Tap any open number to add it — your tickets preview under the grid. Then add your Housie name and book here.</span>
+            </div>
+          </div>
+        )}
+
+        <div className="hg-room-spacer" style={{ height: selected.length > 0 ? 168 : 24 }} />
 
         {selected.length > 0 && (
           <div className="hg-action-foot">
@@ -246,6 +267,8 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             </div>
           </div>
         )}
+        </div>
+        </div>
 
         {lock && game && (
           <BookingModal

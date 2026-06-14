@@ -41,7 +41,7 @@ export default function StaffLogin() {
             <Icon name="arrowL" size={20} />
           </button>
           <div className="hg-login-card">
-            <div className="hg-login-brand"><Logo size={20} /></div>
+            <div className="hg-login-brand"><Logo size={72} /></div>
             <div className="hg-login-secure"><Icon name="shield" size={13} /> Secure staff portal</div>
             <h1 className="hg-login-title">Sign in to continue</h1>
             <form

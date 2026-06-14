@@ -2,7 +2,9 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Same-origin by default ("/"): Socket.io connects back to the host that
+// served the page and Next proxies /socket.io to the backend.
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 // Every server-emitted event the dashboards care about.
 const EVENTS = [
@@ -32,7 +34,7 @@ export function useSocket(
   const joinArg = join?.arg;
 
   useEffect(() => {
-    const socket = io(BASE, { withCredentials: true });
+    const socket = io(BASE || "/", { withCredentials: true });
     socketRef.current = socket;
 
     const doJoin = () => { if (joinEvent && joinArg) socket.emit(joinEvent, joinArg); };

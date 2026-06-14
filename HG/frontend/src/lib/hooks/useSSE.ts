@@ -2,7 +2,9 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useGameStore } from "../stores/gameStore";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Same-origin by default — the SSE stream is proxied through Next to the
+// backend, so one URL works everywhere. Override with NEXT_PUBLIC_API_URL.
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export interface SSEEventData {
   event: string;

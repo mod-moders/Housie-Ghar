@@ -37,10 +37,11 @@ async function seed(): Promise<void> {
 
   console.log('✅ Base seeds complete, starting ticket generation...');
 
-  // Generate 120 tickets for our seeded test game
-  const testGameId = '00000000-0000-0000-0000-000000000001';
   const { generateTicketsForGame } = require('./generateGameTickets');
-  await generateTicketsForGame(testGameId, 120);
+
+  // Generate tickets for both sample games
+  await generateTicketsForGame('00000000-0000-0000-0000-000000000001', 120);
+  await generateTicketsForGame('00000000-0000-0000-0000-000000000002', 90);
 
   console.log('✅ Seeding complete');
   await pool.end();

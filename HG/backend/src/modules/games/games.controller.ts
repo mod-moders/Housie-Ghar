@@ -361,6 +361,12 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // For Nginx compatibility
   });
+  res.flushHeaders?.();
+
+  // Padding preamble: ~2KB of SSE comment. Buffering proxies (Cloudflare
+  // tunnels, some CDNs) withhold a streamed body until they've seen enough
+  // bytes; this pushes past that threshold so events flush immediately.
+  res.write(`:${' '.repeat(2048)}\n\n`);
 
   // Keep-alive heartbeat interval (every 15s)
   const heartbeat = setInterval(() => {

@@ -39,13 +39,6 @@ function formatWhen(iso: string): { date: string; time: string } {
   };
 }
 
-function refreshCopy(refreshesAt: string): string {
-  const daysLeft = Math.ceil((new Date(refreshesAt).getTime() - Date.now()) / 86_400_000);
-  if (daysLeft > 1) return `fresh number in ${daysLeft} days`;
-  if (daysLeft === 1) return "fresh number tomorrow";
-  return "refreshes today";
-}
-
 function cardStatus(g: GameSummary): "sold" | "fast" | "filling" | "open" {
   if (g.available_count <= 0) return "sold";
   const pct = ((g.sold_count + g.locked_count) / g.total_tickets) * 100;
@@ -211,16 +204,18 @@ export default function Lobby() {
 
         <div className="hg-lobby-v2" ref={lobbyRef}>
           {lucky && lucky.lucky_number !== null && (
-            <section
-              className="hg-lucky"
-              aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
-            >
-              <div className={`hg-lucky-ball${String(lucky.lucky_number).length > 2 ? " is-wide" : ""}`}>
-                {lucky.lucky_number}
+            <section className="hg-lucky" aria-label={`Lucky number ${lucky.lucky_number}`}>
+              <span className="hg-lucky-bloom" aria-hidden="true" />
+              <div className="hg-lucky-stage">
+                <span className="hg-lucky-halo" aria-hidden="true" />
+                <div className={`hg-lucky-ball${String(lucky.lucky_number).length > 2 ? " is-wide" : ""}`}>
+                  {lucky.lucky_number}
+                </div>
+                <span className="hg-lucky-spark hg-lucky-spark--y" aria-hidden="true" />
+                <span className="hg-lucky-spark hg-lucky-spark--o" aria-hidden="true" />
               </div>
               <div className="hg-lucky-meta">
                 <h2 className="hg-lucky-title">Lucky Number</h2>
-                <span className="hg-lucky-refresh">{refreshCopy(lucky.refreshes_at)}</span>
               </div>
             </section>
           )}

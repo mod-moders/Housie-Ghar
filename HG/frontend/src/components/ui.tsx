@@ -2,15 +2,14 @@
 /** Shared UI primitives ported from the housieGhar prototype. */
 
 import React from "react";
+import Image from "next/image";
 import { Icon } from "./Icon";
 
-// ── Brand wordmark ───────────────────────────────────────────────────────────
-export function Logo({ size = 17, onClick }: { size?: number; onClick?: () => void }) {
+// ── Brand logo ───────────────────────────────────────────────────────────────
+export function Logo({ size = 48, onClick }: { size?: number; onClick?: () => void }) {
   return (
-    <button className="hg-logo" onClick={onClick} aria-label="Housie Ghar home" style={{ fontSize: size }}>
-      <span className="hg-logo-word">
-        Housie <b>Ghar</b>
-      </span>
+    <button className="hg-logo" onClick={onClick} aria-label="Housie Ghar home">
+      <Image src="/hg-logo.png" alt="Housie Ghar" height={size} width={0} style={{ width: "auto", height: size }} priority />
     </button>
   );
 }

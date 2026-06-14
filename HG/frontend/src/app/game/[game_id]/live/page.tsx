@@ -157,6 +157,8 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             <Icon name="zap" size={11} strokeWidth={2.4} /> Numbers are called automatically — just watch and cheer
           </div>
 
+          <div className="hg-live-body">
+          <div className="hg-live-left">
           <div className="hg-cage">
             <div className="hg-cage-ring" aria-hidden="true" />
             <div className={`hg-cage-num${revealed ? " is-revealed" : " is-teasing"}`}>
@@ -183,7 +185,9 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             ))}
             <span className="hg-recent-count">{count}/90 called</span>
           </div>
+          </div>
 
+          <div className="hg-live-right">
           <div className="hg-prizeboard">
             <h2 className="hg-section-title">Prizes</h2>
             <div className="hg-prizeboard-grid">
@@ -229,8 +233,10 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
               </span>
             ))}
           </div>
+          </div>
+          </div>
 
-          <div style={{ height: 80 }} />
+          <div className="hg-live-spacer" style={{ height: 80 }} />
 
           <div className="hg-emoji-bar">
             {["🎉", "🔥", "👏", "😮", "🍀", "❤️"].map((e) => (

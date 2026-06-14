@@ -1,4 +1,8 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Same-origin by default: requests go to /api on whatever host served the page
+// and Next proxies them to the backend (see next.config rewrites). This means
+// one URL — localhost, a LAN IP, or a public tunnel — works with zero config.
+// Set NEXT_PUBLIC_API_URL only to target a backend on a different origin.
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export async function apiFetch<T>(
   path: string,

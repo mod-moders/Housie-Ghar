@@ -128,6 +128,19 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
           <div className="hg-ls-row"><span>Booking ID</span><b>#{shortId}</b></div>
         </div>
 
+        <button
+          className="hg-dev-bypass"
+          onClick={async () => {
+            try {
+              await apiFetch(`/api/bookings/${lock.booking_id}/dev-bypass`, { method: "POST" });
+            } catch {
+              // polling will pick up the Sold status within 3s
+            }
+          }}
+        >
+          ⚡ Skip (dev)
+        </button>
+
         <div className="hg-wa-block">
           <div className="hg-wa-head">
             <span className="hg-wa-ic"><Icon name="chat" size={16} strokeWidth={2.2} /></span>

@@ -107,7 +107,7 @@ export default function StaffDashboard() {
       <div className="hg-frame hg-frame-wide">
         <div className="hg-dash">
           <aside className={`hg-side${collapsed ? " is-collapsed" : ""}`}>
-            <div className="hg-side-brand"><Logo size={18} onClick={() => router.push("/")} /></div>
+            <div className="hg-side-brand"><Logo size={44} onClick={() => router.push("/")} /></div>
             <nav className="hg-side-nav">
               {nav.map(([key, lbl, ic]) => (
                 <button

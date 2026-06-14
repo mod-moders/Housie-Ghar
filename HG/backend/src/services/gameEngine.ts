@@ -431,23 +431,30 @@ export async function pauseGame(gameId: string, operatorId: string): Promise<voi
  * Resume a paused game loop
  */
 export async function resumeGame(gameId: string, operatorId: string): Promise<void> {
+  // If the process was restarted while this game was Paused, its in-memory
+  // state is gone — boot-time auto-resume only rehydrates games left in the
+  // 'Live' state. Rather than stranding it with "Game state not loaded",
+  // rebuild from Game_Logs: startGame accepts the 'Paused' state, restores the
+  // drawn progress, flips status to Live and restarts the conductor (a full
+  // resume). Otherwise just restart the loop on the live in-memory state.
+  if (!activeGames.has(gameId)) {
+    await startGame(gameId, operatorId);
+  } else {
+    await pool.query(
+      `UPDATE Scheduled_Games SET game_status = 'Live' WHERE game_id = $1`,
+      [gameId]
+    );
+    runConductorTick(gameId);
+  }
+
   const game = activeGames.get(gameId);
-  if (!game) throw new Error('Game state not loaded');
-
-  await pool.query(
-    `UPDATE Scheduled_Games SET game_status = 'Live' WHERE game_id = $1`,
-    [gameId]
-  );
-
   const resumeEvent = {
     event: 'game_resumed' as const,
     timestamp: new Date().toISOString(),
-    interval_ms: game.intervalMs,
+    interval_ms: game?.intervalMs,
   };
   await publishGameEvent(gameId, resumeEvent);
   console.log(`▶ Game ${gameId} resumed by Operator ${operatorId}`);
-
-  runConductorTick(gameId);
 }
 
 /**

@@ -798,6 +798,80 @@ export async function forceConfirmBooking(req: AuthenticatedRequest, res: Respon
 }
 
 /**
+ * Dev-only bypass: auto-confirm a Locked booking without agent auth.
+ * Uses the booking's own assigned_agent_id to perform the wallet debit so
+ * the ledger stays consistent. Blocked in production via NODE_ENV check.
+ */
+export async function devBypassConfirm(req: Request, res: Response): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(404).json({ message: 'Not found' });
+    return;
+  }
+
+  const booking_id = String(req.params.booking_id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const bookingRes = await client.query(
+      `SELECT booking_id, ticket_ids, total_amount, booking_status, housie_name, assigned_agent_id
+       FROM Bookings WHERE booking_id = $1 FOR UPDATE`,
+      [booking_id]
+    );
+    if (bookingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Booking not found' });
+      return;
+    }
+    const booking = bookingRes.rows[0];
+    if (booking.booking_status !== 'Locked') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: `Cannot bypass from status: ${booking.booking_status}` });
+      return;
+    }
+
+    const agentId = booking.assigned_agent_id;
+    const amount = parseFloat(booking.total_amount);
+
+    const agentRes = await client.query(
+      `SELECT current_balance FROM Users WHERE user_id = $1 FOR UPDATE`,
+      [agentId]
+    );
+    const newBalance = Math.max(0, parseFloat(agentRes.rows[0].current_balance) - amount);
+
+    await client.query(`UPDATE Users SET current_balance = $1 WHERE user_id = $2`, [newBalance, agentId]);
+    await client.query(
+      `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
+       VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
+      [agentId, amount, newBalance, booking_id, `[DEV BYPASS] Booking #${booking_id.substring(0, 8).toUpperCase()} for ${booking.housie_name}`]
+    );
+    await client.query(
+      `UPDATE Bookings SET booking_status = 'Sold', confirmed_at = NOW(), confirmed_by = $1 WHERE booking_id = $2`,
+      [agentId, booking_id]
+    );
+    await client.query(
+      `UPDATE Tickets SET status = 'Sold', owner_housie_name = $1, confirmed_at = NOW(), locked_until = NULL, locked_by_booking = NULL
+       WHERE ticket_id = ANY($2)`,
+      [booking.housie_name, booking.ticket_ids]
+    );
+
+    await client.query('COMMIT');
+
+    for (const ticketId of booking.ticket_ids) {
+      io.emit('ticket_status_change', { event: 'ticket_status_change', ticket_id: ticketId, new_status: 'Sold' });
+    }
+
+    res.json({ message: 'Dev bypass: booking confirmed.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Dev bypass error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Skip Alerts (Agent) — returns the bookie's unseen FOMO skip events and marks
  * them seen. Powers the dashboard "you missed a booking" banner on reload.
  */

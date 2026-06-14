@@ -19,13 +19,20 @@ import walletRoutes from './modules/wallet/wallet.routes';
 import configRoutes from './modules/config/config.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import statsRoutes from './modules/stats/stats.routes';
+import playersRoutes from './modules/players/players.routes';
 
 const app = express();
 
 // 1. CORS Configuration
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    // In production, restrict to the configured origin(s). In development,
+    // reflect the request origin so the app is reachable from any LAN device
+    // (e.g. a phone hitting http://192.168.x.x:3000) without extra config.
+    origin:
+      env.NODE_ENV === 'production'
+        ? env.FRONTEND_URL.split(',').map((s) => s.trim())
+        : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -66,6 +73,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/players', playersRoutes);
 app.use('/api', ticketsRoutes); // Exposes /api/tickets/:ticket_id and /api/games/:game_id/tickets
 
 // Default Health check
