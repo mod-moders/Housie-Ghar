@@ -54,6 +54,13 @@ Thumbs.db
 *.zip
 *.crdownload
 
+# ── Design source images & local screenshots (not needed by the app) ──
+# Real app assets live in HG/frontend/public/ and ARE committed; these
+# root-level originals and macOS screenshots are local-only.
+/HG Logo *.png
+Screenshot*.png
+._*
+
 # ── Unrelated project ──
 ruflo/
 
