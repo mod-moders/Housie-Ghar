@@ -7,6 +7,7 @@
 # ─────────────────────────────────────────────────────────────────────
 /*
 !/.gitignore
+!/CLAUDE.md
 !/HG/
 
 # ─── Everything below filters files *inside* HG/ ───
