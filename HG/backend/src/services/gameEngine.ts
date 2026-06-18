@@ -9,6 +9,7 @@ import { sseManager } from '../utils/sseManager';
 import { io } from '../server';
 import { PrizePattern } from '@shared/types/game';
 import { TicketGridData } from '@shared/types/ticket';
+import { logger } from '../utils/logger';
 
 // In-memory runtime state for active games
 interface ActiveGame {
@@ -61,7 +62,7 @@ export async function initGameEngineSubscription(): Promise<void> {
       io.to(`game-${gameId}`).emit('completed', payload);
     }
   });
-  console.log('📢 Game Engine Redis Pub/Sub initialized');
+  logger.info('Game Engine Redis Pub/Sub initialized');
 }
 
 /**
@@ -199,7 +200,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
   };
 
   activeGames.set(gameId, activeGame);
-  console.log(`🎮 Game started: ${game.title} (ID: ${gameId}). Total tickets: ${tickets.length}`);
+  logger.info({ gameId, title: game.title, ticketCount: tickets.length }, 'game started');
 
   // Start conduction ticks
   runConductorTick(gameId);
@@ -216,7 +217,7 @@ function runConductorTick(gameId: string): void {
     try {
       await processNextDraw(gameId);
     } catch (err) {
-      console.error(`Error in game tick for game ${gameId}:`, err);
+      logger.error({ err, gameId }, 'error in game tick');
       // Reschedule tick on failure to keep game running
       runConductorTick(gameId);
     }
@@ -248,7 +249,7 @@ async function processNextDraw(gameId: string): Promise<void> {
     [game.drawnNumbers, game.currentIndex, gameId]
   );
 
-  console.log(`🎲 Game ${gameId} Drew: ${drawNumber} (${game.currentIndex}/90)`);
+  logger.info({ gameId, drawNumber, total: game.currentIndex }, 'number drawn');
 
   // 3. Broadcast draw event
   const drawEvent = {
@@ -277,8 +278,7 @@ async function processNextDraw(gameId: string): Promise<void> {
       await publishGameEvent(gameId, winnerEvent);
     }
 
-    // Add a 4-second pause to the next tick as specified in PDR Chapter 7.4
-    console.log(`🏆 Winners announced! Pausing conductor for 4 seconds...`);
+    logger.info({ gameId, count: winners.length }, 'winner(s) announced — conductor pausing 4s');
     game.timer = setTimeout(() => {
       runConductorTick(gameId);
     }, 4000);
@@ -384,7 +384,7 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Error updating prize claim in DB:', err);
+        logger.error({ err }, 'error updating prize claim in DB');
       } finally {
         client.release();
       }
@@ -424,7 +424,7 @@ export async function pauseGame(gameId: string, operatorId: string): Promise<voi
     timestamp: new Date().toISOString(),
   };
   await publishGameEvent(gameId, pauseEvent);
-  console.log(`⏸ Game ${gameId} paused by Operator ${operatorId}`);
+  logger.info({ gameId, operatorId }, 'game paused');
 }
 
 /**
@@ -454,7 +454,7 @@ export async function resumeGame(gameId: string, operatorId: string): Promise<vo
     interval_ms: game?.intervalMs,
   };
   await publishGameEvent(gameId, resumeEvent);
-  console.log(`▶ Game ${gameId} resumed by Operator ${operatorId}`);
+  logger.info({ gameId, operatorId }, 'game resumed');
 }
 
 /**
@@ -465,7 +465,7 @@ export async function changeGameSpeed(gameId: string, intervalMs: number, operat
   if (!game) throw new Error('Game state not loaded');
 
   game.intervalMs = intervalMs;
-  console.log(`⚡ Speed updated for Game ${gameId}: ${intervalMs}ms by Operator ${operatorId}`);
+  logger.info({ gameId, intervalMs, operatorId }, 'game speed updated');
 }
 
 /**
@@ -509,7 +509,7 @@ export async function completeGame(gameId: string): Promise<void> {
   await publishGameEvent(gameId, completeEvent);
   activeGames.delete(gameId);
 
-  console.log(`🏁 Game ${gameId} Completed! leaderboard:`, leaderboard);
+  logger.info({ gameId, leaderboard }, 'game completed');
 }
 
 /**
@@ -523,7 +523,7 @@ export async function resumeInterruptedGames(): Promise<void> {
   );
   if (res.rowCount === 0) return;
 
-  console.log(`🔄 Resuming ${res.rowCount} interrupted game(s)…`);
+  logger.info({ count: res.rowCount }, 'resuming interrupted games');
 
   for (const row of res.rows) {
     try {
@@ -532,9 +532,9 @@ export async function resumeInterruptedGames(): Promise<void> {
         [row.game_id]
       );
       await startGame(row.game_id, 'system-boot');
-      console.log(`✅ Resumed: ${row.title} (${row.game_id})`);
+      logger.info({ gameId: row.game_id, title: row.title }, 'game resumed on boot');
     } catch (err) {
-      console.error(`⚠️  Could not resume game ${row.game_id}:`, err);
+      logger.error({ err, gameId: row.game_id }, 'could not resume game on boot');
     }
   }
 }

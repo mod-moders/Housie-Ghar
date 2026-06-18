@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import { CONSTANTS } from '../config/constants';
 import { RoleName } from '@shared/types/user';
 import pool from '../db';
+import { logger } from '../utils/logger';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -39,7 +40,7 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     };
     next();
   } catch (error) {
-    console.error('JWT Verification failed:', error);
+    logger.warn({ err: error }, 'JWT verification failed');
     res.status(403).json({ message: 'Invalid or expired session. Please log in again.' });
   }
 }
@@ -98,7 +99,7 @@ export async function requireFinancialOfficer(
     }
     res.status(403).json({ message: 'Forbidden: you are not designated as Financial Officer' });
   } catch (error) {
-    console.error('requireFinancialOfficer check failed:', error);
+    logger.error({ err: error }, 'requireFinancialOfficer check failed');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

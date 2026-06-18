@@ -4,6 +4,7 @@
 
 import { createClient } from 'redis';
 import { env } from '../config/env';
+import { logger } from '../utils/logger';
 
 // Main Redis client (for cache operations)
 const redisClient = createClient({
@@ -20,13 +21,9 @@ const redisSubscriber = createClient({
   url: env.REDIS_URL,
 });
 
-redisClient.on('error', (err) => console.error('Redis Client Error:', err));
-redisPublisher.on('error', (err) => console.error('Redis Publisher Error:', err));
-redisSubscriber.on('error', (err) => console.error('Redis Subscriber Error:', err));
-
-redisClient.on('connect', () => console.log('🔴 Redis client connected'));
-redisPublisher.on('connect', () => console.log('🔴 Redis publisher connected'));
-redisSubscriber.on('connect', () => console.log('🔴 Redis subscriber connected'));
+redisClient.on('error', (err) => logger.error({ err }, 'Redis client error'));
+redisPublisher.on('error', (err) => logger.error({ err }, 'Redis publisher error'));
+redisSubscriber.on('error', (err) => logger.error({ err }, 'Redis subscriber error'));
 
 export async function connectRedis(): Promise<void> {
   await Promise.all([
@@ -34,7 +31,7 @@ export async function connectRedis(): Promise<void> {
     redisPublisher.connect(),
     redisSubscriber.connect(),
   ]);
-  console.log('✅ All Redis connections established');
+  logger.info('all Redis connections established');
 }
 
 export { redisClient, redisPublisher, redisSubscriber };

@@ -9,6 +9,7 @@ import { CONSTANTS } from '../../config/constants';
 import { generateTicketsForGame } from '../../db/generateGameTickets';
 import { logAuditEvent } from '../../services/audit.service';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { logger } from '../../utils/logger';
 import {
   startGame,
   pauseGame,
@@ -74,7 +75,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 
     res.json(games);
   } catch (error) {
-    console.error('Error fetching games:', error);
+    logger.error({ err: error }, 'error fetching games');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -136,7 +137,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       })),
     });
   } catch (error) {
-    console.error('Error fetching game:', error);
+    logger.error({ err: error }, 'error fetching game');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -244,7 +245,7 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
     res.status(201).json({ game_id: gameId, message: 'Game created and tickets generated' });
   } catch (error: any) {
     await client.query('ROLLBACK');
-    console.error('Error creating game:', error);
+    logger.error({ err: error }, 'error creating game');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -262,7 +263,7 @@ export async function handleStartGame(req: any, res: Response): Promise<void> {
     await startGame(game_id, operatorId);
     res.json({ message: 'Game started successfully' });
   } catch (error: any) {
-    console.error('Error starting game:', error);
+    logger.error({ err: error }, 'error starting game');
     res.status(400).json({ message: error.message || 'Failed to start game' });
   }
 }
@@ -278,7 +279,7 @@ export async function handlePauseGame(req: any, res: Response): Promise<void> {
     await pauseGame(game_id, operatorId);
     res.json({ message: 'Game paused successfully' });
   } catch (error: any) {
-    console.error('Error pausing game:', error);
+    logger.error({ err: error }, 'error pausing game');
     res.status(400).json({ message: error.message || 'Failed to pause game' });
   }
 }
@@ -294,7 +295,7 @@ export async function handleResumeGame(req: any, res: Response): Promise<void> {
     await resumeGame(game_id, operatorId);
     res.json({ message: 'Game resumed successfully' });
   } catch (error: any) {
-    console.error('Error resuming game:', error);
+    logger.error({ err: error }, 'error resuming game');
     res.status(400).json({ message: error.message || 'Failed to resume game' });
   }
 }
@@ -316,7 +317,7 @@ export async function handleSpeedChange(req: any, res: Response): Promise<void> 
     await changeGameSpeed(game_id, interval_ms, operatorId);
     res.json({ message: 'Speed updated successfully' });
   } catch (error: any) {
-    console.error('Error changing speed:', error);
+    logger.error({ err: error }, 'error changing speed');
     res.status(400).json({ message: error.message || 'Failed to change speed' });
   }
 }
@@ -343,7 +344,7 @@ export async function getDrawnNumbers(req: Request, res: Response): Promise<void
       current_index: result.rows[0].current_index,
     });
   } catch (error) {
-    console.error('Error fetching drawn numbers:', error);
+    logger.error({ err: error }, 'error fetching drawn numbers');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -409,7 +410,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
 
     res.write(`data: ${JSON.stringify(initialPayload)}\n\n`);
   } catch (error) {
-    console.error('Error writing initial SSE payload:', error);
+    logger.error({ err: error }, 'error writing initial SSE payload');
   }
 
   // Cleanup on close

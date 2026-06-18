@@ -9,6 +9,8 @@
 !/.gitignore
 !/CLAUDE.md
 !/HG/
+!/.github/
+!/manual.md
 
 # ─── Everything below filters files *inside* HG/ ───
 

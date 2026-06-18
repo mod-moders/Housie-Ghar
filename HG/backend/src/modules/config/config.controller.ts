@@ -7,6 +7,7 @@ import { Response } from 'express';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
+import { logger } from '../../utils/logger';
 
 /**
  * Read the entire platform configuration (Superadmin)
@@ -20,7 +21,7 @@ export async function getConfig(req: AuthenticatedRequest, res: Response): Promi
     );
     res.json(result.rows);
   } catch (error) {
-    console.error('Error reading platform config:', error);
+    logger.error({ err: error }, 'error reading platform config');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -78,7 +79,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     res.json({ message: 'Configuration updated', config: refreshed.rows });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error updating platform config:', error);
+    logger.error({ err: error }, 'error updating platform config');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();

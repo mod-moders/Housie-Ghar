@@ -4,6 +4,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../../db';
+import { logger } from '../../utils/logger';
 
 export async function getGameTicketsGrid(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
@@ -52,7 +53,7 @@ export async function getGameTicketsGrid(req: Request, res: Response): Promise<v
       sold,
     });
   } catch (error) {
-    console.error('Error fetching tickets grid:', error);
+    logger.error({ err: error }, 'error fetching tickets grid');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -85,7 +86,7 @@ export async function getTicketGridData(req: Request, res: Response): Promise<vo
       owner_housie_name: ticket.owner_housie_name,
     });
   } catch (error) {
-    console.error('Error fetching ticket grid data:', error);
+    logger.error({ err: error }, 'error fetching ticket grid data');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

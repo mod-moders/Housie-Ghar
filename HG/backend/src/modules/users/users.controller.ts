@@ -9,6 +9,7 @@ import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { deriveTrust } from '../../utils/trust';
+import { logger } from '../../utils/logger';
 
 const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 
@@ -47,7 +48,7 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
       }))
     );
   } catch (error) {
-    console.error('Error listing users:', error);
+    logger.error({ err: error }, 'error listing users');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -120,7 +121,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
       res.status(409).json({ message: 'A user with this email or phone already exists' });
       return;
     }
-    console.error('Error creating user:', error);
+    logger.error({ err: error }, 'error creating user');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -191,7 +192,7 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
 
     res.json({ user: result.rows[0], message: 'User updated successfully' });
   } catch (error) {
-    console.error('Error updating user:', error);
+    logger.error({ err: error }, 'error updating user');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -253,7 +254,7 @@ export async function designateCfo(req: AuthenticatedRequest, res: Response): Pr
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error designating CFO:', error);
+    logger.error({ err: error }, 'error designating CFO');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();

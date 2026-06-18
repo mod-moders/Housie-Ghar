@@ -1,8 +1,9 @@
 import pool from './index';
 import { generateTicketGrid } from '../utils/ticketGenerator';
+import { logger } from '../utils/logger';
 
 export async function generateTicketsForGame(gameId: string, totalTickets: number): Promise<void> {
-  console.log(`🎫 Generating ${totalTickets} tickets for game ${gameId}...`);
+  logger.info({ gameId, totalTickets }, 'generating tickets');
 
   // Insert in batches of 50 to avoid overloading or exceeding limits
   const batchSize = 50;
@@ -23,12 +24,12 @@ export async function generateTicketsForGame(gameId: string, totalTickets: numbe
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error(`Error in ticket generation batch ${start}-${end}:`, error);
+      logger.error({ err: error, gameId, start, end }, 'error in ticket generation batch');
       throw error;
     } finally {
       client.release();
     }
   }
 
-  console.log(`✅ Completed generating tickets for game ${gameId}`);
+  logger.info({ gameId }, 'ticket generation complete');
 }

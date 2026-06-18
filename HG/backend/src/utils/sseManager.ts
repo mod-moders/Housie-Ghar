@@ -5,6 +5,7 @@
 
 import { Response } from 'express';
 import { SSEEvent } from '@shared/types/events';
+import { logger } from './logger';
 
 // Map of gameId -> array of active client responses
 const gameClients = new Map<string, Response[]>();
@@ -53,7 +54,7 @@ export const sseManager = {
       try {
         client.write(data);
       } catch (err) {
-        console.error('Error writing to SSE client:', err);
+        logger.error({ err }, 'error writing to SSE client');
       }
     });
   },
@@ -69,7 +70,7 @@ export const sseManager = {
         try {
           client.write(data);
         } catch (err) {
-          console.error('Error writing to SSE client:', err);
+          logger.error({ err }, 'error writing to SSE client');
         }
       });
     }

@@ -7,6 +7,10 @@ import fs from 'fs';
 import path from 'path';
 import pool from './index';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('seed.ts must never run in production');
+}
+
 const SEEDS_DIR = path.resolve(__dirname, '../../seeds');
 
 async function seed(): Promise<void> {

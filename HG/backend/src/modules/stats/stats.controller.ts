@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { CONSTANTS } from '../../config/constants';
+import { logger } from '../../utils/logger';
 
 /**
  * Platform KPIs for the staff Overview section (Superadmin/Admin).
@@ -54,7 +55,7 @@ export async function getOverview(req: AuthenticatedRequest, res: Response): Pro
       pending_topups: parseInt(topups.rows[0].pending_topups, 10),
     });
   } catch (error) {
-    console.error('Error fetching overview stats:', error);
+    logger.error({ err: error }, 'error fetching overview stats');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -85,7 +86,7 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
       }))
     );
   } catch (error) {
-    console.error('Error fetching hall of fame:', error);
+    logger.error({ err: error }, 'error fetching hall of fame');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -170,7 +171,7 @@ export async function getLuckyNumber(req: Request, res: Response): Promise<void>
     luckyMemo = { cycleIndex, body };
     res.json(body);
   } catch (error) {
-    console.error('Error fetching lucky number:', error);
+    logger.error({ err: error }, 'error fetching lucky number');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

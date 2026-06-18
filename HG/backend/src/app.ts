@@ -6,8 +6,10 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import { env } from './config/env';
 import { CONSTANTS } from './config/constants';
+import { logger } from './utils/logger';
 
 // Route Imports
 import authRoutes from './modules/auth/auth.routes';
@@ -23,7 +25,22 @@ import playersRoutes from './modules/players/players.routes';
 
 const app = express();
 
-// 1. CORS Configuration
+// 1. Security Headers (before routes)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'", 'wss:', 'https:'],
+      },
+    },
+  })
+);
+
+// 2. CORS Configuration
 app.use(
   cors({
     // In production, restrict to the configured origin(s). In development,
@@ -39,12 +56,12 @@ app.use(
   })
 );
 
-// 2. Parsers
+// 3. Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// 3. Global Rate Limiter
+// 4. Global Rate Limiter
 const globalLimiter = rateLimit({
   windowMs: CONSTANTS.RATE_LIMIT_WINDOW_MS,
   max: 100, // Limit each IP to 100 requests per windowMs
@@ -54,7 +71,7 @@ const globalLimiter = rateLimit({
 });
 app.use('/api/', globalLimiter);
 
-// 4. Booking Specific Rate Limiter
+// 5. Booking Specific Rate Limiter
 const bookingLimiter = rateLimit({
   windowMs: CONSTANTS.RATE_LIMIT_WINDOW_MS,
   max: CONSTANTS.RATE_LIMIT_BOOKING,
@@ -64,7 +81,29 @@ const bookingLimiter = rateLimit({
 });
 app.use('/api/bookings/lock', bookingLimiter);
 
-// 5. Mount Routes
+// 6. Strict Auth Rate Limiter — 5 failures per 15 min per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  message: { message: 'Too many attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/players/login', authLimiter);
+
+// 7. Slow-request logger — warns on any request taking >500ms
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    if (ms > 500) logger.warn({ method: req.method, path: req.path, ms }, 'slow request');
+  });
+  next();
+});
+
+// 8. Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/bookings', bookingsRoutes);
@@ -83,7 +122,7 @@ app.get('/health', (req, res) => {
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled Server Error:', err);
+  logger.error({ err }, 'Unhandled server error');
   res.status(500).json({ message: 'An internal server error occurred' });
 });
 

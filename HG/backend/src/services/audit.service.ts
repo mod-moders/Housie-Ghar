@@ -4,6 +4,7 @@
  */
 
 import pool from '../db';
+import { logger } from '../utils/logger';
 
 interface AuditLogPayload {
   userId: string;
@@ -38,6 +39,6 @@ export async function logAuditEvent(payload: AuditLogPayload): Promise<void> {
       ]
     );
   } catch (error) {
-    console.error('Failed to write audit log entry:', error);
+    logger.error({ err: error }, 'failed to write audit log entry');
   }
 }

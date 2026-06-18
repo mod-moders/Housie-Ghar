@@ -8,6 +8,7 @@ import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
+import { logger } from '../../utils/logger';
 
 /**
  * Lock tickets and initiate the WhatsApp P2P workflow
@@ -224,7 +225,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Booking lock error:', error);
+    logger.error({ err: error }, 'booking lock error');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -256,7 +257,7 @@ export async function getBookingStatus(req: Request, res: Response): Promise<voi
       confirmed_at: result.rows[0].confirmed_at,
     });
   } catch (error) {
-    console.error('Error fetching booking status:', error);
+    logger.error({ err: error }, 'error fetching booking status');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -300,7 +301,7 @@ export async function getAgentQueue(req: any, res: Response): Promise<void> {
 
     res.json(bookings);
   } catch (error) {
-    console.error('Error fetching agent queue:', error);
+    logger.error({ err: error }, 'error fetching agent queue');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -409,7 +410,7 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
     res.json({ message: 'Booking approved and tickets successfully sold.' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error confirming booking:', error);
+    logger.error({ err: error }, 'error confirming booking');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -482,7 +483,7 @@ export async function rejectBooking(req: any, res: Response): Promise<void> {
     res.json({ message: 'Booking successfully rejected.' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error rejecting booking:', error);
+    logger.error({ err: error }, 'error rejecting booking');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -631,7 +632,7 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Direct sale error:', error);
+    logger.error({ err: error }, 'direct sale error');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -671,7 +672,7 @@ export async function getAgentSales(req: AuthenticatedRequest, res: Response): P
 
     res.json(sales);
   } catch (error) {
-    console.error('Error fetching agent sales:', error);
+    logger.error({ err: error }, 'error fetching agent sales');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -718,7 +719,7 @@ export async function getOperatorOverflowQueue(req: AuthenticatedRequest, res: R
 
     res.json(bookings);
   } catch (error) {
-    console.error('Error fetching operator overflow queue:', error);
+    logger.error({ err: error }, 'error fetching operator overflow queue');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -790,7 +791,7 @@ export async function forceConfirmBooking(req: AuthenticatedRequest, res: Respon
     res.json({ message: 'Overflow booking force-confirmed. Tickets sold direct-to-platform.' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error force-confirming booking:', error);
+    logger.error({ err: error }, 'error force-confirming booking');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -864,7 +865,7 @@ export async function devBypassConfirm(req: Request, res: Response): Promise<voi
     res.json({ message: 'Dev bypass: booking confirmed.' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Dev bypass error:', error);
+    logger.error({ err: error }, 'dev bypass error');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -904,7 +905,7 @@ export async function getSkipAlerts(req: AuthenticatedRequest, res: Response): P
       }))
     );
   } catch (error) {
-    console.error('Error fetching skip alerts:', error);
+    logger.error({ err: error }, 'error fetching skip alerts');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

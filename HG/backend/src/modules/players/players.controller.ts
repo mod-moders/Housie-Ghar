@@ -11,6 +11,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../../db';
 import { env } from '../../config/env';
+import { logger } from '../../utils/logger';
 
 export const PLAYER_COOKIE_NAME = 'hg_player_token';
 
@@ -101,7 +102,7 @@ export async function playerLogin(req: Request, res: Response): Promise<void> {
     setPlayerCookie(res, { playerId: player.player_id, username: player.username });
     res.status(201).json({ player: toPlayerPayload(player), returning: false });
   } catch (error) {
-    console.error('Player login error:', error);
+    logger.error({ err: error }, 'player login error');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

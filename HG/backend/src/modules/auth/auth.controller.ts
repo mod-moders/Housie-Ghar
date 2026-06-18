@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../../db';
 import { env } from '../../config/env';
 import { CONSTANTS } from '../../config/constants';
+import { logger } from '../../utils/logger';
 
 export async function login(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body;
@@ -92,7 +93,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ err: error }, 'login error');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -140,7 +141,7 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
       },
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    logger.error({ err: error }, 'error fetching profile');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

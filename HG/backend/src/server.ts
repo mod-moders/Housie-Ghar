@@ -9,6 +9,7 @@ import { env } from './config/env';
 import { connectRedis } from './db/redis';
 import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
+import { logger } from './utils/logger';
 
 const server = http.createServer(app);
 
@@ -25,38 +26,30 @@ export const io = new Server(server, {
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`);
+  logger.debug({ socketId: socket.id }, 'client connected');
 
-  // Handle staff authentication / room entry
   socket.on('join_game_room', (gameId: string) => {
     socket.join(`game-${gameId}`);
-    console.log(`🔌 Client ${socket.id} joined room game-${gameId}`);
   });
 
   socket.on('join_agent_room', (agentId: string) => {
     socket.join(`agent-${agentId}`);
-    console.log(`🔌 Agent ${socket.id} joined room agent-${agentId}`);
   });
 
-  // Operators join their own room to receive overflow-failsafe booking requests
   socket.on('join_operator_room', (operatorId: string) => {
     socket.join(`operator-${operatorId}`);
-    console.log(`🔌 Operator ${socket.id} joined room operator-${operatorId}`);
   });
 
-  // Admins/Superadmins join a shared room to receive top-up requests and platform events
   socket.on('join_admin_room', () => {
     socket.join('admin-room');
-    console.log(`🔌 Staff ${socket.id} joined admin-room`);
   });
 
   socket.on('leave_game_room', (gameId: string) => {
     socket.leave(`game-${gameId}`);
-    console.log(`🔌 Client ${socket.id} left room game-${gameId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log(`🔌 Client disconnected: ${socket.id}`);
+    logger.debug({ socketId: socket.id }, 'client disconnected');
   });
 });
 
@@ -80,10 +73,10 @@ async function boot() {
     // 5. Start listening
     const PORT = env.PORT;
     server.listen(PORT, () => {
-      console.log(`🚀 Housie Ghar API running on http://localhost:${PORT}`);
+      logger.info({ port: PORT }, 'Housie Ghar API running');
     });
   } catch (error) {
-    console.error('💥 Crash during server boot:', error);
+    logger.error({ err: error }, 'Crash during server boot');
     process.exit(1);
   }
 }

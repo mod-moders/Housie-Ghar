@@ -12,6 +12,7 @@ import { buildWaLink } from '../../utils/waLink';
 import { buildRechargeMessage } from './rechargeContact';
 import { validateAdjust, computeBalanceAfter } from './walletAdjust';
 import { deriveTrust } from '../../utils/trust';
+import { logger } from '../../utils/logger';
 
 /**
  * Get the authenticated Agent's own wallet ledger (Agent)
@@ -40,7 +41,7 @@ export async function getMyLedger(req: AuthenticatedRequest, res: Response): Pro
       }))
     );
   } catch (error) {
-    console.error('Error fetching wallet ledger:', error);
+    logger.error({ err: error }, 'error fetching wallet ledger');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -71,7 +72,7 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
       }))
     );
   } catch (error) {
-    console.error('Error listing pending top-ups:', error);
+    logger.error({ err: error }, 'error listing pending top-ups');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -123,7 +124,7 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
       }))
     );
   } catch (error) {
-    console.error('Error listing agent wallets:', error);
+    logger.error({ err: error }, 'error listing agent wallets');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -184,7 +185,7 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
       recharge_wa_link,
     });
   } catch (error) {
-    console.error('Error creating top-up request:', error);
+    logger.error({ err: error }, 'error creating top-up request');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -282,7 +283,7 @@ export async function approveTopUp(req: AuthenticatedRequest, res: Response): Pr
     res.json({ message: 'Top-up approved', new_balance: newBalance });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error approving top-up:', error);
+    logger.error({ err: error }, 'error approving top-up');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -363,7 +364,7 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
     res.json({ message: 'Adjustment applied', new_balance: calc.balance_after });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error applying manual adjustment:', error);
+    logger.error({ err: error }, 'error applying manual adjustment');
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
@@ -391,7 +392,7 @@ export async function getFinancialHud(_req: AuthenticatedRequest, res: Response)
       pending_count: parseInt(pending.rows[0].c, 10),
     });
   } catch (error) {
-    console.error('Error building financial HUD:', error);
+    logger.error({ err: error }, 'error building financial HUD');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -446,7 +447,7 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
       }))
     );
   } catch (error) {
-    console.error('Error building master ledger:', error);
+    logger.error({ err: error }, 'error building master ledger');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -487,7 +488,7 @@ export async function rejectTopUp(req: AuthenticatedRequest, res: Response): Pro
 
     res.json({ message: 'Top-up request rejected' });
   } catch (error) {
-    console.error('Error rejecting top-up:', error);
+    logger.error({ err: error }, 'error rejecting top-up');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

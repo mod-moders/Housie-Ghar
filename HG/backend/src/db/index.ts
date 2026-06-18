@@ -4,21 +4,18 @@
 
 import { Pool } from 'pg';
 import { env } from '../config/env';
+import { logger } from '../utils/logger';
 
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  max: 20,              // Maximum number of connections in the pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle PostgreSQL client:', err);
+  logger.error({ err }, 'Unexpected error on idle PostgreSQL client');
   process.exit(-1);
-});
-
-pool.on('connect', () => {
-  console.log('📦 PostgreSQL client connected');
 });
 
 export default pool;

@@ -6,6 +6,7 @@
 import { Response } from 'express';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { logger } from '../../utils/logger';
 
 const MAX_LIMIT = 100;
 
@@ -56,7 +57,7 @@ export async function getAuditLog(req: AuthenticatedRequest, res: Response): Pro
       entries: dataRes.rows,
     });
   } catch (error) {
-    console.error('Error fetching audit log:', error);
+    logger.error({ err: error }, 'error fetching audit log');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

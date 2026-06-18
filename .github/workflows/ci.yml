@@ -1,0 +1,90 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  verify:
+    name: Test · Lint · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Backend ──────────────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: HG/backend/package-lock.json
+
+      - name: Install backend deps
+        run: cd HG/backend && npm ci
+
+      - name: Typecheck backend
+        run: cd HG/backend && npx tsc --noEmit
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379
+          JWT_PRIVATE_KEY: ${{ secrets.CI_JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.CI_JWT_PUBLIC_KEY }}
+          FRONTEND_URL: http://localhost:3000
+
+      - name: Build backend
+        run: cd HG/backend && npm run build
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379
+          JWT_PRIVATE_KEY: ${{ secrets.CI_JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.CI_JWT_PUBLIC_KEY }}
+          FRONTEND_URL: http://localhost:3000
+
+      # ── Frontend ─────────────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: HG/frontend/package-lock.json
+
+      - name: Install frontend deps
+        run: cd HG/frontend && npm ci
+
+      - name: Lint frontend
+        run: cd HG/frontend && npm run lint
+
+      - name: Build frontend
+        run: cd HG/frontend && npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+      # ── Asset guard ───────────────────────────────────────────────────────────
+      - name: Verify required public assets exist
+        run: |
+          test -f HG/frontend/public/hg-logo.png   || { echo "Missing hg-logo.png";  exit 1; }
+          test -f HG/frontend/public/hg-logo-2.png || { echo "Missing hg-logo-2.png"; exit 1; }
+
+  deploy-staging:
+    needs: verify
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger staging deploy
+        run: curl -fsS -X POST "${{ secrets.RAILWAY_STAGING_DEPLOY_HOOK }}"
+
+  deploy-production:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger production deploy
+        run: curl -fsS -X POST "${{ secrets.RAILWAY_PRODUCTION_DEPLOY_HOOK }}"
+
+      - name: Post-deploy health check
+        run: |
+          sleep 30
+          curl --fail https://api.yourdomain.com/health || exit 1

@@ -6,11 +6,12 @@
 import fs from 'fs';
 import path from 'path';
 import pool from './index';
+import { logger } from '../utils/logger';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../migrations');
 
 async function migrate(): Promise<void> {
-  console.log('🔄 Running database migrations...');
+  logger.info('running database migrations');
 
   // Create migrations tracking table if it doesn't exist
   await pool.query(`
@@ -33,7 +34,7 @@ async function migrate(): Promise<void> {
 
   for (const file of migrationFiles) {
     if (executedMigrations.has(file)) {
-      console.log(`  ⏭ Skipping (already executed): ${file}`);
+      logger.debug({ file }, 'migration already executed, skipping');
       continue;
     }
 
@@ -45,19 +46,19 @@ async function migrate(): Promise<void> {
       await pool.query(sql);
       await pool.query('INSERT INTO _migrations (name) VALUES ($1)', [file]);
       await pool.query('COMMIT');
-      console.log(`  ✅ Executed: ${file}`);
+      logger.info({ file }, 'migration executed');
     } catch (error) {
       await pool.query('ROLLBACK');
-      console.error(`  ❌ Failed: ${file}`, error);
+      logger.error({ err: error, file }, 'migration failed');
       throw error;
     }
   }
 
-  console.log('✅ All migrations complete');
+  logger.info('all migrations complete');
   await pool.end();
 }
 
 migrate().catch((err) => {
-  console.error('Migration failed:', err);
+  logger.error({ err }, 'migration runner failed');
   process.exit(1);
 });
