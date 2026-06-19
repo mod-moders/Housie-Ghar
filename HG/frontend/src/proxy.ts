@@ -5,11 +5,18 @@ export function proxy(req: NextRequest) {
   const staffToken = req.cookies.get("hg_auth_token")?.value;
   const playerToken = req.cookies.get("hg_player_token")?.value;
 
-  // Staff area requires the staff cookie.
-  if (pathname.startsWith("/staff") && pathname !== "/staff/login") {
+  // Staff area requires the staff cookie. Every door's login page (paths ending
+  // in /login) is public; no other /staff route ends in /login.
+  if (pathname.startsWith("/staff") && !pathname.endsWith("/login")) {
     if (!staffToken) {
       const url = req.nextUrl.clone();
-      url.pathname = "/staff/login";
+      url.pathname = pathname.startsWith("/staff/superadmin")
+        ? "/staff/superadmin/login"
+        : pathname.startsWith("/staff/admin")
+        ? "/staff/admin/login"
+        : pathname.startsWith("/staff/bookie")
+        ? "/staff/bookie/login"
+        : "/staff/login";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
