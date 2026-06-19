@@ -5,8 +5,11 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { Logo } from "./ui";
+import { AccountButton } from "./AccountButton";
+import { StaffMenu } from "./StaffMenu";
 import { apiFetch } from "@/lib/api";
 import { usePlayerStore } from "@/lib/stores/playerStore";
+import { STAFF_DOORS, DROPDOWN_DOORS } from "@/lib/staffRoles";
 
 // false during SSR/first paint, true after hydration — keeps the
 // localStorage-backed player chip from causing a hydration mismatch.
@@ -79,17 +82,11 @@ export function TopNav() {
         ))}
       </nav>
       <div className="hg-nav-right">
-        {player && (
-          <button className="hg-player-chip" onClick={signOut} title="Sign out">
-            <Icon name="user" size={14} strokeWidth={2} /> {player.username}
-          </button>
-        )}
+        <AccountButton />
         <button className="hg-theme-btn" onClick={toggleTheme} aria-label="Toggle theme" title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
           <Icon name={theme === "dark" ? "sun" : "moon"} size={17} strokeWidth={2} />
         </button>
-        <button className="hg-staff-btn" onClick={() => go("/staff/login")} aria-label="Staff login" title="Staff login">
-          <Icon name="lock" size={17} strokeWidth={2} />
-        </button>
+        <StaffMenu />
         <button className="hg-burger" onClick={() => setOpen((o) => !o)} aria-label="Menu">
           <Icon name={open ? "x" : "menu"} size={20} />
         </button>
@@ -101,9 +98,11 @@ export function TopNav() {
               <Icon name={icon} size={18} /> {lbl}
             </button>
           ))}
-          <button className="hg-sheet-link" onClick={() => go("/staff/login")}>
-            <Icon name="lock" size={18} /> Staff Login
-          </button>
+          {DROPDOWN_DOORS.map((role) => (
+            <button key={role} className="hg-sheet-link" onClick={() => go(STAFF_DOORS[role].login)}>
+              <Icon name={STAFF_DOORS[role].icon} size={18} /> {STAFF_DOORS[role].label}
+            </button>
+          ))}
           {player && (
             <button className="hg-sheet-link" onClick={signOut}>
               <Icon name="user" size={18} /> Sign out ({player.username})
