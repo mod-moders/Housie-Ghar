@@ -6,7 +6,7 @@
  * can be integration-tested against a scratch DB without booting the app.
  */
 
-import { PoolClient } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { logger } from '../utils/logger';
 
 export interface SettlementWinnerInput {
@@ -68,5 +68,110 @@ export async function recordSettlementsForPrize(
         w.amount,
       ]
     );
+  }
+}
+
+export interface SettlementFilter {
+  gameId?: string;
+  status?: string;
+}
+
+/** List settlements, optionally filtered by game and/or status, newest first. */
+export async function listSettlements(
+  db: Pool,
+  filter: SettlementFilter
+): Promise<any[]> {
+  const res = await db.query(
+    `SELECT s.*, u.full_name AS agent_name, u.town AS agent_town
+     FROM Prize_Settlements s
+     JOIN Users u ON u.user_id = s.agent_id
+     WHERE ($1::uuid IS NULL OR s.game_id = $1)
+       AND ($2::text IS NULL OR s.status = $2)
+     ORDER BY s.created_at DESC`,
+    [filter.gameId ?? null, filter.status ?? null]
+  );
+  return res.rows;
+}
+
+export interface SettleResult {
+  status: 'settled' | 'already_paid' | 'not_found';
+  settlement?: any;
+  newBalance?: number;
+}
+
+/**
+ * Mark a settlement Paid and credit the selling agent's wallet, in one
+ * transaction. Row-locked and idempotent: a second call returns 'already_paid'
+ * without crediting again. A zero-amount share flips to Paid without touching
+ * the wallet (Wallet_Ledger.amount has a CHECK > 0).
+ */
+export async function settleSettlement(
+  db: Pool,
+  settlementId: string,
+  financeUserId: string
+): Promise<SettleResult> {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    const sRes = await client.query(
+      `SELECT * FROM Prize_Settlements WHERE settlement_id = $1 FOR UPDATE`,
+      [settlementId]
+    );
+    if (sRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' };
+    }
+    const s = sRes.rows[0];
+    if (s.status === 'Paid') {
+      await client.query('ROLLBACK');
+      return { status: 'already_paid', settlement: s };
+    }
+
+    const amount = parseFloat(s.amount);
+    let newBalance: number | undefined;
+
+    if (amount > 0) {
+      const uRes = await client.query(
+        `SELECT current_balance FROM Users WHERE user_id = $1 FOR UPDATE`,
+        [s.agent_id]
+      );
+      const balance = parseFloat(uRes.rows[0].current_balance);
+      newBalance = balance + amount;
+      await client.query(`UPDATE Users SET current_balance = $1 WHERE user_id = $2`, [
+        newBalance,
+        s.agent_id,
+      ]);
+      await client.query(
+        `INSERT INTO Wallet_Ledger
+           (agent_id, transaction_type, amount, balance_after,
+            reference_type, reference_id, description, performed_by)
+         VALUES ($1, 'Credit', $2, $3, 'Prize', $4, $5, $6)`,
+        [
+          s.agent_id,
+          amount,
+          newBalance,
+          settlementId,
+          `Prize payout: ${s.pattern_name} — ${s.winner_housie_name || 'winner'} (ticket #${s.ticket_number})`,
+          financeUserId,
+        ]
+      );
+    }
+
+    const upd = await client.query(
+      `UPDATE Prize_Settlements
+       SET status = 'Paid', settled_at = NOW(), settled_by = $2
+       WHERE settlement_id = $1
+       RETURNING *`,
+      [settlementId, financeUserId]
+    );
+
+    await client.query('COMMIT');
+    return { status: 'settled', settlement: upd.rows[0], newBalance };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 }
