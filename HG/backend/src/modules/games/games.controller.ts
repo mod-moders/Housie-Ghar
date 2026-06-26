@@ -358,7 +358,10 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // 1. Establish SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    // no-transform stops intermediaries from gzipping the stream. Critical:
+    // the Next dev proxy and nginx both gzip by default, and gzip buffers —
+    // the browser's EventSource gets headers but never the trickled events.
+    'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // For Nginx compatibility
   });

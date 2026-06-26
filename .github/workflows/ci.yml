@@ -87,4 +87,4 @@ jobs:
       - name: Post-deploy health check
         run: |
           sleep 30
-          curl --fail https://api.yourdomain.com/health || exit 1
+          curl --fail https://api.housieghar.in/health || exit 1

@@ -106,6 +106,22 @@ function GameCard({ game, go, goLive }: { game: GameSummary; go: (id: string) =>
   );
 }
 
+// Shown in the Upcoming feed while the first /api/games request is in flight,
+// so the lobby never flashes an empty "0 scheduled" section on load.
+function SkeletonCard() {
+  return (
+    <article className="hg-skel-card" aria-hidden="true">
+      <div className="hg-skel hg-skel-line" style={{ width: "62%", height: 20 }} />
+      <div className="hg-skel" style={{ height: 56, borderRadius: 14 }} />
+      <div className="hg-skel hg-skel-line" style={{ width: "100%", height: 10 }} />
+      <div className="hg-card-foot">
+        <div className="hg-skel hg-skel-line" style={{ width: 60, height: 22 }} />
+        <div className="hg-skel" style={{ width: 124, height: 44, borderRadius: 999 }} />
+      </div>
+    </article>
+  );
+}
+
 export default function Lobby() {
   const router = useRouter();
   const [games, setGames] = useState<GameSummary[] | null>(null);
@@ -268,15 +284,23 @@ export default function Lobby() {
           <section className="hg-feed">
             <div className="hg-feed-head">
               <h2 className="hg-section-title">Upcoming Games</h2>
-              <span className="hg-feed-count">{scheduled.length} scheduled</span>
+              {games !== null && <span className="hg-feed-count">{scheduled.length} scheduled</span>}
             </div>
-            {nothingToShow && (
-              <EmptyHint icon="grid" title="No games scheduled yet" sub="Check back soon — new draws are announced here first." />
-            )}
-            {gridGames.length > 0 && (
+            {games === null ? (
               <div className="hg-feed-list">
-                {gridGames.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
+                {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
               </div>
+            ) : (
+              <>
+                {nothingToShow && (
+                  <EmptyHint icon="grid" title="No games scheduled yet" sub="Check back soon — new draws are announced here first." />
+                )}
+                {gridGames.length > 0 && (
+                  <div className="hg-feed-list">
+                    {gridGames.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
+                  </div>
+                )}
+              </>
             )}
           </section>
         </div>

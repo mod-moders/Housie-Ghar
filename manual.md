@@ -1,43 +1,61 @@
 # Housie Ghar — Manual Launch Steps
 
-Everything in this file requires a human (account creation, secrets that must never touch the filesystem, external dashboards). Work through these in order.
+**Recommended stack:**
+
+| Layer | Service | Cost |
+|---|---|---|
+| Frontend (Next.js 16) | Vercel — Hobby (free) | $0/month |
+| Backend (Express 5 + Node.js) | Railway Web Service | ~$5–10/month |
+| PostgreSQL 14 | Railway Postgres plugin | ~$5/month |
+| Redis | Railway Redis plugin | ~$2/month |
+| DNS + CDN + DDoS | Cloudflare (free plan) | $0/month |
+| Domain | Cloudflare Registrar | ~$10/year |
+| Error tracking | Sentry (free tier) | $0/month |
+| Uptime monitoring | UptimeRobot (free tier) | $0/month |
+
+**Total: roughly $12–17/month.**
+
+PM2 and nginx are **not needed** on this stack — Railway and Vercel each manage process restarts, HTTPS, and routing natively. The `ecosystem.config.js` and `HG/nginx/nginx.conf` files are kept in the repo as a reference for self-hosted VPS deployments only (see Appendix A).
+
+Work through these steps in order. Each one requires a human — account creation, secrets that must never touch the filesystem, external dashboard configuration.
 
 ---
 
 ## 1. Generate production RSA keypair
 
-These keys sign every JWT. The dev keys may have been seen by AI tools — generate fresh ones for production.
+These keys sign every JWT. Dev keys may have been seen by AI tools — generate fresh ones for production.
 
 ```bash
 openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 ```
 
-Copy the content of each file into your host's secret store (not onto disk on the server) as single-line `\n`-escaped strings. Shred the local PEM files after:
+You'll paste these into Railway in Step 6. After that, destroy the local files:
 
 ```bash
 shred -u private.pem public.pem
+# If shred isn't available (macOS): rm -P private.pem public.pem
 ```
 
 ---
 
-## 2. Generate CI-only RSA keypair and add it to GitHub Secrets
+## 2. Generate CI-only RSA keypair and add to GitHub Secrets
 
-The CI workflow needs keys so that `env.ts` doesn't throw during `tsc` and `build`. These are throwaway keys — never use them in production.
+The CI workflow typechecks and builds the backend, which requires `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` to be present at compile time. These are throwaway keys — never use them in production.
 
 ```bash
 openssl genrsa -out ci-private.pem 2048
 openssl rsa -in ci-private.pem -pubout -out ci-public.pem
 ```
 
-In your GitHub repo → **Settings → Secrets and variables → Actions**, add:
+Go to **GitHub → your repo → Settings → Secrets and variables → Actions → New repository secret** and add:
 
 | Secret name | Value |
 |---|---|
-| `CI_JWT_PRIVATE_KEY` | Contents of `ci-private.pem` (the full PEM block) |
-| `CI_JWT_PUBLIC_KEY` | Contents of `ci-public.pem` (the full PEM block) |
+| `CI_JWT_PRIVATE_KEY` | Full contents of `ci-private.pem` (copy-paste the entire PEM block including the header/footer lines) |
+| `CI_JWT_PUBLIC_KEY` | Full contents of `ci-public.pem` |
 
-Then delete the local files:
+Delete the local files:
 
 ```bash
 rm ci-private.pem ci-public.pem
@@ -45,140 +63,225 @@ rm ci-private.pem ci-public.pem
 
 ---
 
-## 3. Set every environment variable in your host's secret store
+## 3. Buy your domain on Cloudflare Registrar
 
-Never copy `.env` to the server. Add each variable through your host's UI (Railway/Render/Fly environment settings, or DigitalOcean App Platform environment variables). Minimum required:
+1. Go to [cloudflare.com](https://cloudflare.com) → sign up for a free account.
+2. **Registrar → Register Domains** → search for `housieghar.in` (or your chosen domain).
+3. Cloudflare Registrar sells at cost with no markup (~$10–13/year for `.in`). You also get free CDN, DDoS protection, and DNS management automatically.
+4. Add the domain to your account. You'll point it at Railway and Vercel in Step 8.
+
+---
+
+## 4. Create a Railway project
+
+1. Sign up at [railway.app](https://railway.app) → choose the **Hobby plan** ($5/month base, plus usage).
+2. **New Project → Empty Project**.
+3. Inside the project, click **+ New** three times to add:
+   - **Postgres** plugin (railway provisions it automatically)
+   - **Redis** plugin (railway provisions it automatically)
+   - **GitHub Repo** → connect your repository → select the `main` branch
+
+The Postgres and Redis plugins automatically inject `DATABASE_URL` and `REDIS_URL` into any service in the same project. You do not need to copy-paste those values.
+
+---
+
+## 5. Configure the Railway backend service
+
+In the GitHub Repo service settings:
+
+**General:**
+- **Root Directory:** `HG/backend`
+
+**Build & Deploy:**
+- **Build Command:** `npm ci && npm run build`
+- **Start Command:** `npm start`
+- **Pre-Deploy Command:** `npm run migrate`
+
+The pre-deploy command runs `ts-node src/db/migrate.ts` before every deploy, keeping the schema up to date without manual intervention.
+
+**Networking:**
+- Click **Generate Domain** to get a `*.up.railway.app` URL. Note it down — you'll use it as `NEXT_PUBLIC_API_URL` in Vercel and as the health check URL in the CI workflow.
+- Later, add your custom domain `api.housieghar.in` here (Step 8).
+
+---
+
+## 6. Set environment variables in Railway
+
+In the backend service → **Variables tab**, add each variable individually. Do **not** paste a raw `.env` file — Railway stores each value encrypted.
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | Connection string to your production Postgres (non-root user) |
-| `REDIS_URL` | Connection string to your production Redis |
-| `JWT_PRIVATE_KEY` | From Step 1 — the private key, `\n`-escaped |
-| `JWT_PUBLIC_KEY` | From Step 1 — the public key, `\n`-escaped |
-| `NODE_ENV` | `production` — **must be set explicitly** |
-| `FRONTEND_URL` | `https://yourdomain.com` — exact scheme+host, no trailing slash |
+| `NODE_ENV` | `production` |
+| `PORT` | `4000` |
+| `DATABASE_URL` | Auto-injected by the Postgres plugin — do not set manually |
+| `REDIS_URL` | Auto-injected by the Redis plugin — do not set manually |
+| `JWT_PRIVATE_KEY` | From Step 1 — the full private key. Railway accepts multi-line values: paste the PEM block as-is |
+| `JWT_PUBLIC_KEY` | From Step 1 — the full public key (same format) |
+| `FRONTEND_URL` | `https://housieghar.in` — exact scheme + host, no trailing slash. Use the Vercel domain until your custom domain is set up, then update it. |
 | `SUPERADMIN_EMAIL` | A real monitored mailbox |
-| `SUPERADMIN_TEMP_PASSWORD` | A strong random value (rotate it on first login) |
-| `JWT_EXPIRY` | `8h` (recommended) |
+| `SUPERADMIN_TEMP_PASSWORD` | A strong random value — rotate it on first login |
+| `JWT_EXPIRY` | `8h` |
+
+After adding all variables, Railway will redeploy automatically. Watch the **Deploy Logs** tab for the Pino startup message confirming the server is listening on port 4000.
 
 ---
 
-## 4. Provision managed Postgres and Redis
+## 7. Deploy the frontend to Vercel
 
-### Postgres
-1. Provision managed Postgres 14 (Railway, Supabase, or AWS RDS).
-2. Create a least-privilege app user — **not** `postgres`:
-   ```sql
-   CREATE USER housieghar_app WITH PASSWORD 'strong-password-here';
-   GRANT CONNECT ON DATABASE housieghar TO housieghar_app;
-   GRANT USAGE ON SCHEMA public TO housieghar_app;
-   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO housieghar_app;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO housieghar_app;
-   ```
-3. Use this user's connection string in `DATABASE_URL`.
-4. Enable automated daily backups in the Postgres dashboard. Set retention ≥ 7 days.
-5. Do one restore test before accepting any signups:
-   ```bash
-   # Managed service: use their console restore tool, then inspect row counts
-   psql "$DATABASE_URL" -c "SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;"
-   ```
+1. Go to [vercel.com](https://vercel.com) → sign up with your GitHub account.
+2. **Add New → Project → Import Git Repository** → select the Housie Ghar repo.
+3. Set these overrides before deploying:
 
-### Redis
-Provision managed Redis (Railway, Upstash, or AWS ElastiCache). Paste the URL into `REDIS_URL`.
+| Setting | Value |
+|---|---|
+| **Root Directory** | `HG/frontend` |
+| **Framework Preset** | Next.js (auto-detected) |
+| **Build Command** | `npm run build` (default) |
+| **Output Directory** | `.next` (default) |
+
+4. Add one environment variable:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Your Railway backend URL — e.g. `https://housieghar-backend-production.up.railway.app` (the Railway-generated domain from Step 5). Update to `https://api.housieghar.in` after Step 8. |
+
+5. Click **Deploy**. Vercel builds and deploys in ~2 minutes. The generated URL will be `housieghar.vercel.app` until you attach the custom domain.
 
 ---
 
-## 5. Run migrations (never seed) in production
+## 8. Point your domain at Railway and Vercel (Cloudflare DNS)
 
-```bash
-cd HG/backend && npm run migrate
-```
+Go to **Cloudflare → your domain → DNS → Records**.
 
-Do this as a pre-deploy step, **not** inside app boot. The `seed.ts` script is blocked in production by a guard — never run it.
+Add these four records:
+
+| Type | Name | Target | Proxy |
+|---|---|---|---|
+| CNAME | `@` (root) | `cname.vercel-dns.com` | DNS only (grey cloud) — Vercel requires this |
+| CNAME | `www` | `cname.vercel-dns.com` | DNS only |
+| CNAME | `api` | `<your-railway-domain>.up.railway.app` | Proxied (orange cloud) |
+
+Set TTL to **Auto** (300s). Once DNS propagates (~5 minutes with Cloudflare), continue.
+
+**Attach the custom domains:**
+
+- **Vercel:** Project Settings → Domains → Add `housieghar.in` and `www.housieghar.in`. Vercel auto-issues a Let's Encrypt certificate.
+- **Railway:** Backend service → Settings → Networking → Custom Domain → Add `api.housieghar.in`. Railway auto-issues a certificate.
+
+After both are live, update two values:
+- In Railway Variables: change `FRONTEND_URL` to `https://housieghar.in`
+- In Vercel Environment Variables: change `NEXT_PUBLIC_API_URL` to `https://api.housieghar.in`
+
+Trigger a redeploy on both after updating (Vercel: Deployments → Redeploy; Railway: redeploys automatically on variable change).
 
 ---
 
-## 6. Set up DNS and HTTPS
+## 9. Wire up CI/CD deploy hooks
 
-1. **Buy your domain** (Cloudflare Registrar recommended — at-cost pricing and you get free CDN/DDoS).
-2. **Point DNS at your host:**
-   - Managed host (Railway/Render/Fly): add a `CNAME` record to the hostname your host gives you. Use Cloudflare's **CNAME flattening** if you need a root `@` record.
-   - Self-hosted Droplet: add `A` records for `@`, `www`, and `api` pointing to your server IP.
-3. **Set TTL to 300s** during launch so you can re-point quickly. Raise to 3600s once stable.
-4. **Issue the TLS certificate:**
-   - Managed host: add the domain in their UI and they auto-issue via Let's Encrypt.
-   - Self-hosted (nginx): `sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com` then `sudo certbot renew --dry-run` to confirm auto-renewal.
-5. Verify `FRONTEND_URL` in your secret store exactly matches the canonical host (e.g. `https://housieghar.in`).
+In Railway: backend service → Settings → **Deploy Hooks** → Generate a deploy hook URL for the `main` branch and another for a `staging` branch (create the staging service separately if you want one).
 
----
-
-## 7. Set up GitHub Actions secrets for deploy hooks
-
-In your GitHub repo → **Settings → Secrets and variables → Actions**, add:
+Go to **GitHub → repo → Settings → Secrets and variables → Actions** and add:
 
 | Secret name | Value |
 |---|---|
-| `RAILWAY_STAGING_DEPLOY_HOOK` | Deploy hook URL from Railway staging service |
-| `RAILWAY_PRODUCTION_DEPLOY_HOOK` | Deploy hook URL from Railway production service |
+| `RAILWAY_PRODUCTION_DEPLOY_HOOK` | The deploy hook URL for your production service |
+| `RAILWAY_STAGING_DEPLOY_HOOK` | The deploy hook URL for staging (or duplicate the production value if you have only one environment) |
 
-Replace the `https://api.yourdomain.com/health` URL in `.github/workflows/ci.yml` with your actual backend domain.
+In `.github/workflows/ci.yml`, replace the placeholder health check URL on line 90:
+
+```yaml
+curl --fail https://api.yourdomain.com/health || exit 1
+```
+
+with your actual backend domain:
+
+```yaml
+curl --fail https://api.housieghar.in/health || exit 1
+```
+
+Commit this change and the CI pipeline is fully wired: every push to `main` typechecks, lints, builds, then triggers the Railway deploy hook.
 
 ---
 
-## 8. Enable branch protection on `main`
+## 10. Enable branch protection on `main`
 
-In GitHub → **Settings → Branches → Add branch protection rule** for `main`:
+**GitHub → repo → Settings → Branches → Add rule** for `main`:
+
 - ✅ Require a pull request before merging
-- ✅ Require status checks to pass (select the `Test · Lint · Build` job)
+- ✅ Require status checks to pass before merging → select **Test · Lint · Build**
 - ✅ Require branches to be up to date before merging
 - ✅ Do not allow bypassing the above settings
 
 ---
 
-## 9. Set up Sentry error tracking (~15 minutes)
+## 11. Set up Sentry error tracking (~15 minutes)
 
-1. Create a free account at [sentry.io](https://sentry.io).
-2. Create two projects: one Node.js (backend), one Next.js (frontend).
-3. Add the `SENTRY_DSN` for the backend to your host's secret store.
-4. In the frontend, run:
+1. Sign up at [sentry.io](https://sentry.io) → free Developer plan covers this project easily.
+2. **Projects → Create Project → Node.js** → name it `housieghar-backend`. Copy the DSN.
+3. In Railway Variables, add:
+
+   | Variable | Value |
+   |---|---|
+   | `SENTRY_DSN` | The DSN from the Node.js project |
+
+4. Install the Sentry SDK in the backend:
+
+   ```bash
+   cd HG/backend && npm install @sentry/node
+   ```
+
+   Initialize it at the very top of `src/server.ts` (before any other imports):
+
+   ```typescript
+   import * as Sentry from '@sentry/node';
+   if (process.env.SENTRY_DSN) {
+     Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV });
+   }
+   ```
+
+5. **Projects → Create Project → Next.js** → name it `housieghar-frontend`. Then run:
+
    ```bash
    cd HG/frontend && npx @sentry/wizard@latest -i nextjs
    ```
-   Accept all prompts. Set `SENTRY_DSN` in your Next.js environment variables.
+
+   Accept all prompts. Add the frontend DSN to Vercel as `NEXT_PUBLIC_SENTRY_DSN` (public) and `SENTRY_DSN` (private).
 
 ---
 
-## 10. Set up UptimeRobot (~5 minutes)
+## 12. Set up UptimeRobot (~5 minutes)
 
-1. Create a free account at [uptimerobot.com](https://uptimerobot.com).
-2. Add monitor 1: **HTTP(S)** `https://api.yourdomain.com/health`, 5-min interval.
-3. Add monitor 2: **HTTP(S)** `https://yourdomain.com`, 5-min interval.
-4. Configure alert contacts: email + SMS (both available on the free tier).
+1. Sign up at [uptimerobot.com](https://uptimerobot.com) → free tier monitors every 5 minutes.
+2. **Add New Monitor:**
+   - Type: **HTTP(S)**
+   - URL: `https://api.housieghar.in/health`
+   - Interval: 5 minutes
+   - Alert contacts: your email + mobile number
+3. Add a second monitor for the frontend: `https://housieghar.in`
 
 Do this before you invite a single user.
 
 ---
 
-## 11. Force all seeded staff off their temporary passwords
+## 13. Rotate all seeded staff passwords
 
-The seed creates all staff with `temp_password_required = TRUE` and the password `ChangeMe123!` (public knowledge — it's in the repo). Before opening to users:
+The seed creates every staff account with the password `ChangeMe123!` — this is public knowledge in the repo. Before going live:
 
-1. Log in as each staff account in the `/staff` UI.
-2. Update the password to a strong unique value.
-3. Repeat for every seeded account: `superadmin`, `cfo`, `operator`, `bookie1`, `bookie2`, `bookie3`.
+1. Log into `/staff` as each seeded account in turn: `superadmin`, `cfo`, `operator`, `bookie1`, `bookie2`, `bookie3`.
+2. Update the password to a strong unique value through the Admin UI.
 
-Alternatively, delete and re-create them through the Admin UI with secure passwords.
+Alternatively, delete and re-create the accounts with secure passwords. Either way, no seeded default password should survive to production.
 
 ---
 
-## 12. Scan git history for committed secrets
+## 14. Scan git history for committed secrets
 
 ```bash
 brew install gitleaks
 gitleaks detect --source . --verbose
 ```
 
-If anything is found, **rotate the credential first** (it's compromised the instant it hit a remote), then scrub history:
+If anything is flagged: **rotate the credential first** (it is already compromised), then scrub the history:
 
 ```bash
 pip install git-filter-repo
@@ -188,20 +291,39 @@ git push origin --force --all
 
 ---
 
-## 13. Run npm audit before launch
+## 15. Run npm audit before launch
 
 ```bash
 cd HG/backend  && npm audit --audit-level=high
 cd HG/frontend && npm audit --audit-level=high
 ```
 
-Fix or document every `high`/`critical` finding before going live.
+Fix or explicitly document every `high`/`critical` finding before going live.
 
 ---
 
-## 14. (Self-hosted only) Set up PM2 and log rotation
+## 16. First smoke-test in production
 
-If hosting on a DigitalOcean Droplet:
+Run the full booking flow manually after deploy:
+
+1. Register a player at `https://housieghar.in/login`.
+2. Browse games, select tickets, lock a booking.
+3. Confirm the dev-bypass endpoint is **blocked** — `POST /api/bookings/:id/dev-bypass` must return 404 in production. (This is the real route path; an earlier draft of this checklist said `dev-bypass-confirm`, which never existed, so the check passed vacuously.)
+4. Have a bookie confirm via the staff dashboard.
+5. Watch the live board — SSE draws should appear in real time.
+6. Verify the winner overlay and the Hall of Fame update correctly.
+
+If something breaks, check the Railway Deploy Logs tab (structured Pino JSON). On Vercel, check Function Logs under the deployment.
+
+---
+
+## Appendix A: Self-hosted VPS (DigitalOcean Droplet)
+
+Use this path only if you prefer a VPS over Railway. The `ecosystem.config.js` (PM2) and `HG/nginx/nginx.conf` files in the repo are written for this setup.
+
+**Recommended Droplet:** Basic, 2 GB RAM, 1 vCPU, Ubuntu 24.04 LTS (~$12/month). Add a $15/month managed Postgres cluster and a $10/month managed Redis cluster from the DigitalOcean marketplace. Total: ~$37/month — more expensive than Railway, but you control the infrastructure.
+
+### PM2 setup
 
 ```bash
 npm install -g pm2
@@ -210,54 +332,45 @@ npm install -g pm2
 cd HG/backend && npm run build && npm run migrate
 pm2 start ecosystem.config.js --env production
 pm2 save
-pm2 startup    # follow the printed command to auto-start on reboot
+pm2 startup    # run the printed command to enable auto-start on reboot
 
-# Log rotation (prevents disk fill from chatty SSE/Socket logs)
+# Log rotation (prevents disk fill)
 pm2 install pm2-logrotate
 pm2 set pm2-logrotate:max_size 50M
 pm2 set pm2-logrotate:retain 7
 pm2 set pm2-logrotate:compress true
 
-# Subsequent deploys (zero-downtime)
+# Subsequent zero-downtime deploys
 cd HG/backend && npm run build && npm run migrate
 pm2 reload ecosystem.config.js --env production
 ```
 
----
+### nginx and TLS
 
-## 15. (Self-hosted only) Configure nginx and firewall
-
-Your `HG/nginx/nginx.conf` is structurally production-ready. After Certbot edits it:
-
-1. Add the HTTP→HTTPS redirect and www→non-www redirect (see `launch.md` §9).
-2. Verify the config and reload:
-   ```bash
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-3. Lock down the firewall:
-   ```bash
-   sudo ufw allow 22    # SSH
-   sudo ufw allow 80    # HTTP (for cert renewal + redirect)
-   sudo ufw allow 443   # HTTPS
-   sudo ufw enable
-   ```
-
----
-
-## 16. First smoke-test in production
-
-After deploy, run the full booking flow manually:
-
-1. Register a player at `/login`.
-2. Browse games, select tickets, lock a booking.
-3. Use dev-bypass if needed — confirm it is **blocked** in production (returns 404).
-4. Have a bookie confirm via the staff dashboard.
-5. Watch the live board via SSE draws.
-6. Verify the winner overlay appears and the Hall of Fame updates.
-
-If anything breaks, tail the structured logs (JSON in prod, pino-pretty in dev):
+The `HG/nginx/nginx.conf` is structurally correct. After install:
 
 ```bash
-# Railway/Render: use their log viewer
-# Self-hosted: pm2 logs housieghar-backend --lines 100
+sudo apt install nginx certbot python3-certbot-nginx
+sudo certbot --nginx -d housieghar.in -d www.housieghar.in -d api.housieghar.in
+sudo certbot renew --dry-run    # confirm auto-renewal
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Add the HTTP→HTTPS and www→non-www redirect blocks that Certbot does not add automatically:
+
+```nginx
+server {
+    listen 80;
+    server_name housieghar.in www.housieghar.in api.housieghar.in;
+    return 301 https://$host$request_uri;
+}
+```
+
+### Firewall
+
+```bash
+sudo ufw allow 22    # SSH
+sudo ufw allow 80    # HTTP (cert renewal + redirect)
+sudo ufw allow 443   # HTTPS
+sudo ufw enable
 ```

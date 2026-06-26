@@ -107,6 +107,22 @@ export async function playerLogin(req: Request, res: Response): Promise<void> {
   }
 }
 
+/**
+ * Decode the player session cookie and return the player_id, or null when no
+ * valid session is present. Used by routes where a player session is optional
+ * (e.g. anonymous booking still works) as well as player-only endpoints.
+ */
+export function getPlayerIdFromRequest(req: Request): string | null {
+  const token = req.cookies?.[PLAYER_COOKIE_NAME];
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+    return decoded.playerId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** GET /api/players/me — current player from the hg_player_token cookie. */
 export async function getCurrentPlayer(req: Request, res: Response): Promise<void> {
   const token = req.cookies[PLAYER_COOKIE_NAME];
@@ -128,6 +144,54 @@ export async function getCurrentPlayer(req: Request, res: Response): Promise<voi
     res.json({ player: toPlayerPayload(result.rows[0]) });
   } catch {
     res.status(403).json({ message: 'Invalid or expired session' });
+  }
+}
+
+/**
+ * GET /api/players/me/tickets?game_id=...
+ * Tickets the logged-in player has booked — optionally scoped to one game.
+ * Resolved from Bookings.ticket_ids (which persists after a sale clears the
+ * ticket's locked_by_booking link), so it covers both locked and sold tickets.
+ */
+export async function getMyTickets(req: Request, res: Response): Promise<void> {
+  const playerId = getPlayerIdFromRequest(req);
+  if (!playerId) {
+    res.status(401).json({ message: 'Not logged in' });
+    return;
+  }
+  const gameId = typeof req.query.game_id === 'string' ? req.query.game_id : null;
+  try {
+    const params: any[] = [playerId];
+    let gameFilter = '';
+    if (gameId) {
+      params.push(gameId);
+      gameFilter = 'AND b.game_id = $2';
+    }
+    const result = await pool.query(
+      `SELECT t.ticket_id, t.ticket_number, t.grid_data, t.status, t.game_id
+       FROM Tickets t
+       WHERE t.ticket_id IN (
+         SELECT unnest(b.ticket_ids) FROM Bookings b
+         WHERE b.player_id = $1
+           AND b.booking_status IN ('Locked', 'Sold')
+           ${gameFilter}
+       )
+       ${gameId ? 'AND t.game_id = $2' : ''}
+       ORDER BY t.game_id, t.ticket_number`,
+      params
+    );
+    res.json({
+      tickets: result.rows.map((row) => ({
+        ticket_id: row.ticket_id,
+        ticket_number: row.ticket_number,
+        grid_data: row.grid_data,
+        status: row.status,
+        game_id: row.game_id,
+      })),
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'error fetching player tickets');
+    res.status(500).json({ message: 'Internal server error' });
   }
 }
 

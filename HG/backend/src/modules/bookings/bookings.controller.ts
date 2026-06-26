@@ -8,6 +8,7 @@ import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
+import { getPlayerIdFromRequest } from '../players/players.controller';
 import { logger } from '../../utils/logger';
 
 /**
@@ -26,6 +27,11 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
     return;
   }
+
+  // Optional: if a player is signed in, bind this booking to their account so
+  // their tickets resolve on the live board and "my tickets". Anonymous
+  // bookings (no session) simply store NULL.
+  const playerId = getPlayerIdFromRequest(req);
 
   const client = await pool.connect();
   try {
@@ -143,10 +149,10 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       const overflowRes = await client.query(
         `INSERT INTO Bookings (
            game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
-           booking_status, locked_at, locked_until, is_overflow
-         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE)
+           booking_status, locked_at, locked_until, is_overflow, player_id
+         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE, $7)
          RETURNING booking_id`,
-        [game_id, ticket_ids, housie_name, operator.user_id, totalAmount, lockedUntil]
+        [game_id, ticket_ids, housie_name, operator.user_id, totalAmount, lockedUntil, playerId]
       );
       const overflowBookingId = overflowRes.rows[0].booking_id;
 
@@ -186,10 +192,10 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     const bookingRes = await client.query(
       `INSERT INTO Bookings (
         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
-        booking_status, locked_at, locked_until
-      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6)
+        booking_status, locked_at, locked_until, player_id
+      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, $7)
       RETURNING booking_id`,
-      [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil]
+      [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil, playerId]
     );
     const bookingId = bookingRes.rows[0].booking_id;
 

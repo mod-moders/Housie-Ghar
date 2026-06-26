@@ -9,6 +9,7 @@ import { useBookingStore } from "@/lib/stores/bookingStore";
 import { usePlayerStore } from "@/lib/stores/playerStore";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
+import { AccountButton } from "@/components/AccountButton";
 import { Button } from "@/components/ui";
 import { BookingModal } from "@/components/BookingModal";
 import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
@@ -165,6 +166,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             <h1>{game?.title ?? "Loading…"}</h1>
             {game && <span>{when} · {money(game.ticket_price)}/ticket</span>}
           </div>
+          <AccountButton compact />
         </div>
 
         <div className="hg-room-body">

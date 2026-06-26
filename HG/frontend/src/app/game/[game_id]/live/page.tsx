@@ -8,9 +8,11 @@ import { money } from "@/lib/money";
 import { useSSE, SSEEventData } from "@/lib/hooks/useSSE";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { useBookingStore } from "@/lib/stores/bookingStore";
+import { usePlayerStore } from "@/lib/stores/playerStore";
 import { Icon } from "@/components/Icon";
+import { AccountButton } from "@/components/AccountButton";
 import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
-import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
+import type { GameSummary, MyTicketsResponse, Prize, TicketDetail } from "@/lib/types";
 
 interface WinOverlay {
   prize: string;
@@ -45,6 +47,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const booking = useBookingStore();
+  const player = usePlayerStore((s) => s.player);
   const audioCtx = useRef<AudioContext | null>(null);
 
   const beep = useCallback(() => {
@@ -80,24 +83,42 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     return () => { alive = false; };
   }, [game_id]);
 
-  // My booked tickets — auto-marked
+  // My booked tickets — auto-marked. Prefer the account-linked source (works
+  // across devices and after the lock is cleared); fall back to an in-flight
+  // booking held in this browser for anonymous play.
   useEffect(() => {
-    if (booking.gameId !== game_id || booking.ticketIds.length === 0) return;
     let alive = true;
-    Promise.all(
-      booking.ticketIds.map((id) =>
-        apiFetch<TicketDetail>(`/api/tickets/${id}`).catch(() => null)
-      )
-    ).then((details) => {
-      if (!alive) return;
-      setMyTickets(
-        details
-          .filter((d): d is TicketDetail => d != null)
-          .map((d) => ({ number: d.ticket_number, matrix: gridToMatrix(d.grid_data) }))
-      );
-    });
+    const setIfAlive = (rows: { number: number; matrix: TicketMatrix }[]) => {
+      if (alive) setMyTickets(rows);
+    };
+    async function load() {
+      if (player) {
+        try {
+          const res = await apiFetch<MyTicketsResponse>(`/api/players/me/tickets?game_id=${game_id}`);
+          if (res.tickets.length > 0) {
+            setIfAlive(res.tickets.map((t) => ({ number: t.ticket_number, matrix: gridToMatrix(t.grid_data) })));
+            return;
+          }
+        } catch {
+          /* fall through to the local booking */
+        }
+      }
+      if (booking.gameId === game_id && booking.ticketIds.length > 0) {
+        const details = await Promise.all(
+          booking.ticketIds.map((id) => apiFetch<TicketDetail>(`/api/tickets/${id}`).catch(() => null))
+        );
+        setIfAlive(
+          details
+            .filter((d): d is TicketDetail => d != null)
+            .map((d) => ({ number: d.ticket_number, matrix: gridToMatrix(d.grid_data) }))
+        );
+        return;
+      }
+      setIfAlive([]);
+    }
+    load();
     return () => { alive = false; };
-  }, [game_id, booking.gameId, booking.ticketIds]);
+  }, [game_id, player, booking.gameId, booking.ticketIds]);
 
   // SSE: reveal-tease on draw, prize updates + overlay on winner
   const onEvent = useCallback((data: SSEEventData) => {
@@ -151,6 +172,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             <button className="hg-mute" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"}>
               <Icon name={muted ? "volumeX" : "volume"} size={18} />
             </button>
+            <AccountButton compact />
           </div>
 
           <div className="hg-wakelock">
@@ -185,6 +207,17 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             ))}
             <span className="hg-recent-count">{count}/90 called</span>
           </div>
+
+          {myTickets.length > 0 && (
+            <div className="hg-mytickets">
+              <h2 className="hg-section-title">Your tickets · auto-marked</h2>
+              <div className="hg-mytickets-row">
+                {myTickets.map((t) => (
+                  <HousieTicket key={t.number} matrix={t.matrix} drawn={drawn} label={`#${t.number}`} compact />
+                ))}
+              </div>
+            </div>
+          )}
           </div>
 
           <div className="hg-live-right">
@@ -211,17 +244,6 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
               ))}
             </div>
           </div>
-
-          {myTickets.length > 0 && (
-            <div className="hg-mytickets">
-              <h2 className="hg-section-title">Your tickets · auto-marked</h2>
-              <div className="hg-mytickets-row">
-                {myTickets.map((t) => (
-                  <HousieTicket key={t.number} matrix={t.matrix} drawn={drawn} label={`#${t.number}`} compact />
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="hg-board90">
             {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (

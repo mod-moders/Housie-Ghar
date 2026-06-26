@@ -48,6 +48,18 @@ export interface TicketDetail {
   owner_housie_name: string | null;
 }
 
+export interface MyTicket {
+  ticket_id: number;
+  ticket_number: number;
+  grid_data: { row1: (number | null)[]; row2: (number | null)[]; row3: (number | null)[] };
+  status: string;
+  game_id: string;
+}
+
+export interface MyTicketsResponse {
+  tickets: MyTicket[];
+}
+
 export interface LockResponse {
   booking_id: string;
   locked_until: string;
