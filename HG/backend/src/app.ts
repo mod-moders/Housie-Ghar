@@ -22,6 +22,7 @@ import configRoutes from './modules/config/config.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import statsRoutes from './modules/stats/stats.routes';
 import playersRoutes from './modules/players/players.routes';
+import settlementsRoutes from './modules/settlements/settlements.routes';
 
 const app = express();
 
@@ -113,6 +114,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/players', playersRoutes);
+app.use('/api/settlements', settlementsRoutes);
 app.use('/api', ticketsRoutes); // Exposes /api/tickets/:ticket_id and /api/games/:game_id/tickets
 
 // Default Health check
