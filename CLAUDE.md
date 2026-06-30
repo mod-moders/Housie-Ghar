@@ -26,6 +26,7 @@ npm run build      # Compile TypeScript to dist/
 npm run start      # Run compiled dist/server.js
 npm run migrate    # Run all SQL migrations in order (idempotent, tracked in _migrations)
 npm run seed       # Seed roles, superadmin, two sample games, sample staff
+npm test           # node:test runner (NOT Jest) — see "Backend Testing" below
 ```
 
 ### Frontend (`HG/frontend/`)
@@ -70,16 +71,22 @@ HG/
       seed.ts           # Seeds: roles → superadmin → sample_games (x2) → sample_staff → tickets
       generateGameTickets.ts
     middleware/auth.ts  # JWT RS256 cookie auth; requireRole([roleNames]); requireFinancialOfficer
-    modules/            # auth, games, bookings, tickets, users, wallet, audit, config, stats, players
+    modules/            # auth, games, bookings, tickets, users, wallet, audit, config, stats, players, settlements
     services/
-      gameEngine.ts     # In-memory game loop + win detection; fixed resume path for Paused+no-memory state
+      gameEngine.ts     # In-memory game loop; on a win, records Owed settlements in the claim txn (see below)
+      winDetection.ts   # PURE win-detection (detectPatternWinners/splitPrize/allPrizesClaimed); imports only types — unit-tested
+      settlements.service.ts  # recordSettlementsForPrize / listSettlements / settleSettlement; takes a pg client param (testable)
       bookingRouter.ts  # Liquidity-aware booking routing
       scheduler.service.ts  # Expiry sweeper cron (every 30s)
       audit.service.ts
+    test-support/
+      db.ts             # Integration-test harness: pool on TEST_DATABASE_URL, runMigrations, truncateAll, fixtures
+                        #   (hasTestDb gates all DB tests; imports only pg + stdlib — never env/singleton pool)
     utils/
       sseManager.ts     # SSE registry; stream endpoint is /api/games/:id/live-stream
       ticketGenerator.ts
       trust.ts          # deriveTrust(soldCount): >=50 veteran, >=10 trusted, else new
+      logger.ts         # pino logger; env-free so test-reachable modules can import it safely
   frontend/src/
     proxy.ts            # Next 16 proxy (replaces middleware.ts). Guards /staff/:path*; gates ALL
                         #   public pages behind hg_player_token or hg_auth_token → redirect to /login
@@ -119,7 +126,7 @@ HG/
       hooks/            # useSSE(gameId, onEvent?), useSocket, useCountdown
       stores/           # zustand: authStore, gameStore, bookingStore ("hg-booking"), playerStore ("hg-player")
   shared/types/         # Shared TS interfaces (backend imports via @shared/*)
-  backend/migrations/   # 001–017 (016 = performance indexes fixed, 017 = player_id on Bookings — both uncommitted)
+  backend/migrations/   # 001–018 (016 = perf indexes fixed, 017 = player_id on Bookings, 018 = Prize_Settlements)
   backend/seeds/        # seed_roles, seed_superadmin, seed_sample_game (2 games), seed_sample_staff, seed_lucky_number
   nginx/nginx.conf
 docs/superpowers/       # Remaining brainstorming docs (plans/specs deleted in cleanup commit)
@@ -144,6 +151,10 @@ Both are driven by a single Redis Pub/Sub channel (`game_events`); the subscribe
 - **Boot-time auto-resume**: on process start, `Live` games are re-hydrated from `Game_Logs`.
 - **Paused-without-memory fix**: `resumeGame` now checks if the game is in `activeGames`. If not (e.g., process restarted while Paused), it calls `startGame` to rebuild from `Game_Logs` rather than failing with "Game state not loaded".
 - Conductor uses `setTimeout` for variable speed (5–12s via `POST /api/games/:id/speed {interval_ms}`); 4s pause after a winner tick.
+- **Win detection is delegated** to the pure `winDetection.ts` module (`detectPatternWinners`); `checkWins` no longer carries its own pattern helpers.
+- **Atomic claim + settlement**: when a prize is won, `checkWins` marks `Prize_Pool.claimed` AND inserts an Owed row per winning ticket (`recordSettlementsForPrize`) in **one** transaction. If that transaction fails it rolls back, leaves the prize unclaimed for a later tick to retry, and announces no winner for it.
+- **Exact split**: co-winners split the prize via `splitPrize` (integer-paise, remainder distributed so the full amount is always paid out); the per-winner share is what's announced and stored in `amount_per_winner`.
+- **Ends on the last prize**: once `allPrizesClaimed` is true the engine calls `completeGame` immediately instead of drawing all 90 numbers.
 
 ### Booking Flow
 
@@ -154,12 +165,27 @@ Both are driven by a single Redis Pub/Sub channel (`game_events`); the subscribe
 5. **Dev bypass** (non-production only): `POST /api/bookings/:booking_id/dev-bypass` auto-confirms a `Locked` booking using the assigned agent's wallet. Blocked by `NODE_ENV === 'production'` check (returns 404 in production).
 6. Frontend persists the in-flight lock in `bookingStore` (localStorage `hg-booking`) — the game room restores it on reload; the live board uses it as a fallback when no player session is present.
 
+### Prize Settlement Flow
+
+The money flow is **symmetric** with booking: a confirmed booking *debits* the selling agent's wallet; winning a prize *credits* it back. Players never hold a wallet. Settlement is two-phase so payouts are auditable and never auto-pushed:
+
+1. **Record (automatic, inside the game engine).** When `checkWins` claims a prize it calls `recordSettlementsForPrize(client, …)` in the **same transaction** as the `Prize_Pool` update. For each winning ticket it resolves the selling `agent_id` (and `player_id`) from that ticket's Sold booking and inserts a `Prize_Settlements` row with `status = 'Owed'`. No booking owns the ticket → it logs and skips (no row, no throw). `UNIQUE (prize_id, ticket_id)` makes a retry a no-op.
+2. **Settle (manual, Financial Officer only).** `requireFinancialOfficer` settles each owed row: `settleSettlement` takes a row `FOR UPDATE`, flips `Owed → Paid`, stamps `settled_at`/`settled_by`, and credits the agent's wallet via a `Wallet_Ledger` `Credit` row (`reference_type = 'Prize'`, `reference_id = settlement_id`). Idempotent — a second call returns `already_paid` and does not double-credit. A zero-amount settlement flips status without a ledger write.
+
+**API** (`modules/settlements`, all `authenticateToken` + `requireFinancialOfficer`):
+- `GET /api/settlements?game_id=&status=` — list (joins Users for `agent_name`/`agent_town`)
+- `GET /api/settlements/pending/count` — count of `Owed` rows
+- `POST /api/settlements/:id/settle` — settle one row; audit-logs `SETTLE_PRIZE`. Returns 404 `not_found`, 409 `already_paid`, or the updated row + agent's `new_balance`.
+
+The service functions take a `pg` Pool/PoolClient **parameter** (never the env-bound singleton) so they are integration-testable; win detection lives in pure `winDetection.ts` so it is unit-testable. No frontend consumes this API yet — it is a backend-only ledger surfaced for a future Finance Hub panel.
+
 ### Database Schema (Key Tables)
 - `Scheduled_Games` (`Scheduled` → `Live` → `Paused` → `Completed`), `Tickets` (`Available` → `Locked` → `Sold`), `Bookings`, `Prize_Pool`, `Game_Logs`, `Wallet_Ledger`, `TopUp_Requests`, `Audit_Log`, `skip_alerts`
 - `Users.is_cfo` — flags one Admin as Financial Officer; `Users.town` (migration 013) — staff/agent locality shown across the UI
 - **`Themes` is dropped** (migration 014) — theming feature removed entirely; do not reintroduce
 - `Player_Logins` (migration 015) — public player accounts. Columns: `player_id` (UUID PK), `username` (VARCHAR 30, unique, lowercased 3–18 `[a-zA-Z0-9_]`), `password` (= username at registration), `full_name`, `date_of_birth`, `created_at`, `last_login`.
-- `Bookings.player_id` (migration 017, uncommitted) — nullable UUID FK to `Player_Logins`. Set at lock time when a player JWT is present; NULL for anonymous bookings. Indexed via `idx_bookings_player`.
+- `Bookings.player_id` (migration 017) — nullable UUID FK to `Player_Logins`. Set at lock time when a player JWT is present; NULL for anonymous bookings. Indexed via `idx_bookings_player`. The settlement engine reads it to stamp the winner's `player_id`.
+- `Prize_Settlements` (migration 018) — one row per winning ticket, the ledger of prize money owed to selling agents. Columns: `settlement_id` (UUID PK), `game_id`/`prize_id` FKs (ON DELETE CASCADE), `pattern_name`, `ticket_id`, `ticket_number`, `player_id` (nullable FK), `winner_housie_name`, `agent_id` (FK→Users, the **selling** agent resolved from the Sold booking), `amount` (the per-winner share), `status` (`Owed` → `Paid`, default `Owed`), `created_at`, `settled_at`, `settled_by`. `UNIQUE (prize_id, ticket_id)` makes settlement recording idempotent on engine retry. Indexed by game, agent, status.
 - Trust is **derived, not stored**: count of `Sold` bookings per agent → `utils/trust.ts` tiers
 
 ### Authentication & RBAC
@@ -176,6 +202,20 @@ Role hierarchy (role_id): `Superadmin(1)` → `Admin(2)` → `Operator(3)` → `
 
 `req.body` is `undefined` when no JSON Content-Type is sent — optional-body handlers must destructure `req.body ?? {}`. `apiFetch` always sends the JSON header, so browser calls are safe.
 
+### Backend Testing
+
+Uses Node's built-in **`node:test`** + `node:assert/strict` (NOT Jest), run through ts-node. `npm test` = `node --require ts-node/register --test --test-concurrency=1 "src/**/*.test.ts"`. Tests live next to their subject as `*.test.ts`.
+
+- **Two kinds of tests.** Pure unit tests (`winDetection.test.ts`, `bookingRouter` math, etc.) always run. **Integration tests are gated** by `TEST_DATABASE_URL`: each test passes `{ skip: !hasTestDb }`, so without the env var the suite reports them as skipped and exits 0.
+- **`--test-concurrency=1` is required, not cosmetic.** `node --test` runs each test *file* in its own parallel process; the DB-backed files share one database and would otherwise INSERT duplicate fixtures / `TRUNCATE` each other mid-run. Serial file execution isolates them.
+- **Run the DB tests locally** against a throwaway database (never the dev DB — `truncateAll` wipes it):
+  ```bash
+  createdb -O housie_user housie_ghar_test    # one-time; pgcrypto must exist
+  cd HG/backend && TEST_DATABASE_URL="postgresql://housie_user:…@localhost:5432/housie_ghar_test" npm test
+  ```
+  The harness (`test-support/db.ts`) runs all migrations against it and exposes fixture builders (`freshGameWithAgent`, `createPrize`/`createTicket`/`createBooking`). Expected: **38 pass / 0 skip** with the env var, **30 pass / 8 skip** without it.
+- **Testability rule:** anything reachable from a test must avoid importing `config/env.ts` (throws on missing vars at import) or the `db/index.ts` singleton (env-bound). Service functions therefore take a `pg` client parameter; `utils/logger.ts` is deliberately env-free.
+
 ### Important Next.js Note
 
 The frontend uses **Next.js 16** (React 19). Conventions differ from training data — check `node_modules/next/dist/docs/` before changing routing/data-fetching. Notably: route params are a Promise (`use(params)`), and the request interceptor is **`src/proxy.ts` exporting `proxy()`** (the `middleware.ts` convention is deprecated). `HG/frontend/AGENTS.md` reinforces: read the bundled docs before touching routing/fonts/data-fetching.
@@ -190,7 +230,7 @@ The frontend uses **Next.js 16** (React 19). Conventions differ from training da
 - Fonts via `next/font/google` variables: `--font-head` Space Grotesk (headings), `--font-body` DM Sans, `--font-mono` JetBrains Mono (amounts/IDs/timers), **`--font-serif` DM Serif Display (italic, the banner quote only)**.
 - Money is always formatted with `lib/money.ts`. Status pills: `hg-pill-{live,scheduled,paused,completed,suspended}`; trust pills: `hg-pill-{veteran,trusted,new}`.
 - Canonical prize names (backend + UI): `Early Five`, `Top Line`, `Middle Line`, `Bottom Line`, `Four Corners`, `Full House`.
-- **Easing token system** (in working tree, not yet committed): `--ease-out-quart: cubic-bezier(.25,1,.5,1)`, `--ease-out-expo: cubic-bezier(.16,1,.3,1)`, `--ease-pop: cubic-bezier(.2,1.3,.4,1)` (win/sticker pops only); duration tokens `--dur-1` (130ms), `--dur-2` (200ms), `--dur-3` (320ms). Use these on all interactive transitions instead of bare `ease`/`linear`.
+- **Easing token system** (committed in `151220b`): `--ease-out-quart: cubic-bezier(.25,1,.5,1)`, `--ease-out-expo: cubic-bezier(.16,1,.3,1)`, `--ease-pop: cubic-bezier(.2,1.3,.4,1)` (win/sticker pops only); duration tokens `--dur-1` (130ms), `--dur-2` (200ms), `--dur-3` (320ms). Use these on all interactive transitions instead of bare `ease`/`linear`.
 
 ### Login page styles
 `.hg-stage` — full-viewport centered flex container. `.hg-frame` — max-width 452px scrollable panel. `.hg-login-card` — card with `.hg-login-field`, `.hg-login-title`, `.hg-login-hint`, `.hg-login-err`, `.hg-login-switch` (mode toggle), `.hg-login-foot`. `.hg-player-chip` — pill in TopNav showing `username`, click to sign out.
@@ -219,22 +259,25 @@ Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` b
 
 ## Current State
 
-### Most recent commits (as of 2026-06-21)
+### Most recent commits (as of 2026-06-30)
 ```
+9968f03 test: run test files serially to isolate DB-backed integration tests
+d52bd5b fix(engine): settle prizes, split exactly, end on last prize
+50331ae feat(settlements): expose Financial Officer settlement API
+2ac0d41 feat(settlements): list + settle (credits selling agent wallet)
+ed7df42 feat(settlements): record Owed settlements on prize win
+de601dd test(db): add TEST_DATABASE_URL-gated integration harness
+08ecfc8 feat(db): add Prize_Settlements table (migration 018)
+0513e0f feat(engine): extract pure win-detection module with unit tests
+151220b feat(players): account-linkage for cross-device tickets + launch-prep
 659b0f6 feat(staff): lock dropdown with three role doors
-130cbff feat(staff): per-door login with role enforcement
-f2e3107 feat(staff): add per-role dashboard panels
-5fad9a2 refactor(staff): extract StaffShell with optional role enforcement
-aa5f012 feat(staff): proxy exempts door logins, redirects door-aware
-23085ff feat(staff): add staff role-door map
-99279e7 chore: launch prep — security hardening, structured logging, CI pipeline
 ```
 
-### Uncommitted working-tree changes (significant batch, 2026-06-21)
+### Player account-linkage batch (committed `151220b`, 2026-06-21)
 
-**Player account linkage — ties logged-in players to their bookings for cross-device ticket recovery:**
+**Ties logged-in players to their bookings for cross-device ticket recovery.** The behaviour is documented in the architecture sections above (Booking Flow, Auth & RBAC, AccountButton/PlayerSync). Files changed in that commit:
 
-1. **`017_add_player_to_bookings.sql`** (untracked) — adds nullable `player_id UUID REFERENCES Player_Logins` to `Bookings` with index `idx_bookings_player`. Anonymous bookings stay NULL.
+1. **`017_add_player_to_bookings.sql`** — adds nullable `player_id UUID REFERENCES Player_Logins` to `Bookings` with index `idx_bookings_player`. Anonymous bookings stay NULL.
 
 2. **`016_add_indexes.sql`** (modified) — removed `CONCURRENTLY` from all `CREATE INDEX` statements. The migration runner wraps files in a transaction; Postgres forbids `CONCURRENTLY` inside a transaction block, which was silently blocking all subsequent migrations.
 
@@ -269,14 +312,29 @@ aa5f012 feat(staff): proxy exempts door logins, redirects door-aware
     - Cage number revealed: ambient glow via `color-mix(in srgb, var(--accent) 45%, transparent)`.
     - Emoji bar: hover scale+lift, active snap, spring easing.
 
+### Prize-settlement engine (committed `0513e0f` → `9968f03`, 2026-06-30)
+
+Backend-only feature: a ledger of prize money owed to selling agents, plus game-engine correctness fixes, all under a real `node:test` suite. **No frontend was touched.** See **Prize Settlement Flow**, **Game Engine**, and **Backend Testing** above for the full design. Commit map:
+- `0513e0f` — pure `winDetection.ts` (`detectPatternWinners`/`splitPrize`/`allPrizesClaimed`) + unit tests.
+- `08ecfc8` — migration 018 `Prize_Settlements`.
+- `de601dd` — `TEST_DATABASE_URL`-gated integration harness (`test-support/db.ts`).
+- `ed7df42` / `2ac0d41` — `settlements.service.ts`: record Owed on win, list, and settle (credits the selling agent's wallet, idempotent) + integration tests.
+- `50331ae` — `modules/settlements` HTTP API (Financial Officer only) mounted at `/api/settlements`.
+- `d52bd5b` — `gameEngine.ts` rewired: settle in the claim txn, split exactly, end on the last prize.
+- `9968f03` — `--test-concurrency=1` so DB-backed test files don't collide.
+
+Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABASE_URL`.
+
 ### Fully built & working (committed)
 - Public site: lobby (banner, game cards, skeleton loading), game room, live board (SSE draws, auto-marked tickets in left column, reveal-tease, win overlay), winners, how-to-play.
 - Player auth: `/login` gate, `hg_player_token` cookie, `playerStore`, TopNav chip, `PlayerSync` for cross-device rehydration.
 - Staff: role-door login flow (commits `23085ff`–`659b0f6`) + unified role-driven `/staff` dashboard.
-- Backend: migrations 001–015 committed; SSE `no-cache, no-transform` fix committed and working.
+- Backend: migrations 001–018 committed; SSE `no-cache, no-transform` fix committed and working.
+- Prize settlement: win → Owed `Prize_Settlements` row (in the claim txn) → Financial Officer settles → agent wallet credited. Backend + tests only; no frontend panel yet.
 
 ### Known issues / TODOs
-- **Migrations 016 (fix) and 017 (player_id)** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate`.
+- **Migrations 016–018 are committed** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate` (018 = `Prize_Settlements`).
+- **Settlement UI not built (by design).** The `/api/settlements` API exists and is tested but no `/staff` panel consumes it yet; a Finance Hub "Prize payouts" view (list Owed, one-click settle) is the natural next frontend task. The agent-facing wallet already shows `Prize` credits once settled (they land in `Wallet_Ledger`).
 - **`housie_name` pre-fill — done.** The game-room name input pre-fills from `playerStore.player.username` (a username always satisfies the no-spaces / ≤18-char rule — `full_name` would not).
 - **`dev-bypass` endpoint — working, not a bug.** Frontend (`BookingModal`) and backend route both use `POST /api/bookings/:booking_id/dev-bypass`; `app.ts` mounts it correctly and the `NODE_ENV === 'production'` guard returns 404 in production. The old `dev-bypass-confirm` name in earlier docs was incorrect and has been corrected here and in `manual.md`.
 - **Sentry backend init — pending dependency install.** Per `manual.md` step 11: `cd HG/backend && npm install @sentry/node`, then add the guarded `Sentry.init` at process start. Not yet installed.
@@ -293,14 +351,13 @@ cd HG/backend && npm run migrate && npm run seed && npm run dev   # :4000
 cd HG/frontend && npm run dev                                      # :3000
 ```
 
-**Run migrate first** — `016_add_indexes.sql` (CONCURRENTLY fix) and `017_add_player_to_bookings.sql` (new FK column) are in the working tree and must be applied before the player-ticket linkage works.
+**Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
 
-**What was last worked on (2026-06-21):**
-Player account-linkage feature — complete in the working tree, not yet committed. The live board "Your tickets · auto-marked" now sources from the player's server-side booking history (`GET /api/players/me/tickets`) rather than just localStorage, enabling cross-device ticket recovery. `AccountButton` was added to game room and live board headers. `PlayerSync` globally rehydrates the store from the cookie on load. A large CSS polish pass introduced easing tokens, keyboard focus rings, scroll-behavior, and hover/active micro-interactions across all interactive elements.
+**What was last worked on (2026-06-30):**
+Prize-settlement engine (backend only, **no frontend touched**) — committed across `0513e0f`→`9968f03`. Winning a prize now records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, which credits the selling agent's wallet. Co-winners split the prize exactly (no lost paisa) and the game ends as soon as the last prize is claimed. Win detection was extracted to a pure, unit-tested module and the project gained its first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
-1. **Commit the working tree** — stage and commit the player-linkage batch (017 migration, controller changes, AccountButton, PlayerSync, layout, live page, lobby skeleton, CSS polish).
-2. **Smoke-test player account linkage end-to-end** — register, lock tickets in the game room, reload the live board in a fresh tab (no localStorage), verify "Your tickets" appears via the API.
-3. **Pre-fill `housie_name`** from `playerStore.player.full_name` in `game/[game_id]/page.tsx`.
-4. **Debug dev-bypass-confirm 404** — check `bookings.routes.ts` for route registration order.
-5. When ready to ship, see `launch.md` at the repo root for the full production checklist.
+1. **Build the Finance Hub settlement UI** (frontend) — list Owed settlements (`GET /api/settlements?status=Owed`) with a one-click settle (`POST /api/settlements/:id/settle`) in `components/staff/FinanceSections`. This is the only missing surface for the feature.
+2. **Smoke-test settlement end-to-end** — start a game with sold tickets, let a prize hit, confirm a `Prize_Settlements` Owed row appears, settle it as the CFO, verify the agent's `current_balance` and `Wallet_Ledger` (`reference_type='Prize'`) update.
+3. **Pre-fill `housie_name`** from `playerStore.player.full_name` in `game/[game_id]/page.tsx` (currently uses `username`).
+4. When ready to ship, see `launch.md` at the repo root for the full production checklist.
