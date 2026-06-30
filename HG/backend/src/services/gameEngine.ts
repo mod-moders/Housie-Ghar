@@ -10,6 +10,12 @@ import { io } from '../server';
 import { PrizePattern } from '@shared/types/game';
 import { TicketGridData } from '@shared/types/ticket';
 import { logger } from '../utils/logger';
+import {
+  detectPatternWinners,
+  splitPrize,
+  allPrizesClaimed,
+} from './winDetection';
+import { recordSettlementsForPrize } from './settlements.service';
 
 // In-memory runtime state for active games
 interface ActiveGame {
@@ -82,34 +88,6 @@ function generateDrawSequence(): number[] {
     [sequence[i], sequence[j]] = [sequence[j], sequence[i]];
   }
   return sequence;
-}
-
-/**
- * Extract numbers from ticket row
- */
-function getRowNumbers(row: (number | null)[]): number[] {
-  return row.filter((n): n is number => n !== null);
-}
-
-/**
- * Four corners detection helper
- */
-function getFourCorners(grid: TicketGridData): number[] {
-  const r1Nums = getRowNumbers(grid.row1);
-  const r3Nums = getRowNumbers(grid.row3);
-  return [
-    r1Nums[0],                  // First number of Row 1
-    r1Nums[r1Nums.length - 1],  // Last number of Row 1
-    r3Nums[0],                  // First number of Row 3
-    r3Nums[r3Nums.length - 1],  // Last number of Row 3
-  ];
-}
-
-/**
- * Check if a sub-sequence is fully drawn
- */
-function isSubset(subset: number[], set: Set<number>): boolean {
-  return subset.every((num) => set.has(num));
 }
 
 /**
@@ -264,8 +242,7 @@ async function processNextDraw(gameId: string): Promise<void> {
   const winners = await checkWins(game);
 
   if (winners.length > 0) {
-    // There are winner(s) on this tick!
-    // Broadcast win announcements
+    // There are winner(s) on this tick — broadcast each announcement.
     for (const win of winners) {
       const winnerEvent = {
         event: 'winner' as const,
@@ -276,6 +253,13 @@ async function processNextDraw(gameId: string): Promise<void> {
         split_count: win.splitCount,
       };
       await publishGameEvent(gameId, winnerEvent);
+    }
+
+    // If every prize is now claimed, the game is over — stop drawing.
+    if (allPrizesClaimed(game.prizes)) {
+      logger.info({ gameId }, 'all prizes claimed — completing game');
+      await completeGame(gameId);
+      return;
     }
 
     logger.info({ gameId, count: winners.length }, 'winner(s) announced — conductor pausing 4s');
@@ -296,103 +280,77 @@ interface WinMatch {
 }
 
 /**
- * Evaluate all winning patterns for all sold tickets
+ * Evaluate all unclaimed prizes against the drawn numbers. For each prize that
+ * is won this tick: mark it claimed, split the amount exactly across winners,
+ * and — in ONE transaction — update Prize_Pool and record an Owed settlement
+ * per winning ticket. If that transaction fails, the prize is left unclaimed so
+ * a later tick can retry, and no winner is announced for it.
  */
-async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPerWinner: number; splitCount: number }>> {
+async function checkWins(
+  game: ActiveGame
+): Promise<Array<WinMatch & { amountPerWinner: number; splitCount: number }>> {
   const drawnSet = new Set(game.drawnNumbers);
   const detectedWinners: Array<WinMatch & { amountPerWinner: number; splitCount: number }> = [];
 
-  // Evaluate each unclaimed prize
   for (const prize of game.prizes) {
     if (prize.claimed) continue;
 
-    const patternWinners: WinMatch[] = [];
+    const winners = detectPatternWinners(prize.patternName, game.tickets, drawnSet);
+    if (winners.length === 0) continue;
 
-    for (const t of game.tickets) {
-      let isWinner = false;
+    const splitCount = winners.length;
+    const shares = splitPrize(prize.prizeAmount, splitCount);
 
-      if (prize.patternName === 'Early Five') {
-        const allNums = [
-          ...getRowNumbers(t.gridData.row1),
-          ...getRowNumbers(t.gridData.row2),
-          ...getRowNumbers(t.gridData.row3),
-        ];
-        // Intersection size >= 5
-        const matching = allNums.filter((n) => drawnSet.has(n));
-        isWinner = matching.length >= 5;
-      } else if (prize.patternName === 'Top Line') {
-        const row1 = getRowNumbers(t.gridData.row1);
-        isWinner = isSubset(row1, drawnSet);
-      } else if (prize.patternName === 'Middle Line') {
-        const row2 = getRowNumbers(t.gridData.row2);
-        isWinner = isSubset(row2, drawnSet);
-      } else if (prize.patternName === 'Bottom Line') {
-        const row3 = getRowNumbers(t.gridData.row3);
-        isWinner = isSubset(row3, drawnSet);
-      } else if (prize.patternName === 'Four Corners') {
-        const corners = getFourCorners(t.gridData);
-        isWinner = isSubset(corners, drawnSet);
-      } else if (prize.patternName === 'Full House') {
-        const allNums = [
-          ...getRowNumbers(t.gridData.row1),
-          ...getRowNumbers(t.gridData.row2),
-          ...getRowNumbers(t.gridData.row3),
-        ];
-        isWinner = isSubset(allNums, drawnSet);
-      }
+    // Mark claimed in memory; rolled back below if the DB write fails.
+    prize.claimed = true;
 
-      if (isWinner) {
-        patternWinners.push({
-          patternName: prize.patternName,
-          ticketId: t.ticketId,
-          ticketNumber: t.ticketNumber,
-          housieName: t.ownerHousieName,
-        });
-      }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE Prize_Pool
+         SET claimed = TRUE,
+             winner_ticket_id = $1,
+             winner_housie_name = $2,
+             claimed_at = NOW(),
+             split_count = $3,
+             amount_per_winner = $4
+         WHERE prize_id = $5`,
+        [
+          winners[0].ticketId,
+          winners.map((w) => w.housieName).join(', '),
+          splitCount,
+          shares[0],
+          prize.prizeId,
+        ]
+      );
+      await recordSettlementsForPrize(client, {
+        gameId: game.gameId,
+        prizeId: prize.prizeId,
+        patternName: prize.patternName,
+        winners: winners.map((w, i) => ({
+          ticketId: w.ticketId,
+          ticketNumber: w.ticketNumber,
+          amount: shares[i],
+        })),
+      });
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error({ err, prizeId: prize.prizeId }, 'error recording prize claim + settlements');
+      prize.claimed = false; // allow a retry on a later tick
+    } finally {
+      client.release();
     }
 
-    if (patternWinners.length > 0) {
-      // Mark prize as claimed in memory
-      prize.claimed = true;
-
-      // Split amount if multiple winners on the same draw tick
-      const splitCount = patternWinners.length;
-      const amountPerWinner = parseFloat((prize.prizeAmount / splitCount).toFixed(2));
-
-      // Record winners in database
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        // Update Prize_Pool
-        await client.query(
-          `UPDATE Prize_Pool
-           SET claimed = TRUE,
-               winner_ticket_id = $1,
-               winner_housie_name = $2,
-               claimed_at = NOW(),
-               split_count = $3,
-               amount_per_winner = $4
-           WHERE prize_id = $5`,
-          [
-            patternWinners[0].ticketId, // Stores first winner's ID or comma separated
-            patternWinners.map((w) => w.housieName).join(', '),
-            splitCount,
-            amountPerWinner,
-            prize.prizeId,
-          ]
-        );
-        await client.query('COMMIT');
-      } catch (err) {
-        await client.query('ROLLBACK');
-        logger.error({ err }, 'error updating prize claim in DB');
-      } finally {
-        client.release();
-      }
-
-      patternWinners.forEach((win) => {
+    if (prize.claimed) {
+      winners.forEach((w, i) => {
         detectedWinners.push({
-          ...win,
-          amountPerWinner,
+          patternName: prize.patternName,
+          ticketId: w.ticketId,
+          ticketNumber: w.ticketNumber,
+          housieName: w.housieName,
+          amountPerWinner: shares[i],
           splitCount,
         });
       });
