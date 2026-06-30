@@ -154,7 +154,7 @@ Both are driven by a single Redis Pub/Sub channel (`game_events`); the subscribe
 - **Win detection is delegated** to the pure `winDetection.ts` module (`detectPatternWinners`); `checkWins` no longer carries its own pattern helpers.
 - **Atomic claim + settlement**: when a prize is won, `checkWins` marks `Prize_Pool.claimed` AND inserts an Owed row per winning ticket (`recordSettlementsForPrize`) in **one** transaction. If that transaction fails it rolls back, leaves the prize unclaimed for a later tick to retry, and announces no winner for it.
 - **Exact split**: co-winners split the prize via `splitPrize` (integer-paise, remainder distributed so the full amount is always paid out); the per-winner share is what's announced and stored in `amount_per_winner`.
-- **Ends on the last prize**: once `allPrizesClaimed` is true the engine calls `completeGame` immediately instead of drawing all 90 numbers.
+- **Always draws all 90**: the game completes only when all 90 numbers are drawn (or on a manual stop) — it does **not** end early when every prize is claimed. (Product decision 2026-06-30; the brief end-on-last-prize behavior from `d52bd5b` was reverted. `winDetection.allPrizesClaimed` is still exported/tested but no longer drives completion.)
 
 ### Booking Flow
 
@@ -320,7 +320,7 @@ Backend-only feature: a ledger of prize money owed to selling agents, plus game-
 - `de601dd` — `TEST_DATABASE_URL`-gated integration harness (`test-support/db.ts`).
 - `ed7df42` / `2ac0d41` — `settlements.service.ts`: record Owed on win, list, and settle (credits the selling agent's wallet, idempotent) + integration tests.
 - `50331ae` — `modules/settlements` HTTP API (Financial Officer only) mounted at `/api/settlements`.
-- `d52bd5b` — `gameEngine.ts` rewired: settle in the claim txn, split exactly, end on the last prize.
+- `d52bd5b` — `gameEngine.ts` rewired: settle in the claim txn, split exactly. (Also added end-on-last-prize, **reverted 2026-06-30** — games always draw all 90.)
 - `9968f03` — `--test-concurrency=1` so DB-backed test files don't collide.
 
 Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABASE_URL`.
@@ -354,7 +354,7 @@ cd HG/frontend && npm run dev                                      # :3000
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
 
 **What was last worked on (2026-06-30):**
-Prize-settlement engine (backend only, **no frontend touched**) — committed across `0513e0f`→`9968f03`. Winning a prize now records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, which credits the selling agent's wallet. Co-winners split the prize exactly (no lost paisa) and the game ends as soon as the last prize is claimed. Win detection was extracted to a pure, unit-tested module and the project gained its first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
+Prize-settlement engine (backend only, **no frontend touched**) — committed across `0513e0f`→`9968f03`. Winning a prize now records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, which credits the selling agent's wallet. Co-winners split the prize exactly (no lost paisa). (An end-on-last-prize tweak was added then reverted on 2026-06-30 — games always draw all 90.) Win detection was extracted to a pure, unit-tested module and the project gained its first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
 1. **Build the Finance Hub settlement UI** (frontend) — list Owed settlements (`GET /api/settlements?status=Owed`) with a one-click settle (`POST /api/settlements/:id/settle`) in `components/staff/FinanceSections`. This is the only missing surface for the feature.

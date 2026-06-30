@@ -10,11 +10,7 @@ import { io } from '../server';
 import { PrizePattern } from '@shared/types/game';
 import { TicketGridData } from '@shared/types/ticket';
 import { logger } from '../utils/logger';
-import {
-  detectPatternWinners,
-  splitPrize,
-  allPrizesClaimed,
-} from './winDetection';
+import { detectPatternWinners, splitPrize } from './winDetection';
 import { recordSettlementsForPrize } from './settlements.service';
 
 // In-memory runtime state for active games
@@ -209,6 +205,8 @@ async function processNextDraw(gameId: string): Promise<void> {
   const game = activeGames.get(gameId);
   if (!game) return;
 
+  // The game always draws the full 1–90 and completes here (or via a manual
+  // stop) — it does NOT end early when all prizes happen to be claimed.
   if (game.currentIndex >= 90) {
     await completeGame(gameId);
     return;
@@ -253,13 +251,6 @@ async function processNextDraw(gameId: string): Promise<void> {
         split_count: win.splitCount,
       };
       await publishGameEvent(gameId, winnerEvent);
-    }
-
-    // If every prize is now claimed, the game is over — stop drawing.
-    if (allPrizesClaimed(game.prizes)) {
-      logger.info({ gameId }, 'all prizes claimed — completing game');
-      await completeGame(gameId);
-      return;
     }
 
     logger.info({ gameId, count: winners.length }, 'winner(s) announced — conductor pausing 4s');
