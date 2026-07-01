@@ -1,5 +1,39 @@
 # Housie Ghar — Manual Launch Steps
 
+---
+
+## What's left — all manual
+
+The AI-doable parts are already complete:
+
+- **CI/CD** — `.github/workflows/ci.yml` is fully wired: deploy-hook jobs for `main` / `staging` plus the `https://api.housieghar.in/health` post-deploy check.
+- **Sentry (backend)** — `@sentry/node` installed; a guarded `Sentry.init` added at the top of `src/server.ts` (no-op until `SENTRY_DSN` is set). Backend typechecks clean.
+- **Secret scan** — `gitleaks` run across all 88 commits; the only two hits are placeholder PEM text in `HG/.env.example` and `PDR.md`, so no real key was ever committed.
+- **Dependency audit** — `npm audit --audit-level=high` run in both packages (see Step 15 for the findings).
+
+Everything below needs you — accounts, payment, secrets that must never touch an AI session, dashboard configuration, or a live browser session.
+
+| Step | Task | What you must do |
+|---|---|---|
+| 1 | Generate **production** RSA keypair | Keys must never be seen by AI tools. Run `openssl`, paste into Railway, then shred the local files. |
+| 2 | Generate CI keypair + add GitHub Secrets | GitHub account + secret upload via the Actions UI. |
+| 3 | Buy domain on Cloudflare | Account creation and payment. |
+| 4 | Create Railway project | Account creation and the Railway UI. |
+| 5 | Configure Railway service settings | Railway UI — root directory, build / start / pre-deploy commands. |
+| 6 | Set environment variables in Railway | Security-sensitive; production JWT keys, DB URLs, and passwords must never touch an AI session. |
+| 7 | Deploy frontend to Vercel | Vercel account creation and UI setup. |
+| 8 | DNS records in Cloudflare | Cloudflare dashboard access. |
+| 9 | CI/CD deploy hooks | **`ci.yml` already wired.** Generate the Railway deploy-hook URLs, then add `RAILWAY_PRODUCTION_DEPLOY_HOOK` / `RAILWAY_STAGING_DEPLOY_HOOK` to GitHub Secrets. |
+| 10 | Enable branch protection on GitHub | GitHub Settings UI. |
+| 11 | Frontend Sentry + DSNs | **Backend Sentry already done.** Create the Sentry projects, run the interactive `npx @sentry/wizard@latest -i nextjs` (needs Sentry login), then add `SENTRY_DSN` to Railway and `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` to Vercel. |
+| 12 | Set up UptimeRobot | UptimeRobot account creation and UI setup. |
+| 13 | Rotate seeded staff passwords | Log into the live app as each seeded staff user and change the password. |
+| 14 | Review the gitleaks scan | **Already run — both hits are placeholder text, nothing leaked.** No credential rotation or history scrub needed; optionally add a `.gitleaksignore`. |
+| 15 | Fix npm audit vulnerabilities | **3 high in backend, 2 moderate + 2 high in frontend** (all `ws` via socket.io chain). Run `npm audit fix` in both packages — see Step 15 for the exact commands and caveats. |
+| 16 | First smoke-test in production | A browser session against the live production URL. |
+
+---
+
 **Recommended stack:**
 
 | Layer | Service | Cost |
@@ -178,6 +212,8 @@ Trigger a redeploy on both after updating (Vercel: Deployments → Redeploy; Rai
 
 ## 9. Wire up CI/CD deploy hooks
 
+> ✅ **The `ci.yml` edits are already done and committed** — the deploy-hook jobs and the `api.housieghar.in` health check are in place. Only the Railway-hook generation and the GitHub Secrets below remain.
+
 In Railway: backend service → Settings → **Deploy Hooks** → Generate a deploy hook URL for the `main` branch and another for a `staging` branch (create the staging service separately if you want one).
 
 Go to **GitHub → repo → Settings → Secrets and variables → Actions** and add:
@@ -187,19 +223,7 @@ Go to **GitHub → repo → Settings → Secrets and variables → Actions** and
 | `RAILWAY_PRODUCTION_DEPLOY_HOOK` | The deploy hook URL for your production service |
 | `RAILWAY_STAGING_DEPLOY_HOOK` | The deploy hook URL for staging (or duplicate the production value if you have only one environment) |
 
-In `.github/workflows/ci.yml`, replace the placeholder health check URL on line 90:
-
-```yaml
-curl --fail https://api.yourdomain.com/health || exit 1
-```
-
-with your actual backend domain:
-
-```yaml
-curl --fail https://api.housieghar.in/health || exit 1
-```
-
-Commit this change and the CI pipeline is fully wired: every push to `main` typechecks, lints, builds, then triggers the Railway deploy hook.
+Once added, every push to `main` will typecheck, lint, build, then trigger the Railway deploy hook automatically.
 
 ---
 
@@ -216,6 +240,8 @@ Commit this change and the CI pipeline is fully wired: every push to `main` type
 
 ## 11. Set up Sentry error tracking (~15 minutes)
 
+> ✅ **Backend code is already done** — `@sentry/node` is installed and the guarded `Sentry.init` is in `src/server.ts` (item 4 below). You still need the Sentry account + DSN (items 1–3), the frontend wizard (item 5), and to add the DSNs to Railway/Vercel.
+
 1. Sign up at [sentry.io](https://sentry.io) → free Developer plan covers this project easily.
 2. **Projects → Create Project → Node.js** → name it `housieghar-backend`. Copy the DSN.
 3. In Railway Variables, add:
@@ -224,22 +250,7 @@ Commit this change and the CI pipeline is fully wired: every push to `main` type
    |---|---|
    | `SENTRY_DSN` | The DSN from the Node.js project |
 
-4. Install the Sentry SDK in the backend:
-
-   ```bash
-   cd HG/backend && npm install @sentry/node
-   ```
-
-   Initialize it at the very top of `src/server.ts` (before any other imports):
-
-   ```typescript
-   import * as Sentry from '@sentry/node';
-   if (process.env.SENTRY_DSN) {
-     Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV });
-   }
-   ```
-
-5. **Projects → Create Project → Next.js** → name it `housieghar-frontend`. Then run:
+4. **Projects → Create Project → Next.js** → name it `housieghar-frontend`. Then run:
 
    ```bash
    cd HG/frontend && npx @sentry/wizard@latest -i nextjs
@@ -276,6 +287,8 @@ Alternatively, delete and re-create the accounts with secure passwords. Either w
 
 ## 14. Scan git history for committed secrets
 
+> ✅ **The scan has already been run** — `gitleaks` flagged only placeholder PEM text in `HG/.env.example` and `PDR.md`; no real secret was committed, so there is nothing to rotate or scrub. The commands below are kept for re-running the scan later.
+
 ```bash
 brew install gitleaks
 gitleaks detect --source . --verbose
@@ -291,14 +304,31 @@ git push origin --force --all
 
 ---
 
-## 15. Run npm audit before launch
+## 15. Fix npm audit vulnerabilities
+
+Both packages were audited (`npm audit --audit-level=high`). All findings are the same root cause: a memory-exhaustion DoS in the `ws` package, pulled in transitively by socket.io / socket.io-client. No user data or auth is at risk — this is a server availability concern.
+
+**Backend — 3 high** (ws → engine.io → socket.io-adapter):
 
 ```bash
-cd HG/backend  && npm audit --audit-level=high
-cd HG/frontend && npm audit --audit-level=high
+cd HG/backend && npm audit fix
 ```
 
-Fix or explicitly document every `high`/`critical` finding before going live.
+`npm audit fix` resolves all 3 without breaking changes — safe to run.
+
+**Frontend — 2 moderate + 2 high** (ws → engine.io-client → socket.io-client):
+
+```bash
+cd HG/frontend && npm audit fix
+```
+
+This fixes the 2 high. The 2 moderate may remain after a plain `fix`; if so, `npm audit fix --force` resolves them but may introduce breaking changes — review the diff before committing. If the force-fix breaks the build, pin `ws` directly in `package.json` overrides instead:
+
+```json
+"overrides": { "ws": "^8.18.0" }
+```
+
+then run `npm install` and verify `npm run build` and `npm run lint` still pass.
 
 ---
 

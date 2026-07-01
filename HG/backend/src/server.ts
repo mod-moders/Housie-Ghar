@@ -2,6 +2,14 @@
  * Backend Entrypoint - Boots HTTP, Socket.io, Redis, and Cron Services
  */
 
+import * as Sentry from '@sentry/node';
+
+// Initialize Sentry before any other imports so its instrumentation can patch them.
+// No-op unless SENTRY_DSN is set (only configured in production via Railway).
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV });
+}
+
 import http from 'http';
 import { Server } from 'socket.io';
 import app from './app';
