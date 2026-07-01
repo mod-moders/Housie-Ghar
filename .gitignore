@@ -72,6 +72,32 @@ Screenshot*.png
 *.zip
 *.crdownload
 
+# ─── Reference material, design assets, extra secrets (defense-in-depth) ───
+# The repo root is already fully ignored by /* at the top; these patterns also
+# catch anything of this kind that ever lands *inside* HG/ or .github/.
+# Design source files
+*.psd
+*.sketch
+*.fig
+*.xd
+*.ai
+# Reference PDFs / exports
+*.pdf
+# Extra secret & certificate formats (beyond *.pem / *.key above)
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_rsa.pub
+# Screenshots (any case, png/jpg)
+[Ss]creenshot*.png
+[Ss]creenshot*.jpg
+[Ss]creenshot*.jpeg
+# Unused Next.js starter SVGs (app uses inline Icon.tsx, never public/*.svg)
+HG/frontend/public/*.svg
+
 # Compiled shared types (build artifacts)
 HG/shared/types/*.js
 HG/shared/types/*.js.map
