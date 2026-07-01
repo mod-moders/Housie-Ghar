@@ -10,6 +10,7 @@ import { io } from '../server';
 import { PrizePattern } from '@shared/types/game';
 import { TicketGridData } from '@shared/types/ticket';
 import { logger } from '../utils/logger';
+import { CONSTANTS } from '../config/constants';
 import { detectPatternWinners, splitPrize } from './winDetection';
 import { recordSettlementsForPrize } from './settlements.service';
 
@@ -167,7 +168,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     drawSequence,
     drawnNumbers,
     currentIndex,
-    intervalMs: 8000, // Default 8s
+    intervalMs: CONSTANTS.DEFAULT_DRAW_INTERVAL_MS,
     timer: null,
     tickets,
     prizes,

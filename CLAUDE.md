@@ -102,6 +102,8 @@ HG/
       game/[game_id]/live/page.tsx   # Live board: SSE draws, reveal-tease, prizes, 1-90 board.
                                      #   "Your tickets · auto-marked" in left column (below recent-numbers strip).
                                      #   AccountButton in top-right. Tickets from /api/players/me/tickets, fallback bookingStore.
+                                     #   Spoken caller: on each draw, beep() then speak() (Web Speech API) announces the
+                                     #   number caller-style ("two and one, twenty one") as it reveals. Gated by the mute toggle.
       winners/page.tsx               # Hall of fame (real Prize_Pool winners)
       how-to-play/page.tsx
       staff/login/page.tsx           # Password-only staff login (also accessible via /login staff toggle)
@@ -122,6 +124,7 @@ HG/
     lib/
       api.ts            # apiFetch (credentials: include, JSON)
       money.ts          # money(n) → "₹1,234" (en-IN)
+      caller.ts         # callerPhrase(n) → spoken Housie phrasing, e.g. 21 → "two and one, twenty one" (pure)
       types.ts          # All API payload types (includes MyTicketsResponse)
       hooks/            # useSSE(gameId, onEvent?), useSocket, useCountdown
       stores/           # zustand: authStore, gameStore, bookingStore ("hg-booking"), playerStore ("hg-player")
@@ -150,7 +153,7 @@ Both are driven by a single Redis Pub/Sub channel (`game_events`); the subscribe
 - `startGame` accepts games in `Scheduled` **or** `Paused` state and restores drawn_numbers/current_index from `Game_Logs` — this is the crash-recovery path.
 - **Boot-time auto-resume**: on process start, `Live` games are re-hydrated from `Game_Logs`.
 - **Paused-without-memory fix**: `resumeGame` now checks if the game is in `activeGames`. If not (e.g., process restarted while Paused), it calls `startGame` to rebuild from `Game_Logs` rather than failing with "Game state not loaded".
-- Conductor uses `setTimeout` for variable speed (5–12s via `POST /api/games/:id/speed {interval_ms}`); 4s pause after a winner tick.
+- Conductor uses `setTimeout` for variable speed (**default 4s**, range 3–12s via `POST /api/games/:id/speed {interval_ms}`); 4s pause after a winner tick. The start-up default is read from `CONSTANTS.DEFAULT_DRAW_INTERVAL_MS` (no longer hardcoded); the operator slider in `OperatorSections.tsx` spans 3–12s.
 - **Win detection is delegated** to the pure `winDetection.ts` module (`detectPatternWinners`); `checkWins` no longer carries its own pattern helpers.
 - **Atomic claim + settlement**: when a prize is won, `checkWins` marks `Prize_Pool.claimed` AND inserts an Owed row per winning ticket (`recordSettlementsForPrize`) in **one** transaction. If that transaction fails it rolls back, leaves the prize unclaimed for a later tick to retry, and announces no winner for it.
 - **Exact split**: co-winners split the prize via `splitPrize` (integer-paise, remainder distributed so the full amount is always paid out); the per-winner share is what's announced and stored in `amount_per_winner`.

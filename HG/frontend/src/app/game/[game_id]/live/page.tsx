@@ -5,6 +5,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
+import { callerPhrase } from "@/lib/caller";
 import { useSSE, SSEEventData } from "@/lib/hooks/useSSE";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { useBookingStore } from "@/lib/stores/bookingStore";
@@ -49,6 +50,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const booking = useBookingStore();
   const player = usePlayerStore((s) => s.player);
   const audioCtx = useRef<AudioContext | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   const beep = useCallback(() => {
     if (muted) return;
@@ -68,6 +70,54 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
       o.stop(ctx.currentTime + 0.2);
     } catch {
       /* audio unavailable */
+    }
+  }, [muted]);
+
+  // Pick the best available English voice for the spoken caller (prefer an
+  // Indian-English voice, then other English variants). Voices load async in
+  // most browsers, so refresh on `voiceschanged`. Cancel speech on unmount so
+  // callouts don't bleed into the next screen.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+    const pickVoice = () => {
+      const voices = synth.getVoices();
+      if (voices.length === 0) return;
+      const byLang = (p: string) => voices.find((v) => v.lang?.toLowerCase().startsWith(p));
+      voiceRef.current =
+        byLang("en-in") || byLang("en-gb") || byLang("en-au") ||
+        byLang("en-us") || byLang("en") || voices[0] || null;
+    };
+    pickVoice();
+    synth.addEventListener("voiceschanged", pickVoice);
+    return () => {
+      synth.removeEventListener("voiceschanged", pickVoice);
+      synth.cancel();
+    };
+  }, []);
+
+  // Announce a drawn number aloud, traditional-caller style ("two and one,
+  // twenty one"). Cancels any in-flight callout so the latest number always
+  // wins, even at fast draw speeds.
+  const speak = useCallback((n: number) => {
+    if (muted) return;
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    try {
+      const u = new SpeechSynthesisUtterance(callerPhrase(n));
+      if (voiceRef.current) u.voice = voiceRef.current;
+      u.rate = 0.95;
+      u.pitch = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {
+      /* speech unavailable */
+    }
+  }, [muted]);
+
+  // Muting also silences an in-progress callout.
+  useEffect(() => {
+    if (muted && typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
   }, [muted]);
 
@@ -125,7 +175,10 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     if (data.event === "draw") {
       setRevealed(false);
       beep();
-      setTimeout(() => setRevealed(true), 1200);
+      setTimeout(() => {
+        setRevealed(true);
+        speak(data.draw_number as number);
+      }, 1200);
     } else if (data.event === "winner") {
       const w = data as unknown as WinOverlay & { split_count: number };
       setPrizes((prev) =>
@@ -140,7 +193,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
         setTimeout(() => setWinOverlay(null), 4000);
       }, 1400);
     }
-  }, [beep]);
+  }, [beep, speak]);
 
   useSSE(game_id, onEvent);
 

@@ -13,7 +13,7 @@ import type { GameSummary, QueueBooking } from "@/lib/types";
 export function OperatorHudSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [speed, setSpeed] = useState(8);
+  const [speed, setSpeed] = useState(4);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
@@ -119,12 +119,12 @@ export function OperatorHudSection() {
           <div className="hg-speed">
             <div className="hg-speed-lbl"><span>Call speed</span><b>{speed}s interval</b></div>
             <input
-              type="range" min={5} max={12} value={speed}
+              type="range" min={3} max={12} value={speed}
               onChange={(e) => applySpeed(+e.target.value)}
               className="hg-speed-range"
               disabled={!running}
             />
-            <div className="hg-speed-ends"><span>Fast 5s</span><span>Slow 12s</span></div>
+            <div className="hg-speed-ends"><span>Fast 3s</span><span>Slow 12s</span></div>
           </div>
           {error && <p className="hg-sec-err" style={{ marginTop: 10 }}>{error}</p>}
         </div>

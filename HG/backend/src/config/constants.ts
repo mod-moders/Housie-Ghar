@@ -10,8 +10,8 @@ export const CONSTANTS = {
   BOOKING_POLL_INTERVAL_MS: 3000,    // 3 seconds
 
   // Game Engine
-  DEFAULT_DRAW_INTERVAL_MS: 8000,    // 8 seconds (Normal speed)
-  MIN_DRAW_INTERVAL_MS: 5000,        // 5 seconds (Fast)
+  DEFAULT_DRAW_INTERVAL_MS: 4000,    // 4 seconds (Normal speed)
+  MIN_DRAW_INTERVAL_MS: 3000,        // 3 seconds (Fast)
   MAX_DRAW_INTERVAL_MS: 12000,       // 12 seconds (Slow/Relaxed)
   TOTAL_NUMBERS: 90,                 // Numbers in Housie draw
   WINNER_PAUSE_MS: 4000,             // 4 seconds pause after win announcement
