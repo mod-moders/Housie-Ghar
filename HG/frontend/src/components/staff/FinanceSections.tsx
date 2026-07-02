@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { EmptyHint } from "@/components/ui";
-import type { LedgerAgent } from "@/lib/types";
+import type { LedgerAgent, Settlement, SettleResponse } from "@/lib/types";
 
 interface QueueItem {
   request_id: string;
@@ -150,6 +150,134 @@ export function MasterLedgerSection() {
                       : "never"}
                   </span>
                   <span><span className={`hg-pill hg-pill-${b.trust}`}>{b.trust}</span></span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type PayoutFilter = "Owed" | "Paid";
+
+export function PrizePayoutsSection({ onSettled }: { onSettled?: () => void }) {
+  const [rows, setRows] = useState<Settlement[] | null>(null);
+  const [filter, setFilter] = useState<PayoutFilter>("Owed");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = useCallback((f: PayoutFilter) => {
+    apiFetch<Settlement[]>(`/api/settlements?status=${f}`)
+      .then(setRows)
+      .catch(() => setRows([]));
+  }, []);
+
+  useEffect(() => { load(filter); }, [filter, load]);
+
+  const switchFilter = (f: PayoutFilter) => {
+    if (f === filter) return;
+    setRows(null);
+    setFilter(f);
+    setConfirmId(null);
+    setError(null);
+    setNote(null);
+  };
+
+  const settle = async (row: Settlement) => {
+    if (busyId) return;
+    setBusyId(row.settlement_id);
+    setError(null);
+    try {
+      const res = await apiFetch<SettleResponse>(`/api/settlements/${row.settlement_id}/settle`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setNote(`Paid ${money(res.settlement.amount)} to ${row.agent_name} · new balance ${money(res.new_balance)}`);
+      setConfirmId(null);
+      load(filter);
+      onSettled?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Settlement failed");
+      setConfirmId(null);
+      load(filter); // race (already paid / not found) — refetch to reflect truth
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="hg-sec">
+      <div className="hg-payouts-head">
+        <p className="hg-sec-sub">Prize money owed to the bookie who sold each winning ticket. Settling credits their wallet.</p>
+        <div className="hg-seg" role="tablist">
+          <button className={`hg-seg-btn${filter === "Owed" ? " is-active" : ""}`} onClick={() => switchFilter("Owed")}>
+            Owed{filter === "Owed" && rows && rows.length ? ` · ${rows.length}` : ""}
+          </button>
+          <button className={`hg-seg-btn${filter === "Paid" ? " is-active" : ""}`} onClick={() => switchFilter("Paid")}>
+            Paid
+          </button>
+        </div>
+      </div>
+
+      {note && <p className="hg-payouts-note"><Icon name="check" size={15} strokeWidth={2.6} /> {note}</p>}
+      {error && <p className="hg-sec-err">{error}</p>}
+
+      <div className="hg-panel">
+        {rows === null ? (
+          <div className="hg-empty"><span className="hg-poll-spin" /></div>
+        ) : rows.length === 0 ? (
+          filter === "Owed" ? (
+            <EmptyHint icon="trophy" title="All settled" sub="No prize payouts are owed right now." />
+          ) : (
+            <EmptyHint icon="trophy" title="No payouts yet" sub="Settled prizes will appear here." />
+          )
+        ) : (
+          <div className="hg-table">
+            <div className="hg-tr hg-tr-6 hg-tr-head">
+              <span>Bookie</span><span>Prize</span><span>Winner</span><span>Ticket</span><span>Amount</span>
+              <span>{filter === "Owed" ? "" : "Settled"}</span>
+            </div>
+            {rows.map((r) => {
+              const confirming = confirmId === r.settlement_id;
+              const busy = busyId === r.settlement_id;
+              return (
+                <div key={r.settlement_id} className="hg-tr hg-tr-6">
+                  <span className="hg-td-name">
+                    <span className="hg-avatar-sm">{r.agent_name[0]}</span>
+                    <span>{r.agent_name}{r.agent_town ? <i className="hg-dim"> · {r.agent_town}</i> : null}</span>
+                  </span>
+                  <span>{r.pattern_name}</span>
+                  <span>{r.winner_housie_name ?? "—"}</span>
+                  <span className="hg-dim">#{r.ticket_number}</span>
+                  <span>{money(r.amount)}</span>
+                  <span>
+                    {filter === "Paid" ? (
+                      <span className="hg-dim">
+                        {r.settled_at
+                          ? new Date(r.settled_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                          : "—"}
+                      </span>
+                    ) : confirming ? (
+                      <span className="hg-settle-wrap">
+                        <button className="hg-settle-btn is-confirm" disabled={busy} onClick={() => settle(r)}>
+                          {busy ? "Paying…" : `Confirm ${money(r.amount)}`}
+                        </button>
+                        {!busy && (
+                          <button className="hg-settle-cancel" aria-label="Cancel" onClick={() => setConfirmId(null)}>
+                            <Icon name="x" size={14} strokeWidth={2.6} />
+                          </button>
+                        )}
+                      </span>
+                    ) : (
+                      <button className="hg-settle-btn" disabled={!!busyId} onClick={() => setConfirmId(r.settlement_id)}>
+                        Settle
+                      </button>
+                    )}
+                  </span>
                 </div>
               );
             })}

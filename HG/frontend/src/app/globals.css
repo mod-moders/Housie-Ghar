@@ -856,6 +856,31 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-pill-trusted{background:var(--locked-soft);color:var(--locked)}
 .hg-pill-new{background:var(--surface-2);color:var(--text-dim)}
 
+/* prize payouts */
+.hg-payouts-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hg-payouts-note{display:flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:var(--success)}
+.hg-seg{display:inline-flex;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+.hg-seg-btn{border:0;background:none;cursor:pointer;padding:6px 14px;border-radius:999px;
+  font:700 12px var(--font-head);color:var(--text-dim);
+  transition:background var(--dur-2) var(--ease-out-quart),color var(--dur-2) var(--ease-out-quart)}
+.hg-seg-btn:hover{color:var(--text)}
+.hg-seg-btn.is-active{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.hg-settle-wrap{display:inline-flex;align-items:center;gap:6px}
+.hg-settle-btn{border:1.5px solid var(--card-line);background:var(--surface-2);color:var(--text);
+  cursor:pointer;padding:6px 14px;border-radius:999px;font:700 12px var(--font-head);white-space:nowrap;
+  transition:background var(--dur-1) var(--ease-out-quart),border-color var(--dur-1) var(--ease-out-quart),
+    transform var(--dur-1) var(--ease-out-quart)}
+.hg-settle-btn:hover{border-color:var(--accent);color:var(--accent)}
+.hg-settle-btn:active{transform:translateY(1px)}
+.hg-settle-btn:disabled{opacity:.5;cursor:not-allowed}
+.hg-settle-btn.is-confirm{background:var(--success);border-color:var(--success);color:#042}
+.hg-settle-btn.is-confirm:hover{color:#042;filter:brightness(1.06)}
+.hg-settle-cancel{width:26px;height:26px;flex:none;border-radius:999px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;cursor:pointer}
+.hg-settle-cancel:hover{color:var(--danger);border-color:var(--danger)}
+.hg-side-badge{margin-left:auto;background:var(--danger);color:#fff;font:700 10.5px var(--font-head);
+  min-width:19px;height:19px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center}
+
 /* audit list */
 .hg-audit{display:flex;flex-direction:column}
 .hg-audit-row{display:flex;align-items:flex-start;gap:11px;padding:12px 16px;border-bottom:1px solid var(--border)}

@@ -183,3 +183,28 @@ export interface SkipAlert {
   agent_balance: number;
   created_at: string;
 }
+
+export interface Settlement {
+  settlement_id: string;
+  game_id: string;
+  prize_id: number;
+  pattern_name: string;
+  ticket_id: number;
+  ticket_number: number;
+  player_id: string | null;
+  winner_housie_name: string | null;
+  agent_id: string;
+  amount: number;
+  status: "Owed" | "Paid";
+  created_at: string;
+  settled_at: string | null;
+  settled_by: string | null;
+  agent_name: string;
+  agent_town: string | null;
+}
+
+export interface SettleResponse {
+  message: string;
+  settlement: Settlement;
+  new_balance: number;
+}

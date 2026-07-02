@@ -12,7 +12,7 @@ import { Logo } from "@/components/ui";
 import {
   OverviewSection, GamesSection, FillingSection, WorkforceSection, AuditSection,
 } from "@/components/staff/AdminSections";
-import { FinanceHubSection, MasterLedgerSection } from "@/components/staff/FinanceSections";
+import { FinanceHubSection, MasterLedgerSection, PrizePayoutsSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
 import { STAFF_DOORS, type DoorRole } from "@/lib/staffRoles";
@@ -24,7 +24,7 @@ function navFor(user: AuthUser): NavItem[] {
   const isFo = user.role_name === "Superadmin" || (user.role_name === "Admin" && user.is_cfo === true);
   if (user.role_id <= 2) {
     const items: NavItem[] = [["overview", "Dashboard", "chart"]];
-    if (isFo) items.push(["finance", "Finance Hub", "wallet"], ["ledger", "Bookie Ledger", "chart"]);
+    if (isFo) items.push(["finance", "Finance Hub", "wallet"], ["ledger", "Bookie Ledger", "chart"], ["payouts", "Prize Payouts", "trophy"]);
     items.push(
       ["games", "Games", "grid"],
       ["filling", "Filling Status", "ticket"],
@@ -45,6 +45,7 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
   const [section, setSection] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [hud, setHud] = useState<FinancialHud | null>(null);
+  const [pendingPayouts, setPendingPayouts] = useState(0);
   const [checked, setChecked] = useState(false);
 
   // Authoritative profile (also restores the session after a reload). When this
@@ -72,9 +73,15 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
     apiFetch<FinancialHud>("/api/wallet/hud").then(setHud).catch(() => {});
   }, []);
 
+  const loadPendingPayouts = useCallback(() => {
+    apiFetch<{ count: number }>("/api/settlements/pending/count")
+      .then((r) => setPendingPayouts(r.count))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
-    if (checked && isFo) loadHud();
-  }, [checked, isFo, loadHud]);
+    if (checked && isFo) { loadHud(); loadPendingPayouts(); }
+  }, [checked, isFo, loadHud, loadPendingPayouts]);
 
   const logout = async () => {
     try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* cookie may already be gone */ }
@@ -102,6 +109,7 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
       case "overview": return <OverviewSection goSection={setSection} />;
       case "finance": return <FinanceHubSection onResolved={loadHud} />;
       case "ledger": return <MasterLedgerSection />;
+      case "payouts": return <PrizePayoutsSection onSettled={loadPendingPayouts} />;
       case "games": return <GamesSection />;
       case "filling": return <FillingSection />;
       case "staff": return <WorkforceSection me={user} />;
@@ -128,6 +136,7 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
                   onClick={() => setSection(key)}
                 >
                   <Icon name={ic} size={18} /> <span>{lbl}</span>
+                  {key === "payouts" && pendingPayouts > 0 && <span className="hg-side-badge">{pendingPayouts}</span>}
                 </button>
               ))}
             </nav>
