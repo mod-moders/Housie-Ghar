@@ -7,9 +7,11 @@
 The AI-doable parts are already complete:
 
 - **CI/CD** — `.github/workflows/ci.yml` is fully wired: deploy-hook jobs for `main` / `staging` plus the `https://api.housieghar.in/health` post-deploy check.
-- **Sentry (backend)** — `@sentry/node` installed; a guarded `Sentry.init` added at the top of `src/server.ts` (no-op until `SENTRY_DSN` is set). Backend typechecks clean.
+- **Sentry (backend + frontend)** — `@sentry/node` installed with a guarded `Sentry.init` at the top of `src/server.ts`; `@sentry/nextjs` installed with guarded `src/instrumentation.ts` / `src/instrumentation-client.ts`. Both are no-ops until the DSN env vars are set — **no wizard needed**, just create the Sentry projects and set the DSNs (Step 11).
 - **Secret scan** — `gitleaks` run across all 88 commits; the only two hits are placeholder PEM text in `HG/.env.example` and `PDR.md`, so no real key was ever committed.
-- **Dependency audit** — `npm audit --audit-level=high` run in both packages (see Step 15 for the findings).
+- **Dependency audit — fixed (2026-07-02)** — `npm audit` reports **0 vulnerabilities** in both packages (`npm audit fix` in both; the frontend's nested `postcss` was lifted to ≥8.5.10 via an npm `overrides` entry; build verified). Step 15 is done — just re-run the audit before launch day for new CVEs.
+- **Production bootstrap** — `npm run seed:prod` (new) idempotently creates Roles, Platform_Config defaults, and one Superadmin from `SUPERADMIN_EMAIL`/`SUPERADMIN_TEMP_PASSWORD`. It refuses to run in production with the dev defaults still set. Run it **once** in Railway after the first deploy (Step 5a).
+- **Forced password change** — staff accounts with `temp_password_required` are now locked to the change-password screen on first login (backend-enforced), so seeded/reset temp passwords can't survive into real use.
 
 Everything below needs you — accounts, payment, secrets that must never touch an AI session, dashboard configuration, or a live browser session.
 
@@ -25,12 +27,12 @@ Everything below needs you — accounts, payment, secrets that must never touch 
 | 8 | DNS records in Cloudflare | Cloudflare dashboard access. |
 | 9 | CI/CD deploy hooks | **`ci.yml` already wired.** Generate the Railway deploy-hook URLs, then add `RAILWAY_PRODUCTION_DEPLOY_HOOK` / `RAILWAY_STAGING_DEPLOY_HOOK` to GitHub Secrets. |
 | 10 | Enable branch protection on GitHub | GitHub Settings UI. |
-| 11 | Frontend Sentry + DSNs | **Backend Sentry already done.** Create the Sentry projects, run the interactive `npx @sentry/wizard@latest -i nextjs` (needs Sentry login), then add `SENTRY_DSN` to Railway and `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` to Vercel. |
+| 11 | Sentry projects + DSNs | **Backend AND frontend code already wired — no wizard needed.** Create the two Sentry projects, then add `SENTRY_DSN` to Railway and `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` to Vercel. |
 | 12 | Set up UptimeRobot | UptimeRobot account creation and UI setup. |
-| 13 | Rotate seeded staff passwords | Log into the live app as each seeded staff user and change the password. |
+| 13 | Rotate seeded staff passwords | Log into the live app as each staff user. **The app now forces the change** for accounts flagged `temp_password_required` (the prod Superadmin from `seed:prod`, and any staff created/reset via the admin UI). Any account seeded without the flag must still be rotated by hand. |
 | 14 | Review the gitleaks scan | **Already run — both hits are placeholder text, nothing leaked.** No credential rotation or history scrub needed; optionally add a `.gitleaksignore`. |
-| 15 | Fix npm audit vulnerabilities | **3 high in backend, 2 moderate + 2 high in frontend** (all `ws` via socket.io chain). Run `npm audit fix` in both packages — see Step 15 for the exact commands and caveats. |
-| 16 | First smoke-test in production | A browser session against the live production URL. |
+| 15 | Fix npm audit vulnerabilities | **Done (2026-07-02) — 0 vulnerabilities in both packages.** Frontend keeps `"overrides": { "postcss": "^8.5.10" }` to patch the copy nested in Next. Re-run `npm audit` right before launch for new CVEs. |
+| 16 | First smoke-test in production | A browser session against the live production URL. (The same flow passed locally end-to-end on 2026-07-02, including prize settlement and the forced password change.) |
 
 ---
 
@@ -158,6 +160,16 @@ In the backend service → **Variables tab**, add each variable individually. Do
 
 After adding all variables, Railway will redeploy automatically. Watch the **Deploy Logs** tab for the Pino startup message confirming the server is listening on port 4000.
 
+### 6a. One-time production bootstrap (after the first successful deploy)
+
+A freshly migrated database has no Roles and no Superadmin — the app boots but nobody can log in. In the Railway backend service, open the **shell/one-off command** runner and execute:
+
+```bash
+npm run seed:prod
+```
+
+It is idempotent (safe to re-run) and creates only: the four Roles, `Platform_Config` defaults, and one Superadmin from `SUPERADMIN_EMAIL` + `SUPERADMIN_TEMP_PASSWORD` with `temp_password_required = TRUE`. It **refuses** to run in production while those two variables still hold the dev defaults. On your first login the app forces you to set a real password.
+
 ---
 
 ## 7. Deploy the frontend to Vercel
@@ -238,9 +250,9 @@ Once added, every push to `main` will typecheck, lint, build, then trigger the R
 
 ---
 
-## 11. Set up Sentry error tracking (~15 minutes)
+## 11. Set up Sentry error tracking (~10 minutes)
 
-> ✅ **Backend code is already done** — `@sentry/node` is installed and the guarded `Sentry.init` is in `src/server.ts` (item 4 below). You still need the Sentry account + DSN (items 1–3), the frontend wizard (item 5), and to add the DSNs to Railway/Vercel.
+> ✅ **All code is already done — backend and frontend.** `@sentry/node` init is guarded in `src/server.ts`; `@sentry/nextjs` is wired via `src/instrumentation.ts` (server, incl. `onRequestError`) and `src/instrumentation-client.ts` (browser). Both no-op until the DSN env vars exist, so all that's left is accounts + variables. (The wizard is NOT needed; run it later only if you want source-map upload for readable stack traces.)
 
 1. Sign up at [sentry.io](https://sentry.io) → free Developer plan covers this project easily.
 2. **Projects → Create Project → Node.js** → name it `housieghar-backend`. Copy the DSN.
@@ -250,13 +262,14 @@ Once added, every push to `main` will typecheck, lint, build, then trigger the R
    |---|---|
    | `SENTRY_DSN` | The DSN from the Node.js project |
 
-4. **Projects → Create Project → Next.js** → name it `housieghar-frontend`. Then run:
+4. **Projects → Create Project → Next.js** → name it `housieghar-frontend`. In Vercel Environment Variables, add:
 
-   ```bash
-   cd HG/frontend && npx @sentry/wizard@latest -i nextjs
-   ```
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SENTRY_DSN` | The DSN from the Next.js project |
+   | `SENTRY_DSN` | Same DSN (server-side rendering errors) |
 
-   Accept all prompts. Add the frontend DSN to Vercel as `NEXT_PUBLIC_SENTRY_DSN` (public) and `SENTRY_DSN` (private).
+   Redeploy the frontend after adding them (`NEXT_PUBLIC_*` vars bake in at build time).
 
 ---
 
@@ -276,12 +289,11 @@ Do this before you invite a single user.
 
 ## 13. Rotate all seeded staff passwords
 
-The seed creates every staff account with the password `ChangeMe123!` — this is public knowledge in the repo. Before going live:
+The dev seed creates every staff account with the password `ChangeMe123!` — this is public knowledge in the repo. **In production you should never run `npm run seed` at all** (use `seed:prod`, which creates only the Superadmin — and the app forces a password change on its first login).
 
-1. Log into `/staff` as each seeded account in turn: `superadmin`, `cfo`, `operator`, `bookie1`, `bookie2`, `bookie3`.
-2. Update the password to a strong unique value through the Admin UI.
+The app now enforces rotation wherever `temp_password_required` is set: the account is locked to a change-password screen (every other staff API returns 403) until a real password is chosen. That covers the `seed:prod` Superadmin, staff created through the admin UI, and admin-reset passwords (`PATCH /api/users/:id` with a `password` re-flags temp).
 
-Alternatively, delete and re-create the accounts with secure passwords. Either way, no seeded default password should survive to production.
+If dev-seeded accounts ever made it into a database you're promoting: log in as each (`superadmin`, `cfo`, `operator`, `bookie1-3`) and change its password, or delete and re-create them via the admin UI. No `ChangeMe123!` may survive to production.
 
 ---
 
@@ -306,29 +318,24 @@ git push origin --force --all
 
 ## 15. Fix npm audit vulnerabilities
 
-Both packages were audited (`npm audit --audit-level=high`). All findings are the same root cause: a memory-exhaustion DoS in the `ws` package, pulled in transitively by socket.io / socket.io-client. No user data or auth is at risk — this is a server availability concern.
+> ✅ **Done (2026-07-02) — both packages report 0 vulnerabilities.**
 
-**Backend — 3 high** (ws → engine.io → socket.io-adapter):
+What was fixed:
 
-```bash
-cd HG/backend && npm audit fix
-```
-
-`npm audit fix` resolves all 3 without breaking changes — safe to run.
-
-**Frontend — 2 moderate + 2 high** (ws → engine.io-client → socket.io-client):
-
-```bash
-cd HG/frontend && npm audit fix
-```
-
-This fixes the 2 high. The 2 moderate may remain after a plain `fix`; if so, `npm audit fix --force` resolves them but may introduce breaking changes — review the diff before committing. If the force-fix breaks the build, pin `ws` directly in `package.json` overrides instead:
+- **Backend — 3 high** (`ws` memory-exhaustion DoS via engine.io → socket.io-adapter): resolved by `npm audit fix`, no breaking changes.
+- **Frontend — 2 high** (same `ws` chain via socket.io-client): resolved by `npm audit fix`.
+- **Frontend — 2 moderate** (`postcss` `</style>` XSS in the copy *nested inside Next.js* — `npm audit`'s suggested "fix" was a nonsense downgrade to next@9): resolved by lifting the nested copy with an npm override, kept in `HG/frontend/package.json`:
 
 ```json
-"overrides": { "ws": "^8.18.0" }
+"overrides": { "postcss": "^8.5.10" }
 ```
 
-then run `npm install` and verify `npm run build` and `npm run lint` still pass.
+`npm run build` and `npm run lint` verified green after all fixes. Before launch day, re-run in both packages to catch newly published CVEs:
+
+```bash
+cd HG/backend  && npm audit --audit-level=moderate
+cd HG/frontend && npm audit --audit-level=moderate
+```
 
 ---
 

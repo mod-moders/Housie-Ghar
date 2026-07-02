@@ -25,7 +25,9 @@ npm run dev        # Start dev server with nodemon + ts-node (port 4000)
 npm run build      # Compile TypeScript to dist/
 npm run start      # Run compiled dist/server.js
 npm run migrate    # Run all SQL migrations in order (idempotent, tracked in _migrations)
-npm run seed       # Seed roles, superadmin, two sample games, sample staff
+npm run seed       # Seed roles, superadmin, two sample games, sample staff (dev only — throws in production)
+npm run seed:prod  # Production bootstrap: roles + Platform_Config + one Superadmin from env (idempotent;
+                   #   refuses dev-default SUPERADMIN_EMAIL/SUPERADMIN_TEMP_PASSWORD in production)
 npm test           # node:test runner (NOT Jest) — see "Backend Testing" below
 ```
 
@@ -68,7 +70,8 @@ HG/
       index.ts          # pg Pool singleton
       redis.ts          # Two Redis clients: publisher + subscriber
       migrate.ts        # Auto-discovers migrations/*.sql via readdirSync().sort(); _migrations table
-      seed.ts           # Seeds: roles → superadmin → sample_games (x2) → sample_staff → tickets
+      seed.ts           # Seeds: roles → superadmin → sample_games (x2) → sample_staff → tickets (dev only)
+      seedProd.ts       # Production bootstrap (roles + Platform_Config + Superadmin from env; idempotent)
       generateGameTickets.ts
     middleware/auth.ts  # JWT RS256 cookie auth; requireRole([roleNames]); requireFinancialOfficer
     modules/            # auth, games, bookings, tickets, users, wallet, audit, config, stats, players, settlements
@@ -90,6 +93,8 @@ HG/
   frontend/src/
     proxy.ts            # Next 16 proxy (replaces middleware.ts). Guards /staff/:path*; gates ALL
                         #   public pages behind hg_player_token or hg_auth_token → redirect to /login
+    instrumentation.ts          # Sentry server init + onRequestError (no-op without SENTRY_DSN)
+    instrumentation-client.ts   # Sentry browser init (no-op without NEXT_PUBLIC_SENTRY_DSN)
     app/
       layout.tsx        # next/font/google: Space Grotesk, DM Sans, JetBrains Mono, DM Serif Display (--font-serif).
                         #   body.hg-root, data-theme="dark" default + inline script restoring localStorage 'hg-theme'.
@@ -120,7 +125,8 @@ HG/
                         #   cookie is valid, calls GET /api/players/me and repopulates the store.
                         #   Fixes the cross-device / cleared-localStorage case where cookie outlives store.
       PublicShell.tsx / BookingModal.tsx
-      staff/            # AdminSections, FinanceSections, OperatorSections, BookieSections
+      staff/            # AdminSections, FinanceSections, OperatorSections, BookieSections, StaffShell,
+                        #   RoleLogin, ChangePasswordCard (forced first-login password change, gated by StaffShell)
     lib/
       api.ts            # apiFetch (credentials: include, JSON)
       money.ts          # money(n) → "₹1,234" (en-IN)
@@ -194,6 +200,8 @@ The service functions take a `pg` Pool/PoolClient **parameter** (never the env-b
 ### Authentication & RBAC
 
 **Staff:** JWT RS256 in HttpOnly cookie `hg_auth_token`. `requireRole([...])` takes role **name strings** (e.g. `['Superadmin','Admin']`), not IDs. `requireFinancialOfficer` = Superadmin OR (Admin AND is_cfo). Login and `/api/auth/me` both return `is_cfo` and `town`.
+
+**Per-request account flags (2026-07-02):** `authenticateToken` re-checks the DB on every request (`getStaffAccessFlags` in `modules/auth/auth.service.ts`): suspended accounts 403 immediately (a live cookie no longer outlives suspension), and `temp_password_required = TRUE` locks the account to `/api/auth/change-password` + `/api/auth/me` + `/api/auth/logout` — everything else returns 403 `{ code: 'TEMP_PASSWORD_REQUIRED' }`. `POST /api/auth/change-password` (`{ current_password, new_password }`, min 8 chars) verifies the current password, re-hashes (bcrypt 12), clears the temp flag, and audit-logs `CHANGE_PASSWORD`. The login bcrypt fallback backdoor (any account + `ChangeMe123!` on a malformed hash) was **removed** — malformed hashes now fail closed. Admin password reset: `PATCH /api/users/:id` accepts optional `password` (≥8 chars, not for your own account), re-hashes and re-flags `temp_password_required = TRUE`, audit-logs `RESET_USER_PASSWORD`. Frontend: `StaffShell` gates on `temp_password_required` from `/api/auth/me` and renders `ChangePasswordCard` (all staff login paths funnel through the shell, so the three login forms needed no changes). Service functions live in `auth.service.ts` (pg-client param, env-free) with integration tests in `auth.service.test.ts`.
 
 **Players:** JWT RS256 in HttpOnly cookie `hg_player_token` (30-day expiry, `sameSite: 'lax'`). `POST /api/players/login` is register-or-login: new username → requires `full_name` + `date_of_birth`, creates account with `password = username`; existing username → checks `password === username` to log in. `GET /api/players/me` decodes the cookie. `GET /api/players/me/tickets?game_id=<id>` returns the player's booked tickets (Locked or Sold) for a game. `POST /api/players/logout` clears it. `playerStore` (zustand, localStorage `hg-player`) caches the player object client-side; `PlayerSync` in `layout.tsx` rehydrates it from the cookie on load.
 
@@ -338,9 +346,12 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 ### Known issues / TODOs
 - **Migrations 016–018 are committed** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate` (018 = `Prize_Settlements`).
 - **Settlement UI — built (2026-07-02).** The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) lists Owed/Paid settlements with a two-click Settle → `POST /api/settlements/:id/settle` that credits the selling agent's wallet; a sidebar badge shows the owed count. The agent-facing wallet also shows the `Prize` credit once settled (`Wallet_Ledger`). Commits `ee1c46f` (amount coercion) + `43f6def` (UI). New CSS: `.hg-seg*`, `.hg-settle*`, `.hg-side-badge`, `.hg-payouts-*`.
+- **Settlement smoke-tested end-to-end (2026-07-02).** Full local flow verified via API + browser: player lock → bookie confirm (wallet −₹60) → live game → Early Five split ₹50/₹50 across co-winning tickets + Top Line ₹100 → Owed rows with `player_id` stamped → CFO settle (+₹100, `Wallet_Ledger` `Prize` credit, `settled_by` stamped) → second settle 409 `already_paid` → pending-count badge decremented.
 - **`housie_name` pre-fill — done.** The game-room name input pre-fills from `playerStore.player.username` (a username always satisfies the no-spaces / ≤18-char rule — `full_name` would not).
 - **`dev-bypass` endpoint — working, not a bug.** Frontend (`BookingModal`) and backend route both use `POST /api/bookings/:booking_id/dev-bypass`; `app.ts` mounts it correctly and the `NODE_ENV === 'production'` guard returns 404 in production. The old `dev-bypass-confirm` name in earlier docs was incorrect and has been corrected here and in `manual.md`.
-- **Sentry backend init — pending dependency install.** Per `manual.md` step 11: `cd HG/backend && npm install @sentry/node`, then add the guarded `Sentry.init` at process start. Not yet installed.
+- **Sentry — fully wired, DSN-gated (2026-07-02).** Backend: `@sentry/node` guarded init at the top of `server.ts`. Frontend: `@sentry/nextjs` via `src/instrumentation.ts` (server, `onRequestError`) + `src/instrumentation-client.ts` (browser, `onRouterTransitionStart`). All no-ops until `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` are set (manual.md step 11 = accounts + env vars only; no wizard).
+- **npm audit — 0 vulnerabilities in both packages (2026-07-02).** Backend/frontend `ws` chain fixed via `npm audit fix`; the `postcss` copy nested in Next lifted via `"overrides": { "postcss": "^8.5.10" }` in `HG/frontend/package.json` (don't remove the override until Next ships postcss ≥8.5.10 itself). `.github/dependabot.yml` keeps weekly watch on both packages + Actions.
+- **Temp passwords are now enforced** — see Authentication & RBAC. The dev-seeded superadmin (`temp_password_required = TRUE`) hits the change-password gate on first login; sample staff (flag FALSE) don't.
 - OTP step intentionally skipped (password-only staff login remains).
 
 ---
@@ -356,12 +367,19 @@ cd HG/frontend && npm run dev                                      # :3000
 
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
 
-**What was last worked on (2026-07-02):**
-Finance Hub **Prize Payouts UI** (`43f6def`, plus backend fix `ee1c46f`) — the FO-facing surface for the settlement engine. `PrizePayoutsSection` (`components/staff/FinanceSections.tsx`) renders an Owed/Paid ledger table with a two-click Settle → Confirm that calls `POST /api/settlements/:id/settle` (credits the selling agent's wallet); a sidebar badge shows the owed count via `GET /api/settlements/pending/count`. The backend fix coerces the `DECIMAL` settlement `amount` to a number in the controller (node-pg returns numeric as a string). Loading is modelled as `rows === null` so setState never fires synchronously in an effect (React Compiler `react-hooks/set-state-in-effect`). Verified: backend build + `npm test` (30/0/8), frontend lint + `tsc --noEmit`. Design/plan in `docs/superpowers/{specs,plans}/2026-07-02-finance-hub-prize-payouts*` (gitignored).
+**What was last worked on (2026-07-02, second batch): launch-prep sweep**
+Everything automatable from `launch.md`/`manual.md` was built and verified, leaving only account/dashboard work for a human (see `manual.md` "What's left"):
+1. **Auth hardening** — login backdoor removed (malformed hash + `ChangeMe123!` no longer authenticates); `POST /api/auth/change-password`; per-request DB check of `status` + `temp_password_required` in `authenticateToken` (suspension + temp-password now bite immediately); admin password reset via `PATCH /api/users/:id` re-flags temp. New env-free `modules/auth/auth.service.ts` + 6 integration tests (suite now 44).
+2. **Forced first-login password change (frontend)** — `ChangePasswordCard` rendered by `StaffShell` when `/api/auth/me` carries `temp_password_required`; covers all staff login paths. Verified in a real browser (headless Chromium): login as temp superadmin → gate renders → change → dashboard loads.
+3. **`seed:prod`** — production bootstrap (roles + `Platform_Config` + Superadmin from env, idempotent, refuses dev defaults in production). Closes the "fresh prod DB has no roles/superadmin" gap; wired into manual.md as Railway step 6a.
+4. **Dependencies** — `npm audit` → 0 vulnerabilities both packages (`ws` chain fixed; `postcss` override in frontend); Dependabot config added; `forceConsistentCasingInFileNames` added to frontend tsconfig.
+5. **Frontend Sentry** — `@sentry/nextjs` wired wizard-free via `src/instrumentation.ts` + `src/instrumentation-client.ts`, DSN-gated.
+6. **Gates + smoke test** — migrate idempotency, backend build + 44/44 tests, frontend lint + tsc + production build, and the full settlement E2E (see Known issues). Note: after `next build`, `rm -rf .next` before restarting `next dev` or every route 404s.
+
+Before that (same day): Finance Hub **Prize Payouts UI** (`43f6def` + `ee1c46f`) — the FO-facing Owed/Paid ledger with two-click Settle; sidebar owed-count badge; `DECIMAL` amount coerced to number in the controller.
 
 Before that (2026-06-30): the prize-settlement **engine** (backend only) — committed across `0513e0f`→`9968f03`. Winning a prize records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, crediting the selling agent's wallet. Co-winners split exactly (no lost paisa). Win detection extracted to a pure, unit-tested module; first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
-1. **Smoke-test settlement end-to-end** — start a game with sold tickets, let a prize hit, confirm a `Prize_Settlements` Owed row appears in the new **Prize Payouts** panel, settle it as the CFO, verify the agent's `current_balance` and `Wallet_Ledger` (`reference_type='Prize'`) update and the sidebar badge decrements.
-2. **Pre-fill `housie_name`** from `playerStore.player.full_name` in `game/[game_id]/page.tsx` (currently uses `username`).
-3. When ready to ship, see `launch.md` at the repo root for the full production checklist.
+1. **Ship it** — every remaining item is manual (accounts, secrets, dashboards): work through `manual.md` steps 1–12 top to bottom, then the production smoke test (step 16). `launch.md` is the background reference.
+2. All previously listed code next-steps are done: the settlement E2E smoke test passed 2026-07-02, and `housie_name` pre-fill stays on `username` by design (see Known issues).
