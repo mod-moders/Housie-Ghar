@@ -18,7 +18,7 @@ export async function getSettlements(req: AuthenticatedRequest, res: Response): 
     const gameId = typeof req.query.game_id === 'string' ? req.query.game_id : undefined;
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
     const rows = await listSettlements(pool, { gameId, status });
-    res.json(rows);
+    res.json(rows.map((r) => ({ ...r, amount: Number(r.amount) })));
   } catch (error) {
     logger.error({ err: error }, 'error listing settlements');
     res.status(500).json({ message: 'Internal server error' });
@@ -67,7 +67,7 @@ export async function postSettle(req: AuthenticatedRequest, res: Response): Prom
 
     res.json({
       message: 'Settlement marked paid and agent credited.',
-      settlement: result.settlement,
+      settlement: { ...result.settlement, amount: Number(result.settlement.amount) },
       new_balance: result.newBalance,
     });
   } catch (error) {
