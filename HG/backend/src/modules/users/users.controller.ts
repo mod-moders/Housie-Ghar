@@ -131,11 +131,23 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function updateUser(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { id } = req.params;
-  const { full_name, phone, upi_id, town, status } = req.body;
+  const { full_name, phone, upi_id, town, status, password } = req.body;
   const actor = req.user!;
 
   if (status && !['Active', 'Suspended'].includes(status)) {
     res.status(400).json({ message: "status must be 'Active' or 'Suspended'" });
+    return;
+  }
+
+  if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+    res.status(400).json({ message: 'Password must be at least 8 characters' });
+    return;
+  }
+
+  // Password resets are for other people's forgotten passwords; changing your
+  // own goes through /api/auth/change-password (which clears the temp flag).
+  if (password && id === actor.userId) {
+    res.status(400).json({ message: 'Use change-password to update your own password' });
     return;
   }
 
@@ -166,26 +178,38 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    // A reset password is always temporary: the staffer must set their own on
+    // next login (enforced by the auth middleware).
+    const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+
     const result = await pool.query(
       `UPDATE Users
        SET full_name = COALESCE($1, full_name),
            phone     = COALESCE($2, phone),
            upi_id    = COALESCE($3, upi_id),
            town      = COALESCE($4, town),
-           status    = COALESCE($5, status)
-       WHERE user_id = $6
+           status    = COALESCE($5, status),
+           password_hash = COALESCE($6, password_hash),
+           temp_password_required = (CASE WHEN $6::TEXT IS NOT NULL THEN TRUE ELSE temp_password_required END)
+       WHERE user_id = $7
        RETURNING user_id, full_name, status`,
-      [full_name ?? null, phone ?? null, upi_id ?? null, town ?? null, status ?? null, id]
+      [full_name ?? null, phone ?? null, upi_id ?? null, town ?? null, status ?? null, passwordHash, id]
     );
 
     await logAuditEvent({
       userId: actor.userId,
       userName: actor.fullName,
       userRole: actor.roleName,
-      action: status ? `SET_USER_STATUS_${status.toUpperCase()}` : 'UPDATE_USER',
+      action: passwordHash
+        ? 'RESET_USER_PASSWORD'
+        : status
+          ? `SET_USER_STATUS_${status.toUpperCase()}`
+          : 'UPDATE_USER',
       targetType: 'User',
       targetId: String(id),
-      targetDescription: `Updated ${target.full_name}`,
+      targetDescription: passwordHash
+        ? `Reset password for ${target.full_name} (temp until next login)`
+        : `Updated ${target.full_name}`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });

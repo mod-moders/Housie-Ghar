@@ -9,6 +9,8 @@ import pool from '../../db';
 import { env } from '../../config/env';
 import { CONSTANTS } from '../../config/constants';
 import { logger } from '../../utils/logger';
+import { logAuditEvent } from '../../services/audit.service';
+import { changeStaffPassword, MIN_PASSWORD_LENGTH } from './auth.service';
 
 export async function login(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body;
@@ -41,13 +43,13 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 2. Verify password (fallback to direct compare if crypt fail, but using bcrypt)
+    // 2. Verify password — a malformed stored hash must fail closed
     let passwordMatch = false;
     try {
       passwordMatch = await bcrypt.compare(password, user.password_hash);
     } catch (e) {
-      // For seed testing fallback if salt rounds don't match standard
-      passwordMatch = user.password_hash.includes(password) || password === 'ChangeMe123!';
+      logger.warn({ userId: user.user_id }, 'stored password hash is not a valid bcrypt hash');
+      passwordMatch = false;
     }
 
     if (!passwordMatch) {
@@ -94,6 +96,62 @@ export async function login(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     logger.error({ err: error }, 'login error');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * POST /api/auth/change-password
+ * Self-service password change for staff. Clearing temp_password_required is
+ * what releases a first-login account from the middleware gate.
+ */
+export async function changePassword(req: any, res: Response): Promise<void> {
+  const { current_password, new_password } = req.body ?? {};
+
+  if (!current_password || !new_password) {
+    res.status(400).json({ message: 'current_password and new_password are required' });
+    return;
+  }
+
+  try {
+    const result = await changeStaffPassword(pool, {
+      userId: req.user.userId,
+      currentPassword: current_password,
+      newPassword: new_password,
+    });
+
+    if (!result.ok) {
+      switch (result.reason) {
+        case 'too_short':
+          res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+          return;
+        case 'unchanged':
+          res.status(400).json({ message: 'New password must be different from the current one' });
+          return;
+        case 'wrong_password':
+          res.status(401).json({ message: 'Current password is incorrect' });
+          return;
+        case 'not_found':
+          res.status(404).json({ message: 'User not found' });
+          return;
+      }
+    }
+
+    await logAuditEvent({
+      userId: req.user.userId,
+      userName: req.user.fullName,
+      userRole: req.user.roleName,
+      action: 'CHANGE_PASSWORD',
+      targetType: 'User',
+      targetId: req.user.userId,
+      targetDescription: 'Changed own password',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Password updated', temp_password_required: false });
+  } catch (error) {
+    logger.error({ err: error }, 'change password error');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
