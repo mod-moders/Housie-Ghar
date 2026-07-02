@@ -9,6 +9,7 @@
     "start": "node dist/backend/src/server.js",
     "migrate": "ts-node src/db/migrate.ts",
     "seed": "ts-node src/db/seed.ts",
+    "seed:prod": "ts-node src/db/seedProd.ts",
     "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test --test-concurrency=1 \"src/**/*.test.ts\""
   },
   "keywords": [],
