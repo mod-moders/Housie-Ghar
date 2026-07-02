@@ -180,7 +180,7 @@ The money flow is **symmetric** with booking: a confirmed booking *debits* the s
 - `GET /api/settlements/pending/count` — count of `Owed` rows
 - `POST /api/settlements/:id/settle` — settle one row; audit-logs `SETTLE_PRIZE`. Returns 404 `not_found`, 409 `already_paid`, or the updated row + agent's `new_balance`.
 
-The service functions take a `pg` Pool/PoolClient **parameter** (never the env-bound singleton) so they are integration-testable; win detection lives in pure `winDetection.ts` so it is unit-testable. No frontend consumes this API yet — it is a backend-only ledger surfaced for a future Finance Hub panel.
+The service functions take a `pg` Pool/PoolClient **parameter** (never the env-bound singleton) so they are integration-testable; win detection lives in pure `winDetection.ts` so it is unit-testable. The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) consumes this API — an Owed/Paid ledger with a two-click Settle. `getSettlements`/`postSettle` coerce the `DECIMAL` `amount` to a JS number before responding (node-pg returns numeric as a string), matching `wallet.controller.ts`.
 
 ### Database Schema (Key Tables)
 - `Scheduled_Games` (`Scheduled` → `Live` → `Paused` → `Completed`), `Tickets` (`Available` → `Locked` → `Sold`), `Bookings`, `Prize_Pool`, `Game_Logs`, `Wallet_Ledger`, `TopUp_Requests`, `Audit_Log`, `skip_alerts`
@@ -254,7 +254,7 @@ The hero is a "game-night" composition, layered back-to-front via `--bn-*` banne
 
 Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` based on the authenticated role:
 - **Superadmin/Admin:** overview (stats KPIs), games (table + create + start/pause/resume/speed), filling status, workforce (create/edit staff incl. town, suspend/reactivate, Superadmin can toggle CFO via `PATCH /api/users/:id/cfo`), audit log
-- **Financial Officer extra:** Finance Hub (pending top-ups from master-ledger, approve/reject), Bookie Ledger, finance status-bar HUD (`GET /api/wallet/hud`)
+- **Financial Officer extra:** Finance Hub (pending top-ups from master-ledger, approve/reject), Bookie Ledger, **Prize Payouts** (Owed/Paid settlement ledger — two-click Settle credits the selling agent's wallet; sidebar owed-count badge from `GET /api/settlements/pending/count`), finance status-bar HUD (`GET /api/wallet/hud`)
 - **Operator:** Live HUD (SSE big number, start/pause/resume, speed slider), overflow queue, filling
 - **Bookie (Agent):** booking queue (socket-driven, WhatsApp reply copy, confirm/reject), wallet (balance, ledger, skip-alert FOMO card, request funds → opens `recharge_wa_link` to the CFO), filling
 
@@ -333,11 +333,11 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 - Player auth: `/login` gate, `hg_player_token` cookie, `playerStore`, TopNav chip, `PlayerSync` for cross-device rehydration.
 - Staff: role-door login flow (commits `23085ff`–`659b0f6`) + unified role-driven `/staff` dashboard.
 - Backend: migrations 001–018 committed; SSE `no-cache, no-transform` fix committed and working.
-- Prize settlement: win → Owed `Prize_Settlements` row (in the claim txn) → Financial Officer settles → agent wallet credited. Backend + tests only; no frontend panel yet.
+- Prize settlement (full stack): win → Owed `Prize_Settlements` row (in the claim txn) → Financial Officer settles via the Finance Hub **Prize Payouts** panel (`PrizePayoutsSection`) → agent wallet credited. Backend + tests + frontend UI all committed.
 
 ### Known issues / TODOs
 - **Migrations 016–018 are committed** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate` (018 = `Prize_Settlements`).
-- **Settlement UI not built (by design).** The `/api/settlements` API exists and is tested but no `/staff` panel consumes it yet; a Finance Hub "Prize payouts" view (list Owed, one-click settle) is the natural next frontend task. The agent-facing wallet already shows `Prize` credits once settled (they land in `Wallet_Ledger`).
+- **Settlement UI — built (2026-07-02).** The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) lists Owed/Paid settlements with a two-click Settle → `POST /api/settlements/:id/settle` that credits the selling agent's wallet; a sidebar badge shows the owed count. The agent-facing wallet also shows the `Prize` credit once settled (`Wallet_Ledger`). Commits `ee1c46f` (amount coercion) + `43f6def` (UI). New CSS: `.hg-seg*`, `.hg-settle*`, `.hg-side-badge`, `.hg-payouts-*`.
 - **`housie_name` pre-fill — done.** The game-room name input pre-fills from `playerStore.player.username` (a username always satisfies the no-spaces / ≤18-char rule — `full_name` would not).
 - **`dev-bypass` endpoint — working, not a bug.** Frontend (`BookingModal`) and backend route both use `POST /api/bookings/:booking_id/dev-bypass`; `app.ts` mounts it correctly and the `NODE_ENV === 'production'` guard returns 404 in production. The old `dev-bypass-confirm` name in earlier docs was incorrect and has been corrected here and in `manual.md`.
 - **Sentry backend init — pending dependency install.** Per `manual.md` step 11: `cd HG/backend && npm install @sentry/node`, then add the guarded `Sentry.init` at process start. Not yet installed.
@@ -356,11 +356,12 @@ cd HG/frontend && npm run dev                                      # :3000
 
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
 
-**What was last worked on (2026-06-30):**
-Prize-settlement engine (backend only, **no frontend touched**) — committed across `0513e0f`→`9968f03`. Winning a prize now records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, which credits the selling agent's wallet. Co-winners split the prize exactly (no lost paisa). (An end-on-last-prize tweak was added then reverted on 2026-06-30 — games always draw all 90.) Win detection was extracted to a pure, unit-tested module and the project gained its first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
+**What was last worked on (2026-07-02):**
+Finance Hub **Prize Payouts UI** (`43f6def`, plus backend fix `ee1c46f`) — the FO-facing surface for the settlement engine. `PrizePayoutsSection` (`components/staff/FinanceSections.tsx`) renders an Owed/Paid ledger table with a two-click Settle → Confirm that calls `POST /api/settlements/:id/settle` (credits the selling agent's wallet); a sidebar badge shows the owed count via `GET /api/settlements/pending/count`. The backend fix coerces the `DECIMAL` settlement `amount` to a number in the controller (node-pg returns numeric as a string). Loading is modelled as `rows === null` so setState never fires synchronously in an effect (React Compiler `react-hooks/set-state-in-effect`). Verified: backend build + `npm test` (30/0/8), frontend lint + `tsc --noEmit`. Design/plan in `docs/superpowers/{specs,plans}/2026-07-02-finance-hub-prize-payouts*` (gitignored).
+
+Before that (2026-06-30): the prize-settlement **engine** (backend only) — committed across `0513e0f`→`9968f03`. Winning a prize records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, crediting the selling agent's wallet. Co-winners split exactly (no lost paisa). Win detection extracted to a pure, unit-tested module; first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
-1. **Build the Finance Hub settlement UI** (frontend) — list Owed settlements (`GET /api/settlements?status=Owed`) with a one-click settle (`POST /api/settlements/:id/settle`) in `components/staff/FinanceSections`. This is the only missing surface for the feature.
-2. **Smoke-test settlement end-to-end** — start a game with sold tickets, let a prize hit, confirm a `Prize_Settlements` Owed row appears, settle it as the CFO, verify the agent's `current_balance` and `Wallet_Ledger` (`reference_type='Prize'`) update.
-3. **Pre-fill `housie_name`** from `playerStore.player.full_name` in `game/[game_id]/page.tsx` (currently uses `username`).
-4. When ready to ship, see `launch.md` at the repo root for the full production checklist.
+1. **Smoke-test settlement end-to-end** — start a game with sold tickets, let a prize hit, confirm a `Prize_Settlements` Owed row appears in the new **Prize Payouts** panel, settle it as the CFO, verify the agent's `current_balance` and `Wallet_Ledger` (`reference_type='Prize'`) update and the sidebar badge decrements.
+2. **Pre-fill `housie_name`** from `playerStore.player.full_name` in `game/[game_id]/page.tsx` (currently uses `username`).
+3. When ready to ship, see `launch.md` at the repo root for the full production checklist.
