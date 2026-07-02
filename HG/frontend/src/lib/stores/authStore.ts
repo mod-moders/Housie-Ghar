@@ -9,6 +9,7 @@ export interface AuthUser {
   current_balance?: number;
   is_cfo?: boolean;
   town?: string | null;
+  temp_password_required?: boolean;
 }
 
 interface AuthStore {

@@ -15,6 +15,7 @@ import {
 import { FinanceHubSection, MasterLedgerSection, PrizePayoutsSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
+import { ChangePasswordCard } from "@/components/staff/ChangePasswordCard";
 import { STAFF_DOORS, type DoorRole } from "@/lib/staffRoles";
 import type { FinancialHud } from "@/lib/types";
 
@@ -79,9 +80,11 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
       .catch(() => {});
   }, []);
 
+  const needsPassword = checked && user?.temp_password_required === true;
+
   useEffect(() => {
-    if (checked && isFo) { loadHud(); loadPendingPayouts(); }
-  }, [checked, isFo, loadHud, loadPendingPayouts]);
+    if (checked && isFo && !needsPassword) { loadHud(); loadPendingPayouts(); }
+  }, [checked, isFo, needsPassword, loadHud, loadPendingPayouts]);
 
   const logout = async () => {
     try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* cookie may already be gone */ }
@@ -96,6 +99,18 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
           <div className="hg-empty" style={{ paddingTop: 120 }}>
             <span className="hg-poll-spin" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // First-login gate: the backend 403s every staff API (except auth) while the
+  // temp password stands, so the dashboard is unusable until it's changed.
+  if (needsPassword) {
+    return (
+      <div className="hg-stage">
+        <div className="hg-frame">
+          <ChangePasswordCard onDone={() => setUser({ ...user, temp_password_required: false })} />
         </div>
       </div>
     );
