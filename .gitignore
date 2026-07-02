@@ -103,3 +103,4 @@ HG/shared/types/*.js
 HG/shared/types/*.js.map
 HG/shared/types/*.d.ts
 HG/shared/types/*.d.ts.map
+.gstack/
