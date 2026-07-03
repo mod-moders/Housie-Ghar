@@ -147,7 +147,7 @@ launch.md               # Comprehensive production launch guide (added 2026-06-1
 Two parallel channels relay game events to clients:
 
 1. **SSE** (`sseManager.ts`) — players receive events via `GET /api/games/:id/live-stream`. Event names after the Redis relay: `initial_state` (drawn_numbers + claimed_prizes), `draw` (draw_number), `winner` (prize/housie_name/ticket_id/amount/split_count), `paused`, `resumed`, `completed`.
-2. **Socket.io** — staff rooms (`join_agent_room`, `join_operator_room`, `join_admin_room`); events `new_booking_request`, `booking_expired`, `booking_skipped`, `wallet_credited`/`wallet_debited`, `topup_request_received`, `overflow_booking`.
+2. **Socket.io** — staff rooms (`join_agent_room`, `join_operator_room`, `join_admin_room`); events `new_booking_request`, `booking_expired`, `booking_skipped`, `wallet_credited`/`wallet_debited`, `topup_request_received`, `overflow_booking`, `prize_owed` (to the selling agent's room when a settlement is recorded — published by the engine after the claim txn commits; never broadcast to players).
 
 Both are driven by a single Redis Pub/Sub channel (`game_events`); the subscriber in `server.ts` fans out to SSE + Socket.io.
 
@@ -181,12 +181,21 @@ The money flow is **symmetric** with booking: a confirmed booking *debits* the s
 1. **Record (automatic, inside the game engine).** When `checkWins` claims a prize it calls `recordSettlementsForPrize(client, …)` in the **same transaction** as the `Prize_Pool` update. For each winning ticket it resolves the selling `agent_id` (and `player_id`) from that ticket's Sold booking and inserts a `Prize_Settlements` row with `status = 'Owed'`. No booking owns the ticket → it logs and skips (no row, no throw). `UNIQUE (prize_id, ticket_id)` makes a retry a no-op.
 2. **Settle (manual, Financial Officer only).** `requireFinancialOfficer` settles each owed row: `settleSettlement` takes a row `FOR UPDATE`, flips `Owed → Paid`, stamps `settled_at`/`settled_by`, and credits the agent's wallet via a `Wallet_Ledger` `Credit` row (`reference_type = 'Prize'`, `reference_id = settlement_id`). Idempotent — a second call returns `already_paid` and does not double-credit. A zero-amount settlement flips status without a ledger write.
 
-**API** (`modules/settlements`, all `authenticateToken` + `requireFinancialOfficer`):
-- `GET /api/settlements?game_id=&status=` — list (joins Users for `agent_name`/`agent_town`)
-- `GET /api/settlements/pending/count` — count of `Owed` rows
-- `POST /api/settlements/:id/settle` — settle one row; audit-logs `SETTLE_PRIZE`. Returns 404 `not_found`, 409 `already_paid`, or the updated row + agent's `new_balance`.
+**WhatsApp payout rails (2026-07-03).** Real money never moves through the website — it moves person-to-person on WhatsApp, exactly like ticket purchase and wallet recharge; the app only records it. Three hops:
+- **Winner → Bookie ("Collect").** The live board shows a "You won" card for the player's winning tickets with a prefilled wa.me link to the **selling bookie** (the same person the player paid at booking). Logged-in players get server truth via `GET /api/players/me/wins?game_id=` (reads `Prize_Settlements.player_id`, joins the agent's phone, builds the link with `buildCollectMessage`); anonymous winners get a client-built link from the `winner` SSE event + `bookingStore` agent contact.
+- **Bookie → CFO ("Claim").** The bookie wallet shows a "Prize money owed to you" card (`GET /api/settlements/mine`, Agent role) listing owed rows + one "Claim ₹total on WhatsApp" button — an itemized `buildClaimMessage` to the finance contact (same CFO/Superadmin lookup as recharges, now shared via `services/financeContact.ts`). The `prize_owed` socket event refreshes this card live mid-game.
+- **CFO settles (recording, not payment).** After the WhatsApp claim checks out, the FO's existing Settle click credits the wallet coins — the bookkeeping step, same as approving a top-up. Each FO panel row also carries a WhatsApp chip (`agent_wa_link`) to jump into that bookie's chat.
 
-The service functions take a `pg` Pool/PoolClient **parameter** (never the env-bound singleton) so they are integration-testable; win detection lives in pure `winDetection.ts` so it is unit-testable. The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) consumes this API — an Owed/Paid ledger with a two-click Settle. `getSettlements`/`postSettle` coerce the `DECIMAL` `amount` to a JS number before responding (node-pg returns numeric as a string), matching `wallet.controller.ts`.
+Message builders are pure (`modules/settlements/payoutMessages.ts` — claim/collect/settle-notice, unit-tested); wa.me assembly stays server-side via `utils/waLink.ts`.
+
+**API** (`modules/settlements`):
+- `GET /api/settlements/mine` — **Agent-only**: own prize ledger (owed first, joins game title) + `total_owed` + `claim_wa_link`
+- `GET /api/settlements?game_id=&status=` — FO: list (joins Users for `agent_name`/`agent_town`/`agent_phone`; adds `agent_wa_link`)
+- `GET /api/settlements/pending/count` — FO: count of `Owed` rows
+- `POST /api/settlements/:id/settle` — FO: settle one row; audit-logs `SETTLE_PRIZE`. Returns 404 `not_found`, 409 `already_paid`, or the updated row + agent's `new_balance`.
+- `GET /api/players/me/wins?game_id=` — player cookie: wins + per-win `whatsapp_link` to the selling bookie (in `modules/players`).
+
+The service functions take a `pg` Pool/PoolClient **parameter** (never the env-bound singleton) so they are integration-testable (`listAgentSettlements`, `listPlayerWins`, `recordSettlementsForPrize` — which returns the inserted rows so the engine can publish `prize_owed` after commit); win detection lives in pure `winDetection.ts` so it is unit-testable. The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) consumes this API — an Owed/Paid ledger with a two-click Settle. `getSettlements`/`postSettle` coerce the `DECIMAL` `amount` to a JS number before responding (node-pg returns numeric as a string), matching `wallet.controller.ts`.
 
 ### Database Schema (Key Tables)
 - `Scheduled_Games` (`Scheduled` → `Live` → `Paused` → `Completed`), `Tickets` (`Available` → `Locked` → `Sold`), `Bookings`, `Prize_Pool`, `Game_Logs`, `Wallet_Ledger`, `TopUp_Requests`, `Audit_Log`, `skip_alerts`
@@ -203,7 +212,7 @@ The service functions take a `pg` Pool/PoolClient **parameter** (never the env-b
 
 **Per-request account flags (2026-07-02):** `authenticateToken` re-checks the DB on every request (`getStaffAccessFlags` in `modules/auth/auth.service.ts`): suspended accounts 403 immediately (a live cookie no longer outlives suspension), and `temp_password_required = TRUE` locks the account to `/api/auth/change-password` + `/api/auth/me` + `/api/auth/logout` — everything else returns 403 `{ code: 'TEMP_PASSWORD_REQUIRED' }`. `POST /api/auth/change-password` (`{ current_password, new_password }`, min 8 chars) verifies the current password, re-hashes (bcrypt 12), clears the temp flag, and audit-logs `CHANGE_PASSWORD`. The login bcrypt fallback backdoor (any account + `ChangeMe123!` on a malformed hash) was **removed** — malformed hashes now fail closed. Admin password reset: `PATCH /api/users/:id` accepts optional `password` (≥8 chars, not for your own account), re-hashes and re-flags `temp_password_required = TRUE`, audit-logs `RESET_USER_PASSWORD`. Frontend: `StaffShell` gates on `temp_password_required` from `/api/auth/me` and renders `ChangePasswordCard` (all staff login paths funnel through the shell, so the three login forms needed no changes). Service functions live in `auth.service.ts` (pg-client param, env-free) with integration tests in `auth.service.test.ts`.
 
-**Players:** JWT RS256 in HttpOnly cookie `hg_player_token` (30-day expiry, `sameSite: 'lax'`). `POST /api/players/login` is register-or-login: new username → requires `full_name` + `date_of_birth`, creates account with `password = username`; existing username → checks `password === username` to log in. `GET /api/players/me` decodes the cookie. `GET /api/players/me/tickets?game_id=<id>` returns the player's booked tickets (Locked or Sold) for a game. `POST /api/players/logout` clears it. `playerStore` (zustand, localStorage `hg-player`) caches the player object client-side; `PlayerSync` in `layout.tsx` rehydrates it from the cookie on load.
+**Players:** JWT RS256 in HttpOnly cookie `hg_player_token` (30-day expiry, `sameSite: 'lax'`). `POST /api/players/login` is register-or-login: new username → requires `full_name` + `date_of_birth`, creates account with `password = username`; existing username → checks `password === username` to log in. `GET /api/players/me` decodes the cookie. `GET /api/players/me/tickets?game_id=<id>` returns the player's booked tickets (Locked or Sold) for a game. `GET /api/players/me/wins?game_id=<id>` returns the player's prize wins with a WhatsApp collect link to the selling bookie. `POST /api/players/logout` clears it. `playerStore` (zustand, localStorage `hg-player`) caches the player object client-side; `PlayerSync` in `layout.tsx` rehydrates it from the cookie on load.
 
 **Proxy gating** (`src/proxy.ts`): all public routes (`/`, `/login`, `/game/:path*`, `/winners`, `/how-to-play`, `/staff/:path*`) are matched. `/login` itself is public but redirects to `/` if already logged in. All other public pages redirect to `/login` if neither `hg_player_token` nor `hg_auth_token` cookie is present. Staff routes redirect to `/staff/login` if `hg_auth_token` is absent.
 
@@ -262,9 +271,9 @@ The hero is a "game-night" composition, layered back-to-front via `--bn-*` banne
 
 Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` based on the authenticated role:
 - **Superadmin/Admin:** overview (stats KPIs), games (table + create + start/pause/resume/speed), filling status, workforce (create/edit staff incl. town, suspend/reactivate, Superadmin can toggle CFO via `PATCH /api/users/:id/cfo`), audit log
-- **Financial Officer extra:** Finance Hub (pending top-ups from master-ledger, approve/reject), Bookie Ledger, **Prize Payouts** (Owed/Paid settlement ledger — two-click Settle credits the selling agent's wallet; sidebar owed-count badge from `GET /api/settlements/pending/count`), finance status-bar HUD (`GET /api/wallet/hud`)
+- **Financial Officer extra:** Finance Hub (pending top-ups from master-ledger, approve/reject), Bookie Ledger, **Prize Payouts** (Owed/Paid settlement ledger — two-click Settle credits the selling agent's wallet; per-row WhatsApp chip to the bookie; sidebar owed-count badge from `GET /api/settlements/pending/count`), finance status-bar HUD (`GET /api/wallet/hud`)
 - **Operator:** Live HUD (SSE big number, start/pause/resume, speed slider), overflow queue, filling
-- **Bookie (Agent):** booking queue (socket-driven, WhatsApp reply copy, confirm/reject), wallet (balance, ledger, skip-alert FOMO card, request funds → opens `recharge_wa_link` to the CFO), filling
+- **Bookie (Agent):** booking queue (socket-driven, WhatsApp reply copy, confirm/reject), wallet (balance, ledger, skip-alert FOMO card, request funds → opens `recharge_wa_link` to the CFO, **"Prize money owed to you" card** → itemized "Claim on WhatsApp" to the CFO, refreshed live by `prize_owed`), filling
 
 ---
 
@@ -342,6 +351,7 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 - Staff: role-door login flow (commits `23085ff`–`659b0f6`) + unified role-driven `/staff` dashboard.
 - Backend: migrations 001–018 committed; SSE `no-cache, no-transform` fix committed and working.
 - Prize settlement (full stack): win → Owed `Prize_Settlements` row (in the claim txn) → Financial Officer settles via the Finance Hub **Prize Payouts** panel (`PrizePayoutsSection`) → agent wallet credited. Backend + tests + frontend UI all committed.
+- WhatsApp payout rails (2026-07-03): winner "Collect" card on the live board, bookie "Claim on WhatsApp" card in the wallet, FO WhatsApp chip in Prize Payouts, `prize_owed` socket event. See **Prize Settlement Flow**.
 
 ### Known issues / TODOs
 - **Migrations 016–018 are committed** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate` (018 = `Prize_Settlements`).
@@ -367,7 +377,15 @@ cd HG/frontend && npm run dev                                      # :3000
 
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
 
-**What was last worked on (2026-07-02, second batch): launch-prep sweep**
+**What was last worked on (2026-07-03): WhatsApp payout rails + desktop login fix**
+Product decision: prize money is never paid "via the website" — it flows person-to-person on WhatsApp like every other rupee in the system, and the app only records it. Built on top of the existing settlement engine (see **Prize Settlement Flow** for the full design):
+1. **Winner → Bookie:** "You won" card on the live board (`.hg-wins*`) with per-win "Collect" wa.me links to the selling bookie — server-truth via new `GET /api/players/me/wins` for logged-in players, `bookingStore` fallback for anonymous; overlay gets a "that's your ticket" line.
+2. **Bookie → CFO:** "Prize money owed to you" card in the bookie wallet (`.hg-owed*`) with an itemized "Claim ₹total on WhatsApp" button — new `GET /api/settlements/mine`; live-refreshed by the new `prize_owed` socket event (engine publishes per recorded settlement after the claim txn commits).
+3. **CFO:** Prize Payouts rows get a WhatsApp chip (`agent_wa_link`); Settle stays as the recording step (like top-up approval). CFO/Superadmin contact lookup extracted to shared `services/financeContact.ts` (recharge + claim use the same person).
+4. Pure `payoutMessages.ts` builders + tests; test suite 44 → **52** (harness gained `createStaff`/`createPlayer` fixtures). Verified in headless Chromium: bookie card (₹3,000 claim), player card (6 wins, Collect links), FO chips.
+Same day, earlier: staff/player login pages were stuck in the 452px phone column on desktop — the `:has(.hg-staff-login)` exclusion in the ≥900px de-phone block was removed and `.hg-staff-login` pinned to `100dvh` (a `min-height:100%` child can't resolve against a `height:auto` parent).
+
+Before that (2026-07-02, second batch): launch-prep sweep
 Everything automatable from `launch.md`/`manual.md` was built and verified, leaving only account/dashboard work for a human (see `manual.md` "What's left"):
 1. **Auth hardening** — login backdoor removed (malformed hash + `ChangeMe123!` no longer authenticates); `POST /api/auth/change-password`; per-request DB check of `status` + `temp_password_required` in `authenticateToken` (suspension + temp-password now bite immediately); admin password reset via `PATCH /api/users/:id` re-flags temp. New env-free `modules/auth/auth.service.ts` + 6 integration tests (suite now 44).
 2. **Forced first-login password change (frontend)** — `ChangePasswordCard` rendered by `StaffShell` when `/api/auth/me` carries `temp_password_required`; covers all staff login paths. Verified in a real browser (headless Chromium): login as temp superadmin → gate renders → change → dashboard loads.
