@@ -1194,10 +1194,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
     align-items:flex-start;
     background:radial-gradient(125% 65% at 50% -15%, var(--bg2), transparent 55%), var(--bg);
   }
-  .hg-frame:not(.hg-frame-wide):not(:has(.hg-staff-login)){
+  .hg-frame:not(.hg-frame-wide){
     max-width:none;width:100%;height:auto;min-height:100dvh;overflow:visible;
     background:transparent;border:0;
   }
+  /* login screens: min-height:100% can't resolve against a height:auto
+     parent, so pin it to the viewport directly to keep the card centered */
+  .hg-staff-login{min-height:100dvh}
   .hg-reactions{max-width:none}
   .hg-nav{
     padding:16px 40px;
