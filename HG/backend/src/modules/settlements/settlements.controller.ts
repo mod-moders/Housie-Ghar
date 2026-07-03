@@ -7,9 +7,13 @@ import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import {
   listSettlements,
+  listAgentSettlements,
   settleSettlement,
 } from '../../services/settlements.service';
+import { findFinanceContact } from '../../services/financeContact';
 import { logAuditEvent } from '../../services/audit.service';
+import { buildWaLink } from '../../utils/waLink';
+import { buildClaimMessage, buildSettleNoticeMessage } from './payoutMessages';
 import { logger } from '../../utils/logger';
 
 /** GET /api/settlements?game_id=&status= */
@@ -18,9 +22,48 @@ export async function getSettlements(req: AuthenticatedRequest, res: Response): 
     const gameId = typeof req.query.game_id === 'string' ? req.query.game_id : undefined;
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
     const rows = await listSettlements(pool, { gameId, status });
-    res.json(rows.map((r) => ({ ...r, amount: Number(r.amount) })));
+    res.json(
+      rows.map((r) => {
+        const amount = Number(r.amount);
+        // Let the FO jump into the bookie's WhatsApp to coordinate the payout.
+        const agent_wa_link = r.agent_phone
+          ? buildWaLink(
+              r.agent_phone,
+              buildSettleNoticeMessage(r.agent_name, r.pattern_name, amount, r.ticket_number, r.winner_housie_name)
+            )
+          : null;
+        return { ...r, amount, agent_wa_link };
+      })
+    );
   } catch (error) {
     logger.error({ err: error }, 'error listing settlements');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/settlements/mine — the authenticated Bookie's own prize ledger.
+ * Owed rows come with a prefilled WhatsApp claim link to the Financial
+ * Officer, mirroring how wallet recharges are requested.
+ */
+export async function getMySettlements(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const rows = await listAgentSettlements(pool, req.user!.userId);
+    const settlements = rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+    const owed = settlements.filter((s) => s.status === 'Owed');
+    const total_owed = owed.reduce((sum, s) => sum + s.amount, 0);
+
+    let claim_wa_link: string | null = null;
+    if (owed.length > 0) {
+      const contact = await findFinanceContact(pool);
+      if (contact) {
+        claim_wa_link = buildWaLink(contact.phone, buildClaimMessage(req.user!.fullName, owed));
+      }
+    }
+
+    res.json({ settlements, total_owed, claim_wa_link });
+  } catch (error) {
+    logger.error({ err: error }, 'error listing agent settlements');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

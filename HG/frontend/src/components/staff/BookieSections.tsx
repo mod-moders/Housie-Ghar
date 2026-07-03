@@ -7,7 +7,7 @@ import { money } from "@/lib/money";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
-import type { QueueBooking, SkipAlert, WalletLedgerEntry } from "@/lib/types";
+import type { MySettlementsResponse, QueueBooking, SkipAlert, WalletLedgerEntry } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 
 const LOW_BALANCE_THRESHOLD = 500;
@@ -100,6 +100,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
   const [balance, setBalance] = useState(me.current_balance ?? 0);
   const [ledger, setLedger] = useState<WalletLedgerEntry[]>([]);
   const [skips, setSkips] = useState<SkipAlert[]>([]);
+  const [payouts, setPayouts] = useState<MySettlementsResponse | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [form, setForm] = useState({ amount: "", reference: "" });
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
       .catch(() => {});
     apiFetch<WalletLedgerEntry[]>("/api/wallet/ledger").then(setLedger).catch(() => {});
     apiFetch<SkipAlert[]>("/api/bookings/agent/skip-alerts").then(setSkips).catch(() => {});
+    apiFetch<MySettlementsResponse>("/api/settlements/mine").then(setPayouts).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -122,10 +124,13 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
         if (typeof d?.new_balance === "number") setBalance(d.new_balance);
         load();
       }
-      if (event === "booking_skipped") load();
+      // A ticket you sold just won — prize money is owed to you.
+      if (event === "booking_skipped" || event === "prize_owed") load();
     },
     { event: "join_agent_room", arg: me.user_id }
   );
+
+  const owed = payouts?.settlements.filter((s) => s.status === "Owed") ?? [];
 
   const requestFunds = async () => {
     setError(null);
@@ -187,6 +192,36 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
               Send request
             </Button>
           </div>
+        </div>
+      )}
+
+      {owed.length > 0 && payouts && (
+        <div className="hg-owed-card">
+          <div className="hg-owed-head">
+            <Icon name="trophy" size={16} />
+            <b>Prize money owed to you</b>
+            <span className="hg-owed-total">{money(payouts.total_owed)}</span>
+          </div>
+          <p className="hg-owed-sub">
+            Tickets you sold won these prizes. Pay each winner in cash, then claim it back —
+            the Financial Officer credits your wallet once verified.
+          </p>
+          <div className="hg-owed-list">
+            {owed.map((s) => (
+              <div key={s.settlement_id} className="hg-owed-row">
+                <span className="hg-owed-prize">{s.pattern_name}</span>
+                <span className="hg-owed-meta">
+                  {s.winner_housie_name ?? "winner"} · #{s.ticket_number} · {s.game_title}
+                </span>
+                <b className="hg-owed-amt">{money(s.amount)}</b>
+              </div>
+            ))}
+          </div>
+          {payouts.claim_wa_link && (
+            <a className="hg-wa-btn hg-owed-claim" href={payouts.claim_wa_link} target="_blank" rel="noopener noreferrer">
+              <Icon name="chat" size={17} /> Claim {money(payouts.total_owed)} on WhatsApp
+            </a>
+          )}
         </div>
       )}
 

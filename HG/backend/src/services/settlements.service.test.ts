@@ -7,6 +7,8 @@ import {
   closeTestPool,
   getTestPool,
   freshGameWithAgent,
+  createAgent,
+  createPlayer,
   createPrize,
   createTicket,
   createBooking,
@@ -14,6 +16,8 @@ import {
 import {
   recordSettlementsForPrize,
   listSettlements,
+  listAgentSettlements,
+  listPlayerWins,
   settleSettlement,
 } from './settlements.service';
 
@@ -30,9 +34,10 @@ test('recordSettlementsForPrize inserts an Owed row resolved from the Sold booki
   await createBooking({ gameId, ticketIds: [ticketId], agentId, housieName: 'Asha' });
 
   const client = await getTestPool().connect();
+  let recorded;
   try {
     await client.query('BEGIN');
-    await recordSettlementsForPrize(client, {
+    recorded = await recordSettlementsForPrize(client, {
       gameId,
       prizeId,
       patternName: 'Top Line',
@@ -52,6 +57,12 @@ test('recordSettlementsForPrize inserts an Owed row resolved from the Sold booki
   assert.equal(rows[0].agent_id, agentId);
   assert.equal(rows[0].winner_housie_name, 'Asha');
   assert.equal(parseFloat(rows[0].amount), 100);
+
+  // It reports what it inserted so the engine can notify the owed agent.
+  assert.equal(recorded!.length, 1);
+  assert.equal(recorded![0].agentId, agentId);
+  assert.equal(recorded![0].settlementId, rows[0].settlement_id);
+  assert.equal(recorded![0].amount, 100);
 });
 
 test('recordSettlementsForPrize is idempotent on replay (UNIQUE prize_id, ticket_id)', { skip: !hasTestDb }, async () => {
@@ -62,16 +73,18 @@ test('recordSettlementsForPrize is idempotent on replay (UNIQUE prize_id, ticket
   const ticketId = await createTicket(gameId, 1);
   await createBooking({ gameId, ticketIds: [ticketId], agentId, housieName: 'Asha' });
 
+  const recordedCounts: number[] = [];
   for (let i = 0; i < 2; i++) {
     const client = await getTestPool().connect();
     try {
       await client.query('BEGIN');
-      await recordSettlementsForPrize(client, {
+      const recorded = await recordSettlementsForPrize(client, {
         gameId,
         prizeId,
         patternName: 'Top Line',
         winners: [{ ticketId, ticketNumber: 1, amount: 100 }],
       });
+      recordedCounts.push(recorded.length);
       await client.query('COMMIT');
     } finally {
       client.release();
@@ -83,6 +96,8 @@ test('recordSettlementsForPrize is idempotent on replay (UNIQUE prize_id, ticket
     [prizeId]
   )).rows[0].c;
   assert.equal(count, 1);
+  // The replay inserted nothing, so it must also report nothing to notify.
+  assert.deepEqual(recordedCounts, [1, 0]);
 });
 
 test('recordSettlementsForPrize skips (does not throw) when no Sold booking owns the ticket', { skip: !hasTestDb }, async () => {
@@ -204,4 +219,93 @@ test('settleSettlement reports not_found for an unknown id', { skip: !hasTestDb 
     '00000000-0000-0000-0000-000000000000'
   );
   assert.equal(r.status, 'not_found');
+});
+
+test('listAgentSettlements returns only that agent\'s rows, owed first, with the game title', { skip: !hasTestDb }, async () => {
+  const { settlementId, agentId, gameId } = await seedOwed(100);
+
+  // A second win for the same agent, already settled → should sort after the owed row.
+  const prize2 = await createPrize(gameId, 'Top Line', 40);
+  const ticket2 = await createTicket(gameId, 2);
+  await createBooking({ gameId, ticketIds: [ticket2], agentId, housieName: 'Binod' });
+  const client = await getTestPool().connect();
+  try {
+    await client.query('BEGIN');
+    await recordSettlementsForPrize(client, {
+      gameId, prizeId: prize2, patternName: 'Top Line',
+      winners: [{ ticketId: ticket2, ticketNumber: 2, amount: 40 }],
+    });
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+  const paidId = (await getTestPool().query(
+    'SELECT settlement_id FROM Prize_Settlements WHERE prize_id = $1', [prize2]
+  )).rows[0].settlement_id;
+  await settleSettlement(getTestPool(), paidId, agentId);
+
+  // A different agent's win must not leak in.
+  const otherAgent = await createAgent(500);
+  const prize3 = await createPrize(gameId, 'Middle Line', 60);
+  const ticket3 = await createTicket(gameId, 3);
+  await createBooking({ gameId, ticketIds: [ticket3], agentId: otherAgent, housieName: 'Cara' });
+  const client2 = await getTestPool().connect();
+  try {
+    await client2.query('BEGIN');
+    await recordSettlementsForPrize(client2, {
+      gameId, prizeId: prize3, patternName: 'Middle Line',
+      winners: [{ ticketId: ticket3, ticketNumber: 3, amount: 60 }],
+    });
+    await client2.query('COMMIT');
+  } finally {
+    client2.release();
+  }
+
+  const rows = await listAgentSettlements(getTestPool(), agentId);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].settlement_id, settlementId); // Owed sorts first
+  assert.equal(rows[0].status, 'Owed');
+  assert.equal(rows[0].game_title, 'Test Game');
+  assert.equal(rows[1].status, 'Paid');
+
+  const otherRows = await listAgentSettlements(getTestPool(), otherAgent);
+  assert.equal(otherRows.length, 1);
+  assert.equal(otherRows[0].pattern_name, 'Middle Line');
+});
+
+test('listPlayerWins returns the stamped player\'s wins with the selling agent\'s contact', { skip: !hasTestDb }, async () => {
+  await runMigrations();
+  await truncateAll();
+  const { agentId, gameId } = await freshGameWithAgent();
+  await getTestPool().query(`UPDATE Users SET phone = '+919999000011', town = 'Shillong' WHERE user_id = $1`, [agentId]);
+  const playerId = await createPlayer('asha_w');
+  const stranger = await createPlayer('someone_else');
+
+  const prizeId = await createPrize(gameId, 'Full House', 500);
+  const ticketId = await createTicket(gameId, 9);
+  await createBooking({ gameId, ticketIds: [ticketId], agentId, housieName: 'Asha', playerId });
+
+  const client = await getTestPool().connect();
+  try {
+    await client.query('BEGIN');
+    await recordSettlementsForPrize(client, {
+      gameId, prizeId, patternName: 'Full House',
+      winners: [{ ticketId, ticketNumber: 9, amount: 500 }],
+    });
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+
+  const wins = await listPlayerWins(getTestPool(), playerId, gameId);
+  assert.equal(wins.length, 1);
+  assert.equal(wins[0].pattern_name, 'Full House');
+  assert.equal(parseFloat(wins[0].amount), 500);
+  assert.equal(wins[0].agent_phone, '+919999000011');
+  assert.equal(wins[0].game_title, 'Test Game');
+  assert.equal(wins[0].winner_housie_name, 'Asha');
+
+  // Scoped to the player and (optionally) the game.
+  assert.equal((await listPlayerWins(getTestPool(), stranger, gameId)).length, 0);
+  assert.equal((await listPlayerWins(getTestPool(), playerId)).length, 1);
 });

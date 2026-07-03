@@ -201,10 +201,50 @@ export interface Settlement {
   settled_by: string | null;
   agent_name: string;
   agent_town: string | null;
+  agent_phone: string | null;
+  agent_wa_link: string | null;
 }
 
 export interface SettleResponse {
   message: string;
   settlement: Settlement;
   new_balance: number;
+}
+
+/** A Bookie's own prize-ledger row (GET /api/settlements/mine). */
+export interface AgentSettlement {
+  settlement_id: string;
+  game_id: string;
+  game_title: string;
+  pattern_name: string;
+  ticket_number: number;
+  winner_housie_name: string | null;
+  amount: number;
+  status: "Owed" | "Paid";
+  created_at: string;
+  settled_at: string | null;
+}
+
+export interface MySettlementsResponse {
+  settlements: AgentSettlement[];
+  total_owed: number;
+  claim_wa_link: string | null;
+}
+
+/** A player's prize win with the selling bookie's WhatsApp (GET /api/players/me/wins). */
+export interface PlayerWin {
+  settlement_id: string;
+  game_id: string;
+  game_title: string;
+  pattern_name: string;
+  ticket_number: number;
+  amount: number;
+  agent_name: string;
+  agent_town: string | null;
+  whatsapp_link: string | null;
+  created_at: string;
+}
+
+export interface MyWinsResponse {
+  wins: PlayerWin[];
 }

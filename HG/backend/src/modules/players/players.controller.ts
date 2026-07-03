@@ -11,6 +11,9 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../../db';
 import { env } from '../../config/env';
+import { listPlayerWins } from '../../services/settlements.service';
+import { buildWaLink } from '../../utils/waLink';
+import { buildCollectMessage } from '../settlements/payoutMessages';
 import { logger } from '../../utils/logger';
 
 export const PLAYER_COOKIE_NAME = 'hg_player_token';
@@ -191,6 +194,58 @@ export async function getMyTickets(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     logger.error({ err: error }, 'error fetching player tickets');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/players/me/wins?game_id=...
+ * The logged-in player's prize wins — optionally scoped to one game. Each win
+ * carries a prefilled WhatsApp link to the bookie who sold the ticket: prize
+ * money is collected from that bookie in person, the same channel the ticket
+ * was paid through. The app never moves the cash itself.
+ */
+export async function getMyWins(req: Request, res: Response): Promise<void> {
+  const playerId = getPlayerIdFromRequest(req);
+  if (!playerId) {
+    res.status(401).json({ message: 'Not logged in' });
+    return;
+  }
+  const gameId = typeof req.query.game_id === 'string' ? req.query.game_id : undefined;
+  try {
+    const rows = await listPlayerWins(pool, playerId, gameId);
+    res.json({
+      wins: rows.map((r) => {
+        const amount = Number(r.amount);
+        const whatsapp_link = r.agent_phone
+          ? buildWaLink(
+              r.agent_phone,
+              buildCollectMessage({
+                winnerName: r.winner_housie_name ?? 'a winner',
+                agentName: r.agent_name,
+                patternName: r.pattern_name,
+                amount,
+                ticketNumber: r.ticket_number,
+                gameTitle: r.game_title,
+              })
+            )
+          : null;
+        return {
+          settlement_id: r.settlement_id,
+          game_id: r.game_id,
+          game_title: r.game_title,
+          pattern_name: r.pattern_name,
+          ticket_number: r.ticket_number,
+          amount,
+          agent_name: r.agent_name,
+          agent_town: r.agent_town,
+          whatsapp_link,
+          created_at: r.created_at,
+        };
+      }),
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'error fetching player wins');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

@@ -12,7 +12,7 @@ import { TicketGridData } from '@shared/types/ticket';
 import { logger } from '../utils/logger';
 import { CONSTANTS } from '../config/constants';
 import { detectPatternWinners, splitPrize } from './winDetection';
-import { recordSettlementsForPrize } from './settlements.service';
+import { recordSettlementsForPrize, RecordedSettlement } from './settlements.service';
 
 // In-memory runtime state for active games
 interface ActiveGame {
@@ -63,6 +63,9 @@ export async function initGameEngineSubscription(): Promise<void> {
     } else if (payload.event === 'game_completed') {
       sseManager.broadcast(gameId, { ...payload, event: 'completed' });
       io.to(`game-${gameId}`).emit('completed', payload);
+    } else if (payload.event === 'prize_owed') {
+      // Staff-only: the selling bookie is owed prize money — not broadcast to players.
+      io.to(`agent-${payload.agent_id}`).emit('prize_owed', payload);
     }
   });
   logger.info('Game Engine Redis Pub/Sub initialized');
@@ -295,6 +298,7 @@ async function checkWins(
 
     // Mark claimed in memory; rolled back below if the DB write fails.
     prize.claimed = true;
+    let recordedSettlements: RecordedSettlement[] = [];
 
     const client = await pool.connect();
     try {
@@ -316,7 +320,7 @@ async function checkWins(
           prize.prizeId,
         ]
       );
-      await recordSettlementsForPrize(client, {
+      recordedSettlements = await recordSettlementsForPrize(client, {
         gameId: game.gameId,
         prizeId: prize.prizeId,
         patternName: prize.patternName,
@@ -333,6 +337,22 @@ async function checkWins(
       prize.claimed = false; // allow a retry on a later tick
     } finally {
       client.release();
+    }
+
+    // Committed: nudge each owed bookie's dashboard so they can WhatsApp the
+    // Financial Officer for reimbursement (the claim flow mirrors recharges).
+    if (prize.claimed) {
+      for (const s of recordedSettlements) {
+        await publishGameEvent(game.gameId, {
+          event: 'prize_owed',
+          agent_id: s.agentId,
+          settlement_id: s.settlementId,
+          prize: s.patternName,
+          ticket_number: s.ticketNumber,
+          winner_housie_name: s.winnerHousieName,
+          amount: s.amount,
+        });
+      }
     }
 
     if (prize.claimed) {

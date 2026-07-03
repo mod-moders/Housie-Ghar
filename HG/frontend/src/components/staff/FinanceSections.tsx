@@ -212,7 +212,9 @@ export function PrizePayoutsSection({ onSettled }: { onSettled?: () => void }) {
   return (
     <div className="hg-sec">
       <div className="hg-payouts-head">
-        <p className="hg-sec-sub">Prize money owed to the bookie who sold each winning ticket. Settling credits their wallet.</p>
+        <p className="hg-sec-sub">
+          Bookies pay winners in cash and claim it back over WhatsApp — verify the claim, then settle to credit their wallet.
+        </p>
         <div className="hg-seg" role="tablist">
           <button className={`hg-seg-btn${filter === "Owed" ? " is-active" : ""}`} onClick={() => switchFilter("Owed")}>
             Owed{filter === "Owed" && rows && rows.length ? ` · ${rows.length}` : ""}
@@ -249,6 +251,18 @@ export function PrizePayoutsSection({ onSettled }: { onSettled?: () => void }) {
                   <span className="hg-td-name">
                     <span className="hg-avatar-sm">{r.agent_name[0]}</span>
                     <span>{r.agent_name}{r.agent_town ? <i className="hg-dim"> · {r.agent_town}</i> : null}</span>
+                    {r.agent_wa_link && (
+                      <a
+                        className="hg-wa-chip"
+                        href={r.agent_wa_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`WhatsApp ${r.agent_name}`}
+                        aria-label={`WhatsApp ${r.agent_name}`}
+                      >
+                        <Icon name="chat" size={13} />
+                      </a>
+                    )}
                   </span>
                   <span>{r.pattern_name}</span>
                   <span>{r.winner_housie_name ?? "—"}</span>

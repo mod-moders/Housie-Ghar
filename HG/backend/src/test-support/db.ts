@@ -77,13 +77,19 @@ export async function truncateAll(): Promise<void> {
   );
 }
 
-/** Ensure the Agent role (role_id 4) exists for user fixtures. */
-export async function ensureAgentRole(): Promise<void> {
+/** Ensure a role row exists for user fixtures. */
+export async function ensureRole(roleId: number, roleName: string): Promise<void> {
   const p = getTestPool();
   await p.query(
-    `INSERT INTO Roles (role_id, role_name) VALUES (4, 'Agent')
-     ON CONFLICT (role_id) DO NOTHING`
+    `INSERT INTO Roles (role_id, role_name) VALUES ($1, $2)
+     ON CONFLICT (role_id) DO NOTHING`,
+    [roleId, roleName]
   );
+}
+
+/** Ensure the Agent role (role_id 4) exists for user fixtures. */
+export async function ensureAgentRole(): Promise<void> {
+  await ensureRole(4, 'Agent');
 }
 
 let emailSeq = 0;
@@ -99,6 +105,45 @@ export async function createAgent(balance: number): Promise<string> {
     [`Agent ${emailSeq}`, `agent${emailSeq}@test.local`, balance]
   );
   return res.rows[0].user_id;
+}
+
+/** Create a staff user (any role); returns user_id. */
+export async function createStaff(args: {
+  roleId: number;
+  roleName: string;
+  isCfo?: boolean;
+  phone?: string | null;
+  status?: string;
+}): Promise<string> {
+  const p = getTestPool();
+  await ensureRole(args.roleId, args.roleName);
+  emailSeq += 1;
+  const res = await p.query(
+    `INSERT INTO Users (role_id, full_name, email, phone, password_hash, is_cfo, status)
+     VALUES ($1, $2, $3, $4, 'x', $5, $6)
+     RETURNING user_id`,
+    [
+      args.roleId,
+      `${args.roleName} ${emailSeq}`,
+      `staff${emailSeq}@test.local`,
+      args.phone ?? null,
+      args.isCfo ?? false,
+      args.status ?? 'Active',
+    ]
+  );
+  return res.rows[0].user_id;
+}
+
+/** Create a Player_Logins row; returns player_id. */
+export async function createPlayer(username: string): Promise<string> {
+  const p = getTestPool();
+  const res = await p.query(
+    `INSERT INTO Player_Logins (username, password, full_name, date_of_birth)
+     VALUES ($1, $1, $2, '2000-01-01')
+     RETURNING player_id`,
+    [username, `Player ${username}`]
+  );
+  return res.rows[0].player_id;
 }
 
 /** Create a Scheduled_Games row; returns game_id. */

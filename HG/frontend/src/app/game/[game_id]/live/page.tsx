@@ -13,13 +13,28 @@ import { usePlayerStore } from "@/lib/stores/playerStore";
 import { Icon } from "@/components/Icon";
 import { AccountButton } from "@/components/AccountButton";
 import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
-import type { GameSummary, MyTicketsResponse, Prize, TicketDetail } from "@/lib/types";
+import type { GameSummary, MyTicketsResponse, MyWinsResponse, Prize, TicketDetail } from "@/lib/types";
 
 interface WinOverlay {
   prize: string;
   housie_name: string;
   ticket_id: number;
   amount: number;
+}
+
+/** One row in the "You won" card — from the server for logged-in players,
+ *  or assembled from the winner event + local booking for anonymous play. */
+interface WinRow {
+  key: string;
+  prize: string;
+  amount: number;
+  ticketNumber: number;
+  agentName: string | null;
+  waLink: string | null;
+}
+
+function clientWaLink(phone: string, message: string): string {
+  return `https://wa.me/${phone.replace(/[^0-9+]/g, "")}?text=${encodeURIComponent(message)}`;
 }
 
 interface FloatingReaction {
@@ -44,7 +59,9 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const [muted, setMuted] = useState(false);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [winOverlay, setWinOverlay] = useState<WinOverlay | null>(null);
-  const [myTickets, setMyTickets] = useState<{ number: number; matrix: TicketMatrix }[]>([]);
+  const [myTickets, setMyTickets] = useState<{ id: number; number: number; matrix: TicketMatrix }[]>([]);
+  const [serverWins, setServerWins] = useState<WinRow[]>([]);
+  const [eventWins, setEventWins] = useState<WinRow[]>([]);
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const booking = useBookingStore();
@@ -138,7 +155,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   // booking held in this browser for anonymous play.
   useEffect(() => {
     let alive = true;
-    const setIfAlive = (rows: { number: number; matrix: TicketMatrix }[]) => {
+    const setIfAlive = (rows: { id: number; number: number; matrix: TicketMatrix }[]) => {
       if (alive) setMyTickets(rows);
     };
     async function load() {
@@ -146,7 +163,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
         try {
           const res = await apiFetch<MyTicketsResponse>(`/api/players/me/tickets?game_id=${game_id}`);
           if (res.tickets.length > 0) {
-            setIfAlive(res.tickets.map((t) => ({ number: t.ticket_number, matrix: gridToMatrix(t.grid_data) })));
+            setIfAlive(res.tickets.map((t) => ({ id: t.ticket_id, number: t.ticket_number, matrix: gridToMatrix(t.grid_data) })));
             return;
           }
         } catch {
@@ -160,7 +177,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
         setIfAlive(
           details
             .filter((d): d is TicketDetail => d != null)
-            .map((d) => ({ number: d.ticket_number, matrix: gridToMatrix(d.grid_data) }))
+            .map((d) => ({ id: d.ticket_id, number: d.ticket_number, matrix: gridToMatrix(d.grid_data) }))
         );
         return;
       }
@@ -169,6 +186,29 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     load();
     return () => { alive = false; };
   }, [game_id, player, booking.gameId, booking.ticketIds]);
+
+  // My wins with a "collect from your bookie" WhatsApp link. Server-truth for
+  // logged-in players (their bookings carry player_id); anonymous winners are
+  // assembled locally from the winner event + the booking held in this browser.
+  const loadWins = useCallback(() => {
+    if (!usePlayerStore.getState().player) return;
+    apiFetch<MyWinsResponse>(`/api/players/me/wins?game_id=${game_id}`)
+      .then((res) =>
+        setServerWins(
+          res.wins.map((w) => ({
+            key: `${w.pattern_name}:${w.ticket_number}`,
+            prize: w.pattern_name,
+            amount: w.amount,
+            ticketNumber: w.ticket_number,
+            agentName: w.agent_name,
+            waLink: w.whatsapp_link,
+          }))
+        )
+      )
+      .catch(() => {});
+  }, [game_id]);
+
+  useEffect(() => { loadWins(); }, [loadWins, player]);
 
   // SSE: reveal-tease on draw, prize updates + overlay on winner
   const onEvent = useCallback((data: SSEEventData) => {
@@ -188,12 +228,35 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             : p
         )
       );
+      const mine = myTickets.find((t) => t.id === w.ticket_id);
+      if (mine) {
+        if (usePlayerStore.getState().player) {
+          loadWins(); // settlement row commits before the event publishes
+        } else {
+          const b = useBookingStore.getState();
+          const canWa = b.gameId === game_id && b.agentPhone;
+          const row: WinRow = {
+            key: `${w.prize}:${mine.number}`,
+            prize: w.prize,
+            amount: w.amount,
+            ticketNumber: mine.number,
+            agentName: b.agentName || null,
+            waLink: canWa
+              ? clientWaLink(
+                  b.agentPhone,
+                  `Hi ${b.agentName}, this is ${w.housie_name}! My ticket #${mine.number} won ${w.prize} (₹${w.amount}). Collecting my prize — how do I get paid?`
+                )
+              : null,
+          };
+          setEventWins((prev) => (prev.some((e) => e.key === row.key) ? prev : [...prev, row]));
+        }
+      }
       setTimeout(() => {
         setWinOverlay(w);
         setTimeout(() => setWinOverlay(null), 4000);
       }, 1400);
     }
-  }, [beep, speak]);
+  }, [beep, speak, myTickets, game_id, loadWins]);
 
   useSSE(game_id, onEvent);
 
@@ -206,6 +269,11 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const drawn = new Set(drawnNumbers);
   const count = drawnNumbers.length;
   const recent = drawnNumbers.slice(Math.max(0, count - 6)).reverse();
+  const myWins: WinRow[] = [
+    ...serverWins,
+    ...eventWins.filter((e) => !serverWins.some((s) => s.key === e.key)),
+  ];
+  const overlayIsMine = !!winOverlay && myTickets.some((t) => t.id === winOverlay.ticket_id);
 
   return (
     <div className="hg-stage">
@@ -269,6 +337,33 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
                   <HousieTicket key={t.number} matrix={t.matrix} drawn={drawn} label={`#${t.number}`} compact />
                 ))}
               </div>
+            </div>
+          )}
+
+          {myWins.length > 0 && (
+            <div className="hg-wins">
+              <h2 className="hg-section-title">You won! 🎉</h2>
+              <div className="hg-wins-list">
+                {myWins.map((w) => (
+                  <div key={w.key} className="hg-wins-row">
+                    <div className="hg-wins-info">
+                      <b>{w.prize}</b>
+                      <span>Ticket #{w.ticketNumber}</span>
+                    </div>
+                    <span className="hg-wins-amt">{money(w.amount)}</span>
+                    {w.waLink && (
+                      <a className="hg-wins-collect" href={w.waLink} target="_blank" rel="noopener noreferrer">
+                        <Icon name="chat" size={14} /> Collect
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="hg-wins-note">
+                {myWins[0].agentName
+                  ? `Your bookie ${myWins[0].agentName} pays winnings in cash — message them on WhatsApp to collect.`
+                  : "Your bookie pays winnings in cash — message them on WhatsApp to collect."}
+              </p>
             </div>
           )}
           </div>
@@ -336,6 +431,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
                 <div className="hg-win-label">{winOverlay.prize}!</div>
                 <div className="hg-win-name">{winOverlay.housie_name}</div>
                 <div className="hg-win-sub">{money(winOverlay.amount)}</div>
+                {overlayIsMine && <div className="hg-win-mine">That&apos;s your ticket — collect from your bookie below 🎊</div>}
               </div>
             </div>
           )}

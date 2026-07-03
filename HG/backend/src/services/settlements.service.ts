@@ -22,16 +22,29 @@ export interface RecordSettlementsParams {
   winners: SettlementWinnerInput[];
 }
 
+export interface RecordedSettlement {
+  settlementId: string;
+  agentId: string;
+  patternName: string;
+  ticketNumber: number;
+  winnerHousieName: string | null;
+  amount: number;
+}
+
 /**
  * Record one 'Owed' settlement per winning ticket, resolving the responsible
  * agent + (optional) player from the ticket's Sold booking. Call this inside
  * the same transaction that claims the prize so a win and its payable are
  * always consistent. Idempotent: ON CONFLICT (prize_id, ticket_id) DO NOTHING.
+ *
+ * Returns the rows actually inserted (replays and unowned tickets return
+ * nothing) so the caller can notify the owed agents after the txn commits.
  */
 export async function recordSettlementsForPrize(
   client: PoolClient,
   params: RecordSettlementsParams
-): Promise<void> {
+): Promise<RecordedSettlement[]> {
+  const recorded: RecordedSettlement[] = [];
   for (const w of params.winners) {
     const bookingRes = await client.query(
       `SELECT assigned_agent_id, player_id, housie_name
@@ -50,12 +63,13 @@ export async function recordSettlementsForPrize(
     }
 
     const b = bookingRes.rows[0];
-    await client.query(
+    const ins = await client.query(
       `INSERT INTO Prize_Settlements
          (game_id, prize_id, pattern_name, ticket_id, ticket_number,
           player_id, winner_housie_name, agent_id, amount, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Owed')
-       ON CONFLICT (prize_id, ticket_id) DO NOTHING`,
+       ON CONFLICT (prize_id, ticket_id) DO NOTHING
+       RETURNING settlement_id`,
       [
         params.gameId,
         params.prizeId,
@@ -68,7 +82,18 @@ export async function recordSettlementsForPrize(
         w.amount,
       ]
     );
+    if (ins.rowCount) {
+      recorded.push({
+        settlementId: ins.rows[0].settlement_id,
+        agentId: b.assigned_agent_id,
+        patternName: params.patternName,
+        ticketNumber: w.ticketNumber,
+        winnerHousieName: b.housie_name ?? null,
+        amount: w.amount,
+      });
+    }
   }
+  return recorded;
 }
 
 export interface SettlementFilter {
@@ -82,13 +107,59 @@ export async function listSettlements(
   filter: SettlementFilter
 ): Promise<any[]> {
   const res = await db.query(
-    `SELECT s.*, u.full_name AS agent_name, u.town AS agent_town
+    `SELECT s.*, u.full_name AS agent_name, u.town AS agent_town, u.phone AS agent_phone
      FROM Prize_Settlements s
      JOIN Users u ON u.user_id = s.agent_id
      WHERE ($1::uuid IS NULL OR s.game_id = $1)
        AND ($2::text IS NULL OR s.status = $2)
      ORDER BY s.created_at DESC`,
     [filter.gameId ?? null, filter.status ?? null]
+  );
+  return res.rows;
+}
+
+/**
+ * A Bookie's own prize ledger: what the platform owes them for winning tickets
+ * they sold, owed rows first. Joined with the game title so the WhatsApp claim
+ * message can name the game.
+ */
+export async function listAgentSettlements(db: Pool, agentId: string): Promise<any[]> {
+  const res = await db.query(
+    `SELECT s.settlement_id, s.game_id, s.pattern_name, s.ticket_number,
+            s.winner_housie_name, s.amount, s.status, s.created_at, s.settled_at,
+            g.title AS game_title
+     FROM Prize_Settlements s
+     JOIN Scheduled_Games g ON g.game_id = s.game_id
+     WHERE s.agent_id = $1
+     ORDER BY (s.status = 'Owed') DESC, s.created_at DESC
+     LIMIT 100`,
+    [agentId]
+  );
+  return res.rows;
+}
+
+/**
+ * A player's wins, joined with the selling agent's contact so the winner can
+ * be pointed at the right bookie's WhatsApp to collect the cash.
+ */
+export async function listPlayerWins(
+  db: Pool,
+  playerId: string,
+  gameId?: string
+): Promise<any[]> {
+  const res = await db.query(
+    `SELECT s.settlement_id, s.game_id, s.pattern_name, s.ticket_number,
+            s.winner_housie_name, s.amount, s.created_at,
+            g.title AS game_title,
+            u.full_name AS agent_name, u.phone AS agent_phone, u.town AS agent_town
+     FROM Prize_Settlements s
+     JOIN Scheduled_Games g ON g.game_id = s.game_id
+     JOIN Users u ON u.user_id = s.agent_id
+     WHERE s.player_id = $1
+       AND ($2::uuid IS NULL OR s.game_id = $2)
+     ORDER BY s.created_at DESC
+     LIMIT 100`,
+    [playerId, gameId ?? null]
   );
   return res.rows;
 }

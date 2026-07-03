@@ -9,6 +9,7 @@ import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { buildWaLink } from '../../utils/waLink';
+import { findFinanceContact } from '../../services/financeContact';
 import { buildRechargeMessage } from './rechargeContact';
 import { validateAdjust, computeBalanceAfter } from './walletAdjust';
 import { deriveTrust } from '../../utils/trust';
@@ -156,20 +157,12 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
 
     const request = result.rows[0];
 
-    // Resolve the recharge contact: the Active Admin designated CFO, else an
-    // Active Superadmin. Used to redirect the Bookie to that person's WhatsApp.
-    const contactRes = await pool.query(
-      `SELECT full_name, phone
-       FROM Users
-       WHERE status = 'Active' AND phone IS NOT NULL
-         AND ((role_id = 2 AND is_cfo = TRUE) OR role_id = 1)
-       ORDER BY (role_id = 2 AND is_cfo = TRUE) DESC, role_id ASC
-       LIMIT 1`
-    );
+    // Redirect the Bookie to the finance contact's WhatsApp (CFO, else Superadmin).
+    const contact = await findFinanceContact(pool);
     let recharge_wa_link: string | null = null;
-    if (contactRes.rowCount && contactRes.rows[0].phone) {
+    if (contact) {
       const msg = buildRechargeMessage(agent.fullName, amount, payment_reference);
-      recharge_wa_link = buildWaLink(contactRes.rows[0].phone, msg);
+      recharge_wa_link = buildWaLink(contact.phone, msg);
     }
 
     // Notify staff dashboards (admins listening on the shared admin room)

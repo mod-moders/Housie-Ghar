@@ -652,6 +652,23 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-prize-tk{font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
 .hg-prize-open{font-size:11px;color:var(--text-mute);font-style:italic}
 .hg-mytickets-row{display:flex;gap:12px;overflow-x:auto;margin-top:10px;padding-bottom:6px}
+
+/* "You won" card — collect the prize from your bookie on WhatsApp */
+.hg-wins{margin:14px 16px 0;padding:14px;border-radius:var(--radius);
+  border:1.5px solid var(--success);background:var(--success-soft)}
+.hg-wins-list{display:flex;flex-direction:column;margin-top:8px}
+.hg-wins-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border)}
+.hg-wins-info{display:flex;flex-direction:column;min-width:0}
+.hg-wins-info b{font-family:var(--font-head);font-size:13px}
+.hg-wins-info span{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim)}
+.hg-wins-amt{margin-left:auto;font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--success)}
+.hg-wins-collect{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;flex-shrink:0;
+  border-radius:999px;border:1.5px solid var(--ink);box-shadow:0 3px 0 -1px var(--ink);
+  background:oklch(0.78 0.17 150);color:#042;font:700 12px var(--font-head);text-decoration:none;
+  transition:filter var(--dur-1) var(--ease-out-quart)}
+.hg-wins-collect:hover{filter:brightness(1.05)}
+.hg-wins-collect:active{transform:translateY(2px);box-shadow:0 1px 0 -1px var(--ink)}
+.hg-wins-note{margin:8px 0 0;font-size:11px;line-height:1.5;color:var(--text-dim)}
 .hg-board90{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;padding:0 16px 16px}
 .hg-b90{aspect-ratio:1;display:grid;place-items:center;border-radius:8px;font-family:var(--font-mono);
   font-size:11px;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--text-mute)}
@@ -683,6 +700,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-win-label{font-family:var(--font-head);font-weight:700;font-size:30px;letter-spacing:-.01em;line-height:1}
 .hg-win-name{font-family:var(--font-head);font-weight:700;font-size:22px;margin-top:8px}
 .hg-win-sub{font-family:var(--font-mono);font-size:13px;margin-top:4px;opacity:.85}
+.hg-win-mine{margin-top:10px;padding-top:8px;border-top:1px dashed color-mix(in srgb,var(--cta-ink) 35%,transparent);
+  font:700 12.5px var(--font-head)}
 .hg-win-burst{position:absolute;top:50%;left:50%}
 .hg-win-burst span{position:absolute;width:14px;height:14px;border-radius:3px;background:var(--accent);
   transform:rotate(calc(var(--i)*30deg)) translateY(0);animation:hg-winburst 1.1s ease-out forwards}
@@ -878,6 +897,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-settle-cancel{width:26px;height:26px;flex:none;border-radius:999px;border:1px solid var(--border);
   background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;cursor:pointer}
 .hg-settle-cancel:hover{color:var(--danger);border-color:var(--danger)}
+.hg-wa-chip{width:24px;height:24px;flex:none;border-radius:999px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-dim);display:inline-grid;place-items:center;
+  transition:color var(--dur-1) var(--ease-out-quart),border-color var(--dur-1) var(--ease-out-quart)}
+.hg-wa-chip:hover{color:var(--success);border-color:var(--success)}
 .hg-side-badge{margin-left:auto;background:var(--danger);color:#fff;font:700 10.5px var(--font-head);
   min-width:19px;height:19px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center}
 
@@ -982,6 +1005,21 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-fomo svg{color:var(--danger);flex-shrink:0}
 .hg-fomo b{font-family:var(--font-head);font-size:13px;display:block}
 .hg-fomo span{font-size:11.5px;color:var(--text-dim)}
+
+/* bookie prize-money owed card (claim via WhatsApp, mirrors recharge) */
+.hg-owed-card{display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:var(--radius);
+  max-width:420px;border:1.5px solid var(--success);background:var(--success-soft)}
+.hg-owed-head{display:flex;align-items:center;gap:8px}
+.hg-owed-head svg{color:var(--success);flex-shrink:0}
+.hg-owed-head b{font-family:var(--font-head);font-size:13.5px}
+.hg-owed-total{margin-left:auto;font-family:var(--font-mono);font-weight:700;font-size:16px;color:var(--success)}
+.hg-owed-sub{margin:0;font-size:11.5px;line-height:1.5;color:var(--text-dim)}
+.hg-owed-list{display:flex;flex-direction:column}
+.hg-owed-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border)}
+.hg-owed-prize{font-family:var(--font-head);font-weight:700;font-size:12.5px;flex-shrink:0}
+.hg-owed-meta{font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hg-owed-amt{margin-left:auto;font-family:var(--font-mono);font-size:13px;flex-shrink:0}
+.hg-owed-claim{margin:4px 0 0}
 
 /* staff forms */
 .hg-form{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--radius)}
