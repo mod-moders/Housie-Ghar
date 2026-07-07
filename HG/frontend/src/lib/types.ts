@@ -99,6 +99,21 @@ export interface LuckyNumberResponse {
   refreshes_at: string;
 }
 
+/** GET /api/config/public — unauthenticated, whitelisted Platform_Config keys. */
+export interface PublicConfigResponse {
+  marquee_text: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+}
+
+/** GET /api/config — Superadmin-only full key-value listing. */
+export interface ConfigEntry {
+  config_key: string;
+  config_value: string;
+  description: string | null;
+  updated_at: string;
+}
+
 export type TrustTier = "veteran" | "trusted" | "new";
 
 export interface StaffUser {

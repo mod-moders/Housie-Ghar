@@ -3,11 +3,36 @@
  * Key-value platform settings, editable only by a Superadmin.
  */
 
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { logger } from '../../utils/logger';
+
+/** Config keys safe to expose to unauthenticated players. */
+const PUBLIC_CONFIG_KEYS = ['marquee_text', 'support_email', 'support_phone'] as const;
+
+/**
+ * Read the player-visible subset of the platform configuration (no auth).
+ * Missing keys come back as null so a fresh database never breaks the lobby.
+ */
+export async function getPublicConfig(_req: Request, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT config_key, config_value FROM Platform_Config WHERE config_key = ANY($1)`,
+      [PUBLIC_CONFIG_KEYS]
+    );
+    const out: Record<string, string | null> = {};
+    for (const key of PUBLIC_CONFIG_KEYS) {
+      const row = result.rows.find((r) => r.config_key === key);
+      out[key] = row ? row.config_value : null;
+    }
+    res.json(out);
+  } catch (error) {
+    logger.error({ err: error }, 'error reading public platform config');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
 
 /**
  * Read the entire platform configuration (Superadmin)

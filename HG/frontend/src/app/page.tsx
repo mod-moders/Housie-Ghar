@@ -9,7 +9,7 @@ import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
-import type { GameSummary, LuckyNumberResponse } from "@/lib/types";
+import type { GameSummary, LuckyNumberResponse, PublicConfigResponse } from "@/lib/types";
 
 // Rotated on the banner every 5s, starting from a random hook each page load.
 const HOOKS = [
@@ -127,6 +127,7 @@ export default function Lobby() {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // The quote rotates through HOOKS every 5s. A client-only random start (via
   // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
@@ -163,6 +164,16 @@ export default function Lobby() {
     let alive = true;
     apiFetch<LuckyNumberResponse>("/api/stats/lucky-number")
       .then((l) => { if (alive) setLucky(l); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Superadmin announcement (Platform_Config.marquee_text). One-shot; empty or
+  // failed fetch simply hides the strip.
+  useEffect(() => {
+    let alive = true;
+    apiFetch<PublicConfigResponse>("/api/config/public")
+      .then((c) => { if (alive) setNotice(c.marquee_text?.trim() || null); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -219,6 +230,13 @@ export default function Lobby() {
         </section>
 
         <div className="hg-lobby-v2" ref={lobbyRef}>
+          {notice && (
+            <div className="hg-notice" role="status">
+              <span className="hg-notice-ic" aria-hidden="true"><Icon name="bell" size={15} /></span>
+              <p>{notice}</p>
+            </div>
+          )}
+
           {lucky && lucky.lucky_number !== null && (
             <section className="hg-lucky" aria-label={`Lucky number ${lucky.lucky_number}`}>
               <span className="hg-lucky-bloom" aria-hidden="true" />

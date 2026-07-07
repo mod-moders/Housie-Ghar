@@ -279,19 +279,40 @@ Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` b
 
 ## Current State
 
-### Most recent commits (as of 2026-06-30)
+### Most recent commits (as of 2026-07-07)
 ```
-9968f03 test: run test files serially to isolate DB-backed integration tests
-d52bd5b fix(engine): settle prizes, split exactly, end on last prize
-50331ae feat(settlements): expose Financial Officer settlement API
-2ac0d41 feat(settlements): list + settle (credits selling agent wallet)
-ed7df42 feat(settlements): record Owed settlements on prize win
-de601dd test(db): add TEST_DATABASE_URL-gated integration harness
-08ecfc8 feat(db): add Prize_Settlements table (migration 018)
-0513e0f feat(engine): extract pure win-detection module with unit tests
-151220b feat(players): account-linkage for cross-device tickets + launch-prep
-659b0f6 feat(staff): lock dropdown with three role doors
+a35f44d docs: record WhatsApp payout rails + login-page desktop fix
+db0efc5 feat(payouts): WhatsApp-first prize payout rails (winner→bookie→CFO)
+9e42653 fix(ui): let staff/player login pages use the desktop layout at >=900px
+71d01fe docs: record launch-prep sweep; manual.md is now truly manual-only
+954792f chore(launch): zero npm audit, wire frontend Sentry, add Dependabot
+b8639e6 feat(db): production bootstrap seed (npm run seed:prod)
+d140b5f feat(staff): forced first-login password change
+1e90067 fix(auth): remove login backdoor, enforce temp passwords & suspension live
+7775f49 docs: mark Finance Hub Prize Payouts UI as built
+43f6def feat(finance): prize-payouts settlement UI in the Finance Hub
 ```
+Branch `frontend-v2-housieghar` is 11 commits ahead of `origin/frontend-v2-housieghar` (unpushed).
+
+### Uncommitted working tree (as of 2026-07-07) — two new features from `do.md` triage
+
+A `do.md` "V3.0 master spec" was dropped into the repo root describing the whole platform. Most of it documents already-built functionality; two genuinely new, valuable pieces were implemented and are **sitting uncommitted** pending the user's go-ahead to commit:
+
+**1. Smart Game Presets (`AdminSections.tsx`, `GamesSection`).** The create-game form previously opened with a default 120%-of-gross prize spread (invalid until hand-tuned). Four one-click preset chips now sit above the form: *High Noon Fortune* (12:00, ₹50×100), *Snack & Stack* (15:00, ₹30×150), *Sundown Showdown* (18:30, ₹80×120), *Prime Time* (21:00, ₹100×200 = 70% of gross). `nextSlotFor(hour, minute)` computes the next occurrence of that time-of-day (rolls to tomorrow if <15 min lead), `toLocalInput()` builds a zone-less `datetime-local` string by hand (no `toISOString()` UTC shift), `slotLabel()` renders "Today/Tomorrow h:mm". Clicking a chip fills title/schedule/price/capacity/prize-pattern all at once; every field stays editable after.
+
+**2. Superadmin announcement / marquee strip.** `Platform_Config.marquee_text` existed in the schema but had no reader and no editor — dead data. Now: `GET /api/config/public` (`config.controller.ts`/`config.routes.ts`, no auth) whitelists `marquee_text`/`support_email`/`support_phone` for public consumption; the lobby (`page.tsx`) renders it as a sticker-style `.hg-notice` strip (bell icon, ink border, offset shadow) above the games list, hidden when empty; a new Superadmin-only **Announcement** sidebar section (`AnnouncementSection` in `AdminSections.tsx`, wired into `StaffShell.tsx` nav for `role_id === 1`) edits it with a live preview and `PUT /api/config`, audit-logged via the existing `UPDATE_PLATFORM_CONFIG` path. New `seed_platform_config.sql` (mirrors `seedProd.ts` defaults, `ON CONFLICT DO NOTHING`) was added to `seed.ts`'s `seedFiles` so a fresh dev DB has the config rows the editor needs — without it `updateConfig`'s UPDATE-only semantics leave the key permanently missing.
+
+Files touched: `config.controller.ts`, `config.routes.ts`, `db/seed.ts`, `seeds/seed_platform_config.sql` (new), `lib/types.ts` (`PublicConfigResponse`, `ConfigEntry`), `AdminSections.tsx`, `StaffShell.tsx`, `app/page.tsx`, `globals.css` (`.hg-notice*`, `.hg-preset-*`, `.hg-form-saved`).
+
+**Skipped from `do.md` deliberately:** Retro Arcade theme / `active_theme` (violates the standing "`Themes` is dropped, do not reintroduce" rule below), OTP (already an intentional skip), a fake SCORE/CREDITS HUD (fabricated data), a `promoters` table (no workflow behind it), a Bingo Machine hero (banner was deliberately redesigned 2026-06-13), a `/sync` reconnect endpoint (SSE `initial_state` + EventSource auto-reconnect already cover it).
+
+Both features were verified end-to-end in headless Chromium (player sees the lobby strip; Superadmin edits it and sees it go live + audit-logged; Prime Time preset → Create Game succeeds with a valid 70%-of-gross pool and 200 generated tickets). Gates green: backend build clean, `npm test` 52/52 (33 pass / 19 skip without `TEST_DATABASE_URL`), frontend `eslint` + `tsc --noEmit` clean. Frontend production build was **not** run because `next dev` was live at the time (see Turbopack note below).
+
+Also present, pre-dating this session and **not to be reverted** — user's own in-progress edits:
+- `seeds/seed_superadmin.sql` — rebranded superadmin to `superadmin@housieghar.com` / password `Housie@2026`, `ON CONFLICT (phone) DO UPDATE`.
+- `src/app.ts` — both auth rate-limiter `app.use` lines commented out.
+
+**Gotcha hit this session:** Turbopack's dev server can miss the second of two back-to-back writes to `globals.css` in the same turn — `touch` does not force a recompile (content-hash based), only a real content change does. Logged to memory (`hg-turbopack-misses-rapid-css-writes`).
 
 ### Player account-linkage batch (committed `151220b`, 2026-06-21)
 
@@ -375,9 +396,12 @@ cd HG/backend && npm run migrate && npm run seed && npm run dev   # :4000
 cd HG/frontend && npm run dev                                      # :3000
 ```
 
-**Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent).
+**Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent). If you're using the dev `seed`, note it now also runs `seed_platform_config.sql` (adds `seed:prod`'s default `Platform_Config` rows, `ON CONFLICT DO NOTHING`) — needed for the Announcement editor's `PUT /api/config` to succeed on a fresh DB.
 
-**What was last worked on (2026-07-03): WhatsApp payout rails + desktop login fix**
+**What was last worked on (2026-07-07): `do.md` triage — Smart Game Presets + Announcement strip**
+A large "V3.0 master spec" (`do.md`) was scanned feature-by-feature against what's already built; two new, high-value pieces were implemented (see **Current State → Uncommitted working tree** above for full detail) and verified in headless Chromium, everything else in the doc was either already shipped or explicitly out of scope. **Nothing from this batch is committed yet** — it's sitting in the working tree awaiting the user's go-ahead. Before touching `globals.css` again in one turn, remember the Turbopack stale-write gotcha noted above (do the edit, then a real content change if the dev server doesn't pick it up — `touch` won't).
+
+Before that (2026-07-03): WhatsApp payout rails + desktop login fix
 Product decision: prize money is never paid "via the website" — it flows person-to-person on WhatsApp like every other rupee in the system, and the app only records it. Built on top of the existing settlement engine (see **Prize Settlement Flow** for the full design):
 1. **Winner → Bookie:** "You won" card on the live board (`.hg-wins*`) with per-win "Collect" wa.me links to the selling bookie — server-truth via new `GET /api/players/me/wins` for logged-in players, `bookingStore` fallback for anonymous; overlay gets a "that's your ticket" line.
 2. **Bookie → CFO:** "Prize money owed to you" card in the bookie wallet (`.hg-owed*`) with an itemized "Claim ₹total on WhatsApp" button — new `GET /api/settlements/mine`; live-refreshed by the new `prize_owed` socket event (engine publishes per recorded settlement after the claim txn commits).
@@ -399,5 +423,6 @@ Before that (same day): Finance Hub **Prize Payouts UI** (`43f6def` + `ee1c46f`)
 Before that (2026-06-30): the prize-settlement **engine** (backend only) — committed across `0513e0f`→`9968f03`. Winning a prize records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, crediting the selling agent's wallet. Co-winners split exactly (no lost paisa). Win detection extracted to a pure, unit-tested module; first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
-1. **Ship it** — every remaining item is manual (accounts, secrets, dashboards): work through `manual.md` steps 1–12 top to bottom, then the production smoke test (step 16). `launch.md` is the background reference.
-2. All previously listed code next-steps are done: the settlement E2E smoke test passed 2026-07-02, and `housie_name` pre-fill stays on `username` by design (see Known issues).
+1. **Decide on the uncommitted `do.md` batch** — review the Smart Presets + Announcement strip (Current State above), then either commit or ask for changes. The user's own `seed_superadmin.sql`/`app.ts` edits in the same working tree should be committed together or separately per their preference, but not silently dropped.
+2. **Ship it** — every other remaining item is manual (accounts, secrets, dashboards): work through `manual.md` steps 1–12 top to bottom, then the production smoke test (step 16). `launch.md` is the background reference.
+3. All previously listed code next-steps are done: the settlement E2E smoke test passed 2026-07-02, and `housie_name` pre-fill stays on `username` by design (see Known issues).

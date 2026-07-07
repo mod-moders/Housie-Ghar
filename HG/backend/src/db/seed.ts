@@ -18,6 +18,7 @@ async function seed(): Promise<void> {
 
   const seedFiles = [
     'seed_roles.sql',
+    'seed_platform_config.sql',
     'seed_superadmin.sql',
     'seed_sample_game.sql',
     'seed_sample_staff.sql', // after sample_game: assigns the seeded operator to it

@@ -10,7 +10,7 @@ import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
 import { Logo } from "@/components/ui";
 import {
-  OverviewSection, GamesSection, FillingSection, WorkforceSection, AuditSection,
+  OverviewSection, GamesSection, FillingSection, WorkforceSection, AuditSection, AnnouncementSection,
 } from "@/components/staff/AdminSections";
 import { FinanceHubSection, MasterLedgerSection, PrizePayoutsSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection } from "@/components/staff/OperatorSections";
@@ -32,6 +32,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["staff", "Workforce", "users"],
       ["audit", "Audit Log", "shield"],
     );
+    if (user.role_id === 1) items.push(["announce", "Announcement", "bell"]);
     return items;
   }
   if (user.role_name === "Operator") {
@@ -129,6 +130,7 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
       case "filling": return <FillingSection />;
       case "staff": return <WorkforceSection me={user} />;
       case "audit": return <AuditSection />;
+      case "announce": return <AnnouncementSection />;
       case "hud": return <OperatorHudSection />;
       case "overflow": return <OverflowSection />;
       case "queue": return <BookieQueueSection me={user} />;

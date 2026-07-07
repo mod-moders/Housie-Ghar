@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint, KpiCard } from "@/components/ui";
-import type { AuditEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/types";
+import type { AuditEntry, ConfigEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 
 const PATTERN_DEFAULTS: { pattern_name: string; prize_amount: number }[] = [
@@ -17,6 +17,87 @@ const PATTERN_DEFAULTS: { pattern_name: string; prize_amount: number }[] = [
   { pattern_name: "Four Corners", prize_amount: 500 },
   { pattern_name: "Full House", prize_amount: 2000 },
 ];
+
+// ── Smart game presets ────────────────────────────────────────────────────────
+// One-click templates for the daily slots. Applying a preset fills the whole
+// form (still editable) and targets the NEXT future occurrence of its time slot
+// — clicking "Snack & Stack (3:00 PM)" at 4 PM schedules tomorrow 3 PM.
+// Prize spreads stay comfortably under the backend's 80%-of-gross cap.
+type GamePreset = {
+  name: string;
+  hour: number;
+  minute: number;
+  ticket_price: number;
+  total_tickets: number;
+  prizes: { pattern_name: string; prize_amount: number }[];
+};
+
+const GAME_PRESETS: GamePreset[] = [
+  {
+    name: "High Noon Fortune", hour: 12, minute: 0, ticket_price: 50, total_tickets: 100,
+    prizes: [
+      { pattern_name: "Early Five", prize_amount: 300 },
+      { pattern_name: "Top Line", prize_amount: 500 },
+      { pattern_name: "Middle Line", prize_amount: 500 },
+      { pattern_name: "Bottom Line", prize_amount: 500 },
+      { pattern_name: "Four Corners", prize_amount: 300 },
+      { pattern_name: "Full House", prize_amount: 1200 },
+    ],
+  },
+  {
+    name: "Snack & Stack", hour: 15, minute: 0, ticket_price: 30, total_tickets: 150,
+    prizes: [
+      { pattern_name: "Early Five", prize_amount: 250 },
+      { pattern_name: "Top Line", prize_amount: 400 },
+      { pattern_name: "Middle Line", prize_amount: 400 },
+      { pattern_name: "Bottom Line", prize_amount: 400 },
+      { pattern_name: "Four Corners", prize_amount: 250 },
+      { pattern_name: "Full House", prize_amount: 1000 },
+    ],
+  },
+  {
+    name: "Sundown Showdown", hour: 18, minute: 30, ticket_price: 80, total_tickets: 120,
+    prizes: [
+      { pattern_name: "Early Five", prize_amount: 500 },
+      { pattern_name: "Top Line", prize_amount: 900 },
+      { pattern_name: "Middle Line", prize_amount: 900 },
+      { pattern_name: "Bottom Line", prize_amount: 900 },
+      { pattern_name: "Four Corners", prize_amount: 500 },
+      { pattern_name: "Full House", prize_amount: 2500 },
+    ],
+  },
+  {
+    name: "Prime Time", hour: 21, minute: 0, ticket_price: 100, total_tickets: 200,
+    prizes: [
+      { pattern_name: "Early Five", prize_amount: 1000 },
+      { pattern_name: "Top Line", prize_amount: 2000 },
+      { pattern_name: "Middle Line", prize_amount: 2000 },
+      { pattern_name: "Bottom Line", prize_amount: 2000 },
+      { pattern_name: "Four Corners", prize_amount: 1000 },
+      { pattern_name: "Full House", prize_amount: 6000 },
+    ],
+  },
+];
+
+// Next occurrence of hh:mm with at least 15 minutes of booking lead time.
+function nextSlotFor(hour: number, minute: number, from = new Date()): Date {
+  const d = new Date(from);
+  d.setHours(hour, minute, 0, 0);
+  if (d.getTime() - from.getTime() < 15 * 60 * 1000) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+// datetime-local wants a zone-less "YYYY-MM-DDTHH:MM" in local time —
+// Date.toISOString() would shift it to UTC, so build it by hand.
+function toLocalInput(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function slotLabel(d: Date, now = new Date()): string {
+  const day = d.getDate() === now.getDate() ? "Today" : "Tomorrow";
+  return `${day} ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
+}
 
 function fillPct(g: GameSummary): number {
   return Math.round(((g.sold_count + g.locked_count) / g.total_tickets) * 100);
@@ -164,6 +245,16 @@ export function GamesSection() {
     }
   };
 
+  const applyPreset = (p: GamePreset) => {
+    setForm({
+      title: p.name,
+      scheduled_at: toLocalInput(nextSlotFor(p.hour, p.minute)),
+      ticket_price: String(p.ticket_price),
+      total_tickets: String(p.total_tickets),
+    });
+    setPrizes(p.prizes);
+  };
+
   const gross = parseFloat(form.ticket_price || "0") * parseInt(form.total_tickets || "0", 10);
   const pool = prizes.reduce((s, p) => s + p.prize_amount, 0);
 
@@ -178,6 +269,19 @@ export function GamesSection() {
 
       {creating && (
         <div className="hg-form">
+          <div className="hg-preset-row" role="group" aria-label="Game presets">
+            {GAME_PRESETS.map((p) => {
+              const slot = nextSlotFor(p.hour, p.minute);
+              return (
+                <button key={p.name} type="button" className="hg-preset-chip" onClick={() => applyPreset(p)}>
+                  <span className="hg-preset-name">{p.name}</span>
+                  <span className="hg-preset-when">
+                    {slotLabel(slot)} · {money(p.ticket_price)} × {p.total_tickets}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <div className="hg-form-row">
             <label className="hg-form-field">
               <span>Title</span>
@@ -467,6 +571,75 @@ export function AuditSection() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Announcement (Superadmin) ────────────────────────────────────────────────
+// Edits Platform_Config.marquee_text — the strip shown at the top of the
+// public lobby. Empty text hides the strip entirely.
+export function AnnouncementSection() {
+  const [text, setText] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<ConfigEntry[]>("/api/config")
+      .then((rows) => {
+        setText(rows.find((r) => r.config_key === "marquee_text")?.config_value ?? "");
+        setLoaded(true);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load the announcement"));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/config", { method: "PUT", body: JSON.stringify({ marquee_text: text.trim() }) });
+      setText((t) => t.trim());
+      setSavedAt(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the announcement");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="hg-sec">
+      <p className="hg-sec-sub">One line shown to every player at the top of the lobby. Leave it empty to hide the strip.</p>
+      <div className="hg-panel">
+        <div className="hg-form">
+          <label className="hg-form-field">
+            <span>Announcement</span>
+            <input
+              maxLength={140}
+              placeholder="e.g. Diwali special tonight 9 PM — Full House ₹10,000!"
+              value={text}
+              disabled={!loaded}
+              onChange={(e) => { setText(e.target.value); setSavedAt(null); }}
+            />
+          </label>
+          {text.trim() ? (
+            <div className="hg-notice" aria-hidden="true">
+              <span className="hg-notice-ic"><Icon name="bell" size={15} /></span>
+              <p>{text.trim()}</p>
+            </div>
+          ) : (
+            <p className="hg-sec-sub">The lobby strip is currently hidden.</p>
+          )}
+          {error && <p className="hg-sec-err">{error}</p>}
+          <div className="hg-form-actions">
+            {savedAt !== null && <span className="hg-form-saved">Saved — live on the lobby</span>}
+            <Button variant="cta" size="sm" disabled={!loaded || saving} onClick={save}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

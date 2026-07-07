@@ -91,8 +91,8 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/api/auth/login', authLimiter);
-app.use('/api/players/login', authLimiter);
+// app.use('/api/auth/login', authLimiter);
+// app.use('/api/players/login', authLimiter);
 
 // 7. Slow-request logger — warns on any request taking >500ms
 app.use((req, res, next) => {

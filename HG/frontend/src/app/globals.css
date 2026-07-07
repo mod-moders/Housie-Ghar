@@ -24,6 +24,8 @@
   --ease-out-quart: cubic-bezier(.25,1,.5,1);
   --ease-out-expo: cubic-bezier(.16,1,.3,1);
   --ease-pop: cubic-bezier(.2,1.3,.4,1);   /* reserved for win/lucky sticker pops only */
+  /* metallic money gradient — resolves per theme via the --gold-* palette vars */
+  --money-grad: linear-gradient(178deg, var(--gold-hi) 6%, var(--gold) 48%, var(--gold-deep) 94%);
   --dur-1: 130ms;
   --dur-2: 200ms;
   --dur-3: 320ms;
@@ -52,6 +54,9 @@
   --cyan:oklch(0.78 0.12 200);
   --shadow:0 5px 0 -1px #000;
   --scrim:rgba(8,8,5,.72);
+  /* casino gold — money always renders in these */
+  --gold-hi:#ffe7a0; --gold:#f2c437; --gold-deep:#c8921d; --gold-text:#f5c93e;
+  --gold-soft:oklch(0.84 0.16 88 / .14);
 }
 .hg-root[data-theme='light']{
   --bg:#ecead9; --bg2:#e4e2d0; --surface:#fffefa; --surface-2:#f4f2e6;
@@ -66,6 +71,9 @@
   --cyan:oklch(0.62 0.12 210);
   --shadow:0 5px 0 -1px #26251c;
   --scrim:rgba(42,40,30,.5);
+  /* casino gold, ink-heavy for cream ground (keeps ~4.5:1 on --bg) */
+  --gold-hi:#9a730f; --gold:#8a6410; --gold-deep:#6e4f0a; --gold-text:#7c5a0d;
+  --gold-soft:oklch(0.80 0.17 86 / .18);
 }
 
 *{box-sizing:border-box}
@@ -359,6 +367,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 .hg-lobby-v2{display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
 .hg-section-live{display:inline-flex;align-items:center;gap:9px}
+
+/* Announcement strip — Superadmin marquee_text, first thing in the lobby column */
+.hg-notice{display:flex;align-items:center;gap:10px;padding:11px 16px;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  border:1.5px solid var(--ink);border-radius:999px;box-shadow:0 4px 0 -1px var(--ink)}
+.hg-notice-ic{display:grid;place-items:center;width:28px;height:28px;flex-shrink:0;
+  border-radius:999px;background:var(--accent);color:var(--accent-ink);
+  border:1.5px solid var(--ink)}
+.hg-notice p{margin:0;font:600 13px/1.45 var(--font-head);color:var(--text)}
 .hg-feature .hg-hero-card{background:var(--surface);border:1.5px solid var(--card-line);
   box-shadow:var(--card-shadow);border-radius:var(--radius-lg);padding:24px}
 .hg-card.is-live{border-color:var(--accent)}
@@ -1030,7 +1047,23 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   background:var(--surface);color:var(--text);font:600 13px var(--font-head);outline:none;
   transition:border-color var(--dur-2) var(--ease-out-quart),box-shadow var(--dur-2) var(--ease-out-quart)}
 .hg-form-field input:focus,.hg-form-field select:focus{border-color:var(--ink);box-shadow:0 3px 0 -1px var(--ink)}
-.hg-form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.hg-form-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:4px}
+.hg-form-saved{font-size:12px;font-weight:600;color:var(--success);margin-right:auto}
+
+/* Game presets — one-click templates above the create-game form */
+.hg-preset-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.hg-preset-chip{display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  padding:10px 14px;cursor:pointer;text-align:left;
+  background:var(--surface);color:var(--text);
+  border:1.5px solid var(--border-2);border-radius:14px;
+  transition:transform var(--dur-2) var(--ease-out-quart),
+    box-shadow var(--dur-2) var(--ease-out-quart),
+    border-color var(--dur-2) var(--ease-out-quart)}
+.hg-preset-chip:hover{border-color:var(--ink);box-shadow:0 4px 0 -1px var(--ink);transform:translateY(-1px)}
+.hg-preset-chip:active{transform:translateY(2px);box-shadow:0 1px 0 -1px var(--ink);
+  transition-duration:60ms}
+.hg-preset-name{font:700 13px var(--font-head)}
+.hg-preset-when{font:500 11px var(--font-mono);color:var(--text-dim)}
 
 /* ledger list */
 .hg-ledger-list{display:flex;flex-direction:column}
@@ -1377,4 +1410,160 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 @media(min-width:1340px){
   .hg-lobby-body,.hg-room-body,.hg-live-body{padding-left:56px;padding-right:56px}
   .hg-room-main .hg-numgrid{grid-template-columns:repeat(auto-fill,minmax(58px,1fr))}
+}
+
+/* ====================================================================
+   CASINO-NIGHT LAYER (2026-07-07)
+   Restyle pass drawn from gambling-site UI references: money renders in
+   metallic gold, live things glow, and dark pages carry ambient depth
+   instead of a flat void. Pure CSS over existing markup — light theme
+   keeps its pastel sticker identity (no neon there), dark gets the glow.
+   ==================================================================== */
+
+/* ---- 1 · Ambient depth (dark) — brand glows + micro star-field ----
+   Painted on the scrolling frame (phone) and the stage (desktop, where the
+   frame goes transparent). px-sized ellipses anchor to the top/bottom of the
+   page instead of stretching with content height. */
+.hg-root[data-theme='dark'] .hg-frame:not(.hg-frame-wide){
+  background:
+    radial-gradient(900px 460px at 85% -120px, oklch(0.67 0.25 354 / .055), transparent 70%),
+    radial-gradient(760px 400px at 4% -60px, oklch(0.78 0.13 205 / .05), transparent 70%),
+    radial-gradient(1100px 520px at 50% calc(100% + 260px), oklch(0.84 0.16 88 / .05), transparent 72%),
+    radial-gradient(rgba(244,243,236,.05) 1px, transparent 1.4px),
+    radial-gradient(rgba(244,243,236,.028) 1px, transparent 1.4px),
+    var(--bg);
+  background-size:auto,auto,auto,26px 26px,54px 54px;
+  background-position:0 0,0 0,0 0,0 0,13px 27px;
+}
+/* pages that painted their own opaque ground would hide the ambience */
+.hg-root[data-theme='dark'] .hg-live,
+.hg-root[data-theme='dark'] .hg-staff-login{background:transparent}
+
+/* ---- 2 · Money is gold ---- */
+/* large amounts: metallic gradient text */
+.hg-pp-amt,.hg-total strong,.hg-wallet-bal,.hg-wins-amt,.hg-owed-total,
+.hg-ls-amt,.hg-hero-line b,.hg-pod-town,.hg-q-amt,.hg-card-price strong{
+  background:var(--money-grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+/* soft bloom around the big ones so amounts read like lit signage (dark only) */
+.hg-root[data-theme='dark'] .hg-pp-amt,
+.hg-root[data-theme='dark'] .hg-wallet-bal,
+.hg-root[data-theme='dark'] .hg-wins-amt{filter:drop-shadow(0 0 12px oklch(0.84 0.16 88 / .30))}
+/* small amounts: solid gold (gradient clip goes muddy below ~14px) */
+.hg-prize-amt{color:var(--gold-text);font-size:12px;font-weight:700}
+.hg-lb-info span{color:var(--gold-text)}
+
+/* the prize strip inside game cards becomes a gold-rimmed money plate */
+.hg-pp-hero{
+  background:linear-gradient(150deg, color-mix(in srgb,var(--gold) 13%,var(--surface-2)), var(--surface-2) 62%);
+  border:1px solid color-mix(in srgb,var(--gold) 30%,transparent)}
+
+/* featured next-draw card = the "bonus hero" of the lobby */
+.hg-feature .hg-hero-card,.hg-hero-card{
+  background:linear-gradient(180deg, color-mix(in srgb,var(--gold) 7%,var(--surface)), var(--surface) 46%);
+  border-color:color-mix(in srgb,var(--gold) 26%,var(--card-line))}
+.hg-root[data-theme='dark'] .hg-feature .hg-hero-card,
+.hg-root[data-theme='dark'] .hg-hero-card{
+  box-shadow:var(--card-shadow), 0 0 34px oklch(0.84 0.16 88 / .12)}
+
+/* ---- 3 · Live things glow (dark only — light stays pure sticker) ---- */
+.hg-root[data-theme='dark'] .hg-btn-cta:not(:disabled),
+.hg-root[data-theme='dark'] .hg-wallet-btn{
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 26px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-btn-cta:not(:disabled):hover,
+.hg-root[data-theme='dark'] .hg-wallet-btn:hover{
+  box-shadow:0 5px 0 -1px var(--ink), 0 0 36px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-btn-cta:not(:disabled):active,
+.hg-root[data-theme='dark'] .hg-wallet-btn:active{
+  box-shadow:0 1px 0 -1px var(--ink), 0 0 16px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-btn-primary:not(:disabled),
+.hg-root[data-theme='dark'] .hg-empty-cta{
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 24px var(--accent-soft)}
+.hg-root[data-theme='dark'] .hg-btn-primary:not(:disabled):active,
+.hg-root[data-theme='dark'] .hg-empty-cta:active{
+  box-shadow:0 1px 0 -1px var(--ink), 0 0 14px var(--accent-soft)}
+
+/* dark banner CTA: white pill → gold sticker with bloom (mirrors light's pink) */
+.hg-root[data-theme='dark'] .hg-banner-btn--primary{
+  background:var(--cta);color:var(--cta-ink);border:2.5px solid var(--ink);font-weight:800;
+  box-shadow:0 5px 0 -1px var(--ink), 0 0 30px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-banner-btn--primary:hover{
+  filter:brightness(1.04);transform:translateY(-2px);
+  box-shadow:0 7px 0 -1px var(--ink), 0 0 42px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-banner-btn--primary:active{
+  transform:translateY(1px);box-shadow:0 1px 0 -1px var(--ink), 0 0 18px var(--cta-glow)}
+
+/* live game card + LIVE badge get a neon rim */
+.hg-root[data-theme='dark'] .hg-card.is-live{
+  box-shadow:var(--card-shadow), 0 0 28px var(--accent-soft)}
+.hg-root[data-theme='dark'] .hg-live-badge{box-shadow:0 0 16px oklch(0.66 0.21 22 / .45)}
+.hg-root[data-theme='dark'] .hg-num.is-sel,
+.hg-root[data-theme='dark'] .hg-recent-chip.is-now{
+  box-shadow:0 2.5px 0 -1px var(--ink), 0 0 18px var(--accent-soft)}
+.hg-root[data-theme='dark'] .hg-num-available:hover{
+  border-color:var(--accent);
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 16px var(--accent-soft)}
+.hg-root[data-theme='dark'] .hg-win-card{
+  box-shadow:0 0 0 3px var(--ink), 0 10px 0 -2px var(--ink), 0 0 64px var(--cta-glow)}
+
+/* countdown digits: faint inner top-light so the cells read like lit tiles */
+.hg-root[data-theme='dark'] .hg-cd-pill{
+  box-shadow:var(--card-shadow), inset 0 1.5px 0 rgba(255,255,255,.07)}
+
+/* ---- 4 · Winners podium — gold / silver / bronze metals ---- */
+.hg-pod-1{
+  background:linear-gradient(180deg, color-mix(in srgb,var(--gold) 14%,var(--surface)), var(--surface) 72%);
+  border-color:color-mix(in srgb,var(--gold) 55%,var(--card-line));
+  padding-top:20px}
+.hg-pod-1 .hg-pod-avatar{
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 70%,transparent)}
+.hg-root[data-theme='dark'] .hg-pod-1{
+  box-shadow:var(--card-shadow), 0 0 32px oklch(0.84 0.16 88 / .16)}
+.hg-root[data-theme='dark'] .hg-pod-1 .hg-pod-avatar{
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 70%,transparent), 0 0 22px var(--cta-glow)}
+.hg-pod-2{border-color:color-mix(in srgb,#aeb4c2 55%,var(--card-line))}
+.hg-pod-2 .hg-pod-avatar{box-shadow:0 0 0 3px color-mix(in srgb,#aeb4c2 60%,transparent)}
+.hg-pod-3{border-color:color-mix(in srgb,#c98a52 55%,var(--card-line))}
+.hg-pod-3 .hg-pod-avatar{box-shadow:0 0 0 3px color-mix(in srgb,#c98a52 60%,transparent)}
+.hg-pod-wins{margin-top:2px}
+
+/* claimed prize rows on the live board carry the gold */
+.hg-prize-row.is-won{
+  background:linear-gradient(90deg, color-mix(in srgb,var(--gold) 13%,var(--surface)), var(--surface) 70%);
+  border-color:color-mix(in srgb,var(--gold) 36%,var(--card-line))}
+
+/* ---- 5 · Chrome polish ---- */
+/* active nav link sits in a soft accent pill (kept underline) */
+.hg-nav-link.is-active{background:var(--accent-soft)}
+/* login card: subtle blush wash toward the brand */
+.hg-login-card{
+  background:linear-gradient(180deg, color-mix(in srgb,var(--accent) 6%,var(--surface)), var(--surface) 55%)}
+/* announcement strip: slow golden shine sweep */
+.hg-notice{position:relative;overflow:hidden}
+/* dark: 10% accent into a dark surface goes muddy-maroon — lift it and let the
+   bell icon's pink ring the strip instead */
+.hg-root[data-theme='dark'] .hg-notice{
+  background:color-mix(in srgb,var(--accent) 15%,var(--surface));
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--ink));
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 22px var(--accent-soft)}
+.hg-notice::after{content:"";position:absolute;inset:0;pointer-events:none;
+  transform:translateX(-130%);
+  background:linear-gradient(105deg, transparent 32%, color-mix(in srgb,var(--gold) 20%,transparent) 50%, transparent 68%);
+  animation:hg-shine 5.4s var(--ease-out-quart) infinite}
+@keyframes hg-shine{0%{transform:translateX(-130%)}60%,100%{transform:translateX(130%)}}
+@media(prefers-reduced-motion:reduce){.hg-notice::after{animation:none}}
+
+/* desktop stage carries the same ambience once the frame goes transparent */
+@media(min-width:900px){
+  .hg-root[data-theme='dark'] .hg-stage:not(.hg-stage-wide){
+    background:
+      radial-gradient(1050px 540px at 85% -140px, oklch(0.67 0.25 354 / .055), transparent 70%),
+      radial-gradient(900px 470px at 3% -80px, oklch(0.78 0.13 205 / .05), transparent 70%),
+      radial-gradient(1300px 600px at 50% calc(100% + 300px), oklch(0.84 0.16 88 / .05), transparent 72%),
+      radial-gradient(rgba(244,243,236,.05) 1px, transparent 1.4px),
+      radial-gradient(rgba(244,243,236,.028) 1px, transparent 1.4px),
+      var(--bg);
+    background-size:auto,auto,auto,26px 26px,54px 54px;
+    background-position:0 0,0 0,0 0,0 0,13px 27px;
+  }
 }
