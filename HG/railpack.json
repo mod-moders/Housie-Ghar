@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "22"
+  },
+  "steps": {
+    "install": {
+      "commands": ["cd backend && npm ci"]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": ["cd backend && npm run build"]
+    }
+  },
+  "deploy": {
+    "startCommand": "cd backend && npm start"
+  }
+}
