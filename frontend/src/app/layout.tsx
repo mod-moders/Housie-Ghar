@@ -1,0 +1,46 @@
+import type { Metadata } from "next";
+import { Space_Grotesk, DM_Sans, JetBrains_Mono, DM_Serif_Display, VT323 } from "next/font/google";
+import "./globals.css";
+
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin", "latin-ext"], variable: "--font-space-grotesk", display: "swap" });
+const dmSans = DM_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-dm-sans", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin", "latin-ext"], variable: "--font-jetbrains", display: "swap" });
+const dmSerif = DM_Serif_Display({ subsets: ["latin", "latin-ext"], weight: "400", style: ["normal", "italic"], variable: "--font-dm-serif-display", display: "swap" });
+const vt323 = VT323({ weight: "400", subsets: ["latin"], variable: "--font-pixel", display: "swap" });
+
+import { ConfigProvider } from "@/components/ConfigProvider";
+
+export const metadata: Metadata = {
+  title: "Housie Ghar — Book on WhatsApp, Play Live",
+  description: "Housie (Tambola) the easy way — book tickets through your local agent and play live.",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className={`${spaceGrotesk.variable} ${dmSans.variable} ${mono.variable} ${dmSerif.variable} ${vt323.variable}`}>
+      {/* suppressHydrationWarning lets the inline script update data-theme before React hydrates */}
+      <body className="hg-root" data-theme="dark" suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('hg-theme');if(t)document.body.dataset.theme=t;}catch(e){}` }} />
+        <ConfigProvider>
+          <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: 1 }}>
+              {children}
+            </div>
+            <div style={{
+              width: "100%",
+              padding: "24px 16px",
+              textAlign: "center",
+              fontSize: "15px",
+              fontFamily: "var(--font-body)",
+              letterSpacing: "0.05em",
+              marginTop: "auto"
+            }}>
+              <span style={{ color: "#06B6D4", fontWeight: 500 }}>Powered by</span>{" "}
+              <span style={{ color: "var(--text)", fontWeight: 800, textShadow: "0px 1px 2px rgba(0,0,0,0.5)" }}>MOD</span>
+            </div>
+          </div>
+        </ConfigProvider>
+      </body>
+    </html>
+  );
+}
