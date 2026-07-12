@@ -391,6 +391,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelId, setConfirmDelId] = useState<string | null>(null);
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", town: "", role_id: "4", password: "" });
 
   const load = useCallback(() => {
@@ -438,6 +439,17 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    }
+  };
+
+  const removeStaff = async (u: StaffUser) => {
+    setError(null);
+    setConfirmDelId(null);
+    try {
+      await apiFetch(`/api/users/${u.user_id}`, { method: "DELETE" });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
     }
   };
 
@@ -529,6 +541,20 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                   <button className="hg-ic-btn" title={u.is_cfo ? "Revoke Financial Officer" : "Make Financial Officer"} onClick={() => makeFo(u)}>
                     <Icon name="wallet" size={14} />
                   </button>
+                )}
+                {me.role_name === "Superadmin" && u.user_id !== me.user_id && (
+                  confirmDelId === u.user_id ? (
+                    <span className="hg-settle-wrap">
+                      <button className="hg-settle-btn is-confirm" onClick={() => removeStaff(u)}>Delete</button>
+                      <button className="hg-settle-cancel" aria-label="Cancel delete" onClick={() => setConfirmDelId(null)}>
+                        <Icon name="x" size={14} strokeWidth={2.6} />
+                      </button>
+                    </span>
+                  ) : (
+                    <button className="hg-ic-btn" title="Delete account permanently" onClick={() => setConfirmDelId(u.user_id)}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  )
                 )}
               </span>
             </div>

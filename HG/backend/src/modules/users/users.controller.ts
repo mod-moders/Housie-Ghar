@@ -10,6 +10,7 @@ import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { deriveTrust } from '../../utils/trust';
 import { logger } from '../../utils/logger';
+import { deleteStaffUser } from './users.service';
 
 const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 
@@ -217,6 +218,51 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
     res.json({ user: result.rows[0], message: 'User updated successfully' });
   } catch (error) {
     logger.error({ err: error }, 'error updating user');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Permanently delete a staff account (Superadmin only). Accounts that any
+ * record still points at (games, bookings, wallet, top-ups, settlements,
+ * created staff) refuse with 409 — those should be suspended instead.
+ */
+export async function deleteUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const actor = req.user!;
+
+  try {
+    const result = await deleteStaffUser(pool, { targetId: String(id), actorId: actor.userId });
+
+    if (!result.ok) {
+      if (result.reason === 'self') {
+        res.status(400).json({ message: 'You cannot delete your own account' });
+      } else if (result.reason === 'not_found') {
+        res.status(404).json({ message: 'User not found' });
+      } else {
+        res.status(409).json({
+          message:
+            'This account has activity on record (games, bookings or wallet history) and cannot be deleted. Suspend it instead.',
+        });
+      }
+      return;
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'DELETE_USER',
+      targetType: 'User',
+      targetId: String(id),
+      targetDescription: `Deleted ${result.deleted.full_name} (${result.deleted.email})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: `${result.deleted.full_name} deleted` });
+  } catch (error) {
+    logger.error({ err: error }, 'error deleting user');
     res.status(500).json({ message: 'Internal server error' });
   }
 }

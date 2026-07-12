@@ -21,6 +21,7 @@ const ICON_PATHS: Record<string, string> = {
   menu: "M4 7h16M4 12h16M4 17h16",
   ticket: "M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4zM12 6v12",
   wallet: "M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l2-3h11l1 3M17 12.5h.01",
+  trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5",
   users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 3.5a4 4 0 0 1 0 7.7M22 21a6.5 6.5 0 0 0-4-6",
   chart: "M4 4v16h16M8 16v-5M12 16V8M16 16v-8",
   play: "M7 4l13 8-13 8z",
