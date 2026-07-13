@@ -9,7 +9,6 @@ import { AccountButton } from "./AccountButton";
 import { StaffMenu } from "./StaffMenu";
 import { apiFetch } from "@/lib/api";
 import { usePlayerStore } from "@/lib/stores/playerStore";
-import { STAFF_DOORS, DROPDOWN_DOORS } from "@/lib/staffRoles";
 
 // false during SSR/first paint, true after hydration — keeps the
 // localStorage-backed player chip from causing a hydration mismatch.
@@ -96,11 +95,6 @@ export function TopNav() {
           {ITEMS.map(([href, lbl, icon]) => (
             <button key={lbl} className="hg-sheet-link" onClick={() => go(href)}>
               <Icon name={icon} size={18} /> {lbl}
-            </button>
-          ))}
-          {DROPDOWN_DOORS.map((role) => (
-            <button key={role} className="hg-sheet-link" onClick={() => go(STAFF_DOORS[role].login)}>
-              <Icon name={STAFF_DOORS[role].icon} size={18} /> {STAFF_DOORS[role].label}
             </button>
           ))}
           {player && (
