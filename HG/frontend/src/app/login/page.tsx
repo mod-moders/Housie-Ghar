@@ -20,6 +20,10 @@ export default function LoginPage() {
 
   const [mode, setMode] = useState<"player" | "staff">("player");
   const [username, setUsername] = useState("");
+  // Returning players sign in with just their username; the full-name and
+  // date-of-birth fields only appear once the backend says the username is
+  // unknown (i.e. this is a genuinely new player registering).
+  const [isNew, setIsNew] = useState(false);
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
@@ -34,6 +38,7 @@ export default function LoginPage() {
 
   const submitPlayer = async () => {
     if (!username.trim() || busy) return;
+    if (isNew && (!fullName.trim() || !dob)) return;
     setBusy(true);
     setError(null);
     try {
@@ -48,7 +53,14 @@ export default function LoginPage() {
       setPlayer(res.player);
       router.push("/");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Login failed");
+      const msg = e instanceof Error ? e.message : "Login failed";
+      // The backend asks for name/DOB only when the username doesn't exist
+      // yet — flip to registration mode instead of surfacing a raw error.
+      if (!isNew && (msg === "Full name is required" || msg === "A valid date of birth is required")) {
+        setIsNew(true);
+      } else {
+        setError(msg);
+      }
       setBusy(false);
     }
   };
@@ -94,33 +106,48 @@ export default function LoginPage() {
                       onChange={(e) => setUsername(e.target.value)}
                     />
                   </label>
-                  <label className="hg-login-field">
-                    <span>Full name</span>
-                    <input
-                      type="text"
-                      value={fullName}
-                      placeholder="Your full name"
-                      autoComplete="name"
-                      maxLength={100}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </label>
-                  <label className="hg-login-field">
-                    <span>Date of birth</span>
-                    <input
-                      type="date"
-                      value={dob}
-                      autoComplete="bday"
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={(e) => setDob(e.target.value)}
-                    />
-                  </label>
+                  {isNew && (
+                    <>
+                      <div className="hg-login-hint" style={{ textAlign: "left" }}>
+                        Fresh username! Introduce yourself once — after this, your username alone signs you in.
+                      </div>
+                      <label className="hg-login-field">
+                        <span>Full name</span>
+                        <input
+                          type="text"
+                          value={fullName}
+                          placeholder="Your full name"
+                          autoComplete="name"
+                          maxLength={100}
+                          autoFocus
+                          onChange={(e) => setFullName(e.target.value)}
+                        />
+                      </label>
+                      <label className="hg-login-field">
+                        <span>Date of birth</span>
+                        <input
+                          type="date"
+                          value={dob}
+                          autoComplete="bday"
+                          max={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setDob(e.target.value)}
+                        />
+                      </label>
+                    </>
+                  )}
                   {error && <div className="hg-login-err">{error}</div>}
-                  <Button variant="cta" size="lg" full type="submit" disabled={busy || !username.trim()}>
-                    {busy ? "One moment…" : "Continue"}
+                  <Button
+                    variant="cta" size="lg" full type="submit"
+                    disabled={busy || !username.trim() || (isNew && (!fullName.trim() || !dob))}
+                  >
+                    {busy ? "One moment…" : isNew ? "Create account" : "Continue"}
                   </Button>
                   <div className="hg-login-hint">
-                    Played before? Just enter your <code>username</code> — it&apos;s your password too.
+                    {isNew ? (
+                      <>Played before? Double-check your <code>username</code> spelling — returning players get in with the username alone.</>
+                    ) : (
+                      <>Your <code>username</code> is your password too — returning players get in with just that. New here? Pick a username and continue.</>
+                    )}
                   </div>
                 </form>
               </>
