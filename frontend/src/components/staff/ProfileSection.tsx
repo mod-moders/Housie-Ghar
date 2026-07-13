@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Button } from "@/components/ui";
+import { Button, Avatar } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
 
 const inputStyle: React.CSSProperties = {
@@ -23,6 +24,13 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [upiId, setUpiId] = useState(me.upi_id ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
+
+  // Password change form
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
   const roleLabel = me.role_name === "Agent" ? "Bookie" : me.role_name;
   const showUpi = me.role_name === "Agent";
@@ -52,6 +60,39 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     setSaving(false);
   };
 
+  const pwValid =
+    curPw.length > 0 && newPw.length >= 6 && confirmPw.length > 0;
+
+  const handleChangePassword = async () => {
+    setPwMessage(null);
+    if (newPw.length < 6) {
+      setPwMessage({ text: "New password must be at least 6 characters.", error: true });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwMessage({ text: "New password and confirmation do not match.", error: true });
+      return;
+    }
+    if (newPw === curPw) {
+      setPwMessage({ text: "New password must be different from your current one.", error: true });
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await apiFetch<{ message: string }>("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ current_password: curPw, new_password: newPw }),
+      });
+      setCurPw("");
+      setNewPw("");
+      setConfirmPw("");
+      setPwMessage({ text: "Password updated successfully." });
+    } catch (e: any) {
+      setPwMessage({ text: e.message || "Failed to update password.", error: true });
+    }
+    setPwSaving(false);
+  };
+
   return (
     <div className="hg-dash-section" style={{ paddingTop: 8 }}>
       {message && (
@@ -67,7 +108,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
 
       <div className="hg-card" style={{ padding: "16px 20px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="hg-avatar-sm" style={{ width: 36, height: 36, fontSize: 15 }}>{me.full_name[0]}</span>
+          <Avatar src={roleAvatar(me)} name={me.full_name} className="hg-avatar-sm" style={{ width: 36, height: 36, fontSize: 15 }} />
           <div>
             <h3 style={{ margin: 0, fontSize: 16 }}>{me.full_name}</h3>
             <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{roleLabel}</span>
@@ -104,6 +145,43 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
 
         <Button onClick={handleSave} disabled={saving || !dirty}>
           {saving ? "Saving…" : "Save Changes"}
+        </Button>
+      </div>
+
+      <div className="hg-card" style={{ padding: "16px 20px", maxWidth: 460, marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon name="wallet" size={16} style={{ color: "var(--text-dim)" }} />
+          <h3 style={{ margin: 0, fontSize: 15 }}>Change Password</h3>
+        </div>
+
+        {pwMessage && (
+          <div style={{
+            padding: "6px 14px", borderRadius: 8,
+            background: pwMessage.error ? "var(--danger-soft)" : "var(--success-soft)",
+            display: "inline-flex", alignItems: "center", gap: 6,
+          }}>
+            <Icon name={pwMessage.error ? "x" : "check"} size={14} style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)" }} />
+            <span style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)", fontWeight: 600, fontSize: 13 }}>{pwMessage.text}</span>
+          </div>
+        )}
+
+        <div>
+          <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
+          <input type="password" value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+        </div>
+
+        <div>
+          <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+          <input type="password" value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+          <input type="password" value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+        </div>
+
+        <Button onClick={handleChangePassword} disabled={pwSaving || !pwValid}>
+          {pwSaving ? "Updating…" : "Update Password"}
         </Button>
       </div>
     </div>

@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
-import { Button, EmptyHint, KpiCard } from "@/components/ui";
+import { Button, EmptyHint, KpiCard, Avatar } from "@/components/ui";
+import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuditEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { CallVoiceSettings } from "./CallVoiceSettings";
@@ -989,6 +990,18 @@ export function FillingSection() {
               </div>
               <div className="hg-fill-bar"><i style={{ width: pct + "%" }} className={pct >= 80 ? "is-hot" : ""} /></div>
               <div className="hg-fill-pct">{pct}% full</div>
+              {(g.game_status === "Live" || g.game_status === "Paused") && (
+                <a
+                  href={`/game/${g.game_id}/live`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hg-ic-btn"
+                  title="Watch Live"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
+                >
+                  <Icon name="eye" size={14} /> Watch Live
+                </a>
+              )}
             </div>
           );
         })}
@@ -1105,7 +1118,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
           {users.map((u) => (
             <div key={u.user_id} className="hg-tr hg-tr-6">
               <span className="hg-td-name">
-                <span className="hg-avatar-sm">{u.full_name[0]}</span>{u.full_name}
+                <Avatar src={roleAvatar(u)} name={u.full_name} />{u.full_name}
                 {u.is_cfo && <span className="hg-pill hg-pill-trusted">FA</span>}
               </span>
               <span className="hg-dim">{roleLabel(u)}</span>

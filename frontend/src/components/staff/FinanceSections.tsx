@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
-import { EmptyHint } from "@/components/ui";
+import { EmptyHint, Avatar } from "@/components/ui";
+import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
 import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
 
@@ -197,7 +198,7 @@ export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
             {active ? (
               <>
                 <div className="hg-detail-head">
-                  <span className="hg-avatar-lg">{active.agent.full_name[0]}</span>
+                  <Avatar src={BOOKIE_AVATAR} name={active.agent.full_name} className="hg-avatar-lg" />
                   <div>
                     <b>{active.agent.full_name}</b>
                     <span>{active.agent.town ?? "—"} · Trust: {active.agent.trust}</span>
@@ -240,7 +241,7 @@ export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
                 const low = b.current_balance < lowThreshold;
                 return (
                   <div key={b.agent_id} className="hg-tr">
-                    <span className="hg-td-name"><span className="hg-avatar-sm">{b.full_name[0]}</span>{b.full_name}</span>
+                    <span className="hg-td-name"><Avatar src={BOOKIE_AVATAR} name={b.full_name} />{b.full_name}</span>
                     <span className={low ? "hg-bad-amt" : ""}>
                       {money(b.current_balance)}
                       {low && <i className="hg-low-tag">LOW</i>}

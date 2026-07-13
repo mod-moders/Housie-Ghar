@@ -72,7 +72,7 @@ function getPresetClass(title: string): string | undefined {
   return undefined;
 }
 
-function GameCard({ game, go, goLive }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void }) {
+function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void; compact?: boolean }) {
   const isLive = game.game_status === "Live" || game.game_status === "Paused";
   const status = cardStatus(game);
   const sold = status === "sold";
@@ -82,7 +82,7 @@ function GameCard({ game, go, goLive }: { game: GameSummary; go: (id: string) =>
   const presetClass = getPresetClass(game.title);
 
   return (
-    <article className={`hg-card${sold && !isLive ? " is-sold" : ""}${isLive ? " is-live" : ""}${presetClass ? " " + presetClass : ""}`}>
+    <article className={`hg-card${sold && !isLive ? " is-sold" : ""}${isLive ? " is-live" : ""}${presetClass ? " " + presetClass : ""}${compact ? " hg-card--compact" : ""}`}>
       {sold && !isLive && <div className="hg-sold-stamp"><span>SOLD OUT</span></div>}
       <div className="hg-card-head">
         <div>
@@ -99,7 +99,7 @@ function GameCard({ game, go, goLive }: { game: GameSummary; go: (id: string) =>
         )}
       </div>
 
-      {game.prize_pool && game.prize_pool.length > 0 && (
+      {!compact && game.prize_pool && game.prize_pool.length > 0 && (
         <div className="hg-card-prizepool">
           <div className="hg-pp-list">
             {game.prize_pool.map((p) => (
@@ -408,7 +408,7 @@ export default function Lobby() {
                 <span className="hg-feed-count">{inProgress.length} playing</span>
               </div>
               <div className="hg-feed-list">
-                {inProgress.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
+                {inProgress.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} compact />)}
               </div>
             </section>
           )}

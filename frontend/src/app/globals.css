@@ -1313,6 +1313,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .hg-card-title{font-size:19px;font-weight:700;line-height:1.1;min-height:2.2em}
 .hg-card-when{display:flex;align-items:center;gap:5px;margin-top:4px;font-size:12px;color:var(--text-dim);white-space:nowrap}
+
+/* Compact live-game card: no prize breakdown, tighter padding/type */
+.hg-card.hg-card--compact{padding:14px 16px;gap:8px}
+.hg-card.hg-card--compact .hg-card-title{font-size:15px;min-height:0}
+.hg-card.hg-card--compact .hg-card-when{font-size:11px;margin-top:2px}
+.hg-card.hg-card--compact .hg-card-foot{margin-top:2px}
 .hg-card-prizepool {
   background: var(--surface-2);
   border: 1px solid var(--border-light);

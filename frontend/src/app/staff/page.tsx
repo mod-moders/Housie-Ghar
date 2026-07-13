@@ -7,14 +7,15 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
-import { Logo } from "@/components/ui";
+import { Logo, Avatar } from "@/components/ui";
+import { roleAvatar } from "@/lib/roleAvatar";
 import {
   OverviewSection, GamesSection, HistorySection, FillingSection, WorkforceSection, AuditSection,
 } from "@/components/staff/AdminSections";
 import { SettingsSection } from "@/components/staff/SettingsSection";
 import { PlayersSection } from "@/components/staff/PlayersSection";
 import { FinanceHubSection } from "@/components/staff/FinanceSections";
-import { OperatorHudSection, OverflowSection } from "@/components/staff/OperatorSections";
+import { OperatorHudSection, OverflowSection, ShareGamesSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
 import { PromoterSection } from "@/components/staff/PromoterSections";
 import { ProfileSection } from "@/components/staff/ProfileSection";
@@ -41,7 +42,13 @@ function navFor(user: AuthUser): NavItem[] {
     return items;
   }
   if (user.role_name === "Operator") {
-    return [["hud", "Live HUD", "play"], ["overflow", "Overflow Queue", "bell"], ["filling", "Filling Status", "ticket"], ["profile", "My Profile", "user"]];
+    return [
+      ["hud", "Live HUD", "play"],
+      ["overflow", "Overflow Queue", "bell"],
+      ["filling", "Filling Status", "ticket"],
+      ["broadcast", "Share to WhatsApp", "chat"],
+      ["profile", "My Profile", "user"],
+    ];
   }
   if (user.role_name === "Promoter") {
     return [["promoter", "Promoter HUD", "chart"], ["filling", "Filling Status", "ticket"], ["profile", "My Profile", "user"]];
@@ -134,6 +141,7 @@ export default function StaffDashboard() {
       case "settings": return <SettingsSection />;
       case "hud": return <OperatorHudSection />;
       case "overflow": return <OverflowSection />;
+      case "broadcast": return <ShareGamesSection />;
       case "queue": return <BookieQueueSection me={user} />;
       case "wallet": return <BookieWalletSection me={user} />;
       case "promoter": return <PromoterSection me={user} />;
@@ -186,7 +194,7 @@ export default function StaffDashboard() {
               )}
               <div className="hg-status-right">
                 <span className="hg-status-role">{user.full_name} · {roleLabel}</span>
-                <span className="hg-avatar-sm">{user.full_name[0]}</span>
+                <Avatar src={roleAvatar(user)} name={user.full_name} />
               </div>
             </header>
 

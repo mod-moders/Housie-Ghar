@@ -69,6 +69,37 @@ interface ButtonProps {
   style?: React.CSSProperties;
 }
 
+// ── Avatar (role profile picture with initial-letter fallback) ───────────────
+export function Avatar({
+  src,
+  name,
+  className = "hg-avatar-sm",
+  style,
+}: {
+  src?: string | null;
+  name?: string | null;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = React.useState(false);
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt={name ?? "Profile picture"}
+        className={className}
+        style={{ objectFit: "cover", ...style }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <span className={className} style={style}>
+      {(name ?? "?").charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 export function Button({
   children, variant = "cta", size = "md", icon, iconRight, full, onClick, disabled, type = "button", style,
 }: ButtonProps) {

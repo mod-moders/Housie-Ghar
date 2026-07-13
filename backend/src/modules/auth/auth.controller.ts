@@ -210,3 +210,72 @@ export async function updateOwnProfile(req: AuthenticatedRequest, res: Response)
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * Self-service password change — any authenticated staff member (Superadmin,
+ * Admin, Operator, Agent, Promoter) setting a new password for their own account.
+ * Requires the current password for verification and clears the
+ * temp_password_required flag once a fresh password is set.
+ */
+export async function changeOwnPassword(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { current_password, new_password } = req.body;
+  const actor = req.user!;
+
+  if (typeof current_password !== 'string' || typeof new_password !== 'string') {
+    res.status(400).json({ message: 'Current and new password are required' });
+    return;
+  }
+  if (new_password.length < 6) {
+    res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    return;
+  }
+  if (new_password === current_password) {
+    res.status(400).json({ message: 'New password must be different from your current password' });
+    return;
+  }
+
+  try {
+    // 1. Load the current hash
+    const result = await pool.query(
+      `SELECT password_hash FROM Users WHERE user_id = $1`,
+      [actor.userId]
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // 2. Verify the current password
+    const passwordMatch = await bcrypt.compare(current_password, result.rows[0].password_hash);
+    if (!passwordMatch) {
+      res.status(401).json({ message: 'Your current password is incorrect' });
+      return;
+    }
+
+    // 3. Hash and store the new password (work factor 12, matching the seed)
+    const newHash = await bcrypt.hash(new_password, 12);
+    await pool.query(
+      `UPDATE Users
+       SET password_hash = $1, temp_password_required = FALSE
+       WHERE user_id = $2`,
+      [newHash, actor.userId]
+    );
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'CHANGE_OWN_PASSWORD',
+      targetType: 'User',
+      targetId: actor.userId,
+      targetDescription: 'Changed own account password',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Error changing own password:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
