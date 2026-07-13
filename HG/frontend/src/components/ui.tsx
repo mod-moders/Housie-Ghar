@@ -9,7 +9,11 @@ import { Icon } from "./Icon";
 export function Logo({ size = 48, onClick }: { size?: number; onClick?: () => void }) {
   return (
     <button className="hg-logo" onClick={onClick} aria-label="Housie Ghar home">
-      <Image src="/hg-logo.png" alt="Housie Ghar" height={size} width={0} style={{ width: "auto", height: size }} priority />
+      {/* Square source (1000×1000). The only fix vs the original is width={0}
+          → width={size}: with a real width Next builds a retina-ready srcset
+          (w=96/256 at size=72) instead of collapsing to a ~32px thumbnail,
+          which was the blur. Layout is unchanged — height drives, width auto. */}
+      <Image src="/hg-logo.png" alt="Housie Ghar" width={size} height={size} style={{ width: "auto", height: size }} priority />
     </button>
   );
 }
