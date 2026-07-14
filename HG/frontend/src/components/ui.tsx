@@ -103,6 +103,29 @@ export function Button({
   );
 }
 
+// ── Password input (eye toggle) ────────────────────────────────────────────
+export function PasswordInput({ style, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input {...props} type={show ? "text" : "password"} style={{ width: "100%", boxSizing: "border-box", ...style, paddingRight: 40 }} />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setShow((s) => !s)}
+        aria-label={show ? "Hide password" : "Show password"}
+        style={{
+          position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+          background: "none", border: "none", cursor: "pointer", padding: 4,
+          display: "grid", placeItems: "center", color: "var(--text-dim)",
+        }}
+      >
+        <Icon name={show ? "eyeOff" : "eye"} size={16} />
+      </button>
+    </div>
+  );
+}
+
 // ── Badge ────────────────────────────────────────────────────────────────────
 export function Badge({ tone = "neutral", icon, children }: { tone?: string; icon?: string; children: React.ReactNode }) {
   return (

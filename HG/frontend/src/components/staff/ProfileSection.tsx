@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Avatar, Button } from "@/components/ui";
+import { Avatar, Button, PasswordInput } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
@@ -169,17 +169,17 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
 
         <div>
           <label style={labelStyle}>Current password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+          <PasswordInput value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
         </div>
 
         <div>
           <label style={labelStyle}>New password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 8 characters" />
+          <PasswordInput value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 8 characters" />
         </div>
 
         <div>
           <label style={labelStyle}>Confirm new password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+          <PasswordInput value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
         </div>
 
         <Button onClick={handleChangePassword} disabled={pwSaving || !pwValid}>

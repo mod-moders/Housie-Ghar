@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 import { usePlayerStore, Player } from "@/lib/stores/playerStore";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
-import { Button, Logo } from "@/components/ui";
+import { Button, Logo, PasswordInput } from "@/components/ui";
 import { STAFF_DOORS, DROPDOWN_DOORS, type DoorRole } from "@/lib/staffRoles";
 
 // false during SSR/first paint, true after hydration — lets us read the
@@ -222,7 +222,6 @@ export default function LoginPage() {
               </>
             ) : staffDoor === null ? (
               <div key="door-list" className="hg-door-step">
-                <div className="hg-login-secure"><Icon name="shield" size={13} /> Secure staff portal</div>
                 <h1 className="hg-login-title">Staff sign in</h1>
 
                 <div className="hg-door-list">
@@ -257,8 +256,7 @@ export default function LoginPage() {
                   </label>
                   <label className="hg-login-field">
                     <span>Password</span>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={password}
                       placeholder="••••••••"
                       autoComplete="current-password"
@@ -301,8 +299,7 @@ export default function LoginPage() {
                   </label>
                   <label className="hg-login-field">
                     <span>Password</span>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={password}
                       placeholder="••••••••"
                       autoComplete="current-password"

@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/Icon";
-import { Button, Logo } from "@/components/ui";
+import { Button, Logo, PasswordInput } from "@/components/ui";
 
 export function ChangePasswordCard({ onDone }: { onDone: () => void }) {
   const [current, setCurrent] = useState("");
@@ -55,8 +55,7 @@ export function ChangePasswordCard({ onDone }: { onDone: () => void }) {
         >
           <label className="hg-login-field">
             <span>Current password</span>
-            <input
-              type="password"
+            <PasswordInput
               value={current}
               placeholder="••••••••"
               autoComplete="current-password"
@@ -65,8 +64,7 @@ export function ChangePasswordCard({ onDone }: { onDone: () => void }) {
           </label>
           <label className="hg-login-field">
             <span>New password</span>
-            <input
-              type="password"
+            <PasswordInput
               value={newPw}
               placeholder="At least 8 characters"
               autoComplete="new-password"
@@ -75,8 +73,7 @@ export function ChangePasswordCard({ onDone }: { onDone: () => void }) {
           </label>
           <label className="hg-login-field">
             <span>Confirm new password</span>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPw}
               placeholder="••••••••"
               autoComplete="new-password"

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
-import { Button, Logo } from "@/components/ui";
+import { Button, Logo, PasswordInput } from "@/components/ui";
 
 export default function StaffLogin() {
   const router = useRouter();
@@ -59,8 +59,7 @@ export default function StaffLogin() {
               </label>
               <label className="hg-login-field">
                 <span>Password</span>
-                <input
-                  type="password"
+                <PasswordInput
                   value={password}
                   placeholder="••••••••"
                   autoComplete="current-password"
