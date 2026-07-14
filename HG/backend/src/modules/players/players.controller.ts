@@ -14,6 +14,7 @@ import { env } from '../../config/env';
 import { listPlayerWins } from '../../services/settlements.service';
 import { buildWaLink } from '../../utils/waLink';
 import { buildCollectMessage } from '../settlements/payoutMessages';
+import { logAuditEvent } from '../../services/audit.service';
 import { logger } from '../../utils/logger';
 
 export const PLAYER_COOKIE_NAME = 'hg_player_token';
@@ -63,7 +64,7 @@ export async function playerLogin(req: Request, res: Response): Promise<void> {
 
   try {
     const existing = await pool.query(
-      `SELECT player_id, username, password, full_name, date_of_birth
+      `SELECT player_id, username, password, full_name, date_of_birth, status
        FROM Player_Logins WHERE username = $1`,
       [uname]
     );
@@ -73,6 +74,10 @@ export async function playerLogin(req: Request, res: Response): Promise<void> {
       // The username doubles as the password for returning players.
       if (player.password !== uname) {
         res.status(401).json({ message: 'Invalid username' });
+        return;
+      }
+      if (player.status === 'Suspended') {
+        res.status(403).json({ message: 'Your account has been suspended. Contact support.' });
         return;
       }
       await pool.query('UPDATE Player_Logins SET last_login = NOW() WHERE player_id = $1', [player.player_id]);
@@ -136,12 +141,16 @@ export async function getCurrentPlayer(req: Request, res: Response): Promise<voi
   try {
     const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
     const result = await pool.query(
-      `SELECT player_id, username, full_name, date_of_birth
+      `SELECT player_id, username, full_name, date_of_birth, status
        FROM Player_Logins WHERE player_id = $1`,
       [decoded.playerId]
     );
     if (result.rowCount === 0) {
       res.status(404).json({ message: 'Player not found' });
+      return;
+    }
+    if (result.rows[0].status === 'Suspended') {
+      res.status(403).json({ message: 'Your account has been suspended. Contact support.' });
       return;
     }
     res.json({ player: toPlayerPayload(result.rows[0]) });
@@ -246,6 +255,132 @@ export async function getMyWins(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     logger.error({ err: error }, 'error fetching player wins');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/players — staff (Superadmin/Admin): every player account with
+ * engagement stats. Spend comes from Sold bookings stamped with player_id
+ * (anonymous bookings are invisible here by design); winnings come from the
+ * Prize_Settlements ledger.
+ */
+export async function getAllPlayers(_req: Request, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT
+         p.player_id, p.username, p.full_name, p.date_of_birth, p.created_at, p.last_login, p.status,
+         COUNT(DISTINCT b.game_id)::INTEGER AS games_played,
+         COALESCE(SUM(array_length(b.ticket_ids, 1)), 0)::INTEGER AS tickets_bought,
+         COALESCE(SUM(b.total_amount), 0)::FLOAT AS total_expenditure,
+         (SELECT COUNT(*)::INTEGER FROM Prize_Settlements ps WHERE ps.player_id = p.player_id) AS total_wins,
+         (SELECT COALESCE(SUM(ps.amount), 0)::FLOAT FROM Prize_Settlements ps WHERE ps.player_id = p.player_id) AS total_won
+       FROM Player_Logins p
+       LEFT JOIN Bookings b ON b.player_id = p.player_id AND b.booking_status = 'Sold'
+       GROUP BY p.player_id
+       ORDER BY p.created_at DESC`
+    );
+    res.json({ players: result.rows });
+  } catch (error) {
+    logger.error({ err: error }, 'error fetching all players');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * PATCH /api/players/:player_id/status — staff (Superadmin/Admin): suspend or
+ * reactivate a player. A suspended player can't log in and their live session
+ * dies at the next /me check.
+ */
+export async function updatePlayerStatus(req: any, res: Response): Promise<void> {
+  const player_id = req.params.player_id as string;
+  const { status } = req.body ?? {};
+  const actor = req.user!;
+
+  if (status !== 'Active' && status !== 'Suspended') {
+    res.status(400).json({ message: "status must be 'Active' or 'Suspended'" });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE Player_Logins SET status = $1 WHERE player_id = $2
+       RETURNING player_id, username, status`,
+      [status, player_id]
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Player not found' });
+      return;
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: status === 'Suspended' ? 'SUSPEND_PLAYER' : 'REACTIVATE_PLAYER',
+      targetType: 'Player',
+      targetId: player_id,
+      targetDescription: `${status === 'Suspended' ? 'Suspended' : 'Reactivated'} player "${result.rows[0].username}"`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: `Player ${status === 'Suspended' ? 'suspended' : 'reactivated'}`, player: result.rows[0] });
+  } catch (error) {
+    logger.error({ err: error }, 'error updating player status');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * DELETE /api/players/:player_id — Superadmin only. Bookings and settlements
+ * are history that must survive the account, so their player_id stamps are
+ * NULLed (back to anonymous) before the login row is removed.
+ */
+export async function deletePlayer(req: any, res: Response): Promise<void> {
+  const player_id = req.params.player_id as string;
+  const actor = req.user!;
+
+  try {
+    const existing = await pool.query(
+      `SELECT username FROM Player_Logins WHERE player_id = $1`,
+      [player_id]
+    );
+    if (existing.rowCount === 0) {
+      res.status(404).json({ message: 'Player not found' });
+      return;
+    }
+    const username = existing.rows[0].username;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`UPDATE Bookings SET player_id = NULL WHERE player_id = $1`, [player_id]);
+      await client.query(`UPDATE Prize_Settlements SET player_id = NULL WHERE player_id = $1`, [player_id]);
+      await client.query(`DELETE FROM Player_Logins WHERE player_id = $1`, [player_id]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'DELETE_PLAYER',
+      targetType: 'Player',
+      targetId: player_id,
+      targetDescription: `Deleted player account "${username}"`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Player account deleted', deleted_player_id: player_id });
+  } catch (error) {
+    logger.error({ err: error }, 'error deleting player');
     res.status(500).json({ message: 'Internal server error' });
   }
 }
