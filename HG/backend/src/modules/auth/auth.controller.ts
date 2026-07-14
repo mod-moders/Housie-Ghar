@@ -165,6 +165,62 @@ export function logout(req: Request, res: Response): void {
   res.json({ message: 'Successfully logged out' });
 }
 
+/**
+ * PATCH /api/auth/me — self-service profile update (any staff role).
+ * Unlike users.controller's updateUser (Admin+, targets another user), this
+ * always acts on the caller's own row and can never touch status or role.
+ */
+export async function updateOwnProfile(req: any, res: Response): Promise<void> {
+  const { full_name, phone, upi_id } = req.body ?? {};
+
+  if (typeof full_name !== 'string' || !full_name.trim()) {
+    res.status(400).json({ message: 'Full name is required' });
+    return;
+  }
+  if (typeof phone !== 'string' || !phone.trim()) {
+    res.status(400).json({ message: 'WhatsApp number is required' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE Users
+       SET full_name = $1,
+           phone     = $2,
+           upi_id    = COALESCE($3, upi_id)
+       WHERE user_id = $4
+       RETURNING user_id, full_name, email, phone, upi_id, town, status, role_id`,
+      [full_name.trim(), phone.trim(), upi_id?.trim() || null, req.user.userId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    await logAuditEvent({
+      userId: req.user.userId,
+      userName: full_name.trim(),
+      userRole: req.user.roleName,
+      action: 'UPDATE_OWN_PROFILE',
+      targetType: 'User',
+      targetId: req.user.userId,
+      targetDescription: 'Updated own profile',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ user: result.rows[0], message: 'Profile updated' });
+  } catch (error: any) {
+    if (error.code === '23505') {
+      res.status(409).json({ message: 'That WhatsApp number is already in use by another account' });
+      return;
+    }
+    logger.error({ err: error }, 'error updating own profile');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 export async function getCurrentProfile(req: any, res: Response): Promise<void> {
   try {
     const result = await pool.query(
