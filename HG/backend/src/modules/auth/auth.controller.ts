@@ -171,7 +171,7 @@ export function logout(req: Request, res: Response): void {
  * always acts on the caller's own row and can never touch status or role.
  */
 export async function updateOwnProfile(req: any, res: Response): Promise<void> {
-  const { full_name, phone, upi_id } = req.body ?? {};
+  const { full_name, phone, upi_id, email } = req.body ?? {};
 
   if (typeof full_name !== 'string' || !full_name.trim()) {
     res.status(400).json({ message: 'Full name is required' });
@@ -181,16 +181,21 @@ export async function updateOwnProfile(req: any, res: Response): Promise<void> {
     res.status(400).json({ message: 'WhatsApp number is required' });
     return;
   }
+  if (email !== undefined && (typeof email !== 'string' || !email.trim())) {
+    res.status(400).json({ message: 'Email is required' });
+    return;
+  }
 
   try {
     const result = await pool.query(
       `UPDATE Users
        SET full_name = $1,
            phone     = $2,
-           upi_id    = COALESCE($3, upi_id)
-       WHERE user_id = $4
+           upi_id    = COALESCE($3, upi_id),
+           email     = COALESCE($4, email)
+       WHERE user_id = $5
        RETURNING user_id, full_name, email, phone, upi_id, town, status, role_id`,
-      [full_name.trim(), phone.trim(), upi_id?.trim() || null, req.user.userId]
+      [full_name.trim(), phone.trim(), upi_id?.trim() || null, email?.trim().toLowerCase() || null, req.user.userId]
     );
 
     if (result.rowCount === 0) {
@@ -213,7 +218,7 @@ export async function updateOwnProfile(req: any, res: Response): Promise<void> {
     res.json({ user: result.rows[0], message: 'Profile updated' });
   } catch (error: any) {
     if (error.code === '23505') {
-      res.status(409).json({ message: 'That WhatsApp number is already in use by another account' });
+      res.status(409).json({ message: 'That WhatsApp number or email is already in use by another account' });
       return;
     }
     logger.error({ err: error }, 'error updating own profile');

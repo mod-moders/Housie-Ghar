@@ -970,7 +970,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelId, setConfirmDelId] = useState<string | null>(null);
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "", town: "", role_id: "4", password: "" });
+  const [form, setForm] = useState({ full_name: "", town: "", role_id: "4", password: "" });
 
   const load = useCallback(() => {
     apiFetch<StaffUser[]>("/api/users").then(setUsers).catch(() => {});
@@ -985,15 +985,13 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
         method: "POST",
         body: JSON.stringify({
           full_name: form.full_name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
           town: form.town.trim() || undefined,
           role_id: parseInt(form.role_id, 10),
           password: form.password,
         }),
       });
       setAdding(false);
-      setForm({ full_name: "", email: "", phone: "", town: "", role_id: "4", password: "" });
+      setForm({ full_name: "", town: "", role_id: "4", password: "" });
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create user");
@@ -1050,14 +1048,6 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
               <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
             </label>
             <label className="hg-form-field">
-              <span>Email</span>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </label>
-            <label className="hg-form-field">
-              <span>Phone (WhatsApp)</span>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            </label>
-            <label className="hg-form-field">
               <span>Town</span>
               <input value={form.town} onChange={(e) => setForm({ ...form, town: e.target.value })} />
             </label>
@@ -1078,7 +1068,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>
             <Button
               variant="cta" size="sm"
-              disabled={!form.full_name.trim() || !form.email.trim() || form.password.length < 8}
+              disabled={!form.full_name.trim() || form.password.length < 8}
               onClick={addStaff}
             >
               Create account

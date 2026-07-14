@@ -216,16 +216,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-prog-pct{font-weight:700;color:var(--text);font-family:var(--font-head)}
 
 /* ============ LOBBY v2 — BANNER (game-night hero) ============ */
-/* Fills the screen below the sticky nav (--nav-h). Layers back-to-front:
+/* Compact hero band (~44dvh, clamped 340–460px). Layers back-to-front:
    ground → bloom → ticket grid → fade → coins → hook. */
 .hg-banner{
-  --nav-h:70px;
   /* banner-local palette — dark defaults; [data-theme='light'] overrides at the end */
   --bn-ground:var(--bg);
-  --bn-bloom-y:oklch(0.88 0.17 96 / .18);
-  --bn-bloom-o:oklch(0.78 0.13 205 / .16);
-  --bn-bloom-p:oklch(0.70 0.24 350 / .20);
-  --bn-bloom-v:oklch(0.58 0.25 290 / .15);
+  --bn-bloom-y:oklch(0.88 0.17 96 / .27);
+  --bn-bloom-o:oklch(0.78 0.13 205 / .24);
+  --bn-bloom-p:oklch(0.70 0.24 350 / .32);
+  --bn-bloom-v:oklch(0.58 0.25 290 / .22);
   --bn-grid-line:rgba(255,255,255,.12);
   --bn-grid-opacity:.38;
   --bn-num-yellow:oklch(0.88 0.17 96);
@@ -237,9 +236,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   --bn-logo-shadow:drop-shadow(0 0 30px rgba(14,13,18,.85));
 
   position:relative;overflow:hidden;
-  min-height:calc(100dvh - var(--nav-h));
+  /* compact hero band — content-led, never the full viewport */
+  min-height:clamp(340px, 44dvh, 460px);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  text-align:center;padding:40px 22px;
+  text-align:center;padding:32px 22px 38px;
   border-bottom:1.5px solid var(--card-line);
   background:var(--bn-ground);
 }
@@ -299,7 +299,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 /* hook — logo, rotating quote, CTAs */
 .hg-banner-hook{position:relative;z-index:3;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:14px}
-.hg-banner-logo img{display:block;width:185px;height:185px;object-fit:contain;filter:var(--bn-logo-shadow)}
+.hg-banner-logo img{display:block;width:148px;height:148px;object-fit:contain;filter:var(--bn-logo-shadow)}
 .hg-banner-quote{margin:0;max-width:22ch;min-height:2.3em;
   font-family:var(--font-serif);font-style:italic;font-weight:400;
   font-size:var(--fs-banner-quote);line-height:1.15;color:var(--bn-quote-ink);text-wrap:balance;
@@ -328,10 +328,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* responsive */
 @media (max-width:899px){
-  .hg-banner-logo img{width:160px;height:160px}
+  .hg-banner-logo img{width:128px;height:128px}
 }
 @media (max-width:559px){
-  .hg-banner-logo img{width:130px;height:130px}
+  .hg-banner-logo img{width:108px;height:108px}
   .hg-banner-coin--1{top:9%;left:6%;width:36px;height:36px;font-size:13px}
   .hg-banner-coin--2{top:62%;left:8%;width:22px;height:22px;font-size:9px}
   .hg-banner-coin--3{top:12%;right:6%;width:30px;height:30px;font-size:11px}
@@ -365,7 +365,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-root[data-theme='light'] .hg-banner-btn--primary:hover{box-shadow:0 6px 0 -1px var(--ink);transform:translateY(-2px)}
 .hg-root[data-theme='light'] .hg-banner-btn--primary:active{box-shadow:0 1px 0 -1px var(--ink);transform:translateY(1px)}
 
-.hg-lobby-v2{display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
+.hg-lobby-v2{display:flex;flex-direction:column;gap:18px;padding:22px 16px 40px;scroll-margin-top:70px}
 .hg-section-live{display:inline-flex;align-items:center;gap:9px}
 
 /* Announcement strip — Superadmin marquee_text, first thing in the lobby column */
@@ -810,14 +810,25 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
    the single-role sign-in form are two .hg-door-step views swapped in place
    (no route navigation); each entrance animates in from the direction it
    conceptually came from. */
-.hg-door-step{display:flex;flex-direction:column;gap:12px;animation:hg-door-fwd var(--dur-3) ease-in-out both}
+.hg-door-step{display:flex;flex-direction:column;gap:18px;animation:hg-door-fwd var(--dur-3) ease-in-out both}
 .hg-door-step-back{animation-name:hg-door-back}
 @keyframes hg-door-fwd{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
 @keyframes hg-door-back{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
 
+.hg-door-list{display:flex;flex-direction:column;gap:8px}
+.hg-door-btn{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:14px;cursor:pointer;
+  background:var(--surface);border:1.5px solid var(--border-2);color:var(--text);text-align:left;font-family:inherit;
+  transition:transform var(--dur-1) var(--ease-out-quart),border-color var(--dur-2) var(--ease-out-quart),box-shadow var(--dur-1) var(--ease-out-quart)}
+.hg-door-btn:hover{border-color:var(--ink);box-shadow:0 4px 0 -1px var(--ink);transform:translateY(-1px)}
+.hg-door-btn:active{transform:translateY(2px);box-shadow:0 1px 0 -1px var(--ink);transition-duration:60ms}
+.hg-door-ic{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;flex-shrink:0;
+  background:var(--accent-soft);color:var(--accent)}
+.hg-door-label{flex:1;font:700 13.5px var(--font-head)}
+.hg-door-chev{color:var(--text-mute);flex-shrink:0}
+
 /* ============ STAFF DASHBOARD ============ */
 .hg-dash{display:flex;min-height:100%;background:var(--bg)}
-.hg-side{display:flex;flex-direction:column;width:212px;flex-shrink:0;padding:16px 12px 16px max(12px,env(safe-area-inset-left));gap:18px;
+.hg-side{display:flex;flex-direction:column;width:212px;flex-shrink:0;padding:20px 16px 20px max(16px,env(safe-area-inset-left));gap:18px;
   background:var(--bg);border-right:1.5px solid var(--card-line);position:sticky;top:0;height:100dvh}
 .hg-side.is-collapsed{width:64px}
 .hg-side.is-collapsed .hg-side-link span,.hg-side.is-collapsed .hg-side-mod,.hg-side.is-collapsed .hg-logo-word{display:none}
@@ -832,7 +843,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-side-foot{display:flex;flex-direction:column;gap:8px}
 .hg-side-mod{font-size:10px;color:var(--text-mute);padding:0 11px;letter-spacing:.05em}
 .hg-dash-main{flex:1;min-width:0;display:flex;flex-direction:column}
-.hg-statusbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:max(12px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));
+.hg-statusbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:max(16px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) 16px max(24px,env(safe-area-inset-left));
   background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);border-bottom:1.5px solid var(--card-line)}
 .hg-statusbar.is-finance{background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
@@ -850,7 +861,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   font-weight:700;font-size:12px;background:var(--accent);color:var(--accent-ink);flex-shrink:0}
 .hg-avatar-lg{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);
   font-weight:700;font-size:18px;background:var(--accent);color:var(--accent-ink)}
-.hg-dash-content{padding:20px 18px 40px;flex:1}
+.hg-dash-content{padding:28px 24px 48px;flex:1}
 .hg-sec{display:flex;flex-direction:column;gap:16px;max-width:none}
 .hg-sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .hg-sec-sub{font-size:13px;color:var(--text-dim);margin:0}
@@ -858,7 +869,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* kpi */
 .hg-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.hg-kpi{padding:16px;border-radius:var(--radius)}
+.hg-kpi{padding:20px;border-radius:var(--radius)}
 .hg-kpi-label{font-size:11.5px;color:var(--text-dim)}
 .hg-kpi-value{display:block;font-family:var(--font-mono);font-size:24px;font-weight:700;margin:5px 0 3px}
 .hg-kpi-sub{font-size:11px;color:var(--text-mute)}
@@ -867,10 +878,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* panel + table */
 .hg-panel{border-radius:var(--radius);overflow:hidden}
-.hg-panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.hg-panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border)}
 .hg-panel-head h3{font-size:15px;font-weight:700}
 .hg-table{display:flex;flex-direction:column}
-.hg-tr{display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 1fr;gap:12px;align-items:center;padding:12px 16px;
+.hg-tr{display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 1fr;gap:12px;align-items:center;padding:16px 20px;
   font-size:13px;border-bottom:1px solid var(--border)}
 .hg-tr:last-child{border-bottom:0}
 .hg-tr-head{font:700 10.5px var(--font-head);letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute);
@@ -932,14 +943,14 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* audit list */
 .hg-audit{display:flex;flex-direction:column}
-.hg-audit-row{display:flex;align-items:flex-start;gap:11px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.hg-audit-row{display:flex;align-items:flex-start;gap:11px;padding:16px 20px;border-bottom:1px solid var(--border)}
 .hg-audit-row:last-child{border-bottom:0}
 .hg-audit-body{font-size:13px;line-height:1.4}
 .hg-audit-body span{font-size:11px}
 
 /* fill grid */
 .hg-fill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.hg-fill-card{padding:14px;border-radius:var(--radius)}
+.hg-fill-card{padding:18px;border-radius:var(--radius)}
 .hg-fill-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .hg-fill-top strong{font-family:var(--font-head);font-size:14px}
 .hg-fill-meta{font-size:11.5px;color:var(--text-dim);margin:4px 0 10px}
@@ -955,12 +966,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-split-head{display:flex;align-items:center;gap:8px;font:700 12px var(--font-head);text-transform:uppercase;
   letter-spacing:.05em;color:var(--text-dim)}
 .hg-q-count{background:var(--danger);color:#fff;font-size:11px;padding:1px 7px;border-radius:999px}
-.hg-q-card{text-align:left;padding:13px;border-radius:var(--radius-sm);cursor:pointer}
+.hg-q-card{text-align:left;padding:16px;border-radius:var(--radius-sm);cursor:pointer}
 .hg-q-top{display:flex;justify-content:space-between;align-items:center}
 .hg-q-top b{font-family:var(--font-head);font-size:14px}
 .hg-q-amt{font-family:var(--font-mono);font-weight:700;color:var(--cta)}
 .hg-q-meta{font-size:11px;color:var(--text-dim);margin-top:4px}
-.hg-split-r{padding:16px;border-radius:var(--radius);min-width:0}
+.hg-split-r{padding:20px;border-radius:var(--radius);min-width:0}
 .hg-detail-head{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--border)}
 .hg-detail-head b{font-family:var(--font-head);font-size:16px}
 .hg-detail-head span{font-size:12px;color:var(--text-dim)}
@@ -968,7 +979,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-detail-grid>div{display:flex;flex-direction:column;gap:2px}
 .hg-detail-grid span{font-size:11px;color:var(--text-dim)}
 .hg-detail-grid b{font-family:var(--font-mono);font-size:15px}
-.hg-detail-note{font-size:12px;color:var(--text-dim);padding:12px;border-radius:var(--radius-sm);background:var(--surface-2);line-height:1.5}
+.hg-detail-note{font-size:12px;color:var(--text-dim);padding:14px 16px;border-radius:var(--radius-sm);background:var(--surface-2);line-height:1.5}
 .hg-detail-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .hg-fin-approve,.hg-fin-reject{flex:1;min-width:160px;display:flex;align-items:center;justify-content:center;gap:8px;
   padding:13px;font:700 14px var(--font-head);cursor:pointer}
@@ -980,7 +991,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 /* operator hud */
 .hg-hud-grid{display:grid;grid-template-columns:1fr;gap:14px}
 @media(min-width:760px){.hg-hud-grid{grid-template-columns:1.4fr 1fr}}
-.hg-hud-main{padding:22px;border-radius:var(--radius);text-align:center}
+.hg-hud-main{padding:26px;border-radius:var(--radius);text-align:center}
 .hg-hud-game{font-size:13px;color:var(--text-dim);display:flex;align-items:center;justify-content:center;gap:8px}
 .hg-hud-num{font-family:var(--font-mono);font-size:var(--fs-hud-num);font-weight:700;line-height:1;margin:12px 0 4px;color:var(--accent)}
 .hg-hud-sub{font-size:12px;color:var(--text-dim)}
@@ -990,19 +1001,19 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-hud-btn.is-on{background:var(--accent);color:var(--accent-ink)}
 .hg-hud-stop{color:var(--danger)}
 .hg-hud-btn:disabled{opacity:.5;cursor:not-allowed}
-.hg-speed{text-align:left;padding:16px;border-radius:var(--radius-sm);background:var(--surface-2);margin-top:8px}
+.hg-speed{text-align:left;padding:18px;border-radius:var(--radius-sm);background:var(--surface-2);margin-top:8px}
 .hg-speed-lbl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}
 .hg-speed-lbl b{font-family:var(--font-mono);color:var(--accent)}
 .hg-speed-range{width:100%;accent-color:var(--accent)}
 .hg-speed-ends{display:flex;justify-content:space-between;font-size:10px;color:var(--text-mute);margin-top:4px}
 .hg-hud-side{display:flex;flex-direction:column;gap:12px}
-.hg-ghost-note{display:flex;gap:9px;align-items:flex-start;padding:13px;border-radius:var(--radius-sm);
+.hg-ghost-note{display:flex;gap:9px;align-items:flex-start;padding:16px;border-radius:var(--radius-sm);
   background:var(--accent-soft);font-size:12px;color:var(--text);line-height:1.5}
 .hg-ghost-note svg{color:var(--accent);flex-shrink:0;margin-top:1px}
 
 /* bookie queue */
 .hg-bq-list{display:flex;flex-direction:column;gap:12px}
-.hg-bq-card{padding:15px;border-radius:var(--radius)}
+.hg-bq-card{padding:18px;border-radius:var(--radius)}
 .hg-bq-top{display:flex;justify-content:space-between;align-items:flex-start}
 .hg-bq-top b{font-family:var(--font-head);font-size:15px}
 .hg-bq-game{display:block;font-size:11.5px;color:var(--text-dim)}
@@ -1019,21 +1030,21 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-bq-copy:disabled,.hg-bq-confirm:disabled,.hg-bq-cancel:disabled{opacity:.5;cursor:not-allowed}
 
 /* bookie wallet */
-.hg-wallet-card{padding:22px;border-radius:var(--radius);
+.hg-wallet-card{padding:26px;border-radius:var(--radius);
   display:flex;flex-direction:column;gap:8px;max-width:420px}
 .hg-wallet-lbl{font-size:12px;color:var(--text-dim)}
 .hg-wallet-bal{font-family:var(--font-mono);font-size:38px;font-weight:700;line-height:1}
 .hg-wallet-low{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--locked);margin-top:4px}
 .hg-wallet-btn{margin-top:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;
   background:var(--cta);color:var(--cta-ink);font:700 14px var(--font-head);cursor:pointer}
-.hg-fomo{display:flex;align-items:center;gap:11px;padding:14px;border-radius:var(--radius);background:var(--danger-soft);
+.hg-fomo{display:flex;align-items:center;gap:11px;padding:16px;border-radius:var(--radius);background:var(--danger-soft);
   max-width:420px}
 .hg-fomo svg{color:var(--danger);flex-shrink:0}
 .hg-fomo b{font-family:var(--font-head);font-size:13px;display:block}
 .hg-fomo span{font-size:11.5px;color:var(--text-dim)}
 
 /* bookie prize-money owed card (claim via WhatsApp, mirrors recharge) */
-.hg-owed-card{display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:var(--radius);
+.hg-owed-card{display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:var(--radius);
   max-width:420px;border:1.5px solid var(--success);background:var(--success-soft)}
 .hg-owed-head{display:flex;align-items:center;gap:8px}
 .hg-owed-head svg{color:var(--success);flex-shrink:0}
@@ -1048,7 +1059,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-owed-claim{margin:4px 0 0}
 
 /* staff forms */
-.hg-form{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--radius)}
+.hg-form{display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:var(--radius)}
 .hg-form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .hg-form-field{display:flex;flex-direction:column;gap:4px}
 .hg-form-field span{font-size:11.5px;font-weight:600;color:var(--text-dim);font-family:var(--font-head)}
@@ -1076,7 +1087,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* ledger list */
 .hg-ledger-list{display:flex;flex-direction:column}
-.hg-ledger-row{display:flex;align-items:center;gap:12px;padding:11px 16px;font-size:12.5px;border-bottom:1px solid var(--border)}
+.hg-ledger-row{display:flex;align-items:center;gap:12px;padding:14px 20px;font-size:12.5px;border-bottom:1px solid var(--border)}
 .hg-ledger-row:last-child{border-bottom:0}
 .hg-ledger-amt{font-family:var(--font-mono);font-weight:700;margin-left:auto}
 .hg-ledger-amt.is-credit{color:var(--success)}
@@ -1096,16 +1107,16 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* ============ STAFF DASHBOARD — narrow-screen handling ============ */
 @media(max-width:720px){
-  .hg-side{width:60px;padding:14px 8px}
+  .hg-side{width:60px;padding:16px 10px}
   .hg-side .hg-side-link span,.hg-side .hg-side-mod,.hg-side .hg-logo-word{display:none}
   .hg-side .hg-side-link{justify-content:center;padding:11px 0}
   .hg-side-brand{display:flex;justify-content:center;padding:4px 0 0}
   .hg-side-toggle{display:none}
-  .hg-statusbar{padding:12px 14px;gap:8px}
+  .hg-statusbar{padding:16px;gap:8px}
   .hg-status-title{font-size:14px}
   .hg-fin-hud{gap:12px}
   .hg-fin-stat b{font-size:13px}
-  .hg-dash-content{padding:16px 12px 36px}
+  .hg-dash-content{padding:20px 16px 40px}
   .hg-panel{overflow-x:auto}
   .hg-table{min-width:480px}
   .hg-split-r{min-width:0}
@@ -1299,10 +1310,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
     display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);
     gap:40px;padding:28px 40px 0;align-items:start;
   }
-  .hg-banner{--nav-h:82px;padding:56px 32px}
-  .hg-banner-logo img{width:200px;height:200px}
-  .hg-banner-quote{font-size:30px}
-  .hg-lobby-v2{max-width:1180px;width:100%;margin:0 auto;gap:34px;padding:44px 40px 0;scroll-margin-top:82px}
+  .hg-banner{padding:44px 32px}
+  .hg-banner-logo img{width:156px;height:156px}
+  .hg-banner-quote{font-size:26px}
+  .hg-lobby-v2{max-width:1180px;width:100%;margin:0 auto;gap:34px;padding:44px 40px 64px;scroll-margin-top:82px}
   .hg-lucky{padding:20px 22px;gap:12px}
   .hg-lucky-stage{width:80px;height:80px}
   .hg-lucky-ball{width:66px;height:66px;font-size:30px}
@@ -1435,9 +1446,9 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
    page instead of stretching with content height. */
 .hg-root[data-theme='dark'] .hg-frame:not(.hg-frame-wide){
   background:
-    radial-gradient(900px 460px at 85% -120px, oklch(0.67 0.25 354 / .055), transparent 70%),
-    radial-gradient(760px 400px at 4% -60px, oklch(0.78 0.13 205 / .05), transparent 70%),
-    radial-gradient(1100px 520px at 50% calc(100% + 260px), oklch(0.84 0.16 88 / .05), transparent 72%),
+    radial-gradient(900px 460px at 85% -120px, oklch(0.67 0.25 354 / .13), transparent 70%),
+    radial-gradient(760px 400px at 4% -60px, oklch(0.78 0.13 205 / .11), transparent 70%),
+    radial-gradient(1100px 520px at 50% calc(100% + 260px), oklch(0.84 0.16 88 / .09), transparent 72%),
     radial-gradient(rgba(244,243,236,.05) 1px, transparent 1.4px),
     radial-gradient(rgba(244,243,236,.028) 1px, transparent 1.4px),
     var(--bg);
@@ -1566,9 +1577,9 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 @media(min-width:900px){
   .hg-root[data-theme='dark'] .hg-stage:not(.hg-stage-wide){
     background:
-      radial-gradient(1050px 540px at 85% -140px, oklch(0.67 0.25 354 / .055), transparent 70%),
-      radial-gradient(900px 470px at 3% -80px, oklch(0.78 0.13 205 / .05), transparent 70%),
-      radial-gradient(1300px 600px at 50% calc(100% + 300px), oklch(0.84 0.16 88 / .05), transparent 72%),
+      radial-gradient(1050px 540px at 85% -140px, oklch(0.67 0.25 354 / .13), transparent 70%),
+      radial-gradient(900px 470px at 3% -80px, oklch(0.78 0.13 205 / .11), transparent 70%),
+      radial-gradient(1300px 600px at 50% calc(100% + 300px), oklch(0.84 0.16 88 / .09), transparent 72%),
       radial-gradient(rgba(244,243,236,.05) 1px, transparent 1.4px),
       radial-gradient(rgba(244,243,236,.028) 1px, transparent 1.4px),
       var(--bg);
@@ -1576,3 +1587,225 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
     background-position:0 0,0 0,0 0,0 0,13px 27px;
   }
 }
+
+/* ====================================================================
+   NEON RADIANT LAYER (2026-07-08)
+   The hall goes dark and the signage comes on. Built from neon-sign
+   references: each lit element commits to ONE brand hue and carries a
+   tube ring + layered same-hue halo + hot near-white core. Strictly
+   dark-theme; light keeps its pastel sticker identity untouched.
+   Player surfaces only — staff dashboards stay calm.
+   ==================================================================== */
+
+/* neon tokens — the existing brand trio, run as light */
+.hg-root[data-theme='dark']{
+  --neon-pink:oklch(0.74 0.26 354);
+  --neon-cyan:oklch(0.84 0.15 200);
+  --neon-gold:oklch(0.90 0.18 92);
+  --halo-pink:0 0 7px oklch(0.74 0.26 354 / .8), 0 0 22px oklch(0.74 0.26 354 / .45), 0 0 52px oklch(0.74 0.26 354 / .22);
+  --halo-cyan:0 0 7px oklch(0.84 0.15 200 / .8), 0 0 22px oklch(0.84 0.15 200 / .45), 0 0 52px oklch(0.84 0.15 200 / .22);
+  --halo-gold:0 0 7px oklch(0.90 0.18 92 / .8), 0 0 22px oklch(0.90 0.18 92 / .45), 0 0 52px oklch(0.90 0.18 92 / .22);
+}
+
+/* ---- 1 · Neon hairline under the sticky chrome (every public page) ---- */
+.hg-root[data-theme='dark'] .hg-nav::after,
+.hg-root[data-theme='dark'] .hg-live-top::after,
+.hg-root[data-theme='dark'] .hg-room-head::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1.5px;pointer-events:none;
+  background:linear-gradient(90deg, transparent 2%,
+    oklch(0.74 0.26 354 / .8) 24%, oklch(0.84 0.15 200 / .85) 50%,
+    oklch(0.90 0.18 92 / .8) 76%, transparent 98%);
+  box-shadow:0 0 14px oklch(0.74 0.26 354 / .35), 0 0 32px oklch(0.84 0.15 200 / .18)}
+
+/* ---- 2 · LIVE badge is a real neon sign: ignition flicker, then it breathes ---- */
+.hg-root[data-theme='dark'] .hg-live-badge:has(.hg-live-dot){
+  box-shadow:0 0 6px oklch(0.66 0.21 22 / .75), 0 0 18px oklch(0.66 0.21 22 / .5), 0 0 42px oklch(0.66 0.21 22 / .3);
+  animation:hg-neon-ignite 1.1s steps(1,end) 1, hg-neon-breathe 2.8s ease-in-out 1.1s infinite}
+@keyframes hg-neon-ignite{
+  0%{opacity:.3;filter:saturate(.4) brightness(.7)}
+  9%{opacity:1;filter:none}
+  16%{opacity:.4;filter:saturate(.5) brightness(.75)}
+  26%{opacity:1;filter:none}
+  38%{opacity:.55;filter:saturate(.7) brightness(.85)}
+  46%,100%{opacity:1;filter:none}}
+@keyframes hg-neon-breathe{0%,100%{filter:brightness(1)}50%{filter:brightness(1.14)}}
+/* the same class renders PAUSED (no dot inside) — amber, not alarm red */
+.hg-live-badge:not(:has(.hg-live-dot)){background:var(--locked);color:#241a00}
+
+/* "Live Now" section head glows with its dot */
+.hg-root[data-theme='dark'] .hg-section-title.hg-section-live{
+  color:var(--neon-pink);text-shadow:0 0 12px oklch(0.74 0.26 354 / .45)}
+.hg-root[data-theme='dark'] .hg-live-dot{box-shadow:0 0 8px var(--accent)}
+
+/* ---- 3 · Live game card: pink tube rim + top edge-light ---- */
+.hg-root[data-theme='dark'] .hg-card.is-live{
+  border-color:color-mix(in srgb,var(--neon-pink) 70%,var(--card-line));
+  box-shadow:var(--card-shadow), 0 0 0 1px oklch(0.74 0.26 354 / .3),
+    0 0 26px oklch(0.74 0.26 354 / .22), 0 0 64px oklch(0.74 0.26 354 / .10)}
+.hg-root[data-theme='dark'] .hg-card.is-live::before{
+  content:"";position:absolute;top:0;left:10%;right:10%;height:2px;z-index:1;pointer-events:none;
+  border-radius:2px;
+  background:linear-gradient(90deg, transparent, var(--neon-pink) 30%, var(--neon-pink) 70%, transparent);
+  box-shadow:0 2px 12px oklch(0.74 0.26 354 / .55)}
+@media(min-width:900px){
+  .hg-root[data-theme='dark'] .hg-card.is-live:not(.is-sold):hover{
+    box-shadow:0 10px 0 -1px var(--ink), 0 0 0 1px oklch(0.74 0.26 354 / .35),
+      0 0 30px oklch(0.74 0.26 354 / .3), 0 0 72px oklch(0.74 0.26 354 / .14)}
+}
+
+/* ---- 4 · Lobby jewels: lucky ball + banner coins get true halos ---- */
+.hg-root[data-theme='dark'] .hg-lucky-ball{
+  box-shadow:0 5px 0 -2px var(--ink), 0 0 10px oklch(0.74 0.26 354 / .55), 0 0 30px oklch(0.74 0.26 354 / .3)}
+.hg-root[data-theme='dark'] .hg-lucky-spark--y{box-shadow:0 2px 0 -1px var(--ink), 0 0 10px oklch(0.90 0.18 92 / .6)}
+.hg-root[data-theme='dark'] .hg-lucky-spark--o{box-shadow:0 2px 0 -1px var(--ink), 0 0 10px oklch(0.84 0.15 200 / .6)}
+.hg-root[data-theme='dark'] .hg-banner-coin--1{
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 12px oklch(0.90 0.18 92 / .55), 0 0 36px oklch(0.90 0.18 92 / .26)}
+.hg-root[data-theme='dark'] .hg-banner-coin--2{
+  box-shadow:0 3px 0 -1px var(--ink), 0 0 11px oklch(0.84 0.15 200 / .6), 0 0 30px oklch(0.84 0.15 200 / .28)}
+.hg-root[data-theme='dark'] .hg-banner-coin--3{
+  box-shadow:0 3px 0 -1px var(--ink), 0 0 12px oklch(0.74 0.26 354 / .6), 0 0 34px oklch(0.74 0.26 354 / .3)}
+.hg-root[data-theme='dark'] .hg-banner-coin--4{
+  box-shadow:0 2px 0 -1px var(--ink), 0 0 10px oklch(0.90 0.18 92 / .6)}
+.hg-root[data-theme='dark'] .hg-banner-quote{
+  text-shadow:0 0 24px oklch(0.74 0.26 354 / .30), 0 0 60px oklch(0.84 0.15 200 / .18)}
+
+/* ---- 5 · The draw is the show: cage ball, ring, recent strip, 1–90 board ---- */
+.hg-root[data-theme='dark'] .hg-cage-ring{
+  border-color:var(--neon-cyan);opacity:.4;
+  filter:drop-shadow(0 0 5px oklch(0.84 0.15 200 / .65))}
+.hg-root[data-theme='dark'] .hg-cage-num{
+  box-shadow:0 7px 0 -2px var(--ink), 0 0 12px oklch(0.74 0.26 354 / .6),
+    0 0 34px oklch(0.74 0.26 354 / .4), 0 0 90px oklch(0.74 0.26 354 / .2)}
+.hg-root[data-theme='dark'] .hg-cage-num.is-revealed{
+  text-shadow:0 2px 4px rgba(0,0,0,.32), 0 0 16px rgba(255,255,255,.6);
+  box-shadow:0 7px 0 -2px var(--ink), 0 0 14px oklch(0.74 0.26 354 / .7),
+    0 0 44px oklch(0.74 0.26 354 / .5), 0 0 110px oklch(0.74 0.26 354 / .26)}
+.hg-root[data-theme='dark'] .hg-cage-num.is-revealed::after{
+  content:"";position:absolute;inset:-6px;border-radius:50%;pointer-events:none;
+  border:2.5px solid var(--neon-pink);opacity:0;
+  animation:hg-neon-ring .7s var(--ease-out-expo) 1 forwards}
+@keyframes hg-neon-ring{0%{opacity:.9;transform:scale(.82)}100%{opacity:0;transform:scale(1.45)}}
+.hg-root[data-theme='dark'] .hg-num.is-sel,
+.hg-root[data-theme='dark'] .hg-recent-chip.is-now{
+  box-shadow:0 2.5px 0 -1px var(--ink), 0 0 10px oklch(0.74 0.26 354 / .6), 0 0 26px oklch(0.74 0.26 354 / .3)}
+/* called numbers stay lit on the 1–90 board, like tubes left on */
+.hg-root[data-theme='dark'] .hg-b90.is-called{
+  background:color-mix(in srgb,var(--neon-cyan) 9%,var(--surface));
+  border-color:color-mix(in srgb,var(--neon-cyan) 38%,transparent);
+  color:var(--neon-cyan);text-shadow:0 0 9px oklch(0.84 0.15 200 / .55)}
+.hg-root[data-theme='dark'] .hg-b90.is-current{
+  border-color:var(--neon-pink);
+  box-shadow:0 0 0 2px oklch(0.74 0.26 354 / .35), 0 0 16px oklch(0.74 0.26 354 / .55)}
+.hg-root[data-theme='dark'] .hg-cell-marked{
+  box-shadow:0 0 0 1.5px var(--accent), inset 0 0 0 1px rgba(255,255,255,.25), 0 0 12px oklch(0.74 0.26 354 / .5)}
+.hg-root[data-theme='dark'] .hg-prize-row.is-won{
+  box-shadow:var(--card-shadow), 0 0 20px oklch(0.90 0.18 92 / .14)}
+.hg-root[data-theme='dark'] .hg-wins{box-shadow:0 0 26px oklch(0.76 0.16 150 / .16)}
+.hg-root[data-theme='dark'] .hg-win-card{
+  box-shadow:0 0 0 3px var(--ink), 0 10px 0 -2px var(--ink),
+    0 0 30px var(--cta-glow), 0 0 90px oklch(0.90 0.18 92 / .25)}
+
+/* ---- 6 · Buttons carry their hue's halo (supersedes the casino glows) ---- */
+.hg-root[data-theme='dark'] .hg-btn-cta:not(:disabled),
+.hg-root[data-theme='dark'] .hg-wallet-btn{
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 9px oklch(0.90 0.18 92 / .4), 0 0 30px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-btn-cta:not(:disabled):hover,
+.hg-root[data-theme='dark'] .hg-wallet-btn:hover{
+  box-shadow:0 5px 0 -1px var(--ink), 0 0 12px oklch(0.90 0.18 92 / .55), 0 0 44px var(--cta-glow)}
+.hg-root[data-theme='dark'] .hg-btn-primary:not(:disabled),
+.hg-root[data-theme='dark'] .hg-empty-cta{
+  box-shadow:0 4px 0 -1px var(--ink), 0 0 9px oklch(0.74 0.26 354 / .45), 0 0 28px oklch(0.74 0.26 354 / .3)}
+.hg-root[data-theme='dark'] .hg-btn-primary:not(:disabled):hover{
+  box-shadow:0 5px 0 -1px var(--ink), 0 0 12px oklch(0.74 0.26 354 / .55), 0 0 40px oklch(0.74 0.26 354 / .35)}
+
+/* ---- 7 · Login door: conic neon ring around the card ---- */
+.hg-root[data-theme='dark'] .hg-login-card{
+  border:1.5px solid transparent;
+  background:
+    linear-gradient(180deg, color-mix(in srgb,var(--accent) 7%,var(--surface)), var(--surface) 55%) padding-box,
+    conic-gradient(from 210deg,
+      oklch(0.74 0.26 354 / .9), oklch(0.62 0.26 290 / .8) 28%,
+      oklch(0.84 0.15 200 / .9) 52%, oklch(0.90 0.18 92 / .85) 78%,
+      oklch(0.74 0.26 354 / .9)) border-box;
+  box-shadow:var(--card-shadow), 0 0 30px oklch(0.74 0.26 354 / .14), 0 0 80px oklch(0.84 0.15 200 / .10)}
+
+/* ---- 8 · Chrome micro-glow on hover ---- */
+.hg-root[data-theme='dark'] :is(.hg-theme-btn,.hg-staff-btn,.hg-burger,.hg-back,.hg-mute):hover{
+  border-color:color-mix(in srgb,var(--neon-cyan) 55%,var(--card-line));color:var(--neon-cyan);
+  box-shadow:var(--card-shadow-sm), 0 0 14px oklch(0.84 0.15 200 / .3)}
+.hg-root[data-theme='dark'] .hg-emoji-btn:hover{
+  border-color:color-mix(in srgb,var(--neon-pink) 45%,var(--card-line));
+  box-shadow:var(--card-shadow-sm), 0 0 16px oklch(0.74 0.26 354 / .35)}
+.hg-root[data-theme='dark'] .hg-frame::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb,var(--accent) 45%,var(--border-2))}
+
+/* ====================================================================
+   CANDY DAYLIGHT LAYER (2026-07-08) — the light-mode answer to neon.
+   Glow physics don't read on cream, so light gets the same brand trio
+   as *print*: pastel ambient washes, crisp color hairlines, tinted
+   color-spill shadows under stickers, and a candy conic ring on the
+   login card. Ink borders and hard offset shadows stay untouched.
+   ==================================================================== */
+
+/* ---- 1 · Pastel ambient washes on the page ground ---- */
+.hg-root[data-theme='light'] .hg-frame:not(.hg-frame-wide){
+  background:
+    radial-gradient(900px 460px at 85% -120px, oklch(0.67 0.25 354 / .11), transparent 70%),
+    radial-gradient(760px 400px at 4% -60px, oklch(0.62 0.12 210 / .11), transparent 70%),
+    radial-gradient(1100px 520px at 50% calc(100% + 260px), oklch(0.80 0.17 86 / .14), transparent 72%),
+    var(--bg)}
+.hg-root[data-theme='light'] .hg-live,
+.hg-root[data-theme='light'] .hg-staff-login{background:transparent}
+@media(min-width:900px){
+  .hg-root[data-theme='light'] .hg-stage:not(.hg-stage-wide){
+    background:
+      radial-gradient(1050px 540px at 85% -140px, oklch(0.67 0.25 354 / .11), transparent 70%),
+      radial-gradient(900px 470px at 3% -80px, oklch(0.62 0.12 210 / .11), transparent 70%),
+      radial-gradient(1300px 600px at 50% calc(100% + 300px), oklch(0.80 0.17 86 / .14), transparent 72%),
+      var(--bg)}
+}
+
+/* ---- 2 · Brand hairline under the sticky chrome (printed, no glow) ---- */
+.hg-root[data-theme='light'] .hg-nav::after,
+.hg-root[data-theme='light'] .hg-live-top::after,
+.hg-root[data-theme='light'] .hg-room-head::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;pointer-events:none;
+  background:linear-gradient(90deg, transparent 2%,
+    oklch(0.62 0.22 0 / .6) 24%, oklch(0.58 0.12 215 / .65) 50%,
+    oklch(0.66 0.13 80 / .65) 76%, transparent 98%)}
+
+/* ---- 3 · Live things carry a color spill (tinted soft shadow) ---- */
+.hg-root[data-theme='light'] .hg-card.is-live{
+  box-shadow:var(--card-shadow), 0 12px 28px -14px oklch(0.62 0.22 0 / .5)}
+.hg-root[data-theme='light'] .hg-card.is-live::before{
+  content:"";position:absolute;top:0;left:10%;right:10%;height:3px;z-index:1;pointer-events:none;
+  border-radius:3px;
+  background:linear-gradient(90deg, transparent, oklch(0.62 0.22 0) 30%, oklch(0.62 0.22 0) 70%, transparent)}
+/* deep magenta so the 11.5px label holds AA on cream */
+.hg-root[data-theme='light'] .hg-section-title.hg-section-live{color:oklch(0.52 0.23 354)}
+.hg-root[data-theme='light'] .hg-lucky-ball{
+  box-shadow:0 5px 0 -2px var(--ink), 0 8px 18px -8px oklch(0.62 0.22 0 / .55)}
+.hg-root[data-theme='light'] .hg-btn-cta:not(:disabled),
+.hg-root[data-theme='light'] .hg-wallet-btn{
+  box-shadow:0 4px 0 -1px var(--ink), 0 9px 20px -10px oklch(0.66 0.13 80 / .6)}
+.hg-root[data-theme='light'] .hg-banner-btn--primary{
+  box-shadow:var(--card-shadow-sm), 0 10px 22px -10px oklch(0.62 0.22 0 / .5)}
+
+/* ---- 4 · The 1–90 board stays lit in daylight too ---- */
+.hg-root[data-theme='light'] .hg-b90.is-called{
+  background:color-mix(in srgb,var(--cyan) 15%,var(--surface));
+  border-color:color-mix(in srgb,var(--cyan) 45%,transparent);
+  color:oklch(0.44 0.12 210);font-weight:700}
+.hg-root[data-theme='light'] .hg-cage-num{
+  box-shadow:0 7px 0 -2px var(--ink), 0 12px 30px -12px oklch(0.62 0.22 0 / .5)}
+
+/* ---- 5 · Login door: candy conic ring (ink shadow stays) ---- */
+.hg-root[data-theme='light'] .hg-login-card{
+  border:2px solid transparent;
+  background:
+    linear-gradient(180deg, color-mix(in srgb,var(--accent) 5%,var(--surface)), var(--surface) 55%) padding-box,
+    conic-gradient(from 210deg,
+      oklch(0.62 0.22 0 / .85), oklch(0.58 0.2 300 / .7) 28%,
+      oklch(0.58 0.12 215 / .85) 52%, oklch(0.68 0.14 84 / .85) 78%,
+      oklch(0.62 0.22 0 / .85)) border-box;
+  box-shadow:var(--card-shadow), 0 16px 34px -20px oklch(0.62 0.22 0 / .45)}

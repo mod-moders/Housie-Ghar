@@ -1,7 +1,7 @@
 "use client";
 /**
  * My Profile — self-service for every staff role. Edits full name / WhatsApp
- * number (+ UPI ID for Bookies) via PATCH /api/auth/me, and changes the
+ * number / email (+ UPI ID for Bookies) via PATCH /api/auth/me, and changes the
  * password via the existing POST /api/auth/change-password (min 8 chars,
  * matching the backend's MIN_PASSWORD_LENGTH).
  */
@@ -40,6 +40,7 @@ function Flash({ text, error }: { text: string; error?: boolean }) {
 export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u: AuthUser) => void }) {
   const [fullName, setFullName] = useState(me.full_name);
   const [phone, setPhone] = useState(me.phone ?? "");
+  const [email, setEmail] = useState(me.email ?? "");
   const [upiId, setUpiId] = useState(me.upi_id ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
@@ -55,25 +56,27 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const dirty =
     fullName.trim() !== me.full_name ||
     phone.trim() !== (me.phone ?? "") ||
+    email.trim() !== (me.email ?? "") ||
     (showUpi && upiId.trim() !== (me.upi_id ?? ""));
 
   const handleSave = async () => {
-    if (!fullName.trim() || !phone.trim()) {
-      setMessage({ text: "Full name and WhatsApp number are required.", error: true });
+    if (!fullName.trim() || !phone.trim() || !email.trim()) {
+      setMessage({ text: "Full name, WhatsApp number and email are required.", error: true });
       return;
     }
     setSaving(true);
     setMessage(null);
     try {
-      const res = await apiFetch<{ user: { full_name: string; phone: string | null; upi_id: string | null } }>("/api/auth/me", {
+      const res = await apiFetch<{ user: { full_name: string; phone: string | null; email: string; upi_id: string | null } }>("/api/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
           full_name: fullName.trim(),
           phone: phone.trim(),
+          email: email.trim(),
           upi_id: showUpi ? (upiId.trim() || null) : undefined,
         }),
       });
-      onUpdated({ ...me, full_name: res.user.full_name, phone: res.user.phone, upi_id: res.user.upi_id });
+      onUpdated({ ...me, full_name: res.user.full_name, phone: res.user.phone, email: res.user.email, upi_id: res.user.upi_id });
       setMessage({ text: "Profile updated." });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Failed to update profile.", error: true });
@@ -147,10 +150,10 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         )}
 
         <div>
-          <label style={labelStyle}>Email</label>
-          <input type="text" value={me.email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
+          <label style={labelStyle}>Email <span style={{ color: "var(--danger)" }}>*</span></label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="you@example.com" />
           <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-            Your login email — contact an administrator to change it.
+            Your login email.
           </span>
         </div>
 

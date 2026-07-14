@@ -4,6 +4,7 @@
  */
 
 import { Response } from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
@@ -59,12 +60,17 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
  * Admins may create Operators and Agents; only a Superadmin may create Admins.
  */
 export async function createUser(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { full_name, email, phone, upi_id, town, role_id, password } = req.body;
+  const { full_name, phone, upi_id, town, role_id, password } = req.body;
+  let { email } = req.body;
   const actor = req.user!;
 
-  if (!full_name || !email || !role_id || !password) {
-    res.status(400).json({ message: 'full_name, email, role_id and password are required' });
+  if (!full_name || !role_id || !password) {
+    res.status(400).json({ message: 'full_name, role_id and password are required' });
     return;
+  }
+
+  if (!email) {
+    email = `staff-${crypto.randomUUID()}@housieghar.internal`;
   }
 
   if (!VALID_ROLE_IDS.has(Number(role_id))) {
@@ -88,7 +94,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
 
     const result = await pool.query(
       `INSERT INTO Users (role_id, full_name, email, phone, upi_id, town, password_hash, temp_password_required, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'Active', $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 'Active', $8)
        RETURNING user_id, full_name, email, role_id, status`,
       [
         Number(role_id),
