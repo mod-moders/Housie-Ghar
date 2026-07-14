@@ -22,7 +22,7 @@ const WHITE = "#ffffff";
 const DIM = "#b7bccb";
 
 const SITE_URL = "www.housieghar.in";
-const LOGO_SRC = "/HG Primary.png";
+const LOGO_SRC = "/HG Secondary.png";
 
 /* ── shared helpers ──────────────────────────────────────────────────── */
 
@@ -144,6 +144,15 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 let cachedLogo: HTMLImageElement | null | undefined;
 function loadLogo(): Promise<HTMLImageElement | null> {
   if (cachedLogo !== undefined) return Promise.resolve(cachedLogo);
@@ -155,16 +164,37 @@ function loadLogo(): Promise<HTMLImageElement | null> {
   });
 }
 
-function paintBackground(ctx: CanvasRenderingContext2D) {
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, "#0c0a12");
-  g.addColorStop(0.5, "#140d1c");
-  g.addColorStop(1, "#0a0810");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElement | null) {
+  if (bgImage) {
+    const canvasRatio = W / H;
+    const imageRatio = bgImage.width / bgImage.height;
+    let sx = 0, sy = 0, sw = bgImage.width, sh = bgImage.height;
+    if (imageRatio > canvasRatio) {
+      sw = bgImage.height * canvasRatio;
+      sx = (bgImage.width - sw) / 2;
+    } else {
+      sh = bgImage.width / canvasRatio;
+      sy = (bgImage.height - sh) / 2;
+    }
+    ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, W, H);
 
-  // tri-color glow: pink upper-left, cyan upper-right — matches the site's
-  // accent (pink) + cyan highlight pairing instead of a flat mono-gold wash.
+    // apply a linear dark overlay gradient to ensure text readability
+    const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
+    overlayGrad.addColorStop(0, "rgba(0, 0, 0, 0.45)");
+    overlayGrad.addColorStop(0.5, "rgba(0, 0, 0, 0.7)");
+    overlayGrad.addColorStop(1, "rgba(0, 0, 0, 0.9)");
+    ctx.fillStyle = overlayGrad;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#0c0a12");
+    g.addColorStop(0.5, "#140d1c");
+    g.addColorStop(1, "#0a0810");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // tri-color glow: pink upper-left, cyan upper-right
   const pinkGlow = ctx.createRadialGradient(W * 0.28, 130, 20, W * 0.28, 130, 520);
   pinkGlow.addColorStop(0, "rgba(255,79,168,0.20)");
   pinkGlow.addColorStop(1, "rgba(255,79,168,0)");
@@ -177,7 +207,7 @@ function paintBackground(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = cyanGlow;
   ctx.fillRect(0, 0, W, H);
 
-  // faint scattered "lottery ball" dots for texture, echoing the homepage banner
+  // faint scattered "lottery ball" dots for texture
   ctx.save();
   ctx.globalAlpha = 0.10;
   const dots: [number, number, number][] = [
@@ -201,35 +231,17 @@ function paintBackground(ctx: CanvasRenderingContext2D) {
 
 async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
   const logo = await loadLogo();
-  const logoSize = 152;
+  const logoSize = 240;
   const logoY = 46;
   if (logo) {
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(W / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 22;
-    ctx.shadowOffsetY = 8;
-    ctx.fillStyle = WHITE;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(W / 2, logoY + logoSize / 2, logoSize / 2 - 3, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
     ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
     ctx.restore();
 
-    ctx.strokeStyle = "rgba(244,201,93,0.6)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(W / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    return logoY + logoSize + 44;
+    return logoY + logoSize + 28;
   }
 
   // fallback if the logo fails to load: plain wordmark, still on-brand
@@ -489,8 +501,8 @@ function paintPrizeCard(
 
 /* ── scheduled-game poster ───────────────────────────────────────────── */
 
-async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSummary) {
-  paintBackground(ctx);
+async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSummary, bgImage: HTMLImageElement | null) {
+  paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
   const seg = timeSegment(new Date(game.scheduled_at));
@@ -499,21 +511,21 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   ctx.fillStyle = PINK;
   ctx.font = "700 28px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText(`GET READY — ${seg.label.toUpperCase()} GAME`, W / 2, y);
-  y += 54;
+  y += 48;
 
   ctx.fillStyle = GOLD;
-  ctx.font = "700 60px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 58px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 68;
+    y += 66;
   }
   y += 6;
 
   ctx.fillStyle = CYAN;
   ctx.font = "600 30px 'JetBrains Mono', ui-monospace, monospace";
   ctx.fillText(`${fmtTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
-  y += 52;
+  y += 46;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -527,11 +539,11 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
     heading: "TODAY'S PRIZE POOL",
     headingColor: PINK,
     rows,
-    rowHeight: 78,
+    rowHeight: 74,
   });
 
-  const pillY = cardBottom + 42;
-  const pillH = 92;
+  const pillY = cardBottom + 32;
+  const pillH = 88;
   const grad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
   grad.addColorStop(0, GOLD);
   grad.addColorStop(1, GOLD_DIM);
@@ -547,15 +559,15 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   ctx.fillStyle = DIM;
   ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("The entire town is playing! Are you?", W / 2, pillY + pillH + 70);
+  ctx.fillText("The entire town is playing! Are you?", W / 2, pillY + pillH + 52);
 
   paintFooter(ctx);
 }
 
 /* ── winners poster ──────────────────────────────────────────────────── */
 
-async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummary) {
-  paintBackground(ctx);
+async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummary, bgImage: HTMLImageElement | null) {
+  paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
   drawIcon(ctx, "trophy", W / 2 - 168, y - 16, 40, GOLD);
@@ -564,7 +576,7 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   ctx.fillStyle = GOLD;
   ctx.font = "700 40px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText("WINNERS", W / 2, y);
-  y += 60;
+  y += 54;
 
   ctx.fillStyle = WHITE;
   ctx.font = "700 56px 'Space Grotesk', system-ui, sans-serif";
@@ -573,7 +585,7 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
     ctx.fillText(line, W / 2, y);
     y += 64;
   }
-  y += 30;
+  y += 24;
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
   const rows: PrizeRowSpec[] = claimed.map((p) => ({
@@ -589,18 +601,18 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
     heading: "WINNING TICKETS",
     headingColor: GOLD,
     rows,
-    rowHeight: 92,
+    rowHeight: 88,
     emptyMessage: "No prizes were claimed this round.",
   });
 
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
   ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("Congratulations to all our winners! 🎉", W / 2, cardBottom + 66);
+  ctx.fillText("Congratulations to all our winners! 🎉", W / 2, cardBottom + 54);
 
   ctx.fillStyle = DIM;
   ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("Ready for more? Book your next game today!", W / 2, cardBottom + 118);
+  ctx.fillText("Ready for more? Book your next game today!", W / 2, cardBottom + 98);
 
   paintFooter(ctx);
 }
@@ -620,8 +632,21 @@ export async function generatePosterBlob(kind: PosterKind, game: GameSummary): P
     try { await document.fonts.ready; } catch { /* proceed with fallback fonts */ }
   }
 
-  if (kind === "scheduled") await drawScheduledPoster(ctx, game);
-  else await drawWinnersPoster(ctx, game);
+  // Load preset background if match
+  const title = game.title.trim().toLowerCase();
+  let bgPath = "";
+  if (title.includes("high noon")) bgPath = "/presets/High Noon Fortune.jpg";
+  else if (title.includes("prime time")) bgPath = "/presets/Prime Time.jpg";
+  else if (title.includes("snack & stack") || title.includes("snack")) bgPath = "/presets/Snack & Stack.jpg";
+  else if (title.includes("sundown")) bgPath = "/presets/Sundown Showdown.jpg";
+
+  let bgImage: HTMLImageElement | null = null;
+  if (bgPath) {
+    bgImage = await loadImage(bgPath);
+  }
+
+  if (kind === "scheduled") await drawScheduledPoster(ctx, game, bgImage);
+  else await drawWinnersPoster(ctx, game, bgImage);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(

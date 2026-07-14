@@ -11,6 +11,7 @@ import {
   liveStream,
   updateGame,
   deleteGame,
+  getGameSalesDetails,
 } from './games.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 import {
@@ -42,5 +43,6 @@ router.post('/:game_id/start', authenticateToken, requireRole(['Operator', 'Fina
 router.post('/:game_id/pause', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handlePauseGame);
 router.post('/:game_id/resume', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleResumeGame);
 router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleSpeedChange);
+router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), getGameSalesDetails);
 
 export default router;

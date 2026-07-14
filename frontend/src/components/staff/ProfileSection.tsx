@@ -97,7 +97,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     <div className="hg-dash-section" style={{ paddingTop: 8 }}>
       {message && (
         <div style={{
-          marginBottom: 12, padding: "6px 14px", borderRadius: 8,
+          marginBottom: 16, padding: "8px 14px", borderRadius: 8,
           background: message.error ? "var(--danger-soft)" : "var(--success-soft)",
           display: "inline-flex", alignItems: "center", gap: 6,
         }}>
@@ -106,83 +106,85 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         </div>
       )}
 
-      <div className="hg-card" style={{ padding: "16px 20px", maxWidth: 460, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Avatar src={roleAvatar(me)} name={me.full_name} className="hg-avatar-sm" style={{ width: 36, height: 36, fontSize: 15 }} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 20, width: "100%", maxWidth: 1000 }}>
+        <div className="hg-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16, height: "fit-content" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--border-light)", paddingBottom: 14, marginBottom: 4 }}>
+            <Avatar src={roleAvatar(me)} name={me.full_name} className="hg-avatar-sm" style={{ width: 44, height: 44, fontSize: 18 }} />
+            <div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{me.full_name}</h3>
+              <span style={{ fontSize: 12, color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 600, letterSpacing: ".02em" }}>{roleLabel}</span>
+            </div>
+          </div>
+
           <div>
-            <h3 style={{ margin: 0, fontSize: 16 }}>{me.full_name}</h3>
-            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{roleLabel}</span>
+            <label style={labelStyle}>Full Name</label>
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} placeholder="Your full name" />
           </div>
-        </div>
 
-        <div>
-          <label style={labelStyle}>Full Name</label>
-          <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} placeholder="Your full name" />
-        </div>
-
-        <div>
-          <label style={labelStyle}>WhatsApp Number <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="e.g. 9876543210" />
-          <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-            Used for booking coordination and account recovery — keep this current.
-          </span>
-        </div>
-
-        {showUpi && (
           <div>
-            <label style={labelStyle}>UPI ID</label>
-            <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} style={inputStyle} placeholder="yourname@upi" />
+            <label style={labelStyle}>WhatsApp Number <span style={{ color: "var(--danger)" }}>*</span></label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="e.g. 9876543210" />
+            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
+              Used for booking coordination and account recovery — keep this current.
+            </span>
           </div>
-        )}
 
-        <div>
-          <label style={labelStyle}>Email</label>
-          <input type="text" value={me.email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
-          <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-            Your login email — contact an administrator to change it.
-          </span>
-        </div>
+          {showUpi && (
+            <div>
+              <label style={labelStyle}>UPI ID</label>
+              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} style={inputStyle} placeholder="yourname@upi" />
+            </div>
+          )}
 
-        <Button onClick={handleSave} disabled={saving || !dirty}>
-          {saving ? "Saving…" : "Save Changes"}
-        </Button>
-      </div>
-
-      <div className="hg-card" style={{ padding: "16px 20px", maxWidth: 460, marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Icon name="wallet" size={16} style={{ color: "var(--text-dim)" }} />
-          <h3 style={{ margin: 0, fontSize: 15 }}>Change Password</h3>
-        </div>
-
-        {pwMessage && (
-          <div style={{
-            padding: "6px 14px", borderRadius: 8,
-            background: pwMessage.error ? "var(--danger-soft)" : "var(--success-soft)",
-            display: "inline-flex", alignItems: "center", gap: 6,
-          }}>
-            <Icon name={pwMessage.error ? "x" : "check"} size={14} style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)" }} />
-            <span style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)", fontWeight: 600, fontSize: 13 }}>{pwMessage.text}</span>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input type="text" value={me.email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
+            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
+              Your login email — contact an administrator to change it.
+            </span>
           </div>
-        )}
 
-        <div>
-          <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+          <Button onClick={handleSave} disabled={saving || !dirty} style={{ marginTop: 8 }}>
+            {saving ? "Saving…" : "Save Changes"}
+          </Button>
         </div>
 
-        <div>
-          <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
-        </div>
+        <div className="hg-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16, height: "fit-content" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid var(--border-light)", paddingBottom: 14, marginBottom: 4 }}>
+            <Icon name="shieldCheck" size={20} style={{ color: "var(--text-dim)" }} />
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Change Password</h3>
+          </div>
 
-        <div>
-          <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
-          <input type="password" value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
-        </div>
+          {pwMessage && (
+            <div style={{
+              padding: "8px 14px", borderRadius: 8,
+              background: pwMessage.error ? "var(--danger-soft)" : "var(--success-soft)",
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}>
+              <Icon name={pwMessage.error ? "x" : "check"} size={14} style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)" }} />
+              <span style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)", fontWeight: 600, fontSize: 13 }}>{pwMessage.text}</span>
+            </div>
+          )}
 
-        <Button onClick={handleChangePassword} disabled={pwSaving || !pwValid}>
-          {pwSaving ? "Updating…" : "Update Password"}
-        </Button>
+          <div>
+            <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <input type="password" value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+          </div>
+
+          <div>
+            <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <input type="password" value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <input type="password" value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+          </div>
+
+          <Button onClick={handleChangePassword} disabled={pwSaving || !pwValid} style={{ marginTop: 8 }}>
+            {pwSaving ? "Updating…" : "Update Password"}
+          </Button>
+        </div>
       </div>
     </div>
   );

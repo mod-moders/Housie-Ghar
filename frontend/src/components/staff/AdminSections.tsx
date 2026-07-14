@@ -10,6 +10,7 @@ import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuditEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { CallVoiceSettings } from "./CallVoiceSettings";
+import { getPresetClass } from "@/lib/presetHelper";
 
 const DIVIDEND_METADATA = [
   { name: "1st Full House", pattern: "1st Full House", defaultAmount: 2000, desc: "The first ticket where all 15 numbers are marked. (Automatically becomes 'Full House' if 2nd and 3rd are not selected)." },
@@ -85,11 +86,13 @@ function gameTime(g: GameSummary): string {
 }
 
 // ── Games table with start/pause/resume controls ─────────────────────────────
-function GamesTable({ games, controls, onAction, onCompletedClick }: {
+function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets, onManualBook }: {
   games: GameSummary[];
   controls?: boolean;
   onAction?: (id: string, action: "start" | "pause" | "resume" | "edit" | "delete" | "speed", speedValue?: number) => void;
   onCompletedClick?: (game: GameSummary) => void;
+  onViewTickets?: (id: string) => void;
+  onManualBook?: (id: string) => void;
 }) {
   return (
     <div className="hg-table">
@@ -134,6 +137,14 @@ function GamesTable({ games, controls, onAction, onCompletedClick }: {
             <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span></span>
             {controls && (
               <span className="hg-row-ctrls" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <button className="hg-ic-btn" title="View Tickets" onClick={(e) => { e.stopPropagation(); onViewTickets?.(g.game_id); }}>
+                  <Icon name="ticket" size={14} />
+                </button>
+                {g.game_status !== "Completed" && (
+                  <button className="hg-ic-btn" title="Manual Booking" onClick={(e) => { e.stopPropagation(); onManualBook?.(g.game_id); }}>
+                    <Icon name="users" size={14} />
+                  </button>
+                )}
                 {g.game_status === "Scheduled" && (
                   <button className="hg-ic-btn" title="Start" onClick={(e) => { e.stopPropagation(); onAction?.(g.game_id, "start"); }}>
                     <Icon name="play" size={14} />
@@ -553,9 +564,11 @@ export function GamesSection() {
   const [managingVoice, setManagingVoice] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
   const [prizes, setPrizes] = useState(PATTERN_DEFAULTS);
   const [ruleModal, setRuleModal] = useState<{ title: string; desc: string } | null>(null);
+  const [salesGameId, setSalesGameId] = useState<string | null>(null);
+  const [bookingGameId, setBookingGameId] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
 
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
@@ -904,8 +917,9 @@ export function GamesSection() {
           <div className="hg-fill-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px", padding: "4px 0" }}>
             {games.map((g) => {
               const pct = fillPct(g);
+              const presetClass = getPresetClass(g.title);
               return (
-                <div key={g.game_id} className="hg-fill-card" style={{ margin: 0 }}>
+                <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ margin: 0 }}>
                   <div className="hg-fill-top">
                     <strong>{g.title}</strong>
                     <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
@@ -915,6 +929,26 @@ export function GamesSection() {
                   </div>
                   <div className="hg-fill-bar"><i style={{ width: pct + "%" }} className={pct >= 80 ? "is-hot" : ""} /></div>
                   <div className="hg-fill-pct">{pct}% full</div>
+                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                    <button
+                      onClick={() => setSalesGameId(g.game_id)}
+                      className="hg-ic-btn"
+                      title="View Tickets"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      <Icon name="ticket" size={14} /> View Tickets
+                    </button>
+                    {g.game_status !== "Completed" && (
+                      <button
+                        onClick={() => setBookingGameId(g.game_id)}
+                        className="hg-ic-btn"
+                        title="Book Ticket"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                      >
+                        <Icon name="users" size={14} /> Book Ticket
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -926,7 +960,7 @@ export function GamesSection() {
         {games.length === 0 ? (
           <EmptyHint icon="grid" title="No games yet" sub="Create the first game to open bookings." />
         ) : (
-          <GamesTable games={games} controls onAction={act} />
+          <GamesTable games={games} controls onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} />
         )}
       </div>
     </>
@@ -954,6 +988,500 @@ export function GamesSection() {
           </div>
         </div>
       )}
+      {salesGameId && <TicketSalesModal gameId={salesGameId} onClose={() => setSalesGameId(null)} />}
+      {bookingGameId && <StaffManualBookingModal gameId={bookingGameId} onClose={() => setBookingGameId(null)} onSuccess={load} />}
+    </div>
+  );
+}
+
+// ── Ticket Sales details Modal ───────────────────────────────────────────────
+export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose: () => void }) {
+  const [data, setData] = useState<{
+    title: string;
+    tickets: Array<{
+      ticket_number: number;
+      status: string;
+      owner_housie_name: string;
+      bookie_username: string;
+      bookie_name: string;
+    }>;
+    agents: Array<{
+      bookie_username: string;
+      bookie_name: string;
+      total_sold: number;
+    }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"tickets" | "agents">("tickets");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch<any>(`/api/games/${gameId}/sales-details`)
+      .then((res) => setData(res))
+      .catch((err) => console.error("Failed to load sales details:", err))
+      .finally(() => setLoading(false));
+  }, [gameId]);
+
+  if (loading) {
+    return (
+      <div className="hg-modal-scrim" onClick={onClose}>
+        <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ width: "90%", maxWidth: "600px", display: "flex", justifyContent: "center", padding: "40px 0" }}>
+          <span className="hg-poll-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // Filter logic
+  const query = searchQuery.trim().toLowerCase();
+  const filteredTickets = data.tickets.filter((t) => {
+    if (!query) return true;
+    return (
+      t.ticket_number.toString().includes(query) ||
+      t.owner_housie_name.toLowerCase().includes(query) ||
+      t.bookie_username.toLowerCase().includes(query) ||
+      t.bookie_name.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredAgents = data.agents.filter((a) => {
+    if (!query) return true;
+    return (
+      a.bookie_username.toLowerCase().includes(query) ||
+      a.bookie_name.toLowerCase().includes(query)
+    );
+  });
+
+  return (
+    <div className="hg-modal-scrim" onClick={onClose}>
+      <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ width: "90%", maxWidth: "680px", background: "var(--surface)", color: "var(--text)" }}>
+        
+        {/* Header */}
+        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{data.title} Sales Info</h3>
+            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Detailed ticket bookings audit logs</span>
+          </div>
+          <button 
+            onClick={onClose} 
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "var(--text-dim)", padding: 4 }}
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Search & Tabs */}
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 10, background: "rgba(0,0,0,0.15)", padding: 4, borderRadius: 30, width: "fit-content" }}>
+            <button
+              onClick={() => setActiveTab("tickets")}
+              style={{
+                border: "none",
+                background: activeTab === "tickets" ? "var(--brand)" : "transparent",
+                color: activeTab === "tickets" ? "var(--accent-ink)" : "var(--text-dim)",
+                padding: "8px 18px",
+                borderRadius: 24,
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              TICKET LIST
+            </button>
+            <button
+              onClick={() => setActiveTab("agents")}
+              style={{
+                border: "none",
+                background: activeTab === "agents" ? "var(--brand)" : "transparent",
+                color: activeTab === "agents" ? "var(--accent-ink)" : "var(--text-dim)",
+                padding: "8px 18px",
+                borderRadius: 24,
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              AGENT LIST
+            </button>
+          </div>
+
+          {/* Search bar */}
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              placeholder="Enter keyword (Ticket #, name, bookie...)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px 10px 38px",
+                borderRadius: 8,
+                border: "1px solid var(--border-light)",
+                background: "var(--surface-2)",
+                color: "var(--text)",
+                fontSize: 13,
+                outline: "none"
+              }}
+            />
+            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", display: "flex" }}>
+              <Icon name="search" size={14} />
+            </span>
+          </div>
+        </div>
+
+        {/* Content Table */}
+        <div style={{ marginTop: 16, maxHeight: "360px", overflowY: "auto", border: "1px solid var(--border-light)", borderRadius: 8 }}>
+          {activeTab === "tickets" ? (
+            filteredTickets.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
+                No matching tickets found.
+              </div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border-light)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-dim)" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>TNO</th>
+                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Name</th>
+                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Bookie</th>
+                    <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTickets.map((t) => (
+                    <tr key={t.ticket_number} style={{ borderBottom: "1px solid var(--border-light)", fontSize: 13 }}>
+                      <td style={{ padding: "10px 14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--brand)" }}>
+                        {t.ticket_number}
+                      </td>
+                      <td style={{ padding: "10px 14px", fontWeight: 600 }}>{t.owner_housie_name}</td>
+                      <td style={{ padding: "10px 14px", color: "var(--text-dim)" }}>{t.bookie_name} ({t.bookie_username})</td>
+                      <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                        <span className={`hg-pill hg-pill-${t.status.toLowerCase()}`} style={{ fontSize: 11 }}>
+                          {t.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          ) : (
+            filteredAgents.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
+                No matching bookies found.
+              </div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border-light)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-dim)" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>No.</th>
+                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Name</th>
+                    <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Total Sold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAgents.map((a, idx) => (
+                    <tr key={a.bookie_username} style={{ borderBottom: "1px solid var(--border-light)", fontSize: 13 }}>
+                      <td style={{ padding: "10px 14px", fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>{idx + 1}</td>
+                      <td style={{ padding: "10px 14px", fontWeight: 600 }}>
+                        {a.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)", fontWeight: 400 }}>({a.bookie_username})</span>
+                      </td>
+                      <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>{a.total_sold}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, paddingTop: 12, borderTop: "1px solid var(--border-light)" }}>
+          <Button variant="cta" size="sm" onClick={onClose}>Close</Button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Staff Manual Booking Modal ───────────────────────────────────────────────
+export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId: string; onClose: () => void; onSuccess?: () => void }) {
+  const [tickets, setTickets] = useState<Array<{ ticket_id: number; ticket_number: number; status: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [housieName, setHousieName] = useState("");
+  const [selectedTicketIds, setSelectedTicketIds] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tnoInput, setTnoInput] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch<any>(`/api/tickets/games/${gameId}/tickets`)
+      .then((res) => {
+        setTickets(res.tickets || []);
+      })
+      .catch((err) => console.error("Failed to load tickets:", err))
+      .finally(() => setLoading(false));
+  }, [gameId]);
+
+  const toggleSelect = (ticketId: number) => {
+    setError(null);
+    setSelectedTicketIds((prev) => {
+      if (prev.includes(ticketId)) {
+        return prev.filter((id) => id !== ticketId);
+      }
+      if (prev.length >= 6) {
+        setError("Maximum 6 tickets can be booked at once.");
+        return prev;
+      }
+      return [...prev, ticketId];
+    });
+  };
+
+  const handleAddTno = () => {
+    setError(null);
+    const num = parseInt(tnoInput, 10);
+    if (isNaN(num)) return;
+    
+    const found = tickets.find((t) => t.ticket_number === num);
+    if (!found) {
+      setError(`Ticket #${num} not found.`);
+      return;
+    }
+    if (found.status !== "Available") {
+      setError(`Ticket #${num} is already ${found.status}.`);
+      return;
+    }
+    
+    toggleSelect(found.ticket_id);
+    setTnoInput("");
+  };
+
+  const handleBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!housieName.trim()) {
+      setError("Housie Name is required.");
+      return;
+    }
+    if (selectedTicketIds.length === 0) {
+      setError("Please select at least one ticket.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/bookings/staff/manual-book", {
+        method: "POST",
+        body: JSON.stringify({
+          game_id: gameId,
+          ticket_ids: selectedTicketIds,
+          housie_name: housieName.trim()
+        })
+      });
+      alert("Manual booking confirmed!");
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Failed to confirm manual booking.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="hg-modal-scrim" onClick={onClose}>
+      <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ width: "95%", maxWidth: "560px", background: "var(--surface)", color: "var(--text)" }}>
+        
+        {/* Header */}
+        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Manual Ticket Booking</h3>
+            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Direct platform booking without wallet deduction</span>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "var(--text-dim)", padding: 4 }}>
+            &times;
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+            <span className="hg-poll-spin" />
+          </div>
+        ) : (
+          <form onSubmit={handleBook} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14 }}>
+            {error && <div className="hg-sec-err" style={{ padding: 10, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 6, fontSize: 13, margin: 0 }}>{error}</div>}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>
+                  Housie Name (Player) <span style={{ color: "var(--danger)" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={housieName}
+                  onChange={(e) => setHousieName(e.target.value)}
+                  placeholder="Enter player's housie name"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border-light)",
+                    background: "var(--surface-2)",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    outline: "none"
+                  }}
+                  required
+                />
+              </div>
+
+              {/* Enter TNO input block */}
+              <div style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                padding: "4px 8px",
+                borderRadius: 24,
+                border: "2px solid var(--brand)",
+                background: "rgba(0,0,0,0.15)"
+              }}>
+                <input
+                  type="number"
+                  value={tnoInput}
+                  onChange={(e) => setTnoInput(e.target.value)}
+                  placeholder="Enter TNO"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    outline: "none",
+                    width: "72px",
+                    textAlign: "center"
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTno();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTno}
+                  style={{
+                    background: "var(--text)",
+                    color: "var(--surface)",
+                    border: "none",
+                    borderRadius: 16,
+                    padding: "3px 10px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer"
+                  }}
+                >
+                  ADD
+                </button>
+              </div>
+            </div>
+
+            {/* Red BOOK NOW button */}
+            <button
+              type="submit"
+              disabled={saving || !housieName.trim() || selectedTicketIds.length === 0}
+              style={{
+                width: "100%",
+                padding: "11px",
+                background: "var(--danger)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                cursor: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? "not-allowed" : "pointer",
+                opacity: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? 0.5 : 1,
+                transition: "background 0.2s"
+              }}
+            >
+              {saving ? "Booking..." : "Book Now"}
+            </button>
+
+            {/* 6-column spreadsheet-like grid layout */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Select Tickets
+                </label>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>
+                  ({selectedTicketIds.length}/6 selected)
+                </span>
+              </div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(6, 1fr)",
+                gap: "1px",
+                background: "var(--border-light)",
+                border: "1px solid var(--border-light)",
+                borderRadius: "8px",
+                overflow: "hidden",
+                maxHeight: "260px",
+                overflowY: "auto"
+              }}>
+                {tickets.map((t) => {
+                  const isAvailable = t.status === "Available";
+                  const isSelected = selectedTicketIds.includes(t.ticket_id);
+                  return (
+                    <button
+                      key={t.ticket_id}
+                      type="button"
+                      disabled={!isAvailable}
+                      onClick={() => toggleSelect(t.ticket_id)}
+                      style={{
+                        padding: "10px 0",
+                        border: "none",
+                        background: isSelected
+                          ? "var(--brand)"
+                          : isAvailable
+                          ? "var(--surface)"
+                          : "var(--surface-3)",
+                        color: isSelected
+                          ? "var(--accent-ink)"
+                          : isAvailable
+                          ? "var(--text)"
+                          : "var(--text-mute)",
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        fontSize: 14,
+                        cursor: isAvailable ? "pointer" : "not-allowed",
+                        opacity: isAvailable ? 1 : 0.5,
+                        transition: "all 0.15s",
+                        textDecoration: isAvailable ? "none" : "line-through"
+                      }}
+                    >
+                      {t.ticket_number}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer Close */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6, borderTop: "1px solid var(--border-light)", paddingTop: 12 }}>
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -961,16 +1489,20 @@ export function GamesSection() {
 // ── Filling status (shared widget) ───────────────────────────────────────────
 export function FillingSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [salesGameId, setSalesGameId] = useState<string | null>(null);
+  const [bookingGameId, setBookingGameId] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    apiFetch<GameSummary[]>("/api/games")
+      .then((g) => setGames(g.filter((x) => x.game_status !== "Completed")))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
-    const load = () =>
-      apiFetch<GameSummary[]>("/api/games")
-        .then((g) => setGames(g.filter((x) => x.game_status !== "Completed")))
-        .catch(() => {});
     load();
     const id = setInterval(load, 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [load]);
 
   return (
     <div className="hg-sec">
@@ -979,8 +1511,9 @@ export function FillingSection() {
       <div className="hg-fill-grid">
         {games.map((g) => {
           const pct = fillPct(g);
+          const presetClass = getPresetClass(g.title);
           return (
-            <div key={g.game_id} className="hg-fill-card">
+            <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`}>
               <div className="hg-fill-top">
                 <strong>{g.title}</strong>
                 <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
@@ -990,22 +1523,44 @@ export function FillingSection() {
               </div>
               <div className="hg-fill-bar"><i style={{ width: pct + "%" }} className={pct >= 80 ? "is-hot" : ""} /></div>
               <div className="hg-fill-pct">{pct}% full</div>
-              {(g.game_status === "Live" || g.game_status === "Paused") && (
-                <a
-                  href={`/game/${g.game_id}/live`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              <div style={{ display: "flex", gap: 12, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                {(g.game_status === "Live" || g.game_status === "Paused") && (
+                  <a
+                    href={`/game/${g.game_id}/live`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hg-ic-btn"
+                    title="Watch Live"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
+                  >
+                    <Icon name="eye" size={14} /> Watch Live
+                  </a>
+                )}
+                <button
+                  onClick={() => setSalesGameId(g.game_id)}
                   className="hg-ic-btn"
-                  title="Watch Live"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
+                  title="View Tickets"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                 >
-                  <Icon name="eye" size={14} /> Watch Live
-                </a>
-              )}
+                  <Icon name="ticket" size={14} /> View Tickets
+                </button>
+                {g.game_status !== "Completed" && (
+                  <button
+                    onClick={() => setBookingGameId(g.game_id)}
+                    className="hg-ic-btn"
+                    title="Book Ticket"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  >
+                    <Icon name="users" size={14} /> Book Ticket
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+      {salesGameId && <TicketSalesModal gameId={salesGameId} onClose={() => setSalesGameId(null)} />}
+      {bookingGameId && <StaffManualBookingModal gameId={bookingGameId} onClose={() => setBookingGameId(null)} onSuccess={load} />}
     </div>
   );
 }
@@ -1211,6 +1766,7 @@ export function HistorySection() {
   const [selectedGame, setSelectedGame] = useState<GameSummary | null>(null);
   const [drawnData, setDrawnData] = useState<{ drawn_numbers: number[]; current_index: number } | null>(null);
   const [loadingDrawn, setLoadingDrawn] = useState(false);
+  const [salesGameId, setSalesGameId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -1262,8 +1818,9 @@ export function HistorySection() {
                   <span className="hg-dim">{dateStr}</span>
                   <span>{g.sold_count} / {g.total_tickets}</span>
                   <strong>{money(totalRevenue)}</strong>
-                  <span>
+                  <span style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <Button variant="ghost" size="sm" onClick={() => viewResults(g)}>View Results</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSalesGameId(g.game_id)}>View Tickets</Button>
                   </span>
                 </div>
               );
@@ -1371,6 +1928,7 @@ export function HistorySection() {
           </div>
         </div>
       )}
+      {salesGameId && <TicketSalesModal gameId={salesGameId} onClose={() => setSalesGameId(null)} />}
     </div>
   );
 }

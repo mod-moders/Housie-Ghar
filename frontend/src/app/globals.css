@@ -62,6 +62,7 @@
 
 /* 1. Retro Arcade */
 .hg-root[data-theme='retro_arcade'] {
+  --accent:#ff00ff; --accent-ink:#ffffff; --accent-soft:rgba(255,0,255,0.15);
   --bg:#030005; --bg2:#0f0721; --surface:#1a0e36; --surface-2:#291652;
   --elevate:#391f71; --border:rgba(0, 255, 255, 0.4); --border-2:rgba(255, 0, 255, 0.5);
   --text:#e0f8ff; --text-dim:#8a9bbd; --text-mute:#b366ff;
@@ -655,6 +656,7 @@
 
 /* 2. Minimalist Light */
 .hg-root[data-theme='minimalist_light'] {
+  --accent:#222222; --accent-ink:#ffffff; --accent-soft:rgba(34,34,34,0.1);
   --bg:#f9f9f9; --bg2:#ffffff; --surface:#ffffff; --surface-2:#f2f2f2;
   --elevate:#ffffff; --border:#e0e0e0; --border-2:#cccccc;
   --text:#222222; --text-dim:#666666; --text-mute:#999999;
@@ -670,6 +672,7 @@
 
 /* 4. Digital Neon */
 .hg-root[data-theme='digital_neon'] {
+  --accent:#00ffff; --accent-ink:#000000; --accent-soft:rgba(0,255,255,0.15);
   --bg:#000000; --bg2:#0a0a0a; --surface:#141414; --surface-2:#1f1f1f;
   --elevate:#292929; --border:#00ffff; --border-2:#ff00ff;
   --text:#ffffff; --text-dim:#00ffff; --text-mute:#ff00ff;
@@ -684,6 +687,7 @@
 
 /* 5. Traditional Festival */
 .hg-root[data-theme='traditional_festival'] {
+  --accent:#ff5722; --accent-ink:#ffffff; --accent-soft:rgba(255,87,34,0.15);
   --bg:#fff3e0; --bg2:#ffe0b2; --surface:#ffcc80; --surface-2:#ffb74d;
   --elevate:#ffa726; --border:#e65100; --border-2:#bf360c;
   --text:#3e2723; --text-dim:#5d4037; --text-mute:#795548;
@@ -698,6 +702,7 @@
 
 /* 6. Classic Tambola */
 .hg-root[data-theme='classic_tambola'] {
+  --accent:#2e7d32; --accent-ink:#ffffff; --accent-soft:rgba(46,125,50,0.15);
   --bg:#f1f8e9; --bg2:#dcedc8; --surface:#c5e1a5; --surface-2:#aed581;
   --elevate:#9ccc65; --border:#33691e; --border-2:#1b5e20;
   --text:#1b5e20; --text-dim:#2e7d32; --text-mute:#388e3c;
@@ -742,8 +747,8 @@
   --scrim:rgba(5,6,8,.75);
 }
 
-/* 9. Luxury Gold & Black */
 .hg-root[data-theme='luxury_gold'] {
+  --accent:#c5a059; --accent-ink:#000000; --accent-soft:rgba(197,160,89,0.16);
   --bg:#0a0a0a; --bg2:#141414; --surface:#1a1a1a; --surface-2:#222222;
   --elevate:#2b2b2b; --border:#c5a059; --border-2:#e6c781;
   --text:#f4ecd8; --text-dim:#c5a059; --text-mute:#8a713b;
@@ -1426,6 +1431,369 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-total{display:flex;flex-direction:column}
 .hg-total span{font-size:11px}
 .hg-total strong{font-family:var(--font-mono);font-size:22px;line-height:1}
+
+/* ============ TICKET NUMBER SELECTOR (for 30-ticket games) ============ */
+.hg-ticket-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow-sm);
+}
+
+.hg-ticket-selector-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hg-ticket-selector-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hg-ticket-selector-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.hg-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hg-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.hg-legend-item.available .hg-legend-dot {
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+}
+
+.hg-legend-item.locked .hg-legend-dot {
+  background: var(--locked-soft);
+  border: 1.5px solid var(--locked);
+}
+
+.hg-legend-item.sold .hg-legend-dot {
+  background: var(--surface-2);
+  border: 1.5px solid var(--danger);
+}
+
+.hg-number-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 6), 1fr);
+  gap: 6px;
+}
+
+.hg-num-btn {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  position: relative;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-2);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 0 -1px var(--border-2);
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.hg-num-btn:not(.disabled):hover {
+  border-color: var(--ink);
+  box-shadow: 0 2.5px 0 -1px var(--ink);
+  transform: translateY(-1px);
+}
+
+.hg-num-btn:not(.disabled):active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.hg-num-btn.selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--ink) !important;
+  box-shadow: 0 2.5px 0 -1px var(--ink);
+}
+
+.hg-num-btn.selected .hg-num-btn-check {
+  display: grid;
+  place-items: center;
+}
+
+.hg-num-btn.locked {
+  background: var(--locked-soft);
+  color: var(--locked);
+  cursor: not-allowed;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.hg-num-btn.sold {
+  background: var(--surface-2);
+  color: var(--text-mute);
+  cursor: not-allowed;
+  box-shadow: none;
+  border-color: transparent;
+  text-decoration: line-through;
+}
+
+.hg-num-btn.disabled {
+  cursor: not-allowed;
+}
+
+.hg-num-btn-text {
+  z-index: 1;
+}
+
+.hg-num-btn-check {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-ink);
+  color: var(--accent);
+  border-radius: 50%;
+  display: none;
+  z-index: 2;
+}
+
+.hg-num-btn.locked .hg-num-btn-text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+}
+
+/* Selected summary */
+.hg-selected-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  animation: hg-slide-in 0.2s ease;
+}
+
+@keyframes hg-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hg-selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.hg-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.hg-chip-remove {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s;
+}
+
+.hg-chip-remove:hover {
+  transform: scale(1.15);
+}
+
+.hg-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border-2);
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hg-clear-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.hg-selected-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.hg-selected-total strong {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--text);
+}
+
+/* Book now button */
+.hg-book-now-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+  background: var(--cta);
+  color: var(--cta-ink);
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--card-shadow-sm);
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+}
+
+.hg-book-now-btn:not(:disabled):hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--card-shadow);
+  filter: brightness(1.05);
+}
+
+.hg-book-now-btn:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.hg-book-now-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.hg-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--cta-ink);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: hg-spin 0.7s linear infinite;
+}
+
+/* Compact variant for tight spaces */
+.hg-ticket-selector.compact {
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.hg-ticket-selector.compact .hg-number-grid {
+  gap: 4px;
+}
+
+.hg-ticket-selector.compact .hg-num-btn {
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+/* Full width variant */
+.hg-ticket-selector.full-width {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive: adjust columns based on screen width */
+@media (max-width: 340px) {
+  .hg-number-grid {
+    grid-template-columns: repeat(var(--cols, 5), 1fr) !important;
+  }
+  .hg-num-btn {
+    font-size: 12px !important;
+    border-radius: 10px !important;
+  }
+}
+
+@media (min-width: 341px) and (max-width: 420px) {
+  .hg-number-grid {
+    grid-template-columns: repeat(var(--cols, 6), 1fr) !important;
+  }
+}
+
+@media (min-width: 421px) {
+  .hg-number-grid {
+    grid-template-columns: repeat(var(--cols, 7), 1fr) !important;
+  }
+}
+
+/* For 30 tickets, use 6 columns on mobile, 7 on tablet, 10 on desktop for tighter packing */
+.hg-ticket-selector[data-ticket-count="30"] .hg-number-grid {
+  --cols: 6;
+}
+
+@media (min-width: 420px) {
+  .hg-ticket-selector[data-ticket-count="30"] .hg-number-grid {
+    --cols: 7;
+  }
+}
+
+@media (min-width: 640px) {
+  .hg-ticket-selector[data-ticket-count="30"] .hg-number-grid {
+    --cols: 10;
+  }
+}
 
 /* ============ HOUSIE TICKET ============ */
 .hg-ticket{padding:8px;display:inline-block;border-radius:var(--radius-sm)}
@@ -2568,6 +2936,37 @@ select option {
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Overrides for staff dashboard preset fill-cards */
+.hg-card-preset.hg-fill-card {
+  position: relative !important;
+}
+.hg-card-preset .hg-fill-top strong {
+  color: #ffffff !important;
+  text-shadow: 0 1.5px 3px rgba(0, 0, 0, 0.75);
+}
+.hg-card-preset .hg-fill-meta {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+.hg-card-preset .hg-fill-pct {
+  color: #ffffff !important;
+}
+.hg-card-preset .hg-pill {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+.hg-card-preset .hg-download-icon-btn {
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+.hg-card-preset .hg-download-icon-btn:hover {
+  background: var(--brand) !important;
+  color: var(--accent-ink) !important;
+  border-color: var(--brand) !important;
+}
+
 @media(min-width:560px) and (max-width:899px) {
   .hg-feed-list {
     display: grid;
@@ -3013,6 +3412,73 @@ select option {
   font-size: 11px;
   color: var(--text-mute);
   text-align: center;
+}
+
+/* Custom premium download button inside Share to WhatsApp */
+.hg-download-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--card-shadow-sm);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hg-download-icon-btn:hover:not(:disabled) {
+  background: var(--brand);
+  color: var(--accent-ink);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 0 -1px var(--ink);
+}
+.hg-download-icon-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.95);
+  box-shadow: none;
+}
+.hg-download-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Enhancements to caption copy button and details */
+.hg-caption-copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-family: var(--font-head);
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1.5px solid var(--ink);
+  color: var(--text);
+  box-shadow: var(--card-shadow-sm);
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.1s ease;
+}
+.hg-caption-copy-btn:hover {
+  background: var(--brand);
+  color: var(--accent-ink);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 0 -1px var(--ink);
+}
+.hg-caption-copy-btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.hg-caption-copy-btn.is-success {
+  background: var(--success);
+  color: #fff;
+  border-color: var(--ink);
 }
 
 

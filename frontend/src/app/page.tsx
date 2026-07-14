@@ -63,14 +63,7 @@ const PRESET_BG: Record<string, string> = {
   "Sundown Showdown": "/presets/Sundown Showdown.jpg"
 };
 
-function getPresetClass(title: string): string | undefined {
-  const t = title.trim().toLowerCase();
-  if (t.includes("high noon")) return "hg-card-preset hg-card-preset--high-noon";
-  if (t.includes("prime time")) return "hg-card-preset hg-card-preset--prime-time";
-  if (t.includes("snack & stack") || t.includes("snack")) return "hg-card-preset hg-card-preset--snack-stack";
-  if (t.includes("sundown")) return "hg-card-preset hg-card-preset--sundown";
-  return undefined;
-}
+import { getPresetClass } from "@/lib/presetHelper";
 
 function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void; compact?: boolean }) {
   const isLive = game.game_status === "Live" || game.game_status === "Paused";

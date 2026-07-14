@@ -30,6 +30,7 @@ function navFor(user: AuthUser): NavItem[] {
     items.push(
       ["games", "Games", "grid"],
       ["history", "Past Games", "clock"],
+      ["overflow", "Overflow Queue", "bell"],
       ["players", "Player Management", "users"],
       ["staff", "Staff Management", "shieldCheck"],
       ["audit", "Website Audits", "shield"],

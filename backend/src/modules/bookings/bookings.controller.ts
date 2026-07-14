@@ -131,17 +131,47 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       return buildWaLink(phone, msg);
     };
 
-    // 5. Overflow Failsafe: no bookie had sufficient inventory → route to the Operator.
+    // 5. Overflow Failsafe: no bookie had sufficient inventory → route to Superadmin, Financial Admin, or Operator turn wise.
     if (!assigned) {
-      const opRes = await client.query(
-        `SELECT u.user_id, u.full_name, u.phone, u.town, u.status
-         FROM Scheduled_Games g
-         JOIN Users u ON u.user_id = g.operator_id
-         WHERE g.game_id = $1`,
-        [game_id]
+      // Find the last overflow booking's assigned role to determine the sequence
+      const lastOverflowRes = await client.query(
+        `SELECT u.role_id
+         FROM Bookings b
+         JOIN Users u ON b.assigned_agent_id = u.user_id
+         WHERE b.is_overflow = TRUE
+         ORDER BY b.locked_at DESC LIMIT 1`
       );
-      const operator = opRes.rows[0];
-      if (!operator || operator.status !== 'Active' || !operator.phone) {
+      const lastRole = lastOverflowRes.rows[0]?.role_id ?? null;
+
+      // Define preferred role sequence based on lastRole (Superadmin=1, Financial Admin=2, Operator=3)
+      let preferredRoles = [1, 2, 3];
+      if (lastRole === 1) {
+        preferredRoles = [2, 3, 1];
+      } else if (lastRole === 2) {
+        preferredRoles = [3, 1, 2];
+      } else if (lastRole === 3) {
+        preferredRoles = [1, 2, 3];
+      }
+
+      let selectedStaff = null;
+      for (const roleId of preferredRoles) {
+        const staffRes = await client.query(
+          `SELECT u.user_id, u.full_name, u.phone, u.town, MAX(b.locked_at) as last_assigned
+           FROM Users u
+           LEFT JOIN Bookings b ON u.user_id = b.assigned_agent_id AND b.is_overflow = TRUE
+           WHERE u.role_id = $1 AND u.status = 'Active' AND u.phone IS NOT NULL AND u.phone != ''
+           GROUP BY u.user_id, u.full_name, u.phone, u.town
+           ORDER BY last_assigned ASC NULLS FIRST, u.user_id ASC
+           LIMIT 1`,
+          [roleId]
+        );
+        if (staffRes.rows.length > 0) {
+          selectedStaff = staffRes.rows[0];
+          break;
+        }
+      }
+
+      if (!selectedStaff) {
         await client.query('ROLLBACK');
         res.status(503).json({
           message:
@@ -156,7 +186,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
            booking_status, locked_at, locked_until, is_overflow
          ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE)
          RETURNING booking_id`,
-        [game_id, ticket_ids, housie_name, operator.user_id, totalAmount, lockedUntil]
+        [game_id, ticket_ids, housie_name, selectedStaff.user_id, totalAmount, lockedUntil]
       );
       const overflowBookingId = overflowRes.rows[0].booking_id;
 
@@ -169,7 +199,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       await client.query('COMMIT');
       emitSkips();
 
-      io.to(`operator-${operator.user_id}`).emit('overflow_booking', {
+      io.to(`operator-${selectedStaff.user_id}`).emit('overflow_booking', {
         event: 'overflow_booking',
         booking_id: overflowBookingId,
         housie_name,
@@ -182,11 +212,11 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       res.json({
         booking_id: overflowBookingId,
         locked_until: lockedUntil.toISOString(),
-        agent_name: operator.full_name,
-        agent_phone: operator.phone,
-        agent_town: operator.town ?? null,
+        agent_name: selectedStaff.full_name,
+        agent_phone: selectedStaff.phone,
+        agent_town: selectedStaff.town ?? null,
         total_amount: totalAmount,
-        whatsapp_link: makeBookingWaLink(operator.phone, operator.full_name, overflowBookingId),
+        whatsapp_link: makeBookingWaLink(selectedStaff.phone, selectedStaff.full_name, overflowBookingId),
         is_overflow: true,
       });
       return;
@@ -904,5 +934,124 @@ async function handleReferralCommission(
         `Referral commission for player ${housieName} booking #${bookingId.substring(0, 8).toUpperCase()}`,
       ]
     );
+  }
+}
+
+/**
+ * Staff manual booking — atomically lock + confirm tickets in one transaction WITHOUT wallet deduction
+ */
+export async function staffManualBooking(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { game_id, ticket_ids } = req.body;
+  const housie_name: string = (req.body.housie_name ?? '').trim();
+  const staffId = req.user!.userId;
+
+  if (!game_id || !Array.isArray(ticket_ids) || ticket_ids.length === 0 || !housie_name) {
+    res.status(400).json({ message: 'game_id, ticket_ids, and housie_name are required' });
+    return;
+  }
+  if (ticket_ids.length > 6) {
+    res.status(400).json({ message: 'A maximum of 6 tickets can be booked at once' });
+    return;
+  }
+  if (housie_name.length < 3 || housie_name.length > 20) {
+    res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify game accepts sales
+    const gameRes = await client.query(
+      `SELECT game_id, title, ticket_price, game_status FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    if (gameRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+    const game = gameRes.rows[0];
+    if (!['Scheduled', 'Live'].includes(game.game_status)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Game is not accepting bookings' });
+      return;
+    }
+
+    // 2. Lock ticket rows and verify availability
+    const ticketsRes = await client.query(
+      `SELECT ticket_id, ticket_number, status
+       FROM Tickets
+       WHERE ticket_id = ANY($1) AND game_id = $2
+       FOR UPDATE`,
+      [ticket_ids, game_id]
+    );
+    if (ticketsRes.rows.length !== ticket_ids.length) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Some tickets do not exist in this game' });
+      return;
+    }
+    const unavailable = ticketsRes.rows.filter((t) => t.status !== 'Available');
+    if (unavailable.length > 0) {
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        message: `Tickets ${unavailable.map((t) => `#${t.ticket_number}`).join(', ')} are not available`,
+      });
+      return;
+    }
+
+    const ticketPrice = parseFloat(game.ticket_price);
+    const totalAmount = ticketPrice * ticket_ids.length;
+
+    // 3. Create Booking — immediately Sold
+    const now = new Date();
+    const bookingRes = await client.query(
+      `INSERT INTO Bookings (
+         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
+         booking_status, locked_at, locked_until, confirmed_at, confirmed_by, is_overflow
+       ) VALUES ($1, $2, $3, $4, $5, 'Sold', $6, $6, $6, $4, TRUE)
+       RETURNING booking_id`,
+      [game_id, ticket_ids, housie_name, staffId, totalAmount, now]
+    );
+    const bookingId = bookingRes.rows[0].booking_id;
+
+    // 4. Mark tickets Sold
+    await client.query(
+      `UPDATE Tickets
+       SET status = 'Sold',
+           owner_housie_name = $1,
+           confirmed_at = $2,
+           locked_by_booking = $3,
+           locked_until = NULL
+       WHERE ticket_id = ANY($4)`,
+      [housie_name, now, bookingId, ticket_ids]
+    );
+
+    // 5. Credit Promoter Referral Commission if player is referred
+    await handleReferralCommission(client, game_id, bookingId, housie_name, totalAmount);
+
+    await client.query('COMMIT');
+
+    // Notify all connected clients that these tickets are now Sold
+    for (const ticketId of ticket_ids) {
+      io.emit('ticket_status_change', {
+        event: 'ticket_status_change',
+        ticket_id: ticketId,
+        new_status: 'Sold',
+      });
+    }
+
+    res.status(201).json({
+      booking_id: bookingId,
+      total_amount: totalAmount,
+      message: 'Tickets successfully booked and sold manually.'
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Staff manual booking error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
   }
 }

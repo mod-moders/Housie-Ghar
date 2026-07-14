@@ -133,13 +133,30 @@ export default function ProfilePage() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--profile" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 16px" }}>
-        <div style={{ width: "100%", maxWidth: 600, margin: "0 auto" }}>
-          <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 20, background: "var(--surface)", padding: 20, borderRadius: 12, border: "1px solid var(--border-light)" }}>
+        <div style={{ width: "100%", maxWidth: 1000, margin: "0 auto" }}>
+          <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 24, background: "var(--surface)", padding: "24px 28px", borderRadius: 12, border: "1px solid var(--border-light)" }}>
             
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: "1px solid var(--border-light)", paddingBottom: 18 }}>
+              <div className="hg-avatar-sm" style={{ width: 48, height: 48, fontSize: 20, borderRadius: "50%", background: "var(--brand)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
+                {(profile?.full_name || profile?.housie_name || "?")[0].toUpperCase()}
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: "var(--text)" }}>{profile?.full_name || profile?.housie_name}</h2>
+                <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Player Account Settings</span>
+              </div>
+            </div>
+
             {error && <div className="hg-sec-err" style={{ padding: 12, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8 }}>{error}</div>}
 
-            <section>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 24 }}>
+              
+              {/* Left Column: Personal Information */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                  Personal Information
+                </h3>
+                
                 <div>
                   <label style={labelStyle}>Housie Name</label>
                   <input type="text" value={profile?.housie_name || ""} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed", fontFamily: "var(--font-mono)", padding: "10px 14px" }} />
@@ -161,63 +178,72 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-            </section>
 
-            <section>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16, borderBottom: "1px solid var(--border-light)", paddingBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Security</h3>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>
-                    {hasPassword ? "Change Password (Optional)" : "Set Password to Secure Account (Leave Blank if Not Required)"}
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    disabled={removePassword}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
-                    style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
-                  />
+              {/* Right Column: Security & Preferences */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                
+                {/* Security */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                    Security
+                  </h3>
+                  
+                  <div>
+                    <label style={labelStyle}>
+                      {hasPassword ? "Change Password (Optional)" : "Set Password to Secure Account (Leave Blank if Not Required)"}
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      disabled={removePassword}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
+                      style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
+                    />
+                  </div>
+
+                  {hasPassword && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={removePassword} 
+                        onChange={e => {
+                          setRemovePassword(e.target.checked);
+                          if (e.target.checked) setPassword("");
+                        }} 
+                        style={{ width: 16, height: 16, accentColor: "var(--accent)" }} 
+                      />
+                      <span style={{ fontSize: 13, color: "var(--danger)" }}>Remove password security (revert to passwordless login)</span>
+                    </label>
+                  )}
                 </div>
 
-                {hasPassword && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+                {/* Preferences */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                    Preferences
+                  </h3>
+                  
+                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", userSelect: "none", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-light)" }}>
                     <input 
                       type="checkbox" 
-                      checked={removePassword} 
-                      onChange={e => {
-                        setRemovePassword(e.target.checked);
-                        if (e.target.checked) setPassword("");
-                      }} 
-                      style={{ width: 16, height: 16, accentColor: "var(--accent)" }} 
+                      checked={soundEnabled} 
+                      onChange={e => setSoundEnabled(e.target.checked)} 
+                      style={{ width: 18, height: 18, accentColor: "var(--accent)", cursor: "pointer" }} 
                     />
-                    <span style={{ fontSize: 13, color: "var(--danger)" }}>Remove password security (revert to passwordless login)</span>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Enable Sound Effects</span>
+                      <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Play immersive sounds for number calls and wins.</span>
+                    </div>
                   </label>
-                )}
-              </div>
-            </section>
+                </div>
 
-            <section>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16, borderBottom: "1px solid var(--border-light)", paddingBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Preferences</h3>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", userSelect: "none", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-light)" }}>
-                  <input 
-                    type="checkbox" 
-                    checked={soundEnabled} 
-                    onChange={e => setSoundEnabled(e.target.checked)} 
-                    style={{ width: 18, height: 18, accentColor: "var(--accent)", cursor: "pointer" }} 
-                  />
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Enable Sound Effects</span>
-                    <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Play immersive sounds for number calls and wins.</span>
-                  </div>
-                </label>
               </div>
-            </section>
 
-            <div style={{ marginTop: 4, display: "flex", gap: 12, alignItems: "center" }}>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", borderTop: "1px solid var(--border-light)", paddingTop: 18 }}>
               <Button type="submit" variant="cta" disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
               </Button>
@@ -225,6 +251,7 @@ export default function ProfilePage() {
                 Logout
               </Button>
             </div>
+
           </form>
         </div>
       </div>

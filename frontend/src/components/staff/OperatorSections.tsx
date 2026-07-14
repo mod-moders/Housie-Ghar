@@ -10,6 +10,7 @@ import { Icon } from "@/components/Icon";
 import { EmptyHint, KpiCard } from "@/components/ui";
 import { downloadPoster, type PosterKind } from "@/lib/sharePoster";
 import type { GameSummary, QueueBooking } from "@/lib/types";
+import { getPresetClass } from "@/lib/presetHelper";
 
 interface WhatsAppShareGroup {
   name: string;
@@ -215,7 +216,7 @@ export function ShareGamesSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ gameTitle: string; filename: string; caption: string } | null>(null);
+  const [result, setResult] = useState<{ gameId: string; gameTitle: string; filename: string; caption: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareGroups, setShareGroups] = useState<WhatsAppShareGroup[]>([]);
 
@@ -250,7 +251,7 @@ export function ShareGamesSection() {
     setSharingId(g.game_id);
     try {
       const { filename, caption } = await downloadPoster(kind, g);
-      setResult({ gameTitle: g.title, filename, caption });
+      setResult({ gameId: g.game_id, gameTitle: g.title, filename, caption });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate the share image");
     } finally {
@@ -279,51 +280,63 @@ export function ShareGamesSection() {
       <p className="hg-sec-sub">Share a game's schedule card, or its final winners, as an image straight to a Housie Ghar WhatsApp group.</p>
       {error && <p className="hg-sec-err">{error}</p>}
 
+      {/* Redesigned Modal Popout Card when download is clicked */}
       {result && (
-        <div className="hg-card" style={{ padding: "14px 16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <strong style={{ fontSize: 13 }}>
-              <Icon name="check" size={14} style={{ color: "var(--success)", verticalAlign: -2, marginRight: 6 }} />
-              "{result.filename}" downloaded — caption for {result.gameTitle}:
-            </strong>
-            <button
-              className="hg-ic-btn"
-              onClick={() => setResult(null)}
-              title="Dismiss"
-              style={{ color: "var(--text-dim)" }}
-            >
-              <Icon name="x" size={14} />
-            </button>
-          </div>
-          <textarea
-            ref={captionRef}
-            readOnly
-            value={result.caption}
-            rows={8}
-            style={{
-              width: "100%", resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 12.5,
-              padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)",
-              background: "var(--bg)", color: "var(--text)",
-            }}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-            <div style={{ display: "flex", gap: 8 }}>
+        <div className="hg-modal-scrim" onClick={() => setResult(null)}>
+          <div className="hg-modal hg-card" onClick={(e) => e.stopPropagation()} style={{ background: "var(--surface)", color: "var(--text)", maxWidth: "480px", width: "90%", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <strong style={{ fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text)", fontFamily: "var(--font-head)" }}>
+                <Icon name="check" size={16} style={{ color: "var(--success)" }} />
+                <span>Poster Generated!</span>
+              </strong>
               <button
-                className="hg-hud-share-btn"
-                onClick={copyCaption}
-                style={{ color: copied ? "var(--success)" : "var(--brand)", display: "inline-flex", alignItems: "center", gap: 6 }}
+                onClick={() => setResult(null)}
+                title="Dismiss"
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--text-mute)", display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: 4, borderRadius: "50%", transition: "all 0.15s"
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = "var(--danger)"}
+                onMouseOut={(e) => e.currentTarget.style.color = "var(--text-mute)"}
               >
-                <Icon name={copied ? "check" : "copy"} size={14} /> {copied ? "Caption Copied" : "Copy Caption"}
+                <Icon name="x" size={16} />
               </button>
             </div>
             
-            <div className="hg-share-destinations" style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", display: "block", marginBottom: 6 }}>
+            <p className="hg-sec-sub" style={{ margin: 0, fontSize: 12, color: "var(--text-dim)" }}>
+              The share poster for <b>"{result.gameTitle}"</b> has been downloaded. Copy the caption below and share:
+            </p>
+
+            <div style={{ position: "relative" }}>
+              <textarea
+                ref={captionRef}
+                readOnly
+                value={result.caption}
+                rows={6}
+                style={{
+                  width: "100%", resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 12,
+                  padding: "10px 12px", borderRadius: 8, border: "1.5px solid var(--border-2)",
+                  background: "var(--bg)", color: "var(--text)", outline: "none",
+                }}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button
+                onClick={copyCaption}
+                className={`hg-caption-copy-btn ${copied ? "is-success" : ""}`}
+                title={copied ? "Copied to clipboard!" : "Copy Caption"}
+              >
+                <Icon name={copied ? "check" : "copy"} size={13} />
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+
+            <div className="hg-share-destinations" style={{ borderTop: "1.5px dashed var(--border-2)", paddingTop: 14, marginTop: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-mute)", textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 8 }}>
                 Send directly to Official Info Groups
               </span>
               {shareGroups.length > 0 ? (
-                <div className="hg-share-group-list" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <div className="hg-share-group-list" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {shareGroups.map((group) => (
                     <button
                       key={`${group.name}-${group.url}`}
@@ -332,32 +345,22 @@ export function ShareGamesSection() {
                         navigator.clipboard.writeText(result.caption).catch(() => {});
                         window.open(group.url, "_blank", "noopener,noreferrer");
                       }}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 6,
-                        padding: "6px 12px", borderRadius: 20, border: "1px solid var(--border-2)",
-                        background: "var(--surface)", color: "var(--text)", fontSize: 12,
-                        fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-                      }}
                     >
-                      <Icon name="chat" size={13} style={{ color: "var(--success)" }} /> {group.name}
+                      <Icon name="chat" size={14} style={{ color: "var(--success)" }} />
+                      <span>{group.name}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
                     className="hg-share-group"
                     onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer")}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                      padding: "6px 12px", borderRadius: 20, border: "1px solid var(--border-2)",
-                      background: "var(--surface)", color: "var(--text)", fontSize: 12,
-                      fontWeight: 600, cursor: "pointer",
-                    }}
                   >
-                    <Icon name="chat" size={13} style={{ color: "var(--success)" }} /> Share via WhatsApp
+                    <Icon name="chat" size={14} style={{ color: "var(--success)" }} />
+                    <span>Share via WhatsApp</span>
                   </button>
-                  <p className="hg-dim" style={{ margin: 0, fontSize: 11, alignSelf: "center" }}>
+                  <p className="hg-dim" style={{ margin: 0, fontSize: 12, alignSelf: "center", color: "var(--text-mute)" }}>
                     No Official Info Groups configured. Click button to share generally.
                   </p>
                 </div>
@@ -367,36 +370,53 @@ export function ShareGamesSection() {
         </div>
       )}
 
-      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".05em", margin: "18px 0 10px" }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: "20px 0 12px" }}>
         Upcoming &amp; Live
       </h3>
       {upcoming.length === 0 ? (
         <EmptyHint icon="grid" title="No upcoming games" sub="Scheduled and live games appear here to share." />
       ) : (
         <div className="hg-fill-grid">
-          {upcoming.map((g) => (
-            <div key={g.game_id} className="hg-fill-card">
-              <div className="hg-fill-top">
-                <strong>{g.title}</strong>
-                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+          {upcoming.map((g) => {
+            const presetClass = getPresetClass(g.title);
+            return (
+              <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ display: "flex", flexDirection: "column", minHeight: "128px", position: "relative" }}>
+                <div>
+                  <div className="hg-fill-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <strong style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)", fontFamily: "var(--font-head)" }}>{g.title}</strong>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`} style={{ flexShrink: 0 }}>{g.game_status}</span>
+                  </div>
+                  <div className="hg-fill-meta" style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "6px" }}>
+                    {fmtDateTime(g.scheduled_at)}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: "8px" }}>
+                  <span style={{ fontSize: "11.5px", color: "var(--text-mute)", fontWeight: 600 }}>
+                    {money(g.prize_pool.reduce((s, p) => s + p.prize_amount, 0))} pool
+                  </span>
+                  
+                  <button
+                    className="hg-download-icon-btn"
+                    disabled={sharingId === g.game_id}
+                    onClick={() => share("scheduled", g)}
+                    title="Download Share Image + Caption"
+                    aria-label="Download Share Image + Caption"
+                  >
+                    {sharingId === g.game_id ? (
+                      <span className="hg-poll-spin" style={{ width: "16px", height: "16px" }} />
+                    ) : (
+                      <Icon name="download" size={16} />
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="hg-fill-meta">
-                {fmtDateTime(g.scheduled_at)} · {money(g.prize_pool.reduce((s, p) => s + p.prize_amount, 0))} pool
-              </div>
-              <button
-                className="hg-ic-btn"
-                disabled={sharingId === g.game_id}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
-                onClick={() => share("scheduled", g)}
-              >
-                <Icon name="chat" size={14} /> {sharingId === g.game_id ? "Generating…" : "Download Image + Caption"}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".05em", margin: "22px 0 10px" }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: "24px 0 12px" }}>
         Completed
       </h3>
       {completed.length === 0 ? (
@@ -405,23 +425,38 @@ export function ShareGamesSection() {
         <div className="hg-fill-grid">
           {completed.map((g) => {
             const wins = g.prize_pool.filter((p) => p.claimed).length;
+            const presetClass = getPresetClass(g.title);
             return (
-              <div key={g.game_id} className="hg-fill-card">
-                <div className="hg-fill-top">
-                  <strong>{g.title}</strong>
-                  <span className="hg-pill hg-pill-completed">Completed</span>
+              <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ display: "flex", flexDirection: "column", minHeight: "128px", position: "relative" }}>
+                <div>
+                  <div className="hg-fill-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <strong style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)", fontFamily: "var(--font-head)" }}>{g.title}</strong>
+                    <span className="hg-pill hg-pill-completed" style={{ flexShrink: 0 }}>Completed</span>
+                  </div>
+                  <div className="hg-fill-meta" style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "6px" }}>
+                    {fmtDateTime(g.completed_at ?? g.scheduled_at)}
+                  </div>
                 </div>
-                <div className="hg-fill-meta">
-                  {fmtDateTime(g.completed_at ?? g.scheduled_at)} · {wins} prize{wins === 1 ? "" : "s"} claimed
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: "8px" }}>
+                  <span style={{ fontSize: "11.5px", color: "var(--text-mute)", fontWeight: 600 }}>
+                    {wins} prize{wins === 1 ? "" : "s"} claimed
+                  </span>
+                  
+                  <button
+                    className="hg-download-icon-btn"
+                    disabled={sharingId === g.game_id}
+                    onClick={() => share("winners", g)}
+                    title="Download Winners Poster + Caption"
+                    aria-label="Download Winners Poster + Caption"
+                  >
+                    {sharingId === g.game_id ? (
+                      <span className="hg-poll-spin" style={{ width: "16px", height: "16px" }} />
+                    ) : (
+                      <Icon name="download" size={16} />
+                    )}
+                  </button>
                 </div>
-                <button
-                  className="hg-ic-btn"
-                  disabled={sharingId === g.game_id}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
-                  onClick={() => share("winners", g)}
-                >
-                  <Icon name="chat" size={14} /> {sharingId === g.game_id ? "Generating…" : "Download Image + Caption"}
-                </button>
               </div>
             );
           })}

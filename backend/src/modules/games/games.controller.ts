@@ -641,3 +641,68 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
     res.status(500).json({ message: error.message || 'Internal server error' });
   }
 }
+
+/**
+ * Fetch detailed booking sales (ticket list & agent summary) for a game (Staff only)
+ */
+export async function getGameSalesDetails(req: Request, res: Response): Promise<void> {
+  const { game_id } = req.params;
+
+  try {
+    const gameRes = await pool.query('SELECT game_id, title FROM Scheduled_Games WHERE game_id = $1', [game_id]);
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+
+    const ticketsRes = await pool.query(
+      `SELECT t.ticket_number, t.status, t.owner_housie_name,
+              u.email as bookie_username, u.full_name as bookie_name
+       FROM Tickets t
+       LEFT JOIN Bookings b ON (b.booking_id = t.locked_by_booking) OR (t.status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = t.game_id AND b.booking_status = 'Sold')
+       LEFT JOIN Users u ON u.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE t.game_id = $1 AND t.status IN ('Sold', 'Locked')
+       ORDER BY t.ticket_number ASC`,
+      [game_id]
+    );
+
+    const tickets = ticketsRes.rows.map(row => ({
+      ticket_number: row.ticket_number,
+      status: row.status,
+      owner_housie_name: row.owner_housie_name,
+      bookie_username: row.bookie_username || 'System/Operator',
+      bookie_name: row.bookie_name || 'System/Operator'
+    }));
+
+    // Aggregate Agent Total Sales count
+    const agentMap = new Map<string, { name: string; total: number }>();
+    tickets.forEach((t) => {
+      if (t.status === 'Sold') {
+        const username = t.bookie_username;
+        const name = t.bookie_name;
+        const existing = agentMap.get(username);
+        if (existing) {
+          existing.total += 1;
+        } else {
+          agentMap.set(username, { name, total: 1 });
+        }
+      }
+    });
+
+    const agents = Array.from(agentMap.entries()).map(([username, data]) => ({
+      bookie_username: username,
+      bookie_name: data.name,
+      total_sold: data.total
+    })).sort((a, b) => b.total_sold - a.total_sold);
+
+    res.json({
+      game_id,
+      title: gameRes.rows[0].title,
+      tickets,
+      agents
+    });
+  } catch (error) {
+    console.error('Error fetching game sales details:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
