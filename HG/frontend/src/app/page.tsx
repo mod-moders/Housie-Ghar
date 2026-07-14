@@ -127,7 +127,9 @@ export default function Lobby() {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
+  const [noticeSpeed, setNoticeSpeed] = useState(10);
+  const [noticeStep, setNoticeStep] = useState(0);
 
   // The quote rotates through HOOKS every 5s. A client-only random start (via
   // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
@@ -168,15 +170,36 @@ export default function Lobby() {
     return () => { alive = false; };
   }, []);
 
-  // Superadmin announcement (Platform_Config.marquee_text). One-shot; empty or
-  // failed fetch simply hides the strip.
+  // Superadmin announcements (Platform_Config.announcements_list — rotating,
+  // per-item + global mute; legacy marquee_text is the fallback when the list
+  // is empty). One-shot; empty or failed fetch simply hides the strip.
   useEffect(() => {
     let alive = true;
     apiFetch<PublicConfigResponse>("/api/config/public")
-      .then((c) => { if (alive) setNotice(c.marquee_text?.trim() || null); })
+      .then((c) => {
+        if (!alive) return;
+        const speed = Number(c.announcement_speed);
+        if (Number.isFinite(speed) && speed >= 3) setNoticeSpeed(speed);
+        if (c.announcements_muted === "true") return;
+        let list: { text?: unknown; muted?: unknown }[] = [];
+        try { list = JSON.parse(c.announcements_list || "[]"); } catch { /* malformed config — fall back */ }
+        const texts = (Array.isArray(list) ? list : [])
+          .filter((a) => !a.muted && typeof a.text === "string" && a.text.trim())
+          .map((a) => (a.text as string).trim());
+        if (texts.length > 0) setNotices(texts);
+        else if (c.marquee_text?.trim()) setNotices([c.marquee_text.trim()]);
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // Rotate through the announcements at the configured speed.
+  useEffect(() => {
+    if (notices.length < 2) return;
+    const id = setInterval(() => setNoticeStep((s) => s + 1), noticeSpeed * 1000);
+    return () => clearInterval(id);
+  }, [notices.length, noticeSpeed]);
+  const notice = notices.length > 0 ? notices[noticeStep % notices.length] : null;
 
   const go = (id: string) => router.push(`/game/${id}`);
   const goLive = (id: string) => router.push(`/game/${id}/live`);
@@ -233,7 +256,7 @@ export default function Lobby() {
           {notice && (
             <div className="hg-notice" role="status">
               <span className="hg-notice-ic" aria-hidden="true"><Icon name="bell" size={15} /></span>
-              <p>{notice}</p>
+              <p key={notice}>{notice}</p>
             </div>
           )}
 

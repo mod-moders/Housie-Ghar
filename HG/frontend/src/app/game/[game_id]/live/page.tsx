@@ -13,7 +13,10 @@ import { usePlayerStore } from "@/lib/stores/playerStore";
 import { Icon } from "@/components/Icon";
 import { AccountButton } from "@/components/AccountButton";
 import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
-import type { GameSummary, MyTicketsResponse, MyWinsResponse, Prize, TicketDetail } from "@/lib/types";
+import type { GameSummary, MyTicketsResponse, MyWinsResponse, NumberCallConfig, Prize, PublicConfigResponse, TicketDetail } from "@/lib/types";
+
+// Prefix for backend-served caller MP3s; same-origin in dev via the /audio rewrite.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface WinOverlay {
   prize: string;
@@ -68,6 +71,9 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const player = usePlayerStore((s) => s.player);
   const audioCtx = useRef<AudioContext | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const callsRef = useRef<Map<number, NumberCallConfig>>(new Map());
+  const callerEnabledRef = useRef(true);
+  const callAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const beep = useCallback(() => {
     if (muted) return;
@@ -90,19 +96,22 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     }
   }, [muted]);
 
-  // Pick the best available English voice for the spoken caller (prefer an
-  // Indian-English voice, then other English variants). Voices load async in
-  // most browsers, so refresh on `voiceschanged`. Cancel speech on unmount so
-  // callouts don't bleed into the next screen.
+  // Pick the voice for the spoken caller: the admin's saved preference from
+  // Call Voice Settings first, then the best available English voice (prefer
+  // Indian-English, then other variants). Voices load async in most browsers,
+  // so refresh on `voiceschanged`. Cancel speech on unmount so callouts don't
+  // bleed into the next screen.
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     const synth = window.speechSynthesis;
     const pickVoice = () => {
       const voices = synth.getVoices();
       if (voices.length === 0) return;
+      const preferred = localStorage.getItem("preferred_caller_voice");
+      const byName = preferred ? voices.find((v) => v.name === preferred) : undefined;
       const byLang = (p: string) => voices.find((v) => v.lang?.toLowerCase().startsWith(p));
       voiceRef.current =
-        byLang("en-in") || byLang("en-gb") || byLang("en-au") ||
+        byName || byLang("en-in") || byLang("en-gb") || byLang("en-au") ||
         byLang("en-us") || byLang("en") || voices[0] || null;
     };
     pickVoice();
@@ -113,28 +122,72 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     };
   }, []);
 
+  // Caller configuration: per-number phrases / MP3s (Number_Calls) and the
+  // global English-caller switch. Both are one-shot best-effort — any failure
+  // leaves the built-in callerPhrase() fallback in charge.
+  useEffect(() => {
+    let alive = true;
+    apiFetch<NumberCallConfig[]>("/api/games/number-calls")
+      .then((calls) => {
+        if (!alive) return;
+        callsRef.current = new Map(calls.map((c) => [c.number, c]));
+      })
+      .catch(() => {});
+    apiFetch<PublicConfigResponse>("/api/config/public")
+      .then((c) => { if (alive) callerEnabledRef.current = c.english_caller_enabled !== "false"; })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      callAudioRef.current?.pause();
+      callAudioRef.current = null;
+    };
+  }, []);
+
   // Announce a drawn number aloud, traditional-caller style ("two and one,
-  // twenty one"). Cancels any in-flight callout so the latest number always
-  // wins, even at fast draw speeds.
+  // twenty one"). Uses the admin-configured phrase or MP3 from Number_Calls
+  // when present (falling back to the built-in callerPhrase), and stays silent
+  // when the Superadmin has switched the English caller off. Cancels any
+  // in-flight callout so the latest number always wins, even at fast speeds.
   const speak = useCallback((n: number) => {
-    if (muted) return;
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    try {
-      const u = new SpeechSynthesisUtterance(callerPhrase(n));
-      if (voiceRef.current) u.voice = voiceRef.current;
-      u.rate = 0.95;
-      u.pitch = 1;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {
-      /* speech unavailable */
+    if (muted || !callerEnabledRef.current) return;
+    if (typeof window === "undefined") return;
+    callAudioRef.current?.pause();
+    callAudioRef.current = null;
+    window.speechSynthesis?.cancel();
+    const cfg = callsRef.current.get(n);
+    if (cfg?.call_mode === "Audio" && cfg.audio_url) {
+      try {
+        const audio = new Audio(`${API_BASE}${cfg.audio_url}`);
+        callAudioRef.current = audio;
+        void audio.play().catch(() => speakText(n, cfg.call_text));
+        return;
+      } catch {
+        /* fall through to TTS */
+      }
+    }
+    speakText(n, cfg?.call_text);
+
+    function speakText(num: number, text?: string) {
+      if (!window.speechSynthesis) return;
+      try {
+        const u = new SpeechSynthesisUtterance(text?.trim() || callerPhrase(num));
+        if (voiceRef.current) u.voice = voiceRef.current;
+        u.rate = 0.95;
+        u.pitch = 1;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      } catch {
+        /* speech unavailable */
+      }
     }
   }, [muted]);
 
   // Muting also silences an in-progress callout.
   useEffect(() => {
-    if (muted && typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (muted && typeof window !== "undefined") {
+      window.speechSynthesis?.cancel();
+      callAudioRef.current?.pause();
+      callAudioRef.current = null;
     }
   }, [muted]);
 
