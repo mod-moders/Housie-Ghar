@@ -806,6 +806,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   background:var(--surface-2);border:1.5px dashed var(--border-2);font-size:12px;color:var(--text-dim);text-align:center}
 .hg-login-cred code{font-family:var(--font-mono);color:var(--text);font-weight:600}
 
+/* staff "door" picker on the unified /login staff card — the door list and
+   the single-role sign-in form are two .hg-door-step views swapped in place
+   (no route navigation); each entrance animates in from the direction it
+   conceptually came from. */
+.hg-door-step{display:flex;flex-direction:column;gap:12px;animation:hg-door-fwd var(--dur-3) ease-in-out both}
+.hg-door-step-back{animation-name:hg-door-back}
+@keyframes hg-door-fwd{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes hg-door-back{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+
 /* ============ STAFF DASHBOARD ============ */
 .hg-dash{display:flex;min-height:100%;background:var(--bg)}
 .hg-side{display:flex;flex-direction:column;width:212px;flex-shrink:0;padding:16px 12px 16px max(12px,env(safe-area-inset-left));gap:18px;

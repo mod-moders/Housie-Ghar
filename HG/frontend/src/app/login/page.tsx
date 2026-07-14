@@ -12,7 +12,7 @@ import { usePlayerStore, Player } from "@/lib/stores/playerStore";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
 import { Button, Logo } from "@/components/ui";
-import { STAFF_DOORS, DROPDOWN_DOORS } from "@/lib/staffRoles";
+import { STAFF_DOORS, DROPDOWN_DOORS, type DoorRole } from "@/lib/staffRoles";
 
 // false during SSR/first paint, true after hydration — lets us read the
 // localStorage-backed player store without a hydration mismatch.
@@ -25,6 +25,9 @@ export default function LoginPage() {
   const setUser = useAuthStore((s) => s.setUser);
 
   const [mode, setMode] = useState<"player" | "staff">("player");
+  // null = staff-mode door list; a role = that door's inline sign-in form is
+  // showing (same page, no navigation — see submitRoleLogin/switchMode).
+  const [staffDoor, setStaffDoor] = useState<DoorRole | null>(null);
   const [username, setUsername] = useState("");
 
   // Sign in vs. sign up defaults to whatever this device has done before: a
@@ -46,6 +49,7 @@ export default function LoginPage() {
 
   const switchMode = (m: "player" | "staff") => {
     setMode(m);
+    setStaffDoor(null);
     setError(null);
   };
 
@@ -94,6 +98,31 @@ export default function LoginPage() {
       });
       setUser(res.user);
       router.push("/staff");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Login failed");
+      setBusy(false);
+    }
+  };
+
+  // Same role-mismatch guard as RoleLogin, but inline: picking a door never
+  // navigates away from /login, it just swaps which form the card shows.
+  const submitRoleLogin = async () => {
+    if (!staffDoor || !email || !password || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{ user: AuthUser }>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.user.role_name !== staffDoor) {
+        try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* ignore */ }
+        setError(`These credentials aren't a ${STAFF_DOORS[staffDoor].label} account.`);
+        setBusy(false);
+        return;
+      }
+      setUser(res.user);
+      router.push(STAFF_DOORS[staffDoor].panel);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
       setBusy(false);
@@ -191,8 +220,8 @@ export default function LoginPage() {
                   </div>
                 </form>
               </>
-            ) : (
-              <>
+            ) : staffDoor === null ? (
+              <div key="door-list" className="hg-door-step">
                 <div className="hg-login-secure"><Icon name="shield" size={13} /> Secure staff portal</div>
                 <h1 className="hg-login-title">Staff sign in</h1>
 
@@ -202,7 +231,7 @@ export default function LoginPage() {
                       key={role}
                       type="button"
                       className="hg-door-btn"
-                      onClick={() => router.push(STAFF_DOORS[role].login)}
+                      onClick={() => { setStaffDoor(role); setError(null); }}
                     >
                       <span className="hg-door-ic"><Icon name={STAFF_DOORS[role].icon} size={16} /></span>
                       <span className="hg-door-label">{STAFF_DOORS[role].label}</span>
@@ -241,7 +270,51 @@ export default function LoginPage() {
                     {busy ? "Signing in…" : "Continue"}
                   </Button>
                 </form>
-              </>
+              </div>
+            ) : (
+              <div key={staffDoor} className="hg-door-step hg-door-step-back">
+                <button
+                  type="button"
+                  className="hg-back"
+                  onClick={() => { setStaffDoor(null); setError(null); }}
+                  aria-label="Back to staff portals"
+                >
+                  <Icon name="arrowL" size={20} />
+                </button>
+                <div className="hg-login-secure">
+                  <Icon name={STAFF_DOORS[staffDoor].icon} size={13} /> {STAFF_DOORS[staffDoor].label} portal
+                </div>
+                <h1 className="hg-login-title">{STAFF_DOORS[staffDoor].label} sign-in</h1>
+
+                <form
+                  onSubmit={(e) => { e.preventDefault(); submitRoleLogin(); }}
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <label className="hg-login-field">
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={email}
+                      autoComplete="username"
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </label>
+                  <label className="hg-login-field">
+                    <span>Password</span>
+                    <input
+                      type="password"
+                      value={password}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </label>
+                  {error && <div className="hg-login-err">{error}</div>}
+                  <Button variant="cta" size="lg" full type="submit" disabled={busy || !email || !password}>
+                    {busy ? "Signing in…" : "Continue"}
+                  </Button>
+                </form>
+              </div>
             )}
           </div>
 
