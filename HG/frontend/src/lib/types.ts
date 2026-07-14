@@ -6,6 +6,7 @@ export interface Prize {
   prize_amount: number;
   claimed: boolean;
   winner_housie_name: string | null;
+  winner_ticket_number?: number | null;
   claimed_at: string | null;
   split_count: number;
   amount_per_winner: number | null;
@@ -15,10 +16,12 @@ export interface GameSummary {
   game_id: string;
   title: string;
   scheduled_at: string;
+  completed_at?: string | null;
   ticket_price: number;
   total_tickets: number;
   sold_count: number;
   locked_count: number;
+  player_count?: number;
   available_count: number;
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Completed";
@@ -99,11 +102,84 @@ export interface LuckyNumberResponse {
   refreshes_at: string;
 }
 
+// GET /api/stats/financial-analysis (Superadmin/Admin)
+export interface DailyPoint {
+  day: string;
+  revenue: number;
+  payouts: number;
+  net: number;
+  tickets: number;
+}
+
+export interface HourlyPoint {
+  hour: number;
+  tickets: number;
+}
+
+export interface RetentionData {
+  new_players: number;
+  returning_players: number;
+}
+
+export interface FinAnalysisGame {
+  game_id: string;
+  title: string;
+  completed_at: string | null;
+  ticket_price: number;
+  tickets_sold: number;
+  gross_collection: number;
+  payout: number;
+  net_profit: number;
+  profit_margin: number;
+}
+
+export interface FinancialAnalysis {
+  overall_collection: number;
+  total_payouts: number;
+  overall_profit: number;
+  profit_margin: number;
+  total_tickets_sold: number;
+  wallet_balances: number;
+  recent_games: FinAnalysisGame[];
+  daily: DailyPoint[];
+  hourly_today: HourlyPoint[];
+  retention: RetentionData;
+}
+
+// GET /api/players (staff player management)
+export interface PlayerAccount {
+  player_id: string;
+  username: string;
+  full_name: string;
+  date_of_birth: string | null;
+  created_at: string;
+  last_login: string | null;
+  status: "Active" | "Suspended";
+  games_played: number;
+  tickets_bought: number;
+  total_expenditure: number;
+  total_wins: number;
+  total_won: number;
+}
+
+// GET /api/games/number-calls
+export interface NumberCallConfig {
+  number: number;
+  call_text: string;
+  default_text: string;
+  audio_url: string | null;
+  call_mode: "Text" | "Audio";
+}
+
 /** GET /api/config/public — unauthenticated, whitelisted Platform_Config keys. */
 export interface PublicConfigResponse {
   marquee_text: string | null;
   support_email: string | null;
   support_phone: string | null;
+  announcements_list: string | null;
+  announcement_speed: string | null;
+  announcements_muted: string | null;
+  english_caller_enabled: string | null;
 }
 
 /** GET /api/config — Superadmin-only full key-value listing. */

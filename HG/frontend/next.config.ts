@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/api/:path*", destination: `${BACKEND}/api/:path*` },
       { source: "/socket.io/:path*", destination: `${BACKEND}/socket.io/:path*` },
+      // Uploaded caller MP3s are served by the backend (see numberCalls.controller)
+      { source: "/audio/:path*", destination: `${BACKEND}/audio/:path*` },
     ];
   },
 };

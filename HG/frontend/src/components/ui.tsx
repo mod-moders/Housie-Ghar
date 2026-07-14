@@ -18,6 +18,59 @@ export function Logo({ size = 48, onClick }: { size?: number; onClick?: () => vo
   );
 }
 
+// ── Avatar (role profile picture with initial-letter fallback) ───────────────
+export function Avatar({
+  src,
+  name,
+  size = 36,
+  style,
+}: {
+  src?: string | null;
+  name?: string | null;
+  size?: number;
+  style?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = React.useState(false);
+  const base: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    border: "2px solid var(--ink)",
+    flexShrink: 0,
+    ...style,
+  };
+  if (src && !failed) {
+    return (
+      // Static role portraits from /public/avatars — plain <img> keeps the
+      // component usable at any size without Next image-loader config.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name ?? "Profile picture"}
+        style={{ ...base, objectFit: "cover" }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <span
+      style={{
+        ...base,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--surface)",
+        color: "var(--text)",
+        fontFamily: "var(--font-head)",
+        fontWeight: 700,
+        fontSize: Math.round(size * 0.42),
+      }}
+    >
+      {(name ?? "?").charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 // ── Button ───────────────────────────────────────────────────────────────────
 interface ButtonProps {
   children: React.ReactNode;
