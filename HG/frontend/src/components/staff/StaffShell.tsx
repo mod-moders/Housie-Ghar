@@ -8,13 +8,17 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
-import { Logo } from "@/components/ui";
+import { Avatar, Logo } from "@/components/ui";
+import { roleAvatar } from "@/lib/roleAvatar";
 import {
-  OverviewSection, GamesSection, FillingSection, WorkforceSection, AuditSection, AnnouncementSection,
+  GamesSection, FillingSection, WorkforceSection, AuditSection, HistorySection,
 } from "@/components/staff/AdminSections";
-import { FinanceHubSection, MasterLedgerSection, PrizePayoutsSection } from "@/components/staff/FinanceSections";
-import { OperatorHudSection, OverflowSection } from "@/components/staff/OperatorSections";
+import { FinanceHubSection, PrizePayoutsSection } from "@/components/staff/FinanceSections";
+import { OperatorHudSection, OverflowSection, ShareGamesSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
+import { PlayersSection } from "@/components/staff/PlayersSection";
+import { ProfileSection } from "@/components/staff/ProfileSection";
+import { SettingsSection } from "@/components/staff/SettingsSection";
 import { ChangePasswordCard } from "@/components/staff/ChangePasswordCard";
 import { STAFF_DOORS, type DoorRole } from "@/lib/staffRoles";
 import type { FinancialHud } from "@/lib/types";
@@ -24,21 +28,34 @@ type NavItem = [key: string, label: string, icon: string];
 function navFor(user: AuthUser): NavItem[] {
   const isFo = user.role_name === "Superadmin" || (user.role_name === "Admin" && user.is_cfo === true);
   if (user.role_id <= 2) {
-    const items: NavItem[] = [["overview", "Dashboard", "chart"]];
-    if (isFo) items.push(["finance", "Finance Hub", "wallet"], ["ledger", "Bookie Ledger", "chart"], ["payouts", "Prize Payouts", "trophy"]);
+    const items: NavItem[] = [];
+    if (isFo) items.push(["finance", "Finance Hub", "wallet"], ["payouts", "Prize Payouts", "trophy"]);
     items.push(
       ["games", "Games", "grid"],
-      ["filling", "Filling Status", "ticket"],
-      ["staff", "Workforce", "users"],
-      ["audit", "Audit Log", "shield"],
+      ["history", "Past Games", "clock"],
+      ["players", "Player Management", "users"],
+      ["staff", "Staff Management", "shieldCheck"],
+      ["audit", "Website Audits", "shield"],
     );
-    if (user.role_id === 1) items.push(["announce", "Announcement", "bell"]);
+    if (user.role_name === "Superadmin") items.push(["settings", "Website Settings", "edit"]);
+    items.push(["profile", "My Profile", "user"]);
     return items;
   }
   if (user.role_name === "Operator") {
-    return [["hud", "Live HUD", "play"], ["overflow", "Overflow Queue", "bell"], ["filling", "Filling Status", "ticket"]];
+    return [
+      ["hud", "Live HUD", "play"],
+      ["overflow", "Overflow Queue", "bell"],
+      ["filling", "Filling Status", "ticket"],
+      ["broadcast", "Share to WhatsApp", "chat"],
+      ["profile", "My Profile", "user"],
+    ];
   }
-  return [["queue", "Booking Queue", "bell"], ["wallet", "My Wallet", "wallet"], ["filling", "Filling Status", "ticket"]];
+  return [
+    ["queue", "Booking Queue", "bell"],
+    ["wallet", "My Wallet", "wallet"],
+    ["filling", "Filling Status", "ticket"],
+    ["profile", "My Profile", "user"],
+  ];
 }
 
 export function StaffShell({ expects }: { expects?: DoorRole }) {
@@ -66,6 +83,13 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
       })
       .catch(() => router.replace(loginPath));
   }, [setUser, router, expects]);
+
+  // Browser-tab title per role, so several open panels stay tellable apart.
+  useEffect(() => {
+    if (!user) return;
+    const label = user.role_name === "Agent" ? "Bookie" : user.role_name;
+    document.title = `HG-${label}`;
+  }, [user]);
 
   const nav = useMemo(() => (user ? navFor(user) : []), [user]);
   const isFo = !!user && (user.role_name === "Superadmin" || (user.role_name === "Admin" && user.is_cfo === true));
@@ -118,23 +142,25 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
   }
 
   const roleLabel = user.role_name === "Agent" ? "Bookie" : user.is_cfo ? "Financial Officer" : user.role_name;
-  const showFinanceBar = isFo && hud && (active === "finance" || active === "ledger" || active === "overview");
+  const showFinanceBar = isFo && hud && active === "finance";
 
   const renderSection = () => {
     switch (active) {
-      case "overview": return <OverviewSection goSection={setSection} />;
       case "finance": return <FinanceHubSection onResolved={loadHud} />;
-      case "ledger": return <MasterLedgerSection />;
       case "payouts": return <PrizePayoutsSection onSettled={loadPendingPayouts} />;
       case "games": return <GamesSection />;
+      case "history": return <HistorySection />;
+      case "players": return <PlayersSection me={user} />;
       case "filling": return <FillingSection />;
       case "staff": return <WorkforceSection me={user} />;
       case "audit": return <AuditSection />;
-      case "announce": return <AnnouncementSection />;
+      case "settings": return <SettingsSection />;
       case "hud": return <OperatorHudSection />;
       case "overflow": return <OverflowSection />;
+      case "broadcast": return <ShareGamesSection />;
       case "queue": return <BookieQueueSection me={user} />;
       case "wallet": return <BookieWalletSection me={user} />;
+      case "profile": return <ProfileSection me={user} onUpdated={setUser} />;
       default: return null;
     }
   };
@@ -186,7 +212,7 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
               )}
               <div className="hg-status-right">
                 <span className="hg-status-role">{user.full_name} · {roleLabel}</span>
-                <span className="hg-avatar-sm">{user.full_name[0]}</span>
+                <Avatar src={roleAvatar(user)} name={user.full_name} size={28} />
               </div>
             </header>
 

@@ -1,19 +1,25 @@
 "use client";
-/** Operator sections: live HUD with draw controls + overflow failsafe queue. */
+/** Operator sections: live HUD with draw controls, overflow failsafe queue, WhatsApp share posters. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useSSE } from "@/lib/hooks/useSSE";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { Icon } from "@/components/Icon";
 import { EmptyHint, KpiCard } from "@/components/ui";
+import { downloadPoster, type PosterKind } from "@/lib/sharePoster";
 import type { GameSummary, QueueBooking } from "@/lib/types";
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`;
+}
 
 export function OperatorHudSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [speed, setSpeed] = useState(4);
+  const [speed, setSpeed] = useState(8);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
@@ -119,12 +125,12 @@ export function OperatorHudSection() {
           <div className="hg-speed">
             <div className="hg-speed-lbl"><span>Call speed</span><b>{speed}s interval</b></div>
             <input
-              type="range" min={3} max={12} value={speed}
+              type="range" min={5} max={12} value={speed}
               onChange={(e) => applySpeed(+e.target.value)}
               className="hg-speed-range"
               disabled={!running}
             />
-            <div className="hg-speed-ends"><span>Fast 3s</span><span>Slow 12s</span></div>
+            <div className="hg-speed-ends"><span>Fast 5s</span><span>Slow 12s</span></div>
           </div>
           {error && <p className="hg-sec-err" style={{ marginTop: 10 }}>{error}</p>}
         </div>
@@ -183,6 +189,173 @@ export function OverflowSection() {
           {queue.map((r) => (
             <OverflowCard key={r.booking_id} booking={r} onConfirm={() => forceConfirm(r.booking_id)} />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Share to WhatsApp (poster generator) ─────────────────────────────────────
+export function ShareGamesSection() {
+  const [games, setGames] = useState<GameSummary[]>([]);
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ gameTitle: string; filename: string; caption: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
+
+  const load = useCallback(() => {
+    apiFetch<GameSummary[]>("/api/games").then(setGames).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const upcoming = games
+    .filter((g) => g.game_status === "Scheduled" || g.game_status === "Live" || g.game_status === "Paused")
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+
+  const completed = games
+    .filter((g) => g.game_status === "Completed")
+    .sort((a, b) => new Date(b.completed_at ?? b.scheduled_at).getTime() - new Date(a.completed_at ?? a.scheduled_at).getTime())
+    .slice(0, 8);
+
+  const share = async (kind: PosterKind, g: GameSummary) => {
+    setError(null);
+    setCopied(false);
+    setSharingId(g.game_id);
+    try {
+      const { filename, caption } = await downloadPoster(kind, g);
+      setResult({ gameTitle: g.title, filename, caption });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not generate the share image");
+    } finally {
+      setSharingId(null);
+    }
+  };
+
+  const copyCaption = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.caption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Clipboard API blocked (permissions, unfocused doc, etc.) — select the
+      // text so the operator can copy it manually with Ctrl/Cmd+C instead.
+      captionRef.current?.focus();
+      captionRef.current?.select();
+    }
+  };
+
+  return (
+    <div className="hg-sec">
+      <p className="hg-sec-sub">Share a game&apos;s schedule card, or its final winners, as an image straight to a Housie Ghar WhatsApp group.</p>
+      {error && <p className="hg-sec-err">{error}</p>}
+
+      {result && (
+        <div className="hg-panel" style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <strong style={{ fontSize: 13 }}>
+              <Icon name="check" size={14} style={{ color: "var(--success)", verticalAlign: -2, marginRight: 6 }} />
+              &quot;{result.filename}&quot; downloaded — caption for {result.gameTitle}:
+            </strong>
+            <button className="hg-ic-btn" onClick={() => setResult(null)} title="Dismiss" style={{ color: "var(--text-dim)" }}>
+              <Icon name="x" size={14} />
+            </button>
+          </div>
+          <textarea
+            ref={captionRef}
+            readOnly
+            value={result.caption}
+            rows={8}
+            style={{
+              width: "100%", resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 12.5,
+              padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)",
+              background: "var(--bg)", color: "var(--text)",
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              className="hg-ic-btn"
+              onClick={copyCaption}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent)", fontSize: 12, fontWeight: 600 }}
+            >
+              <Icon name={copied ? "check" : "edit"} size={14} /> {copied ? "Copied!" : "Copy Caption"}
+            </button>
+            <button
+              className="hg-ic-btn"
+              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer")}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent)", fontSize: 12, fontWeight: 600 }}
+            >
+              <Icon name="chat" size={14} /> Open WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".05em", margin: "18px 0 10px" }}>
+        Upcoming &amp; Live
+      </h3>
+      {upcoming.length === 0 ? (
+        <EmptyHint icon="grid" title="No upcoming games" sub="Scheduled and live games appear here to share." />
+      ) : (
+        <div className="hg-fill-grid">
+          {upcoming.map((g) => (
+            <div key={g.game_id} className="hg-fill-card">
+              <div className="hg-fill-top">
+                <strong>{g.title}</strong>
+                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+              </div>
+              <div className="hg-fill-meta">
+                {fmtDateTime(g.scheduled_at)} · {money(g.prize_pool.reduce((s, p) => s + p.prize_amount, 0))} pool
+              </div>
+              <button
+                className="hg-ic-btn"
+                disabled={sharingId === g.game_id}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--accent)", fontSize: 12, fontWeight: 600 }}
+                onClick={() => share("scheduled", g)}
+              >
+                <Icon name="chat" size={14} /> {sharingId === g.game_id ? "Generating…" : "Download Image + Caption"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".05em", margin: "22px 0 10px" }}>
+        Completed
+      </h3>
+      {completed.length === 0 ? (
+        <EmptyHint icon="trophy" title="No completed games yet" sub="Winners lists appear here once a game finishes." />
+      ) : (
+        <div className="hg-fill-grid">
+          {completed.map((g) => {
+            const wins = g.prize_pool.filter((p) => p.claimed).length;
+            return (
+              <div key={g.game_id} className="hg-fill-card">
+                <div className="hg-fill-top">
+                  <strong>{g.title}</strong>
+                  <span className="hg-pill hg-pill-completed">Completed</span>
+                </div>
+                <div className="hg-fill-meta">
+                  {fmtDateTime(g.completed_at ?? g.scheduled_at)} · {wins} prize{wins === 1 ? "" : "s"} claimed
+                </div>
+                <button
+                  className="hg-ic-btn"
+                  disabled={sharingId === g.game_id}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, color: "var(--accent)", fontSize: 12, fontWeight: 600 }}
+                  onClick={() => share("winners", g)}
+                >
+                  <Icon name="chat" size={14} /> {sharingId === g.game_id ? "Generating…" : "Download Image + Caption"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
