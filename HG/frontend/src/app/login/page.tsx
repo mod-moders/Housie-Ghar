@@ -12,6 +12,7 @@ import { usePlayerStore, Player } from "@/lib/stores/playerStore";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
 import { Button, Logo } from "@/components/ui";
+import { STAFF_DOORS, DROPDOWN_DOORS } from "@/lib/staffRoles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -155,6 +156,23 @@ export default function LoginPage() {
               <>
                 <div className="hg-login-secure"><Icon name="shield" size={13} /> Secure staff portal</div>
                 <h1 className="hg-login-title">Staff sign in</h1>
+
+                <div className="hg-door-list">
+                  {DROPDOWN_DOORS.map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      className="hg-door-btn"
+                      onClick={() => router.push(STAFF_DOORS[role].login)}
+                    >
+                      <span className="hg-door-ic"><Icon name={STAFF_DOORS[role].icon} size={16} /></span>
+                      <span className="hg-door-label">{STAFF_DOORS[role].label}</span>
+                      <Icon name="chevR" size={16} className="hg-door-chev" />
+                    </button>
+                  ))}
+                </div>
+                <div className="hg-login-hint">Not sure which portal? Sign in with any staff email below.</div>
+
                 <form
                   onSubmit={(e) => { e.preventDefault(); submitStaff(); }}
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
