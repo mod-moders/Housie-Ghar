@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Badge, Button, CountdownPills, GameStatusBadge, ProgressBar, EmptyHint } from "@/components/ui";
+import { Badge, Button, GameStatusBadge, ProgressBar, EmptyHint } from "@/components/ui";
 import type { GameSummary, LuckyNumberResponse, PublicConfigResponse } from "@/lib/types";
 
 // Rotated on the banner every 5s, starting from a random hook each page load.
@@ -213,10 +213,9 @@ export default function Lobby() {
     .filter((g) => g.game_status === "Scheduled")
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
-  // With nothing live, promote the soonest upcoming game to a featured hero so
-  // the page still has a focal point; otherwise the whole list is a flat grid.
-  const featuredNext = inProgress.length === 0 ? scheduled[0] : undefined;
-  const gridGames = featuredNext ? scheduled.slice(1) : scheduled;
+  // Only genuinely live/paused games ever appear above Upcoming Games —
+  // everything else (including the soonest scheduled draw) stays in the grid.
+  const gridGames = scheduled;
   const nothingToShow = games !== null && inProgress.length === 0 && scheduled.length === 0;
 
   return (
@@ -288,33 +287,6 @@ export default function Lobby() {
               </div>
               <div className="hg-feed-list">
                 {inProgress.map((g) => <GameCard key={g.game_id} game={g} go={go} goLive={goLive} />)}
-              </div>
-            </section>
-          )}
-
-          {/* Promoted next draw (only when nothing is live) */}
-          {featuredNext && (
-            <section className="hg-feature">
-              <div className="hg-hero-card">
-                <div className="hg-hero-kicker"><span className="hg-live-dot" /> NEXT DRAW</div>
-                <h1 className="hg-hero-title">{featuredNext.title}</h1>
-                <div className="hg-hero-when">
-                  {formatWhen(featuredNext.scheduled_at).date} · {formatWhen(featuredNext.scheduled_at).time}
-                </div>
-                <CountdownPills targetTs={new Date(featuredNext.scheduled_at).getTime()} />
-                <div className="hg-hero-line">
-                  {featuredNext.prize_pool.length > 0 && (
-                    <>
-                      {featuredNext.prize_pool[featuredNext.prize_pool.length - 1].pattern_name}{" "}
-                      <b>{money(featuredNext.prize_pool[featuredNext.prize_pool.length - 1].prize_amount)}</b>
-                      <span className="sep">·</span>
-                    </>
-                  )}
-                  <b>{money(featuredNext.ticket_price)}</b> per ticket
-                </div>
-                <Button variant="cta" size="lg" full iconRight="chevR" onClick={() => go(featuredNext.game_id)}>
-                  Pick Your Tickets
-                </Button>
               </div>
             </section>
           )}
