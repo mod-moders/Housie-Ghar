@@ -194,6 +194,7 @@ export default function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const { config } = useConfigStore();
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // The quote rotates through HOOKS every 5s. A client-only random start (via
   // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
@@ -273,13 +274,22 @@ export default function Lobby() {
       localStorage.setItem("hg_ref_promoter_id", ref);
     }
 
-    apiFetch("/api/player/me")
-      .catch(() => {
-        router.push("/signup");
-      });
+    const token = localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token");
+    if (!token) {
+      router.push("/signup");
+    } else {
+      apiFetch("/api/player/me")
+        .then(() => {
+          setIsCheckingAuth(false);
+        })
+        .catch(() => {
+          router.push("/signup");
+        });
+    }
   }, [router]);
 
   useEffect(() => {
+    if (isCheckingAuth) return;
     let alive = true;
     const load = () =>
       apiFetch<GameSummary[]>("/api/games")
@@ -288,17 +298,18 @@ export default function Lobby() {
     load();
     const id = setInterval(load, 15000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [isCheckingAuth]);
 
   // One-shot fetch: the lucky number only changes every 12 days, so no polling.
   // Any failure simply leaves the card hidden.
   useEffect(() => {
+    if (isCheckingAuth) return;
     let alive = true;
     apiFetch<LuckyNumberResponse>("/api/stats/lucky-number")
       .then((l) => { if (alive) setLucky(l); })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [isCheckingAuth]);
 
   const go = (id: string) => router.push(`/game/${id}`);
   const goLive = (id: string) => router.push(`/game/${id}/live`);
@@ -321,6 +332,16 @@ export default function Lobby() {
     .filter((g) => g.game_status === "Completed")
     .sort((a, b) => new Date(b.completed_at || b.scheduled_at).getTime() - new Date(a.completed_at || a.scheduled_at).getTime())
     .slice(0, 4);
+
+  if (isCheckingAuth) {
+    return (
+      <PublicShell>
+        <div className="hg-screen flex items-center justify-center min-h-[50vh]">
+          <span style={{ color: "var(--text-dim)", fontSize: 15, fontWeight: 500 }}>Entering lobby…</span>
+        </div>
+      </PublicShell>
+    );
+  }
 
   return (
     <PublicShell>

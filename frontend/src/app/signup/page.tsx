@@ -52,6 +52,7 @@ export default function SignUp() {
       });
 
       if (typeof window !== "undefined") {
+        localStorage.setItem("hg_player_token", res.token);
         sessionStorage.setItem("hg_player_token", res.token);
       }
 

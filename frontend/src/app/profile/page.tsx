@@ -38,7 +38,7 @@ export default function ProfilePage() {
       })
       .catch((err) => {
         console.error("Failed to load profile", err);
-        router.push("/signup"); // redirect to login/signup
+        router.push("/login"); // redirect to login/signup
       });
   }, [router]);
 
@@ -86,14 +86,16 @@ export default function ProfilePage() {
     try {
       await apiFetch("/api/player/logout", { method: "POST" });
       if (typeof window !== "undefined") {
+        localStorage.removeItem("hg_player_token");
         sessionStorage.removeItem("hg_player_token");
       }
-      router.push("/signup");
+      router.push("/login");
     } catch {
       if (typeof window !== "undefined") {
+        localStorage.removeItem("hg_player_token");
         sessionStorage.removeItem("hg_player_token");
       }
-      router.push("/signup");
+      router.push("/login");
     }
   };
 
