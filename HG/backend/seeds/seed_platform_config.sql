@@ -10,5 +10,9 @@ INSERT INTO Platform_Config (config_key, config_value, description) VALUES
   ('terms_text', 'Housie Ghar is for recreational play. All transactions are peer-to-peer.', 'Platform Terms and Conditions'),
   ('lock_duration_minutes', '10', 'Number of minutes a ticket booking soft-lock is held'),
   ('low_balance_threshold', '500', 'Alert threshold for Agent wallet balance'),
-  ('spam_flag_threshold', '3', 'Number of spam flags before a player is soft-banned')
+  ('spam_flag_threshold', '3', 'Number of spam flags before a player is soft-banned'),
+  ('announcements_list', '[]', 'Lobby announcements as a JSON array of up to 5 {id, text, muted} items'),
+  ('announcement_speed', '10', 'Seconds each lobby announcement stays on screen before rotating'),
+  ('announcements_muted', 'false', 'Whether all lobby announcements are hidden'),
+  ('english_caller_enabled', 'true', 'Whether the live board speaks each drawn number (TTS / MP3)')
 ON CONFLICT (config_key) DO NOTHING;

@@ -10,7 +10,15 @@ import { logAuditEvent } from '../../services/audit.service';
 import { logger } from '../../utils/logger';
 
 /** Config keys safe to expose to unauthenticated players. */
-const PUBLIC_CONFIG_KEYS = ['marquee_text', 'support_email', 'support_phone'] as const;
+const PUBLIC_CONFIG_KEYS = [
+  'marquee_text',
+  'support_email',
+  'support_phone',
+  'announcements_list',
+  'announcement_speed',
+  'announcements_muted',
+  'english_caller_enabled',
+] as const;
 
 /**
  * Read the player-visible subset of the platform configuration (no auth).
