@@ -11,7 +11,7 @@ import { PrizePattern } from '@shared/types/game';
 import { TicketGridData } from '@shared/types/ticket';
 import { logger } from '../utils/logger';
 import { CONSTANTS } from '../config/constants';
-import { detectPatternWinners, splitPrize } from './winDetection';
+import { detectPatternWinners, splitPrize, isFullHousePattern } from './winDetection';
 import { recordSettlementsForPrize, RecordedSettlement } from './settlements.service';
 
 // In-memory runtime state for active games
@@ -34,6 +34,9 @@ interface ActiveGame {
     prizeAmount: number;
     claimed: boolean;
   }>;
+  // Tickets that already took a Full House tier — 1st/2nd/3rd must go to
+  // distinct tickets, so these are excluded from later-tier detection.
+  fullHouseWinnerTickets: Set<number>;
 }
 
 const activeGames = new Map<string, ActiveGame>();
@@ -122,6 +125,20 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     prizeAmount: parseFloat(row.prize_amount),
     claimed: row.claimed,
   }));
+  // Evaluate Full House tiers in tier order regardless of insert order, so
+  // "2nd Full House" can never claim before "1st Full House" on the same tick.
+  const fhOrder: Record<string, number> = { 'Full House': 0, '1st Full House': 1, '2nd Full House': 2, '3rd Full House': 3 };
+  prizes.sort((a, b) => (fhOrder[a.patternName] ?? -1) - (fhOrder[b.patternName] ?? -1));
+
+  // Restore FH-tier winners on the crash-recovery path: each winning ticket
+  // has an Owed/Paid settlement row recorded in the claim transaction.
+  const fhWinnersRes = await pool.query(
+    `SELECT DISTINCT ticket_id FROM Prize_Settlements
+     WHERE game_id = $1
+       AND pattern_name IN ('Full House', '1st Full House', '2nd Full House', '3rd Full House')`,
+    [gameId]
+  );
+  const fullHouseWinnerTickets = new Set<number>(fhWinnersRes.rows.map((r) => r.ticket_id));
 
   // 3. Fetch sold tickets with their owner names
   const ticketsRes = await pool.query(
@@ -175,6 +192,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     timer: null,
     tickets,
     prizes,
+    fullHouseWinnerTickets,
   };
 
   activeGames.set(gameId, activeGame);
@@ -290,7 +308,13 @@ async function checkWins(
   for (const prize of game.prizes) {
     if (prize.claimed) continue;
 
-    const winners = detectPatternWinners(prize.patternName, game.tickets, drawnSet);
+    const isFhTier = isFullHousePattern(prize.patternName);
+    const winners = detectPatternWinners(
+      prize.patternName,
+      game.tickets,
+      drawnSet,
+      isFhTier ? game.fullHouseWinnerTickets : undefined
+    );
     if (winners.length === 0) continue;
 
     const splitCount = winners.length;
@@ -353,6 +377,10 @@ async function checkWins(
           amount: s.amount,
         });
       }
+    }
+
+    if (prize.claimed && isFhTier) {
+      for (const w of winners) game.fullHouseWinnerTickets.add(w.ticketId);
     }
 
     if (prize.claimed) {

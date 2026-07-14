@@ -10,8 +10,8 @@ export const CONSTANTS = {
   BOOKING_POLL_INTERVAL_MS: 3000,    // 3 seconds
 
   // Game Engine
-  DEFAULT_DRAW_INTERVAL_MS: 4000,    // 4 seconds (Normal speed)
-  MIN_DRAW_INTERVAL_MS: 3000,        // 3 seconds (Fast)
+  DEFAULT_DRAW_INTERVAL_MS: 8000,    // 8 seconds (Normal speed)
+  MIN_DRAW_INTERVAL_MS: 5000,        // 5 seconds (Fast)
   MAX_DRAW_INTERVAL_MS: 12000,       // 12 seconds (Slow/Relaxed)
   TOTAL_NUMBERS: 90,                 // Numbers in Housie draw
   WINNER_PAUSE_MS: 4000,             // 4 seconds pause after win announcement
@@ -42,15 +42,22 @@ export const CONSTANTS = {
   // Prize Patterns
   PRIZE_PATTERNS: [
     'Early Five',
+    'Quick 7',
+    'Corner',
+    'Star',
     'Top Line',
     'Middle Line',
     'Bottom Line',
-    'Four Corners',
+    'Box Bonus',
     'Full House',
+    '1st Full House',
+    '2nd Full House',
+    '3rd Full House',
+    'Four Corners', // legacy name for 'Corner' — pre-expansion games still carry it
   ] as const,
 
   // Prize Pool Constraint
-  MAX_PRIZE_POOL_PERCENTAGE: 0.80,   // 80% of gross
+  MAX_PRIZE_POOL_PERCENTAGE: 1.00,   // 100% of gross
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: 60 * 1000,   // 1 minute window

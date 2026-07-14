@@ -47,11 +47,18 @@ export interface PrizePoolEntry {
 
 export type PrizePattern =
   | 'Early Five'
+  | 'Quick 7'
+  | 'Corner'
+  | 'Star'
   | 'Top Line'
   | 'Middle Line'
   | 'Bottom Line'
-  | 'Four Corners'
-  | 'Full House';
+  | 'Box Bonus'
+  | 'Full House'
+  | '1st Full House'
+  | '2nd Full House'
+  | '3rd Full House'
+  | 'Four Corners'; // legacy name for 'Corner'
 
 export interface GameLiveState {
   game_id: string;

@@ -96,6 +96,82 @@ test('detectPatternWinners returns every ticket that satisfies the pattern', () 
   assert.deepEqual(winners.map((w) => w.ticketId).sort(), [1, 2]);
 });
 
+test('Quick 7 wins at exactly seven marked numbers, not six', () => {
+  assert.deepEqual(detectPatternWinners('Quick 7', [T1], new Set([1, 2, 3, 4, 5, 11])), []);
+  assert.deepEqual(
+    detectPatternWinners('Quick 7', [T1], new Set([1, 2, 3, 4, 5, 11, 12])).map((w) => w.ticketId),
+    [1]
+  );
+});
+
+test('Corner is an alias of Four Corners', () => {
+  const g = grid(
+    [1, null, null, null, null, null, null, null, 9],
+    [40, null, null, null, null, null, null, null, null],
+    [80, null, null, null, null, null, null, null, 90]
+  );
+  const tk = ticket(7, g);
+  assert.deepEqual(detectPatternWinners('Corner', [tk], new Set([1, 9, 80])), []);
+  assert.deepEqual(
+    detectPatternWinners('Corner', [tk], new Set([1, 9, 80, 90])).map((w) => w.ticketId),
+    [7]
+  );
+});
+
+test('Star needs the four corners plus the centre (3rd number of the middle row)', () => {
+  // Corners = 1, 9, 80, 90; centre = 33 (third real number of row2).
+  const g = grid(
+    [1, null, null, null, null, null, null, null, 9],
+    [31, 32, 33, 34, 35, null, null, null, null],
+    [80, null, null, null, null, null, null, null, 90]
+  );
+  const tk = ticket(8, g);
+  assert.deepEqual(detectPatternWinners('Star', [tk], new Set([1, 9, 80, 90])), []);
+  assert.deepEqual(detectPatternWinners('Star', [tk], new Set([1, 9, 80, 90, 32])), []);
+  assert.deepEqual(
+    detectPatternWinners('Star', [tk], new Set([1, 9, 80, 90, 33])).map((w) => w.ticketId),
+    [8]
+  );
+});
+
+test('Box Bonus needs at least two marked numbers in every row', () => {
+  // Two in rows 1 and 2, only one in row 3 — not yet.
+  assert.deepEqual(
+    detectPatternWinners('Box Bonus', [T1], new Set([1, 2, 11, 12, 21])),
+    []
+  );
+  assert.deepEqual(
+    detectPatternWinners('Box Bonus', [T1], new Set([1, 2, 11, 12, 21, 22])).map((w) => w.ticketId),
+    [1]
+  );
+});
+
+test('Full House tiers behave as full house and honour the exclusion set', () => {
+  const all = [1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 21, 22, 23, 24, 25];
+  assert.deepEqual(
+    detectPatternWinners('1st Full House', [T1], new Set(all)).map((w) => w.ticketId),
+    [1]
+  );
+  // Ticket 1 already took an earlier tier → excluded from the next tier.
+  assert.deepEqual(
+    detectPatternWinners('2nd Full House', [T1], new Set(all), new Set([1])),
+    []
+  );
+  const T9 = ticket(
+    9,
+    grid(
+      [1, 2, 3, 4, 5, null, null, null, null],
+      [11, 12, 13, 14, 15, null, null, null, null],
+      [21, 22, 23, 24, 26, null, null, null, null]
+    )
+  );
+  // With ticket 1 excluded, another completed ticket takes the 2nd tier.
+  assert.deepEqual(
+    detectPatternWinners('2nd Full House', [T1, T9], new Set([...all, 26]), new Set([1])).map((w) => w.ticketId),
+    [9]
+  );
+});
+
 test('splitPrize distributes the full amount with no lost paisa', () => {
   assert.deepEqual(splitPrize(100, 1), [100]);
   assert.deepEqual(splitPrize(100, 2), [50, 50]);
