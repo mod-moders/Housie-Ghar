@@ -11,6 +11,9 @@ frontend/.next/
 frontend/out/
 backend/dist/
 
+# Runtime uploads (caller MP3s land here)
+backend/uploads/
+
 # IDE
 .vscode/
 .idea/

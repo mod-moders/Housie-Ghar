@@ -23,6 +23,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import statsRoutes from './modules/stats/stats.routes';
 import playersRoutes from './modules/players/players.routes';
 import settlementsRoutes from './modules/settlements/settlements.routes';
+import { AUDIO_CALLS_DIR } from './modules/games/numberCalls.controller';
 
 const app = express();
 
@@ -52,12 +53,15 @@ app.use(
         ? env.FRONTEND_URL.split(',').map((s) => s.trim())
         : true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
 // 3. Parsers
+// Caller MP3s arrive as base64 JSON — allow a bigger body on that path only.
+// (express.json marks the body parsed, so the global parser below skips it.)
+app.use('/api/games/number-calls', express.json({ limit: '6mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -116,6 +120,18 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/players', playersRoutes);
 app.use('/api/settlements', settlementsRoutes);
 app.use('/api', ticketsRoutes); // Exposes /api/tickets/:ticket_id and /api/games/:game_id/tickets
+
+// Uploaded caller MP3s (see numberCalls.controller). CORP header is required
+// because helmet defaults to same-origin, which would block the frontend
+// origin from playing audio served by the API host.
+app.use(
+  '/audio/calls',
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(AUDIO_CALLS_DIR, { maxAge: '1h' })
+);
 
 // Default Health check
 app.get('/health', (req, res) => {

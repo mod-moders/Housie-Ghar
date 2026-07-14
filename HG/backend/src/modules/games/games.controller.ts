@@ -25,16 +25,20 @@ const VALID_PATTERNS = new Set<string>(CONSTANTS.PRIZE_PATTERNS as readonly stri
 export async function getGames(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, ticket_price, total_tickets, game_status
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
        FROM Scheduled_Games
        ORDER BY scheduled_at ASC`
     );
 
     const games = [];
     for (const game of result.rows) {
-      // Fetch counts: sold, locked
+      // Fetch counts: sold, locked, distinct buyers
       const soldRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game.game_id]);
       const lockedRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Locked'`, [game.game_id]);
+      const playersRes = await pool.query(
+        `SELECT COUNT(DISTINCT housie_name) FROM Bookings WHERE game_id = $1 AND booking_status = 'Sold'`,
+        [game.game_id]
+      );
       const soldCount = parseInt(soldRes.rows[0].count, 10);
       const lockedCount = parseInt(lockedRes.rows[0].count, 10);
       const totalCount = parseInt(game.total_tickets, 10);
@@ -42,10 +46,12 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 
       // Fetch prize pool
       const prizesRes = await pool.query(
-        `SELECT prize_id, pattern_name, prize_amount, claimed, winner_housie_name, claimed_at, split_count, amount_per_winner
-         FROM Prize_Pool
-         WHERE game_id = $1
-         ORDER BY prize_id ASC`,
+        `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name,
+                p.claimed_at, p.split_count, p.amount_per_winner, t.ticket_number AS winner_ticket_number
+         FROM Prize_Pool p
+         LEFT JOIN Tickets t ON t.ticket_id = p.winner_ticket_id
+         WHERE p.game_id = $1
+         ORDER BY p.prize_id ASC`,
         [game.game_id]
       );
 
@@ -53,10 +59,12 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         game_id: game.game_id,
         title: game.title,
         scheduled_at: game.scheduled_at,
+        completed_at: game.completed_at,
         ticket_price: parseFloat(game.ticket_price),
         total_tickets: totalCount,
         sold_count: soldCount,
         locked_count: lockedCount,
+        player_count: parseInt(playersRes.rows[0].count, 10),
         available_count: availableCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
@@ -66,6 +74,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
           prize_amount: parseFloat(row.prize_amount),
           claimed: row.claimed,
           winner_housie_name: row.winner_housie_name,
+          winner_ticket_number: row.winner_ticket_number,
           claimed_at: row.claimed_at,
           split_count: row.split_count,
           amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
@@ -107,10 +116,12 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const totalCount = parseInt(game.total_tickets, 10);
 
     const prizesRes = await pool.query(
-      `SELECT prize_id, pattern_name, prize_amount, claimed, winner_housie_name, claimed_at, split_count, amount_per_winner
-       FROM Prize_Pool
-       WHERE game_id = $1
-       ORDER BY prize_id ASC`,
+      `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name,
+              p.claimed_at, p.split_count, p.amount_per_winner, t.ticket_number AS winner_ticket_number
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON t.ticket_id = p.winner_ticket_id
+       WHERE p.game_id = $1
+       ORDER BY p.prize_id ASC`,
       [game_id]
     );
 
@@ -131,6 +142,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
         prize_amount: parseFloat(row.prize_amount),
         claimed: row.claimed,
         winner_housie_name: row.winner_housie_name,
+        winner_ticket_number: row.winner_ticket_number,
         claimed_at: row.claimed_at,
         split_count: row.split_count,
         amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
@@ -421,4 +433,228 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
     clearInterval(heartbeat);
     sseManager.unregister(game_id, res);
   });
+}
+
+/**
+ * Update a scheduled game (Admin+)
+ * Body: { title?, scheduled_at?, ticket_price?, total_tickets?, prizes? }
+ * Only Scheduled games are editable. Once any ticket is Sold or Locked the
+ * economics are frozen — only title and scheduled_at may still change.
+ */
+export async function updateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const game_id = req.params.game_id as string;
+  const { title, scheduled_at, ticket_price, total_tickets, prizes } = req.body ?? {};
+  const actor = req.user!;
+
+  try {
+    const gameRes = await pool.query(
+      `SELECT game_id, title, ticket_price, total_tickets, game_status
+       FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+    const game = gameRes.rows[0];
+
+    if (game.game_status !== 'Scheduled') {
+      res.status(409).json({ message: `Only scheduled games can be edited (this game is ${game.game_status})` });
+      return;
+    }
+
+    const committedRes = await pool.query(
+      `SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status IN ('Sold', 'Locked')`,
+      [game_id]
+    );
+    const committedCount = parseInt(committedRes.rows[0].count, 10);
+
+    const wantsEconomicsChange = ticket_price != null || total_tickets != null || prizes != null;
+    if (committedCount > 0 && wantsEconomicsChange) {
+      res.status(409).json({
+        message: `${committedCount} ticket(s) already sold or locked — price, capacity and prizes are frozen. Only title and schedule can change.`,
+      });
+      return;
+    }
+
+    // Validate the effective (new-or-existing) economics as a whole
+    const price = ticket_price != null ? parseFloat(ticket_price) : parseFloat(game.ticket_price);
+    const tickets = total_tickets != null ? parseInt(total_tickets, 10) : parseInt(game.total_tickets, 10);
+
+    if (title != null && !String(title).trim()) {
+      res.status(400).json({ message: 'title cannot be empty' });
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      res.status(400).json({ message: 'ticket_price must be a positive number' });
+      return;
+    }
+    if (isNaN(tickets) || tickets <= 0) {
+      res.status(400).json({ message: 'total_tickets must be a positive integer' });
+      return;
+    }
+
+    let totalPrize = 0;
+    if (prizes != null) {
+      if (!Array.isArray(prizes) || prizes.length === 0) {
+        res.status(400).json({ message: 'prizes must be a non-empty array' });
+        return;
+      }
+      const seenPatterns = new Set<string>();
+      for (const p of prizes) {
+        if (!p.pattern_name || !VALID_PATTERNS.has(p.pattern_name)) {
+          res.status(400).json({ message: `Invalid prize pattern: ${p.pattern_name}` });
+          return;
+        }
+        if (seenPatterns.has(p.pattern_name)) {
+          res.status(400).json({ message: `Duplicate prize pattern: ${p.pattern_name}` });
+          return;
+        }
+        seenPatterns.add(p.pattern_name);
+
+        const amount = parseFloat(p.prize_amount);
+        if (isNaN(amount) || amount <= 0) {
+          res.status(400).json({ message: `Invalid prize_amount for ${p.pattern_name}` });
+          return;
+        }
+        totalPrize += amount;
+      }
+    } else {
+      const sumRes = await pool.query(
+        `SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE game_id = $1`,
+        [game_id]
+      );
+      totalPrize = parseFloat(sumRes.rows[0].total);
+    }
+
+    const cap = price * tickets * CONSTANTS.MAX_PRIZE_POOL_PERCENTAGE;
+    if (totalPrize > cap) {
+      res.status(400).json({
+        message: `Total prize (₹${totalPrize}) exceeds ${CONSTANTS.MAX_PRIZE_POOL_PERCENTAGE * 100}% of gross revenue (cap ₹${cap.toFixed(2)})`,
+      });
+      return;
+    }
+
+    const ticketCountChanged = tickets !== parseInt(game.total_tickets, 10);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE Scheduled_Games
+         SET title = COALESCE($2, title),
+             scheduled_at = COALESCE($3, scheduled_at),
+             ticket_price = $4,
+             total_tickets = $5
+         WHERE game_id = $1`,
+        [game_id, title != null ? String(title).trim() : null, scheduled_at ?? null, price, tickets]
+      );
+
+      if (prizes != null) {
+        await client.query(`DELETE FROM Prize_Pool WHERE game_id = $1`, [game_id]);
+        for (const p of prizes) {
+          await client.query(
+            `INSERT INTO Prize_Pool (game_id, pattern_name, prize_amount, claimed)
+             VALUES ($1, $2, $3, FALSE)`,
+            [game_id, p.pattern_name, parseFloat(p.prize_amount)]
+          );
+        }
+      }
+
+      if (ticketCountChanged) {
+        // Safe: economics changes are rejected above once any ticket is Sold/Locked
+        await client.query(`DELETE FROM Tickets WHERE game_id = $1`, [game_id]);
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    if (ticketCountChanged) {
+      await generateTicketsForGame(game_id, tickets);
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'UPDATE_GAME',
+      targetType: 'Scheduled_Game',
+      targetId: game_id,
+      targetDescription: `Updated game "${title != null ? String(title).trim() : game.title}"${ticketCountChanged ? ` (tickets regenerated: ${tickets})` : ''}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Game updated' });
+  } catch (error) {
+    logger.error({ err: error }, 'error updating game');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Delete a game and everything under it (Admin+)
+ * Live/Paused games cannot be deleted — pause is a temporary state; stop the
+ * game first. Bookings/Game_Logs/skip_alerts are removed explicitly (no
+ * cascade); Tickets, Prize_Pool and Prize_Settlements cascade off the game row.
+ */
+export async function deleteGame(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const game_id = req.params.game_id as string;
+  const actor = req.user!;
+
+  try {
+    const gameRes = await pool.query(
+      `SELECT title, game_status FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+    const game = gameRes.rows[0];
+
+    if (game.game_status === 'Live' || game.game_status === 'Paused') {
+      res.status(409).json({ message: `Cannot delete a ${game.game_status} game — stop it first` });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`DELETE FROM skip_alerts WHERE game_id = $1`, [game_id]);
+      await client.query(`DELETE FROM Bookings WHERE game_id = $1`, [game_id]);
+      await client.query(`DELETE FROM Game_Logs WHERE game_id = $1`, [game_id]);
+      // Cascades: Tickets, Prize_Pool, Prize_Settlements
+      await client.query(`DELETE FROM Scheduled_Games WHERE game_id = $1`, [game_id]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'DELETE_GAME',
+      targetType: 'Scheduled_Game',
+      targetId: game_id,
+      targetDescription: `Deleted game "${game.title}" (was ${game.game_status})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Game deleted' });
+  } catch (error) {
+    logger.error({ err: error }, 'error deleting game');
+    res.status(500).json({ message: 'Internal server error' });
+  }
 }
