@@ -199,26 +199,6 @@ export function GameStatusBadge({ status }: { status: "sold" | "fast" | "filling
   return <Badge tone="open" icon="check">Open</Badge>;
 }
 
-// ── Trust line — quiet inline chips ──────────────────────────────────────────
-export function TrustBadges() {
-  return (
-    <div className="hg-trust2">
-      <span><Icon name="shieldCheck" size={15} /> Provably fair draws</span>
-      <span><Icon name="wallet" size={15} /> Pay your agent directly</span>
-    </div>
-  );
-}
-
-// ── Footer ───────────────────────────────────────────────────────────────────
-export function Footer() {
-  return (
-    <footer className="hg-footer">
-      <div className="hg-footer-mod">Powered by <strong>MOD</strong></div>
-      <div className="hg-footer-sub">Mission for Operations &amp; Development · Shillong, Meghalaya</div>
-    </footer>
-  );
-}
-
 // ── Empty state ──────────────────────────────────────────────────────────────
 export function EmptyHint({ icon, title, sub, cta, onCta }: {
   icon: string; title: string; sub: string; cta?: string; onCta?: () => void;

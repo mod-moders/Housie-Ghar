@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Footer, EmptyHint } from "@/components/ui";
+import { EmptyHint } from "@/components/ui";
 import type { HallOfFameEntry } from "@/lib/types";
 
 export default function Winners() {
@@ -70,8 +70,6 @@ export default function Winners() {
             ))}
           </div>
         )}
-
-        <Footer />
       </div>
     </PublicShell>
   );

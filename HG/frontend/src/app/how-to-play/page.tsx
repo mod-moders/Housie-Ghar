@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Button, Footer, TrustBadges } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 const STEPS = [
   { ic: "grid", t: "Pick a game", d: "Browse the lobby, check the prize pool and start time, then open a game with tickets still available." },
@@ -58,11 +58,9 @@ export default function HowToPlay() {
           </div>
         </div>
 
-        <TrustBadges />
         <div className="hg-cta-block">
           <Button variant="cta" size="lg" full iconRight="chevR" onClick={() => router.push("/")}>Browse games</Button>
         </div>
-        <Footer />
       </div>
     </PublicShell>
   );

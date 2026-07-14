@@ -84,7 +84,6 @@ export function RoleLogin({ expects }: { expects: DoorRole }) {
               </Button>
             </form>
           </div>
-          <div className="hg-login-foot">Powered by <strong>MOD</strong></div>
         </div>
       </div>
     </div>

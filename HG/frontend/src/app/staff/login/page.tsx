@@ -72,7 +72,6 @@ export default function StaffLogin() {
               </Button>
             </form>
           </div>
-          <div className="hg-login-foot">Powered by <strong>MOD</strong></div>
         </div>
       </div>
     </div>

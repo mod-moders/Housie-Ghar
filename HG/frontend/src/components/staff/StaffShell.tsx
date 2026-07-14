@@ -190,7 +190,6 @@ export function StaffShell({ expects }: { expects?: DoorRole }) {
               <button className="hg-side-link" onClick={logout}>
                 <Icon name="lock" size={18} /> <span>Log out</span>
               </button>
-              <div className="hg-side-mod">Powered by MOD</div>
             </div>
           </aside>
 

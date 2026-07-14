@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
+import { Badge, Button, CountdownPills, GameStatusBadge, ProgressBar, EmptyHint } from "@/components/ui";
 import type { GameSummary, LuckyNumberResponse, PublicConfigResponse } from "@/lib/types";
 
 // Rotated on the banner every 5s, starting from a random hook each page load.
@@ -319,8 +319,6 @@ export default function Lobby() {
             </section>
           )}
 
-          <TrustBadges />
-
           {/* Upcoming Games */}
           <section className="hg-feed">
             <div className="hg-feed-head">
@@ -345,8 +343,6 @@ export default function Lobby() {
             )}
           </section>
         </div>
-
-        <Footer />
       </div>
     </PublicShell>
   );

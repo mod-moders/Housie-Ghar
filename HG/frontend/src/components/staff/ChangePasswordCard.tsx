@@ -89,7 +89,6 @@ export function ChangePasswordCard({ onDone }: { onDone: () => void }) {
           </div>
         </form>
       </div>
-      <div className="hg-login-foot">Powered by <strong>MOD</strong></div>
     </div>
   );
 }

@@ -325,7 +325,6 @@ export default function LoginPage() {
             </button>
           )}
 
-          <div className="hg-login-foot">Powered by <strong>MOD</strong></div>
         </div>
       </div>
     </div>
