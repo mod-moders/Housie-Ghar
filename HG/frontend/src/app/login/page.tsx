@@ -271,16 +271,16 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </div>
-                <div className="hg-login-hint">Not sure which portal? Sign in with any staff email below.</div>
+                <div className="hg-login-hint">Not sure which portal? Sign in with your staff email or full name below.</div>
 
                 <form
                   onSubmit={(e) => { e.preventDefault(); submitStaff(); }}
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
                 >
                   <label className="hg-login-field">
-                    <span>Username</span>
+                    <span>Email or full name</span>
                     <input
-                      type="email"
+                      type="text"
                       value={email}
                       placeholder="you@housieghar.local"
                       autoComplete="username"
@@ -322,9 +322,9 @@ export default function LoginPage() {
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
                 >
                   <label className="hg-login-field">
-                    <span>Email</span>
+                    <span>Email or full name</span>
                     <input
-                      type="email"
+                      type="text"
                       value={email}
                       autoComplete="username"
                       onChange={(e) => setEmail(e.target.value)}

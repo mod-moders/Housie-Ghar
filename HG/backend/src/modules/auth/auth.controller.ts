@@ -16,23 +16,24 @@ export async function login(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    res.status(400).json({ message: 'Email and password are required' });
+    res.status(400).json({ message: 'Email/username and password are required' });
     return;
   }
 
   try {
-    // 1. Fetch user
+    // 1. Fetch user — accepts either the login email or the account's full name (case-insensitive)
+    const identifier = email.toLowerCase().trim();
     const result = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.password_hash, u.temp_password_required, u.status,
               u.role_id, u.current_balance, u.is_cfo, u.town, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
-       WHERE u.email = $1`,
-      [email.toLowerCase().trim()]
+       WHERE u.email = $1 OR LOWER(u.full_name) = $1`,
+      [identifier]
     );
 
     if (result.rowCount === 0) {
-      res.status(401).json({ message: 'Invalid email or password' });
+      res.status(401).json({ message: 'Invalid email/username or password' });
       return;
     }
 
@@ -53,7 +54,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     if (!passwordMatch) {
-      res.status(401).json({ message: 'Invalid email or password' });
+      res.status(401).json({ message: 'Invalid email/username or password' });
       return;
     }
 

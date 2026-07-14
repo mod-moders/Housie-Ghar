@@ -103,6 +103,8 @@ HG/
       globals.css       # Entire hg-* design system (~1100 lines plain CSS under Tailwind v4 import)
       page.tsx          # Public lobby: game-night banner + Lucky Number + Live/Upcoming, 15s poll. SkeletonCard while loading.
       login/page.tsx    # Unified player+staff entry gate. Toggles between player card and staff card.
+                        #   Progressive player sign-in (c812409): username first; full-name/DOB fields
+                        #   appear only when the backend says the username doesn't exist yet.
       game/[game_id]/page.tsx        # Game room: number grid, ticket previews, name entry, lock. AccountButton in header.
       game/[game_id]/live/page.tsx   # Live board: SSE draws, reveal-tease, prizes, 1-90 board.
                                      #   "Your tickets · auto-marked" in left column (below recent-numbers strip).
@@ -135,7 +137,11 @@ HG/
       hooks/            # useSSE(gameId, onEvent?), useSocket, useCountdown
       stores/           # zustand: authStore, gameStore, bookingStore ("hg-booking"), playerStore ("hg-player")
   shared/types/         # Shared TS interfaces (backend imports via @shared/*)
-  backend/migrations/   # 001–018 (016 = perf indexes fixed, 017 = player_id on Bookings, 018 = Prize_Settlements)
+  backend/migrations/   # 001–019 (016 = perf indexes fixed, 017 = player_id on Bookings, 018 = Prize_Settlements,
+                        #   019 = drop Audit_Log.user_id FK so staff deletion isn't blocked by past logins)
+  railpack.json / package.json / package-lock.json   # HG-root deploy shims for Railway (Root Directory = HG):
+                        #   railpack.json pins provider node 22 for Railpack; the root package.json (private,
+                        #   engines node 22.x) makes Node auto-detection work under either builder. Not used locally.
   backend/seeds/        # seed_roles, seed_superadmin, seed_sample_game (2 games), seed_sample_staff, seed_lucky_number
   nginx/nginx.conf
 docs/superpowers/       # Remaining brainstorming docs (plans/specs deleted in cleanup commit)
@@ -233,7 +239,7 @@ Uses Node's built-in **`node:test`** + `node:assert/strict` (NOT Jest), run thro
   createdb -O housie_user housie_ghar_test    # one-time; pgcrypto must exist
   cd HG/backend && TEST_DATABASE_URL="postgresql://housie_user:…@localhost:5432/housie_ghar_test" npm test
   ```
-  The harness (`test-support/db.ts`) runs all migrations against it and exposes fixture builders (`freshGameWithAgent`, `createPrize`/`createTicket`/`createBooking`). Expected: **38 pass / 0 skip** with the env var, **30 pass / 8 skip** without it.
+  The harness (`test-support/db.ts`) runs all migrations against it and exposes fixture builders (`freshGameWithAgent`, `createPrize`/`createTicket`/`createBooking`, `createStaff`/`createPlayer`). Expected (as of `1a28383`): **58 pass / 0 skip** with the env var; the DB-backed tests all report skipped without it.
 - **Testability rule:** anything reachable from a test must avoid importing `config/env.ts` (throws on missing vars at import) or the `db/index.ts` singleton (env-bound). Service functions therefore take a `pg` client parameter; `utils/logger.ts` is deliberately env-free.
 
 ### Important Next.js Note
@@ -251,6 +257,9 @@ The frontend uses **Next.js 16** (React 19). Conventions differ from training da
 - Money is always formatted with `lib/money.ts`. Status pills: `hg-pill-{live,scheduled,paused,completed,suspended}`; trust pills: `hg-pill-{veteran,trusted,new}`.
 - Canonical prize names (backend + UI): `Early Five`, `Top Line`, `Middle Line`, `Bottom Line`, `Four Corners`, `Full House`.
 - **Easing token system** (committed in `151220b`): `--ease-out-quart: cubic-bezier(.25,1,.5,1)`, `--ease-out-expo: cubic-bezier(.16,1,.3,1)`, `--ease-pop: cubic-bezier(.2,1.3,.4,1)` (win/sticker pops only); duration tokens `--dur-1` (130ms), `--dur-2` (200ms), `--dur-3` (320ms). Use these on all interactive transitions instead of bare `ease`/`linear`.
+- **Compact banner (2026-07-09)** — `.hg-banner` is a hero *band*, not a full viewport: `min-height:clamp(340px, 44dvh, 460px)` (the old `calc(100dvh - var(--nav-h))` and the `--nav-h` var are gone). Logo 148px base / 156px desktop / 128px ≤899 / 108px ≤559; desktop quote 26px.
+- **Candy daylight layer (2026-07-09, light theme)** — light mode's answer to neon, appended after the neon layer in `globals.css`. Same brand trio as *print*, not light: pastel ambient washes on `.hg-frame`/`.hg-stage` (live board + login grounds made transparent to show them), crisp pink→cyan→gold hairline under sticky chrome, tinted color-spill shadows under live cards/CTAs/lucky ball/cage, cyan-lit called tiles on the 1–90 board (deep-teal text for AA), deep-magenta "Live Now" label (`oklch(0.52 0.23 354)` — the base accent fails AA at 11.5px on cream), candy conic border ring on `.hg-login-card` (2px; ink offset shadow retained).
+- **Neon radiant layer (2026-07-08, dark theme only)** — final section of `globals.css` before the candy layer. Tokens on `.hg-root[data-theme='dark']`: `--neon-pink/--neon-cyan/--neon-gold` (brand trio run as light) + `--halo-pink/cyan/gold` (layered box-shadow stacks). Neon-sign language on player surfaces: gradient hairline under sticky chrome (`.hg-nav/.hg-live-top/.hg-room-head::after`), LIVE badge ignition flicker + breathe (`hg-neon-ignite`/`hg-neon-breathe`; `:has(.hg-live-dot)` scopes it so PAUSED renders amber instead), pink tube rim + top edge-light on `.hg-card.is-live`, halo'd cage ball with expanding `hg-neon-ring` on reveal, cyan-lit called tiles on the 1–90 board, conic-gradient border ring on `.hg-login-card`, glowing banner coins/lucky ball, chrome micro-glow hovers. The 2026-07-07 casino-layer ambient alphas were also raised (.05→.09–.13) and banner blooms amped. Light theme and staff dashboards untouched; reduced-motion relies on the global animation kill-switch.
 
 ### Login page styles
 `.hg-stage` — full-viewport centered flex container. `.hg-frame` — max-width 452px scrollable panel. `.hg-login-card` — card with `.hg-login-field`, `.hg-login-title`, `.hg-login-hint`, `.hg-login-err`, `.hg-login-switch` (mode toggle), `.hg-login-foot`. `.hg-player-chip` — pill in TopNav showing `username`, click to sign out.
@@ -270,7 +279,7 @@ The hero is a "game-night" composition, layered back-to-front via `--bn-*` banne
 ## Staff Dashboard (`/staff`)
 
 Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` based on the authenticated role:
-- **Superadmin/Admin:** overview (stats KPIs), games (table + create + start/pause/resume/speed), filling status, workforce (create/edit staff incl. town, suspend/reactivate, Superadmin can toggle CFO via `PATCH /api/users/:id/cfo`), audit log
+- **Superadmin/Admin:** overview (stats KPIs), games (table + create + start/pause/resume/speed), filling status, workforce (create/edit staff incl. town, suspend/reactivate, Superadmin can toggle CFO via `PATCH /api/users/:id/cfo`; Superadmin can hard-delete via `DELETE /api/users/:id` — two-click trash button, committed `1a28383`. Accounts referenced by games/bookings/wallet/created-staff 409 ("suspend instead"); migration 019 dropped the `Audit_Log.user_id` FK (log is immutable + stores name/role text) so a past login doesn't block deletion; audit-logs `DELETE_USER`; service in `users.service.ts`, 6 integration tests, suite 52 → 58), audit log
 - **Financial Officer extra:** Finance Hub (pending top-ups from master-ledger, approve/reject), Bookie Ledger, **Prize Payouts** (Owed/Paid settlement ledger — two-click Settle credits the selling agent's wallet; per-row WhatsApp chip to the bookie; sidebar owed-count badge from `GET /api/settlements/pending/count`), finance status-bar HUD (`GET /api/wallet/hud`)
 - **Operator:** Live HUD (SSE big number, start/pause/resume, speed slider), overflow queue, filling
 - **Bookie (Agent):** booking queue (socket-driven, WhatsApp reply copy, confirm/reject), wallet (balance, ledger, skip-alert FOMO card, request funds → opens `recharge_wa_link` to the CFO, **"Prize money owed to you" card** → itemized "Claim on WhatsApp" to the CFO, refreshed live by `prize_owed`), filling
@@ -279,24 +288,81 @@ Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` b
 
 ## Current State
 
-### Most recent commits (as of 2026-07-07)
+### Latest session (2026-07-14 evening): staff-account cleanup + player profile polish
+
+Most recent commit is **`a9921ef`** on top of a run of small player/staff-facing fixes made earlier the same day. In commit order (oldest → newest):
+
+- **`8273e11` chore** — removed "Powered by MOD" and the `TrustBadges` copy ("Provably fair draws" / "Pay your agent directly") site-wide. `TrustBadges` and the `Footer`'s tagline/branding line were deleted from `ui.tsx` entirely (now unused); every staff login surface (`/login`, `RoleLogin`, `/staff/login`, `ChangePasswordCard`) and the staff sidebar had their standalone "Powered by MOD" line stripped too.
+- **`14e1795` feat(players)** — ports master's player profile/stats parity, adapted to this branch's real schema: new **`/profile`** page (`HG/frontend/src/app/profile/page.tsx`) lets a player edit `full_name`/`phone`/`email`, toggle the caller-sound preference, and optionally layer a real password on top of the default username-only login (set/change/remove); new **`/stats`** page (`HG/frontend/src/app/stats/page.tsx`) shows lifetime engagement/wins computed from real `Bookings`/`Prize_Settlements` rows (net profit, win rate, streaks, luckiest ticket) — **not** master's fabricated numbers. Backend: migration **023** adds `Player_Logins.phone/email/password_hash/sound_enabled`; `players.controller.ts` grew a `PATCH /api/players/me` (accepts `password`/`remove_password` to toggle real-password login) and `GET /api/players/me/stats`. Login (`/login/page.tsx`) and the live board's default mute state now honor the saved password/sound preferences.
+- **`c229c93` fix(profile)** — the two profile cards felt cramped; bumped panel padding 20→28px and inner gap 14→18px (`HG/frontend/src/app/profile/page.tsx`).
+- **`afefa6b` fix(lobby)** — the lobby's "next draw" hero card was pulling the soonest **scheduled** game up above the Upcoming Games list whenever nothing was live, contradicting the intended section order. Fixed in `page.tsx`: only `Live`/`Paused` games ever render above "Upcoming Games"; that section now always lists every scheduled game.
+- **`a9921ef` feat(staff)** — three unrelated small fixes bundled together per user request:
+  1. **Add Staff form simplified** (`AdminSections.tsx`, `WorkforceSection`) — no longer asks for email/phone when provisioning an Admin/Operator/Bookie. Backend (`users.controller.ts`, `createUser`) synthesizes a unique placeholder email (`staff-<uuid>@housieghar.internal`) server-side when none is submitted, since `Users.email` is `NOT NULL UNIQUE`. New staff also no longer get `temp_password_required = TRUE` on creation — they log in directly with the password the admin set (this only affects newly-created accounts; admin-initiated password *resets* via `PATCH /api/users/:id` still re-flag the target account, that's a separate intentional reset flow).
+  2. **Staff self-service email edit** (`ProfileSection.tsx` + `auth.controller.ts`) — Admins/Operators/Bookies can now edit their own login email directly from **My Profile**, no admin approval needed. `PATCH /api/auth/me` accepts an optional `email` field (empty/whitespace rejected, 409 on collision with another account's email/phone).
+  3. **Lobby spacing** (`globals.css`, `.hg-lobby-v2`) — added bottom padding (40px mobile / 64px ≥900px) so there's breathing room after the last game card instead of the list running flush to the page edge.
+
+  Both `tsc --noEmit` (backend and frontend) pass clean. Not covered by the `node:test` suite (small UI/controller tweaks, no new integration tests written this session).
+
+**Caution for next session:** the `a9921ef` commit's diff to `globals.css` shows ~325 lines changed even though only ~2 lines (the `.hg-lobby-v2` padding) were intentionally authored this session — the file already carried the **uncommitted neon/candy CSS layer** (see "Uncommitted working tree" below, dated 2026-07-08/09) before this session started, and it rode along into the commit. The user was asked and explicitly said to push as-is, so this is expected/accepted, not a mistake to undo — but it means `git blame`/`git show a9921ef -- globals.css` will show that older CSS work attributed to this commit's message.
+
+### Master-branch staff-feature integration (committed `be706da`→`3732147`, 2026-07-14)
+
+The user pushed a parallel "HG Final Website" codebase to `origin/master` (unrelated history) and asked to **port all new superadmin/admin/operator/bookie features into `frontend-v2-housieghar` without merging branches**. Master also *regressed* things this branch has (it lacks the settlement engine, the test suite, and the auth hardening), so only the genuinely-new staff features were re-implemented against our architecture — and master's fabricated dashboard data was replaced with real SQL. Landed as 10 feature-grouped commits:
+
+- **`be706da` engine** — 11-dividend prize system (Early Five, Quick 7, Corner, Star, Top/Middle/Bottom Line, Box Bonus, tiered 1st/2nd/3rd Full House with exclusion-set semantics; legacy aliases like Four Corners→Corner for editing old games). Draw pace default now **8s** (range 5–12s). `winDetection.ts` + tests + `gameEngine.ts` + `shared/types/game.ts`.
+- **`d856cdc` game management + caller** — `PATCH /api/games/:id` (edit Scheduled games; economics frozen once any ticket is Sold/Locked) and `DELETE /api/games/:id` (blocks Live/Paused). `getGames` returns `completed_at` + real `player_count`. **Number_Calls** (migration **020**): per-number caller `call_text` + MP3s uploaded base64→`uploads/audio/calls` (cwd-relative, gitignored), served at `/audio/calls` with `Cross-Origin-Resource-Policy: cross-origin` (helmet default would block cross-origin playback); a 6mb JSON parser is scoped to the upload path *before* the global parser. **CORS `methods` gained `PATCH`** — a real production bug (dev's same-origin rewrites hid it). `numberCalls.controller.ts` new; number-calls routes declared before `/:game_id` param routes.
+- **`ac2c6cb` players** — `GET /api/players` (derived stats), `PATCH /:id/status` (Admin+ suspend/reactivate), `DELETE /:id` (Superadmin-only; NULLs `player_id` on bookings + settlements first). Migration **022** adds `Player_Logins.status`; suspended players are rejected at login and `/me`.
+- **`7ca12a4` auth** — `PATCH /api/auth/me` (staff self-edit full_name/phone/upi_id; duplicate WhatsApp 409s).
+- **`d9c414f` stats** — `GET /api/stats/financial-analysis` (Admin+): lifetime collection/payouts/profit over Completed games, per-game rows, 7-day daily series, 24-bucket hourly-today, new-vs-returning retention from `Bookings.player_id`. Fixes master's `SUM(DISTINCT prize_amount)` bug (gross computed in JS).
+- **`298fb0b` config** — Platform_Config gains `announcements_list` (JSON, ≤5 `{id,text,muted}`), `announcement_speed`, `announcements_muted`, `english_caller_enabled` (migration **021**, seeded dev + `seedProd`). `config/public` whitelists all four.
+- **`3721b37` ui primitives** — role avatars (`public/avatars/` + `roleAvatar.ts` + self-contained `Avatar` in `ui.tsx`), edit/eye/spark icons, Canvas `sharePoster.ts`, new payload types, `phone`/`upi_id` on `AuthUser`, `/audio` rewrite in `next.config.ts` (same-origin MP3s in dev).
+- **`0e45714` admin sections** — GamesSection 11-dividend prize editor (Full House tier auto-rename `1st Full House`→`Full House`), inline edit + two-click delete, Watch-Live link, real player count; new `HistorySection` (completed games + results modal); real-data analytics widgets (Sparkline via `useId`, AnalyticsChart, Heatmap, Retention). New `CallVoiceSettings` (per-number phrase/MP3 editor + TTS preview; global caller toggle only for Superadmin since `PUT /api/config` is Superadmin-only). **`AnnouncementSection` removed** (folded into SettingsSection).
+- **`fdbc4d4` staff sections + shell** — `PlayersSection`, `ProfileSection`, `SettingsSection` (Superadmin lobby-announcements manager, **no theme gallery** — `Themes` stays dropped), Operator `ShareGamesSection`, tabbed `FinanceHubSection` (analysis tab renders the real `financial-analysis` series with true day-over-day deltas; **`MasterLedgerSection` export removed**, folded into a Ledgers tab; master's fake "Withdrawal Queue" dropped). `StaffShell` nav rebuilt (Past Games/Player Management/Staff Management/Website Audits/Website Settings/My Profile/Share to WhatsApp; `document.title = HG-{role}`; avatar in status bar).
+- **`3732147` public** — lobby strip rotates the un-muted `announcements_list` at `announcement_speed` (per-item + global mutes; `marquee_text` fallback when empty); live board's spoken caller uses each number's configured `call_text`/MP3 (respects saved voice preference), silent when `english_caller_enabled === "false"`, else falls back to `callerPhrase()`.
+
+**Deliberately NOT ported:** master's login backdoor (`ChangeMe123!` bcrypt fallback — our branch removed it), the theme gallery / `active_theme` (`Themes` is dropped), the fabricated dashboard charts/deltas/heatmap/retention (replaced with real SQL), and master's fake withdrawal queue. Gates green at integration: backend build clean + `npm test` 63 tests (38 pass / 25 skip, no `TEST_DATABASE_URL`), frontend `tsc` + `eslint` clean + production build clean; all new endpoints smoke-tested against the running dev backend (config/public, number-calls list + PATCH + restore, players, financial-analysis, auth/me PATCH, games PATCH/DELETE 404). **Excluded from these commits** (left in the working tree, pre-existing dirty state owned by the launch work): `manual.md`, `HG/frontend/src/app/globals.css`, this `CLAUDE.md`, and untracked `HG/nixpacks.toml`. Not yet pushed.
+
+### Most recent commits (as of 2026-07-13)
 ```
+c77d59b fix(nav): keep staff doors out of the mobile hamburger
+c812409 feat(login): progressive player sign-in — username first, register only if new
+1a28383 feat(staff): delete staff accounts from the Workforce panel
+24f0e75 chore: trigger Vercel production deploy
+4b93efb chore(deploy): lockfile for the HG-root manifest
+c831021 fix(deploy): add HG-root package.json so Nixpacks detects Node
+e569daa fix(deploy): declare Node provider via railpack.json, not nixpacks.toml
+b3b5cef fix(deploy): use generic nodejs package name in nixpacks.toml
+f790451 fix(deploy): force Node.js provider for Railway build
+6e51aa8 feat(admin): smart game presets + announcement marquee strip
 a35f44d docs: record WhatsApp payout rails + login-page desktop fix
-db0efc5 feat(payouts): WhatsApp-first prize payout rails (winner→bookie→CFO)
-9e42653 fix(ui): let staff/player login pages use the desktop layout at >=900px
-71d01fe docs: record launch-prep sweep; manual.md is now truly manual-only
-954792f chore(launch): zero npm audit, wire frontend Sentry, add Dependabot
-b8639e6 feat(db): production bootstrap seed (npm run seed:prod)
-d140b5f feat(staff): forced first-login password change
-1e90067 fix(auth): remove login backdoor, enforce temp passwords & suspension live
-7775f49 docs: mark Finance Hub Prize Payouts UI as built
-43f6def feat(finance): prize-payouts settlement UI in the Finance Hub
 ```
-Branch `frontend-v2-housieghar` is 11 commits ahead of `origin/frontend-v2-housieghar` (unpushed).
 
-### Uncommitted working tree (as of 2026-07-07) — two new features from `do.md` triage
+**Two GitHub repos exist.** `origin` is now **`mod-moders/Housie-Ghar`** (canonical, up to date at `c812409`); **`flinchtheflincher/Housie-Ghar`** is the original and sits 3 commits behind at `4b93efb`. Mid-launch (2026-07-11) `origin` was silently repointed from flinchtheflincher to mod-moders while the mod-moders copy was 17 commits stale — Railway (watching the stale copy) kept building old code, making every deploy fix look ineffective for an evening ("npm: not found" across 6+ deployments). Since resolved: all work now lands on mod-moders. This machine's keychain credential can push to flinchtheflincher; mod-moders pushes worked as of `c812409` (auth fixed outside this session). See memory `hg-two-github-repos`. **Before debugging any deploy: confirm Railway's Settings → Source repo matches the repo you're pushing to.**
 
-A `do.md` "V3.0 master spec" was dropped into the repo root describing the whole platform. Most of it documents already-built functionality; two genuinely new, valuable pieces were implemented and are **sitting uncommitted** pending the user's go-ahead to commit:
+### Production launch in progress (2026-07-10 → 07-13) — Railway + Hostinger DNS + Vercel, following manual.md
+
+The user (an infra beginner) is walking `manual.md` steps 4–8 with heavy hand-holding; the guide received ~370 lines of corrections (uncommitted) as reality diverged from the doc:
+
+- **Railway backend service config (the combination that builds):** Root Directory **`HG`** — NOT `HG/backend`; the backend imports `@shared/types/*` from the sibling `HG/shared`, which a narrower root excludes from the build context (tsc exit 2). All three commands are prefixed: Build `cd backend && npm ci && npm run build`, Start `cd backend && npm start`, Pre-Deploy `cd backend && npm run migrate`.
+- **Node detection at the HG root:** with Root Directory `HG` there is no `package.json` at the build root, so Railway's builder installed no Node at all → `sh: 1: npm: not found` (exit 127). Fixes committed: `HG/railpack.json` (`provider: node`, node 22 — the service builds with **Railpack**, so the earlier `nixpacks.toml` attempts were silently ignored), `HG/package.json` (root manifest: private, engines node 22.x, build/start scripts delegating into `backend/` — makes detection work under either builder; commit `c831021`, authored by a parallel session), and `HG/package-lock.json` (empty lockfile so a root `npm ci` can't fail; `4b93efb`).
+- **Railway state:** project `housie-ghar` with Postgres + Redis plugins + the repo service. Public domain generated: `housie-ghar-production.up.railway.app` (port 4000). Custom domain `api.housieghar.in` added — "Waiting for DNS update" at last check. `DATABASE_URL`/`REDIS_URL` must be added as **reference variables** via the Value-field picker (they are **not** auto-injected by project membership — older doc text claiming so was wrong; manual.md Step 6.1 has the corrected flow). Step 6 env vars were entered by the user; completeness verified only up to the last crash-loop.
+- **Hostinger DNS (Step 8):** apex A → `76.76.21.21` with the Name field left **blank** (hPanel rejects a literal `@`), `www` CNAME → `cname.vercel-dns.com`, `api` CNAME → `housie-ghar-production.up.railway.app`.
+- **Vercel:** connected (Step 7) — `24f0e75` is an empty commit to trigger a production deploy, implying the Vercel project exists and builds this repo. `NEXT_PUBLIC_API_URL` should hold the Railway URL until DNS lands, then `https://api.housieghar.in` + a manual Vercel redeploy.
+- **Unverified as of this checkpoint:** whether the newest Railway build is green now that mod-moders has all fixes; whether Step 6a (`seed:prod` via `railway ssh`) has been run; where the user stands in Steps 7–8's closing env swaps. A Railway-suggested **PR #1** (adds railpack.json) may still be open — close it unmerged, it's redundant.
+
+Parallel-session features landed meanwhile: **`1a28383`** Superadmin hard-delete of staff (`DELETE /api/users/:id`, two-click trash in Workforce; 409 "suspend instead" when referenced by games/bookings/wallet/created-staff; migration **019** drops the `Audit_Log.user_id` FK so a past login doesn't block deletion; suite 52 → 58) and **`c812409`** progressive player sign-in (username-first; full-name/DOB fields appear only when the backend says the username is new).
+
+### Uncommitted working tree (as of 2026-07-13)
+
+- **`manual.md` (~372-line diff)** — launch-guide corrections from walking the real launch: Step 5 rewritten (Root Directory `HG`, `cd backend &&` commands, the railpack/npm-not-found correction blocks), Step 6 expanded for a first-time Railway user (6.1 reference-variable picker, 6.2 beginner walkthrough, 6.3 Raw Editor multi-line PEM format, 6.4 variables table with per-variable failure modes, 6.4a plain-terms explainer, 6.5 deploy verification), Step 8 corrections (blank apex Name, de-bracketed CNAME placeholder, "Waiting for DNS update" explainer with a beginner box).
+- **`HG/frontend/src/app/globals.css` (~262 insertions)** — the neon radiant layer (dark), compact banner, and candy daylight layer (light) from 2026-07-08/09, still awaiting a commit decision; full detail in the Design System bullets above. Verified in headless Chromium at the time. Dev-DB quirks found then: `superadmin@housieghar.com` rejects the seeded `Housie@2026` (memory `hg-dev-staff-creds-drift`); the CFO account was found Suspended and re-activated.
+- **`HG/frontend/src/components/TopNav.tsx`** — removes the per-role staff door links (`DROPDOWN_DOORS`) from the mobile menu sheet; parallel-session work, likely part of the `c812409` login consolidation.
+- **`CLAUDE.md`** — this checkpoint plus the parallel session's Staff Dashboard delete-feature note.
+- **Untracked `HG/nixpacks.toml`** — inert leftover from the deploy debugging (Railpack ignores it); safe to delete.
+
+### Committed in `6e51aa8` (2026-07-07) — two new features from `do.md` triage
+
+A `do.md` "V3.0 master spec" was dropped into the repo root describing the whole platform. Most of it documents already-built functionality; two genuinely new, valuable pieces were implemented and **committed in `6e51aa8`** together with the casino-night CSS layer and the user's own `seed_superadmin.sql`/`app.ts` edits:
 
 **1. Smart Game Presets (`AdminSections.tsx`, `GamesSection`).** The create-game form previously opened with a default 120%-of-gross prize spread (invalid until hand-tuned). Four one-click preset chips now sit above the form: *High Noon Fortune* (12:00, ₹50×100), *Snack & Stack* (15:00, ₹30×150), *Sundown Showdown* (18:30, ₹80×120), *Prime Time* (21:00, ₹100×200 = 70% of gross). `nextSlotFor(hour, minute)` computes the next occurrence of that time-of-day (rolls to tomorrow if <15 min lead), `toLocalInput()` builds a zone-less `datetime-local` string by hand (no `toISOString()` UTC shift), `slotLabel()` renders "Today/Tomorrow h:mm". Clicking a chip fills title/schedule/price/capacity/prize-pattern all at once; every field stays editable after.
 
@@ -375,7 +441,7 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 - WhatsApp payout rails (2026-07-03): winner "Collect" card on the live board, bookie "Claim on WhatsApp" card in the wallet, FO WhatsApp chip in Prize Payouts, `prize_owed` socket event. See **Prize Settlement Flow**.
 
 ### Known issues / TODOs
-- **Migrations 016–018 are committed** — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate` (018 = `Prize_Settlements`).
+- **Migrations 001–019 are committed** (018 = `Prize_Settlements`, 019 = drop `Audit_Log.user_id` FK for staff deletion) — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate`.
 - **Settlement UI — built (2026-07-02).** The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) lists Owed/Paid settlements with a two-click Settle → `POST /api/settlements/:id/settle` that credits the selling agent's wallet; a sidebar badge shows the owed count. The agent-facing wallet also shows the `Prize` credit once settled (`Wallet_Ledger`). Commits `ee1c46f` (amount coercion) + `43f6def` (UI). New CSS: `.hg-seg*`, `.hg-settle*`, `.hg-side-badge`, `.hg-payouts-*`.
 - **Settlement smoke-tested end-to-end (2026-07-02).** Full local flow verified via API + browser: player lock → bookie confirm (wallet −₹60) → live game → Early Five split ₹50/₹50 across co-winning tickets + Top Line ₹100 → Owed rows with `player_id` stamped → CFO settle (+₹100, `Wallet_Ledger` `Prize` credit, `settled_by` stamped) → second settle 409 `already_paid` → pending-count badge decremented.
 - **`housie_name` pre-fill — done.** The game-room name input pre-fills from `playerStore.player.username` (a username always satisfies the no-spaces / ≤18-char rule — `full_name` would not).
@@ -384,6 +450,9 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 - **npm audit — 0 vulnerabilities in both packages (2026-07-02).** Backend/frontend `ws` chain fixed via `npm audit fix`; the `postcss` copy nested in Next lifted via `"overrides": { "postcss": "^8.5.10" }` in `HG/frontend/package.json` (don't remove the override until Next ships postcss ≥8.5.10 itself). `.github/dependabot.yml` keeps weekly watch on both packages + Actions.
 - **Temp passwords are now enforced** — see Authentication & RBAC. The dev-seeded superadmin (`temp_password_required = TRUE`) hits the change-password gate on first login; sample staff (flag FALSE) don't.
 - OTP step intentionally skipped (password-only staff login remains).
+- **Two GitHub repos** (`mod-moders` canonical, `flinchtheflincher` 3 behind) — see Current State; always confirm Railway's Source repo before debugging a deploy (memory `hg-two-github-repos`).
+- **Auth rate limiters are still commented out in `app.ts`** (the user's own edit — don't silently revert, but they must be re-enabled before real users arrive; manual.md Step 16 flags it: without them staff passwords can be brute-forced at 100 attempts/15 min instead of 5).
+- **`ci.yml`'s deploy jobs are broken by design-drift** — they curl `RAILWAY_*_DEPLOY_HOOK` secrets for a Railway feature that doesn't exist; manual.md Step 9 documents the real mechanism (native autodeploy + the Wait for CI toggle). Delete the two curl jobs when convenient. Note CI only triggers on `main`/`staging` pushes — the working branch `frontend-v2-housieghar` gets no CI runs at all.
 
 ---
 
@@ -398,8 +467,17 @@ cd HG/frontend && npm run dev                                      # :3000
 
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent). If you're using the dev `seed`, note it now also runs `seed_platform_config.sql` (adds `seed:prod`'s default `Platform_Config` rows, `ON CONFLICT DO NOTHING`) — needed for the Announcement editor's `PUT /api/config` to succeed on a fresh DB.
 
-**What was last worked on (2026-07-07): `do.md` triage — Smart Game Presets + Announcement strip**
-A large "V3.0 master spec" (`do.md`) was scanned feature-by-feature against what's already built; two new, high-value pieces were implemented (see **Current State → Uncommitted working tree** above for full detail) and verified in headless Chromium, everything else in the doc was either already shipped or explicitly out of scope. **Nothing from this batch is committed yet** — it's sitting in the working tree awaiting the user's go-ahead. Before touching `globals.css` again in one turn, remember the Turbopack stale-write gotcha noted above (do the edit, then a real content change if the dev server doesn't pick it up — `touch` won't).
+**What was last worked on (2026-07-14 evening): staff-account cleanup + player profile polish**
+See **Current State → Latest session** for full detail. Five commits landed, all pushed to `origin/frontend-v2-housieghar` (currently at `a9921ef`): removed leftover "Powered by MOD" branding (`8273e11`); ported player self-service profile/stats pages with real data (`14e1795`); tightened profile-page padding (`c229c93`); fixed the lobby so only Live/Paused games ever appear above "Upcoming Games" (`afefa6b`); and simplified the staff Add-Staff form (dropped email/phone fields, backend auto-generates a placeholder email, new staff skip the forced first-login password change), added staff self-service email editing in My Profile, and added bottom spacing to the lobby games list (`a9921ef`). Working tree is clean except the long-standing `CLAUDE.md`/`manual.md`/`HG/nixpacks.toml` items below (untouched, not part of this session's work).
+
+**Most logical next step:** none of today's changes are blocking — pick up wherever the production launch checklist below left off, or address user-requested polish as it comes in. If resuming the launch, start from "Before that (2026-07-10 → 07-13)" further down.
+
+Before that (2026-07-10 → 07-13): PRODUCTION LAUNCH — manual.md steps 4–8 on Railway/Hostinger/Vercel
+See **Current State → Production launch in progress** for the full picture: the working Railway service config (Root Directory `HG`, `cd backend &&` commands, railpack.json + HG-root package.json), the two-GitHub-repos incident (`origin` is now **mod-moders** — confirm Railway's Source repo matches before debugging anything), the Hostinger DNS records, and the open verification items. **The immediate task on resume: confirm the newest Railway deployment is green** — Build Logs must get past `npm ci` (Node detection was the blocker) and Deploy Logs must show the Pino "listening on port 4000" line. Then continue manual.md in order: Step 6a `seed:prod` via `railway ssh`, Step 8's closing env swaps (`FRONTEND_URL` → `https://housieghar.in` on Railway; `NEXT_PUBLIC_API_URL` → `https://api.housieghar.in` on Vercel + manual redeploy), then Steps 9–16 (Wait for CI, branch protection, Sentry DSNs, UptimeRobot, seeded-password rotation, **re-enable the auth rate limiters in `app.ts`**, production smoke test). A parallel session shipped `1a28383` (staff hard-delete, migration 019) and `c812409` (progressive player sign-in) during this window — **avoid two concurrent Claude sessions doing git work in this checkout**; it caused the repo confusion above.
+
+Before that (2026-07-08/09): neon radiant layer + compact banner + candy daylight — still uncommitted in `globals.css` (see Current State). Turbopack stale-write gotcha applies when editing it twice in one turn (`touch` won't force a recompile; only a real content change does).
+
+Before that (2026-07-07): `do.md` triage — Smart Game Presets + Announcement strip, committed in `6e51aa8` (see Current State).
 
 Before that (2026-07-03): WhatsApp payout rails + desktop login fix
 Product decision: prize money is never paid "via the website" — it flows person-to-person on WhatsApp like every other rupee in the system, and the app only records it. Built on top of the existing settlement engine (see **Prize Settlement Flow** for the full design):
@@ -423,6 +501,7 @@ Before that (same day): Finance Hub **Prize Payouts UI** (`43f6def` + `ee1c46f`)
 Before that (2026-06-30): the prize-settlement **engine** (backend only) — committed across `0513e0f`→`9968f03`. Winning a prize records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, crediting the selling agent's wallet. Co-winners split exactly (no lost paisa). Win detection extracted to a pure, unit-tested module; first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
 
 **Most logical next steps:**
-1. **Decide on the uncommitted `do.md` batch** — review the Smart Presets + Announcement strip (Current State above), then either commit or ask for changes. The user's own `seed_superadmin.sql`/`app.ts` edits in the same working tree should be committed together or separately per their preference, but not silently dropped.
-2. **Ship it** — every other remaining item is manual (accounts, secrets, dashboards): work through `manual.md` steps 1–12 top to bottom, then the production smoke test (step 16). `launch.md` is the background reference.
-3. All previously listed code next-steps are done: the settlement E2E smoke test passed 2026-07-02, and `housie_name` pre-fill stays on `username` by design (see Known issues).
+1. **Verify the Railway build is green** after the repo/config fixes (see Current State → Production launch), then run Step 6a's `seed:prod` and walk manual.md Steps 7–16 through the production smoke test.
+2. **Deal with the uncommitted working tree** — commit the `manual.md` launch corrections (docs-only, safe), decide on the neon/candy CSS layers + the TopNav sheet edit, delete the inert `HG/nixpacks.toml`.
+3. **Sync or retire `flinchtheflincher/Housie-Ghar`** (3 commits behind) so the two-repo trap can't recur, and close Railway's PR #1 unmerged if it's still open.
+4. **Clean up `ci.yml`** — remove the two deploy-hook curl jobs (Step 9 correction); they fail on secrets for a Railway feature that doesn't exist.

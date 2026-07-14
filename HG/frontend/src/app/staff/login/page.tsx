@@ -49,9 +49,9 @@ export default function StaffLogin() {
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
               <label className="hg-login-field">
-                <span>Email</span>
+                <span>Email or full name</span>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   autoComplete="username"
                   onChange={(e) => setEmail(e.target.value)}
