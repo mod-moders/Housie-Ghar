@@ -175,3 +175,135 @@ export async function getLuckyNumber(req: Request, res: Response): Promise<void>
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * GET /api/stats/financial-analysis (Superadmin/Admin)
+ * The Finance Hub's Analysis tab: lifetime totals over completed games, a
+ * per-game breakdown of the last 10, plus real time series for the widgets —
+ * 7-day daily revenue/payouts/tickets, today's hourly ticket buckets, and
+ * new-vs-returning buyers (only bookings stamped with player_id count;
+ * anonymous sales are invisible to retention by design).
+ */
+export async function getFinancialAnalysis(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [totals, walletBalances, recentGames, daily, hourly, retention] = await Promise.all([
+      pool.query(
+        `SELECT
+           (SELECT COALESCE(SUM(b.total_amount), 0)
+            FROM Bookings b JOIN Scheduled_Games g ON b.game_id = g.game_id
+            WHERE b.booking_status = 'Sold' AND g.game_status = 'Completed') AS total_revenue,
+           (SELECT COALESCE(SUM(p.prize_amount), 0)
+            FROM Prize_Pool p JOIN Scheduled_Games g ON p.game_id = g.game_id
+            WHERE p.claimed = TRUE AND g.game_status = 'Completed') AS total_payouts,
+           (SELECT COUNT(*)
+            FROM Tickets t JOIN Scheduled_Games g ON t.game_id = g.game_id
+            WHERE t.status = 'Sold' AND g.game_status = 'Completed') AS total_tickets_sold`
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(balance_after), 0) AS wallet_balances
+         FROM (
+           SELECT DISTINCT ON (agent_id) balance_after
+           FROM Wallet_Ledger
+           ORDER BY agent_id, created_at DESC
+         ) last_balances`
+      ),
+      pool.query(
+        `SELECT g.game_id, g.title, g.completed_at, g.ticket_price,
+           (SELECT COUNT(*) FROM Tickets t WHERE t.game_id = g.game_id AND t.status = 'Sold')::INTEGER AS tickets_sold,
+           (SELECT COALESCE(SUM(p.prize_amount), 0) FROM Prize_Pool p WHERE p.game_id = g.game_id AND p.claimed = TRUE) AS payout
+         FROM Scheduled_Games g
+         WHERE g.game_status = 'Completed'
+         ORDER BY g.completed_at DESC NULLS LAST
+         LIMIT 10`
+      ),
+      pool.query(
+        `SELECT d::date AS day,
+           COALESCE(r.revenue, 0)::FLOAT AS revenue,
+           COALESCE(r.tickets, 0)::INTEGER AS tickets,
+           COALESCE(p.payouts, 0)::FLOAT AS payouts
+         FROM generate_series(date_trunc('day', NOW()) - INTERVAL '6 days', date_trunc('day', NOW()), '1 day') d
+         LEFT JOIN (
+           SELECT date_trunc('day', confirmed_at) AS day,
+                  SUM(total_amount) AS revenue,
+                  SUM(COALESCE(array_length(ticket_ids, 1), 0)) AS tickets
+           FROM Bookings
+           WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         ) r ON r.day = d
+         LEFT JOIN (
+           SELECT date_trunc('day', claimed_at) AS day, SUM(prize_amount) AS payouts
+           FROM Prize_Pool
+           WHERE claimed = TRUE AND claimed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         ) p ON p.day = d
+         ORDER BY d`
+      ),
+      pool.query(
+        `SELECT h AS hour, COALESCE(t.tickets, 0)::INTEGER AS tickets
+         FROM generate_series(0, 23) h
+         LEFT JOIN (
+           SELECT EXTRACT(HOUR FROM confirmed_at)::INTEGER AS hour, COUNT(*) AS tickets
+           FROM Tickets
+           WHERE status = 'Sold' AND confirmed_at >= date_trunc('day', NOW())
+           GROUP BY 1
+         ) t ON t.hour = h
+         ORDER BY h`
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE first_buy >= date_trunc('day', NOW()) - INTERVAL '6 days')::INTEGER AS new_players,
+           COUNT(*) FILTER (WHERE first_buy <  date_trunc('day', NOW()) - INTERVAL '6 days')::INTEGER AS returning_players
+         FROM (
+           SELECT player_id, MIN(confirmed_at) AS first_buy
+           FROM Bookings
+           WHERE booking_status = 'Sold' AND player_id IS NOT NULL
+           GROUP BY player_id
+           HAVING MAX(confirmed_at) >= date_trunc('day', NOW()) - INTERVAL '6 days'
+         ) buyers_this_week`
+      ),
+    ]);
+
+    const collection = parseFloat(totals.rows[0].total_revenue);
+    const payouts = parseFloat(totals.rows[0].total_payouts);
+    const profit = collection - payouts;
+    const margin = collection > 0 ? (profit / collection) * 100 : 0;
+
+    res.json({
+      overall_collection: collection,
+      total_payouts: payouts,
+      overall_profit: profit,
+      profit_margin: margin,
+      total_tickets_sold: parseInt(totals.rows[0].total_tickets_sold, 10),
+      wallet_balances: parseFloat(walletBalances.rows[0].wallet_balances),
+      recent_games: recentGames.rows.map((row: any) => {
+        const price = parseFloat(row.ticket_price);
+        const gross = row.tickets_sold * price;
+        const pay = parseFloat(row.payout);
+        const net = gross - pay;
+        return {
+          game_id: row.game_id,
+          title: row.title,
+          completed_at: row.completed_at,
+          ticket_price: price,
+          tickets_sold: row.tickets_sold,
+          gross_collection: gross,
+          payout: pay,
+          net_profit: net,
+          profit_margin: gross > 0 ? (net / gross) * 100 : 0,
+        };
+      }),
+      daily: daily.rows.map((row: any) => ({
+        day: row.day,
+        revenue: row.revenue,
+        payouts: row.payouts,
+        net: row.revenue - row.payouts,
+        tickets: row.tickets,
+      })),
+      hourly_today: hourly.rows,
+      retention: retention.rows[0],
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'error fetching financial analysis');
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
