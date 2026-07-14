@@ -124,7 +124,11 @@ export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
 
   return (
     <div className="hg-sec">
-      <div style={{ display: "flex", gap: 6, background: "var(--surface-2)", padding: 4, borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", width: "fit-content", marginBottom: 4 }}>
+      <div style={{
+        display: "flex", gap: 6, background: "var(--surface-2)", padding: 4, borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--border)", maxWidth: "100%", marginBottom: 4,
+        overflowX: "auto", WebkitOverflowScrolling: "touch",
+      }}>
         {tabs.map(([tab, label]) => (
           <button
             key={tab}
@@ -139,6 +143,7 @@ export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
               fontWeight: 600,
               cursor: "pointer",
               whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {label}

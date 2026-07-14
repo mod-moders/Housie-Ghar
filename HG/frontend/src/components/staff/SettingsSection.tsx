@@ -82,7 +82,7 @@ export function SettingsSection() {
         </div>
       )}
 
-      <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="hg-panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Icon name="bell" size={18} style={{ color: "var(--accent)" }} />

@@ -117,7 +117,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     <div className="hg-sec">
       {message && <div style={{ marginBottom: 12 }}><Flash text={message.text} error={message.error} /></div>}
 
-      <div className="hg-panel" style={{ maxWidth: 460, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="hg-panel" style={{ maxWidth: 460, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar src={roleAvatar(me)} name={me.full_name} size={36} />
           <div>
@@ -159,7 +159,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         </Button>
       </div>
 
-      <div className="hg-panel" style={{ maxWidth: 460, marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="hg-panel" style={{ maxWidth: 460, marginTop: 18, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="lock" size={16} style={{ color: "var(--text-dim)" }} />
           <h3 style={{ margin: 0, fontSize: 15 }}>Change password</h3>

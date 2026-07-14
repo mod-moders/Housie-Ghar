@@ -311,7 +311,7 @@ export function AnalyticsChart({ daily }: { daily: DailyPoint[] }) {
   }
 
   return (
-    <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="hg-panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h3 style={{ margin: 0 }}>Platform Performance</h3>
@@ -391,7 +391,7 @@ export function HeatmapWidget({ hourly }: { hourly: HourlyPoint[] }) {
   const max = Math.max(...slots.map((s) => s.val), 1);
 
   return (
-    <div className="hg-panel" style={{ flex: 1, minWidth: 260 }}>
+    <div className="hg-panel" style={{ flex: 1, minWidth: 260, padding: 20 }}>
       <h3 style={{ margin: 0 }}>Peak Ticket Sales</h3>
       <p className="hg-sec-sub" style={{ margin: "2px 0 12px" }}>Today&apos;s ticket confirmations by time of day.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -432,7 +432,7 @@ export function RetentionWidget({ retention }: { retention: RetentionData }) {
   const offset = circ - (returningPct / 100) * circ;
 
   return (
-    <div className="hg-panel" style={{ flex: 1, minWidth: 260, display: "flex", flexDirection: "column" }}>
+    <div className="hg-panel" style={{ flex: 1, minWidth: 260, padding: 20, display: "flex", flexDirection: "column" }}>
       <h3 style={{ margin: 0 }}>Player Retention</h3>
       <p className="hg-sec-sub" style={{ margin: "2px 0 12px" }}>New vs. returning buyers over the last 7 days (signed-in players only).</p>
 
