@@ -15,7 +15,7 @@ function Flash({ text, error }: { text: string; error?: boolean }) {
   return (
     <div
       style={{
-        padding: "6px 14px",
+        padding: "10px 16px",
         borderRadius: "var(--radius-sm)",
         background: error ? "var(--danger-soft)" : "var(--success-soft)",
         display: "inline-flex",
@@ -150,7 +150,7 @@ export default function ProfilePage() {
           <p className="hg-page-sub">Manage your details, password and sound preference.</p>
         </div>
 
-        <div className="hg-panel" style={{ maxWidth: 460, margin: "0 auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="hg-panel" style={{ maxWidth: 460, margin: "0 auto", padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
           {detailsMsg && <Flash text={detailsMsg.text} error={detailsMsg.error} />}
 
           <label className="hg-login-field">
@@ -186,7 +186,7 @@ export default function ProfilePage() {
           </Button>
         </div>
 
-        <div className="hg-panel" style={{ maxWidth: 460, margin: "18px auto 0", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="hg-panel" style={{ maxWidth: 460, margin: "24px auto 0", padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Icon name="lock" size={16} style={{ color: "var(--text-dim)" }} />
             <h3 style={{ margin: 0, fontSize: 15 }}>{profile.has_password ? "Change password" : "Secure your account"}</h3>
