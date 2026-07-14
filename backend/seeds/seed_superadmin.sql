@@ -15,7 +15,7 @@ INSERT INTO Platform_Config (config_key, config_value, description) VALUES
 ('lock_duration_minutes', '10', 'Number of minutes a ticket booking soft-lock is held'),
 ('low_balance_threshold', '500', 'Alert threshold for Agent wallet balance'),
 ('spam_flag_threshold', '3', 'Number of spam flags before a player is soft-banned'),
-('active_theme', 'digital_neon', 'The globally active UI theme'),
+('active_theme', 'luxury_gold', 'The globally active UI theme'),
 ('announcement_text', 'Welcome to Housie Ghar! Join our live games every day.', 'Instant announcement shown on homepage'),
 ('site_title', 'Housie Ghar', 'The title of the website'),
 ('maintenance_mode', 'false', 'Enable maintenance mode to lock the site')

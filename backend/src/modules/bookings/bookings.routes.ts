@@ -19,13 +19,13 @@ const router = Router();
 router.post('/lock', lockTickets);
 router.get('/status/:booking_id', getBookingStatus);
 
-// Agent endpoints (Authenticated)
-router.get('/agent/queue', authenticateToken, requireRole(['Agent']), getAgentQueue);
-router.get('/agent/sales', authenticateToken, requireRole(['Agent']), getAgentSales);
-router.get('/agent/skip-alerts', authenticateToken, requireRole(['Agent']), getSkipAlerts);
-router.post('/agent/direct-sale', authenticateToken, requireRole(['Agent']), directSale);
-router.post('/agent/:booking_id/confirm', authenticateToken, requireRole(['Agent']), confirmBooking);
-router.post('/agent/:booking_id/reject', authenticateToken, requireRole(['Agent']), rejectBooking);
+// Bookie endpoints (Authenticated)
+router.get('/agent/queue', authenticateToken, requireRole(['Bookie']), getAgentQueue);
+router.get('/agent/sales', authenticateToken, requireRole(['Bookie']), getAgentSales);
+router.get('/agent/skip-alerts', authenticateToken, requireRole(['Bookie']), getSkipAlerts);
+router.post('/agent/direct-sale', authenticateToken, requireRole(['Bookie']), directSale);
+router.post('/agent/:booking_id/confirm', authenticateToken, requireRole(['Bookie']), confirmBooking);
+router.post('/agent/:booking_id/reject', authenticateToken, requireRole(['Bookie']), rejectBooking);
 
 // Operator overflow failsafe endpoints (Authenticated)
 router.get('/operator/overflow-queue', authenticateToken, requireRole(['Operator']), getOperatorOverflowQueue);

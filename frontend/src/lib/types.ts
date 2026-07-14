@@ -22,6 +22,7 @@ export interface GameSummary {
   sold_count: number;
   locked_count: number;
   available_count: number;
+  player_count?: number; // Optional since it might be missing in older API versions
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Completed";
   prize_pool: Prize[];
@@ -97,7 +98,7 @@ export type TrustTier = "veteran" | "trusted" | "new";
 export interface StaffUser {
   user_id: string;
   full_name: string;
-  role_name: "Superadmin" | "Admin" | "Operator" | "Agent";
+  role_name: "Superadmin" | "Financial Admin" | "Operator" | "Bookie";
   role_id: number;
   is_cfo: boolean;
   email: string;

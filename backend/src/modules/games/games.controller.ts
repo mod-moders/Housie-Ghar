@@ -31,11 +31,13 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 
     const games = [];
     for (const game of result.rows) {
-      // Fetch counts: sold, locked
+      // Fetch counts: sold, locked, unique players
       const soldRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game.game_id]);
       const lockedRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Locked'`, [game.game_id]);
+      const playersRes = await pool.query(`SELECT COUNT(DISTINCT owner_housie_name) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game.game_id]);
       const soldCount = parseInt(soldRes.rows[0].count, 10);
       const lockedCount = parseInt(lockedRes.rows[0].count, 10);
+      const playerCount = parseInt(playersRes.rows[0].count, 10);
       const totalCount = parseInt(game.total_tickets, 10);
       const availableCount = totalCount - (soldCount + lockedCount);
 
@@ -60,6 +62,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         sold_count: soldCount,
         locked_count: lockedCount,
         available_count: availableCount,
+        player_count: playerCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
         prize_pool: prizesRes.rows.map((row) => ({
@@ -105,8 +108,10 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const game = result.rows[0];
     const soldRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game_id]);
     const lockedRes = await pool.query(`SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND status = 'Locked'`, [game_id]);
+    const playersRes = await pool.query(`SELECT COUNT(DISTINCT owner_housie_name) FROM Tickets WHERE game_id = $1 AND status = 'Sold'`, [game_id]);
     const soldCount = parseInt(soldRes.rows[0].count, 10);
     const lockedCount = parseInt(lockedRes.rows[0].count, 10);
+    const playerCount = parseInt(playersRes.rows[0].count, 10);
     const totalCount = parseInt(game.total_tickets, 10);
 
     const prizesRes = await pool.query(
@@ -129,6 +134,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       sold_count: soldCount,
       locked_count: lockedCount,
       available_count: totalCount - (soldCount + lockedCount),
+      player_count: playerCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
       prize_pool: prizesRes.rows.map((row) => ({

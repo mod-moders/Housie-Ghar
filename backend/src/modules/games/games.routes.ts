@@ -26,21 +26,21 @@ const router = Router();
 router.get('/number-calls', listNumberCalls);
 router.get('/', getGames);
 
-// Game creation (Admin or Superadmin)
-router.post('/', authenticateToken, requireRole(['Admin', 'Superadmin']), createGame);
-router.patch('/:game_id', authenticateToken, requireRole(['Admin', 'Superadmin']), updateGame);
-router.delete('/:game_id', authenticateToken, requireRole(['Admin', 'Superadmin']), deleteGame);
-router.patch('/number-calls/:number', authenticateToken, requireRole(['Admin', 'Superadmin']), updateNumberCall);
-router.post('/number-calls/:number/restore', authenticateToken, requireRole(['Admin', 'Superadmin']), restoreDefaultCallText);
-router.post('/number-calls/:number/upload', authenticateToken, requireRole(['Admin', 'Superadmin']), uploadNumberAudio);
+// Game creation (Financial Admin or Superadmin)
+router.post('/', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), createGame);
+router.patch('/:game_id', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), updateGame);
+router.delete('/:game_id', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), deleteGame);
+router.patch('/number-calls/:number', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), updateNumberCall);
+router.post('/number-calls/:number/restore', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), restoreDefaultCallText);
+router.post('/number-calls/:number/upload', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), uploadNumberAudio);
 router.get('/:game_id/drawn', getDrawnNumbers);
 router.get('/:game_id/live-stream', liveStream);
 router.get('/:game_id', getGameById);
 
 // Staff control endpoints (Authenticated Operator or higher)
-router.post('/:game_id/start', authenticateToken, requireRole(['Operator', 'Admin', 'Superadmin']), handleStartGame);
-router.post('/:game_id/pause', authenticateToken, requireRole(['Operator', 'Admin', 'Superadmin']), handlePauseGame);
-router.post('/:game_id/resume', authenticateToken, requireRole(['Operator', 'Admin', 'Superadmin']), handleResumeGame);
-router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Admin', 'Superadmin']), handleSpeedChange);
+router.post('/:game_id/start', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleStartGame);
+router.post('/:game_id/pause', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handlePauseGame);
+router.post('/:game_id/resume', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleResumeGame);
+router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleSpeedChange);
 
 export default router;

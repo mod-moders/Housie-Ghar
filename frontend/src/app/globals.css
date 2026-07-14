@@ -667,19 +667,6 @@
   --cyan:#0277bd; --shadow:0 4px 12px rgba(0,0,0,0.08); --scrim:rgba(255,255,255,0.7);
 }
 
-/* 3. Glamour Casino */
-.hg-root[data-theme='glamour_casino'] {
-  --bg:#1a0000; --bg2:#330000; --surface:#4d0000; --surface-2:#660000;
-  --elevate:#800000; --border:#ffd700; --border-2:#d4af37;
-  --text:#ffffff; --text-dim:#ffd700; --text-mute:#b8860b;
-  --ink:#1a0000; --card-line:#ffd700; --card-shadow:0 5px 0 -1px #8b0000;
-  --card-shadow-sm:0 3px 0 -1px #8b0000;
-  --cta:#ffd700; --cta-ink:#4d0000; --cta-glow:rgba(255,215,0,0.4);
-  --success:#00ff00; --success-soft:rgba(0,255,0,0.1);
-  --danger:#ff0000; --danger-soft:rgba(255,0,0,0.1);
-  --locked:#808080; --locked-soft:rgba(128,128,128,0.2);
-  --cyan:#00ffff; --shadow:0 5px 15px rgba(0,0,0,0.5); --scrim:rgba(26,0,0,0.8);
-}
 
 /* 4. Digital Neon */
 .hg-root[data-theme='digital_neon'] {
@@ -2754,6 +2741,278 @@ select option {
   color: var(--accent) !important;
   background: var(--accent-soft) !important;
   box-shadow: 0 0 10px var(--accent-soft) !important;
+}
+
+/* ============ LIVE OPERATOR HUD GRID AND 3-COLUMN LAYOUT ============ */
+.hg-hud-grid.is-live {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "main"
+    "center"
+    "prizes";
+  gap: 14px;
+  align-items: start;
+}
+
+@media(min-width: 760px) {
+  .hg-hud-grid.is-live {
+    grid-template-columns: 1.2fr 1fr;
+    grid-template-areas:
+      "main prizes"
+      "center center";
+  }
+}
+
+.hg-hud-grid.is-live .hg-hud-main {
+  grid-area: main;
+}
+
+.hg-hud-grid.is-live .hg-hud-prizes {
+  grid-area: prizes;
+  align-self: stretch;
+}
+
+.hg-hud-center-column {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Wide screen 3-column layout */
+@media (min-width: 1160px) {
+  .hg-dash-content:has(.hg-hud-section-live) {
+    padding: 12px 16px;
+    overflow: hidden;
+  }
+
+  .hg-hud-section-live {
+    height: 100%;
+    min-height: 0;
+    gap: 10px;
+  }
+
+  .hg-hud-section-live .hg-hud-grid.is-live {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: 1fr 1.25fr 1fr;
+    grid-template-rows: auto;
+    grid-template-areas: "main center prizes";
+    gap: 12px;
+    align-items: start;
+    overflow: visible;
+  }
+
+  .hg-hud-section-live .hg-hud-main {
+    padding: 14px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    border: 1.5px solid var(--card-line);
+    background: radial-gradient(circle at 50% 38%, var(--accent-soft), transparent 48%), var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .hg-hud-section-live .hg-cage-area.hg-hud-cage-compact {
+    min-height: 0;
+    margin-bottom: 6px !important;
+  }
+
+  .hg-hud-section-live .hg-hud-controls {
+    margin: 7px 0;
+  }
+
+  .hg-hud-section-live .hg-hud-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .hg-hud-section-live .hg-speed {
+    margin-top: 2px;
+    padding: 9px 10px;
+  }
+
+  .hg-hud-section-live .hg-speed-lbl {
+    margin-bottom: 5px;
+  }
+
+  .hg-hud-section-live .hg-hud-prizes {
+    padding: 12px;
+  }
+
+  .hg-hud-section-live .hg-hud-prizes-scroll {
+    gap: 6px;
+  }
+
+  .hg-hud-section-live .hg-hud-prize-item {
+    padding: 7px 8px;
+  }
+
+  .hg-hud-section-live .hg-hud-track-card {
+    padding: 9px 12px;
+  }
+
+  .hg-hud-section-live .hg-hud-recent .hg-recent-chip {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+  }
+
+  .hg-hud-section-live .hg-hud-recent .hg-recent-chip.is-now {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .hg-hud-section-live .hg-hud-board90 {
+    max-width: min(100%, 480px);
+    gap: 6px;
+    margin: 0 auto;
+  }
+
+  .hg-hud-section-live .hg-hud-board90 .hg-b90 {
+    font-size: clamp(10px, 1.2vw, 14px);
+    border-radius: 6px;
+  }
+
+  .hg-hud-section-live .hg-hud-ghost-full {
+    display: none;
+  }
+}
+
+/* ============ WINNER ANNOUNCEMENT SHARE DIALOG ============ */
+.hg-share-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.hg-share-dialog-card {
+  width: 100%;
+  max-width: 500px;
+  background: var(--surface);
+  border: 1.5px solid var(--card-line);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.hg-share-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hg-share-dialog-head h2 {
+  font-family: var(--font-head);
+  font-size: 20px;
+  font-weight: 800;
+  margin: 2px 0 0;
+  color: var(--text);
+}
+
+.hg-share-kicker {
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hg-share-dialog-card p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.hg-share-dialog-card textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-2);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: none;
+  resize: none;
+}
+
+.hg-share-dialog-card textarea:focus {
+  border-color: var(--accent);
+}
+
+.hg-share-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hg-share-destinations {
+  border-top: 1px solid var(--border-2);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hg-share-destinations > span {
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hg-share-group-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hg-share-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border-2);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hg-share-group:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  transform: translateY(-1px);
+}
+
+.hg-share-dialog-card small {
+  font-size: 11px;
+  color: var(--text-mute);
+  text-align: center;
 }
 
 

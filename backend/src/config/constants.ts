@@ -76,8 +76,8 @@ export const CONSTANTS = {
   // Roles
   ROLES: {
     SUPERADMIN: 1,
-    ADMIN: 2,
+    FINANCIAL_ADMIN: 2,
     OPERATOR: 3,
-    AGENT: 4,
+    BOOKIE: 4,
   } as const,
 };

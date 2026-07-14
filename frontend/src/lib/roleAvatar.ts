@@ -15,13 +15,13 @@ export function roleAvatar(u: RoleAvatarInput | null | undefined): string | null
     case "Superadmin":
       return "/avatars/superadmin.jpg";
     case "Admin":
+    case "Financial Admin":
       return u.is_cfo ? "/avatars/financial-officer.jpg" : "/avatars/admin.jpg";
     case "Operator":
       return "/avatars/operator.jpg";
-    case "Agent": // "Bookie" in the UI
+    case "Agent":
+    case "Bookie":
       return "/avatars/bookie.jpg";
-    case "Promoter":
-      return "/avatars/promoter.jpg";
     default:
       return null;
   }

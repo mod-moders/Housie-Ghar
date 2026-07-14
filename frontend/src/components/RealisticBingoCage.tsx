@@ -201,17 +201,23 @@ export function RealisticBingoCage({
   lastDrawn,
   isTeasing,
   drawn = new Set<number>(),
+  compact = false,
 }: {
   lastDrawn: number | null;
   isTeasing: boolean;
   drawn?: Set<number>;
+  compact?: boolean;
 }) {
   const ballHue = lastDrawn !== null ? (lastDrawn * 37) % 360 : 0;
   const ballColor = lastDrawn !== null ? `hsl(${ballHue}, 75%, 50%)` : "transparent";
   const showBadge = !isTeasing && lastDrawn !== null;
+  const cageSize = compact ? "280px" : "420px";
+  const badgeSize = compact ? "84px" : "120px";
+  const badgeFontSize = compact ? "34px" : "48px";
+  const badgeBorder = compact ? "4px" : "6px";
 
   return (
-    <div style={{ position: "relative", width: "100%", maxWidth: "420px", margin: "0 auto" }}>
+    <div style={{ position: "relative", width: "100%", maxWidth: cageSize, margin: "0 auto" }}>
       {/* 3D Cage */}
       <div style={{ width: "100%", aspectRatio: "4 / 3" }}>
         <Canvas
@@ -253,16 +259,16 @@ export function RealisticBingoCage({
         <div
           key={lastDrawn}
           style={{
-            width: "120px",
-            height: "120px",
+            width: badgeSize,
+            height: badgeSize,
             borderRadius: "50%",
             background: "#fff",
-            border: `6px solid ${ballColor}`,
+            border: `${badgeBorder} solid ${ballColor}`,
             boxShadow: `0 0 30px ${ballColor}44, 0 8px 32px rgba(0,0,0,0.5)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "48px",
+            fontSize: badgeFontSize,
             fontWeight: 900,
             color: "#111",
             fontFamily: "var(--font-head), sans-serif",

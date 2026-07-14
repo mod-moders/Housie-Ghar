@@ -179,13 +179,17 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
     setIsSearching(true);
     apiFetch<any[]>(`/api/games/${game_id}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
       .then((tickets) => {
-        setSearchedTickets(
-          tickets.map((t) => ({
-            number: t.ticket_number,
-            matrix: gridToMatrix(t.grid_data),
-            owner: t.owner_housie_name,
-          }))
-        );
+        const mapped = tickets.map((t) => ({
+          number: t.ticket_number,
+          matrix: gridToMatrix(t.grid_data),
+          owner: t.owner_housie_name,
+        }));
+        setSearchedTickets((prev) => {
+          const existing = new Set(prev.map((x) => x.number));
+          const unique = mapped.filter((x) => !existing.has(x.number));
+          return [...prev, ...unique];
+        });
+        setSearchQuery("");
       })
       .catch((err) => {
         console.error("Search failed:", err);

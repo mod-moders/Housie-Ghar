@@ -11,6 +11,11 @@ import { EmptyHint, KpiCard } from "@/components/ui";
 import { downloadPoster, type PosterKind } from "@/lib/sharePoster";
 import type { GameSummary, QueueBooking } from "@/lib/types";
 
+interface WhatsAppShareGroup {
+  name: string;
+  url: string;
+}
+
 export function OperatorHudSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -212,9 +217,16 @@ export function ShareGamesSection() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ gameTitle: string; filename: string; caption: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shareGroups, setShareGroups] = useState<WhatsAppShareGroup[]>([]);
 
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games").then(setGames).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    apiFetch<{ groups: WhatsAppShareGroup[] }>("/api/config/share-groups")
+      .then((res) => setShareGroups(res.groups))
+      .catch(() => setShareGroups([]));
   }, []);
 
   useEffect(() => {
@@ -295,21 +307,62 @@ export function ShareGamesSection() {
             }}
             onFocus={(e) => e.currentTarget.select()}
           />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              className="hg-ic-btn"
-              onClick={copyCaption}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
-            >
-              <Icon name={copied ? "check" : "edit"} size={14} /> {copied ? "Copied!" : "Copy Caption"}
-            </button>
-            <button
-              className="hg-ic-btn"
-              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer")}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
-            >
-              <Icon name="chat" size={14} /> Open WhatsApp
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="hg-hud-share-btn"
+                onClick={copyCaption}
+                style={{ color: copied ? "var(--success)" : "var(--brand)", display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Icon name={copied ? "check" : "copy"} size={14} /> {copied ? "Caption Copied" : "Copy Caption"}
+              </button>
+            </div>
+            
+            <div className="hg-share-destinations" style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", display: "block", marginBottom: 6 }}>
+                Send directly to Official Info Groups
+              </span>
+              {shareGroups.length > 0 ? (
+                <div className="hg-share-group-list" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {shareGroups.map((group) => (
+                    <button
+                      key={`${group.name}-${group.url}`}
+                      className="hg-share-group"
+                      onClick={() => {
+                        navigator.clipboard.writeText(result.caption).catch(() => {});
+                        window.open(group.url, "_blank", "noopener,noreferrer");
+                      }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        padding: "6px 12px", borderRadius: 20, border: "1px solid var(--border-2)",
+                        background: "var(--surface)", color: "var(--text)", fontSize: 12,
+                        fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                      }}
+                    >
+                      <Icon name="chat" size={13} style={{ color: "var(--success)" }} /> {group.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className="hg-share-group"
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer")}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: 20, border: "1px solid var(--border-2)",
+                      background: "var(--surface)", color: "var(--text)", fontSize: 12,
+                      fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    <Icon name="chat" size={13} style={{ color: "var(--success)" }} /> Share via WhatsApp
+                  </button>
+                  <p className="hg-dim" style={{ margin: 0, fontSize: 11, alignSelf: "center" }}>
+                    No Official Info Groups configured. Click button to share generally.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

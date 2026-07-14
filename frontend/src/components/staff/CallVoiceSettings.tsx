@@ -155,8 +155,18 @@ export function CallVoiceSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".mp3") && file.type !== "audio/mpeg") {
-      alert("Please upload an MP3 audio file only.");
+    const fileName = file.name.toLowerCase().trim();
+    const hasAudioExtension = fileName.endsWith(".mp3") ||
+                              fileName.endsWith(".wav") ||
+                              fileName.endsWith(".m4a") ||
+                              fileName.endsWith(".mpeg") ||
+                              fileName.endsWith(".aac") ||
+                              fileName.endsWith(".ogg") ||
+                              fileName.endsWith(".wma");
+    const isAudio = hasAudioExtension || file.type.startsWith("audio/");
+
+    if (!isAudio) {
+      alert(`Please upload an MP3 or standard audio file only. (Detected file: ${file.name}, type: ${file.type || "unknown"})`);
       return;
     }
 
@@ -443,7 +453,7 @@ export function CallVoiceSettings() {
                     >
                       <input 
                         type="file" 
-                        accept=".mp3,audio/mpeg" 
+                        accept="audio/*,.mp3,.wav,.m4a,.mpeg,.aac,.ogg,.wma" 
                         onChange={(e) => handleFileUpload(item.number, e)}
                         style={{ display: "none" }}
                       />

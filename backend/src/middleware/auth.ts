@@ -96,7 +96,7 @@ export async function requireFinancialOfficer(
     return;
   }
 
-  if (req.user.roleName !== 'Admin') {
+  if (req.user.roleName !== 'Financial Admin') {
     res.status(403).json({ message: 'Forbidden: Financial Officer access required' });
     return;
   }

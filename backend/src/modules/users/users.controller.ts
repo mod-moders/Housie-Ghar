@@ -10,7 +10,7 @@ import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { deriveTrust } from '../../utils/trust';
 
-const VALID_ROLE_IDS = new Set([1, 2, 3, 4, 5]);
+const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 
 /**
  * List all staff users with assigned game counts (Admin+)
@@ -53,8 +53,8 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
 }
 
 /**
- * Create a new staff account (Admin+)
- * Admins may create Operators and Agents; only a Superadmin may create Admins.
+ * Create a new staff account (Financial Admin+)
+ * Financial Admins may create Operators and Bookies; only a Superadmin may create Financial Admins.
  */
 export async function createUser(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { full_name, email, phone, upi_id, town, role_id, password } = req.body;
@@ -70,9 +70,9 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
     return;
   }
 
-  // Only a Superadmin may create Admins or other Superadmins
+  // Only a Superadmin may create Financial Admins or other Superadmins
   if (Number(role_id) <= 2 && actor.roleName !== 'Superadmin') {
-    res.status(403).json({ message: 'Only a Superadmin can create Admin or Superadmin accounts' });
+    res.status(403).json({ message: 'Only a Superadmin can create Financial Admin or Superadmin accounts' });
     return;
   }
 
@@ -159,9 +159,9 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
 
     const target = existing.rows[0];
 
-    // An Admin may not modify a Superadmin or another Admin
-    if (actor.roleName === 'Admin' && target.role_id <= 2) {
-      res.status(403).json({ message: 'Admins cannot modify Admin or Superadmin accounts' });
+    // A Financial Admin may not modify a Superadmin or another Financial Admin
+    if (actor.roleName === 'Financial Admin' && target.role_id <= 2) {
+      res.status(403).json({ message: 'Financial Admins cannot modify Financial Admin or Superadmin accounts' });
       return;
     }
 
@@ -197,6 +197,62 @@ export async function updateUser(req: AuthenticatedRequest, res: Response): Prom
 }
 
 /**
+ * Delete a staff account (Superadmin only).
+ * Superadmin cannot delete themselves or other Superadmins.
+ */
+export async function deleteUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const actor = req.user!;
+
+  try {
+    const existing = await pool.query(
+      `SELECT u.user_id, u.full_name, u.role_id, r.role_name
+       FROM Users u JOIN Roles r ON u.role_id = r.role_id
+       WHERE u.user_id = $1`,
+      [id]
+    );
+
+    if (existing.rowCount === 0) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const target = existing.rows[0];
+
+    // Superadmin cannot delete themselves
+    if (id === actor.userId) {
+      res.status(400).json({ message: 'You cannot delete your own account' });
+      return;
+    }
+
+    // Superadmin cannot delete other Superadmins
+    if (target.role_id === 1) {
+      res.status(403).json({ message: 'Cannot delete Superadmin accounts' });
+      return;
+    }
+
+    await pool.query(`DELETE FROM Users WHERE user_id = $1`, [id]);
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'DELETE_USER',
+      targetType: 'User',
+      targetId: String(id),
+      targetDescription: `Deleted ${target.full_name} (role_id ${target.role_id})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Designate (or revoke) an Admin as the Financial Officer (Superadmin only).
  * Single-FO model: designating one Admin clears the flag from every other.
  */
@@ -220,7 +276,7 @@ export async function designateCfo(req: AuthenticatedRequest, res: Response): Pr
     }
     if (target.rows[0].role_id !== 2) {
       await client.query('ROLLBACK');
-      res.status(400).json({ message: 'Only an Admin can be designated as Financial Officer' });
+      res.status(400).json({ message: 'Only a Financial Admin can be designated as Financial Officer' });
       return;
     }
 

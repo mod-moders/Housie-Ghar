@@ -23,10 +23,10 @@ export function TopNav() {
         // 2. If not player, check if logged in as staff
         apiFetch<{ user: { full_name: string; role_name: string } }>("/api/auth/me")
           .then((res) => {
-            setUser({ 
-              role: "staff", 
-              name: res.user.full_name, 
-              label: `${res.user.full_name} (${res.user.role_name})` 
+            setUser({
+              role: "staff",
+              name: res.user.full_name,
+              label: `${res.user.full_name} (${res.user.role_name})`
             });
           })
           .catch(() => {
@@ -68,18 +68,12 @@ export function TopNav() {
 
       <div className="hg-nav-right">
         {user?.role === "staff" ? (
-          <>
-            <span className="hg-staff-badge">
-              <Icon name="shield" size={12} style={{ marginRight: "4px" }} />
-              Staff: {user.name}
-            </span>
-            <button className="hg-staff-btn is-active" onClick={() => go("/staff")} aria-label="Staff panel" title="Staff panel">
-              <Icon name="shield" size={17} strokeWidth={2} />
-            </button>
-          </>
+          <button className="hg-staff-btn is-active" onClick={() => go("/staff")} aria-label="Staff panel" title="Staff panel">
+            <Icon name="shield" size={18} strokeWidth={2.2} />
+          </button>
         ) : (
           <button className="hg-staff-btn" onClick={() => go("/staff/login")} aria-label="Staff login" title="Staff login">
-            <Icon name="lock" size={17} strokeWidth={2} />
+            <Icon name="lock" size={18} strokeWidth={2.2} />
           </button>
         )}
         <button className="hg-burger" onClick={() => setOpen((o) => !o)} aria-label="Menu">

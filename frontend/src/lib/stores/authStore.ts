@@ -5,7 +5,7 @@ export interface AuthUser {
   full_name: string;
   email: string;
   role_id: number;
-  role_name: "Superadmin" | "Admin" | "Operator" | "Agent" | "Promoter";
+  role_name: "Superadmin" | "Financial Admin" | "Operator" | "Bookie";
   current_balance?: number;
   is_cfo?: boolean;
   town?: string | null;

@@ -32,8 +32,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
-  const roleLabel = me.role_name === "Agent" ? "Bookie" : me.role_name;
-  const showUpi = me.role_name === "Agent";
+  const roleLabel = me.role_name;
+  const showUpi = me.role_name === "Bookie";
   const dirty = fullName.trim() !== me.full_name || phone.trim() !== (me.phone ?? "") || upiId.trim() !== (me.upi_id ?? "");
 
   const handleSave = async () => {

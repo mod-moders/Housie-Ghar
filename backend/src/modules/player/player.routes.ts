@@ -14,8 +14,8 @@ router.patch('/me', authenticatePlayer, updateProfile);
 router.get('/stats', authenticatePlayer, getPlayerStats);
 
 // Administrative Player Management endpoints
-router.get('/', authenticateToken, requireRole(['Superadmin', 'Admin']), getAllPlayers);
-router.patch('/:player_id/status', authenticateToken, requireRole(['Superadmin', 'Admin']), adminUpdatePlayerStatus);
+router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getAllPlayers);
+router.patch('/:player_id/status', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), adminUpdatePlayerStatus);
 router.delete('/:player_id', authenticateToken, requireRole(['Superadmin']), adminDeletePlayer);
 
 export default router;

@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { getConfig, updateConfig, getPublicConfig } from './config.controller';
+import { getConfig, updateConfig, getPublicConfig, getShareGroups } from './config.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
 const router = Router();
 
 router.get('/public', getPublicConfig);
-router.get('/', authenticateToken, requireRole(['Superadmin', 'Admin']), getConfig);
-router.put('/', authenticateToken, requireRole(['Superadmin', 'Admin']), updateConfig);
+router.get('/share-groups', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getShareGroups);
+router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getConfig);
+router.put('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), updateConfig);
 
 export default router;

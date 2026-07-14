@@ -3,7 +3,7 @@
  * Used by both frontend and backend
  */
 
-export type RoleName = 'Superadmin' | 'Admin' | 'Operator' | 'Agent' | 'Promoter';
+export type RoleName = 'Superadmin' | 'Financial Admin' | 'Operator' | 'Bookie';
 export type UserStatus = 'Active' | 'Suspended';
 
 export interface Role {

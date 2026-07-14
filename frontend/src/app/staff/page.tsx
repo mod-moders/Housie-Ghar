@@ -17,14 +17,13 @@ import { PlayersSection } from "@/components/staff/PlayersSection";
 import { FinanceHubSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection, ShareGamesSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
-import { PromoterSection } from "@/components/staff/PromoterSections";
 import { ProfileSection } from "@/components/staff/ProfileSection";
 import type { FinancialHud } from "@/lib/types";
 
 type NavItem = [key: string, label: string, icon: string];
 
 function navFor(user: AuthUser): NavItem[] {
-  const isFo = user.role_name === "Superadmin" || (user.role_name === "Admin" && user.is_cfo === true);
+  const isFo = user.role_name === "Superadmin" || (user.role_name === "Financial Admin" && user.is_cfo === true);
   if (user.role_id <= 2) {
     const items: NavItem[] = [];
     if (isFo) items.push(["finance", "Finance Hub", "wallet"]);
@@ -49,9 +48,6 @@ function navFor(user: AuthUser): NavItem[] {
       ["broadcast", "Share to WhatsApp", "chat"],
       ["profile", "My Profile", "user"],
     ];
-  }
-  if (user.role_name === "Promoter") {
-    return [["promoter", "Promoter HUD", "chart"], ["filling", "Filling Status", "ticket"], ["profile", "My Profile", "user"]];
   }
   return [["queue", "Booking Queue", "bell"], ["wallet", "My Wallet", "wallet"], ["filling", "Filling Status", "ticket"], ["profile", "My Profile", "user"]];
 }
@@ -81,19 +77,17 @@ export default function StaffDashboard() {
     if (!user) return;
     if (user.role_name === "Superadmin") {
       document.title = "HG-Superadmin";
-    } else if (user.role_name === "Admin") {
-      document.title = "HG-Admin";
+    } else if (user.role_name === "Financial Admin") {
+      document.title = "HG-FinancialAdmin";
     } else if (user.role_name === "Operator") {
       document.title = "HG-Operator";
-    } else if (user.role_name === "Agent") {
+    } else if (user.role_name === "Bookie") {
       document.title = "HG-Bookie";
-    } else if (user.role_name === "Promoter") {
-      document.title = "HG Promoter";
     }
   }, [user]);
 
   const nav = useMemo(() => (user ? navFor(user) : []), [user]);
-  const isFo = !!user && (user.role_name === "Superadmin" || (user.role_name === "Admin" && user.is_cfo === true));
+  const isFo = !!user && (user.role_name === "Superadmin" || (user.role_name === "Financial Admin" && user.is_cfo === true));
   const active = section ?? nav[0]?.[0] ?? null;
 
   const loadHud = useCallback(() => {
@@ -125,7 +119,7 @@ export default function StaffDashboard() {
     );
   }
 
-  const roleLabel = user.role_name === "Agent" ? "Bookie" : user.is_cfo ? "Financial Admin" : user.role_name;
+  const roleLabel = user.role_name;
   const showFinanceBar = isFo && hud && (active === "finance" || active === "overview");
 
   const renderSection = () => {
@@ -144,7 +138,6 @@ export default function StaffDashboard() {
       case "broadcast": return <ShareGamesSection />;
       case "queue": return <BookieQueueSection me={user} />;
       case "wallet": return <BookieWalletSection me={user} />;
-      case "promoter": return <PromoterSection me={user} />;
       case "profile": return <ProfileSection me={user} onUpdated={setUser} />;
       default: return null;
     }

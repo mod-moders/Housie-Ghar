@@ -106,7 +106,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick }: {
         const pct = fillPct(g);
         const prizeTotal = g.prize_pool?.reduce((acc, p) => acc + (p.prize_amount || 0), 0) || 0;
         const expMargin = (g.sold_count * g.ticket_price) - prizeTotal;
-        const playerCount = g.sold_count > 0 ? Math.round(g.sold_count * 0.8) + 1 : 0;
+        const playerCount = g.player_count !== undefined ? g.player_count : (g.sold_count > 0 ? Math.round(g.sold_count * 0.8) + 1 : 0);
         const isCompleted = g.game_status === "Completed";
 
         return (
@@ -1011,7 +1011,7 @@ export function FillingSection() {
 }
 
 // ── Workforce ────────────────────────────────────────────────────────────────
-const ROLE_OPTIONS: [number, string][] = [[2, "Admin"], [3, "Operator"], [4, "Bookie"], [5, "Promoter"]];
+const ROLE_OPTIONS: [number, string][] = [[2, "Financial Admin"], [3, "Operator"], [4, "Bookie"]];
 
 export function WorkforceSection({ me }: { me: AuthUser }) {
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -1065,12 +1065,23 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
     }
   };
 
-  const roleLabel = (u: StaffUser) => (u.role_name === "Agent" ? "Bookie" : u.is_cfo ? "Financial Admin" : u.role_name);
+  const deleteUser = async (u: StaffUser) => {
+    if (!window.confirm(`Delete ${u.full_name} (${roleLabel(u)})? This action cannot be undone.`)) return;
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${u.user_id}`, { method: "DELETE" });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
+
+  const roleLabel = (u: StaffUser) => u.role_name;
 
   return (
     <div className="hg-sec">
       <div className="hg-sec-head">
-        <p className="hg-sec-sub">Provision Admins, Operators and Bookies.</p>
+        <p className="hg-sec-sub">Provision Financial Admins, Operators and Bookies.</p>
         <Button variant="cta" size="sm" icon="users" onClick={() => setAdding((a) => !a)}>
           {adding ? "Close" : "Add Staff"}
         </Button>
@@ -1140,6 +1151,11 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                 {me.role_name === "Superadmin" && u.role_id === 2 && (
                   <button className="hg-ic-btn" title={u.is_cfo ? "Revoke Financial Officer" : "Make Financial Officer"} onClick={() => makeFo(u)}>
                     <Icon name="wallet" size={14} />
+                  </button>
+                )}
+                {me.role_name === "Superadmin" && u.user_id !== me.user_id && (
+                  <button className="hg-ic-btn" title="Delete" style={{ color: "var(--danger)" }} onClick={() => deleteUser(u)}>
+                    <Icon name="trash" size={14} />
                   </button>
                 )}
               </span>

@@ -50,6 +50,40 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
 }
 
 /**
+ * Operator-safe read of the WhatsApp destinations configured by Superadmin.
+ * The links are intentionally kept out of the public configuration payload.
+ */
+export async function getShareGroups(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT config_value FROM Platform_Config WHERE config_key = 'whatsapp_share_groups'`
+    );
+    const raw = result.rows[0]?.config_value ?? '[]';
+    let groups: unknown = [];
+    try { groups = JSON.parse(raw); } catch { groups = []; }
+
+    if (!Array.isArray(groups)) {
+      res.json({ groups: [] });
+      return;
+    }
+
+    const safeGroups = groups
+      .filter((group): group is { name: string; url: string } =>
+        !!group && typeof group === 'object' &&
+        typeof (group as { name?: unknown }).name === 'string' &&
+        typeof (group as { url?: unknown }).url === 'string'
+      )
+      .map((group) => ({ name: group.name.trim(), url: group.url.trim() }))
+      .filter((group) => group.name && /^https:\/\/(chat\.whatsapp\.com|web\.whatsapp\.com|wa\.me)\//i.test(group.url));
+
+    res.json({ groups: safeGroups });
+  } catch (error) {
+    console.error('Error reading WhatsApp share groups:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Update one or more config keys (Superadmin)
  * Body: { "lock_duration_minutes": "12", "marquee_text": "..." }
  */

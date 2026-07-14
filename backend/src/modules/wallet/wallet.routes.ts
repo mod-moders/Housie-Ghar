@@ -14,12 +14,12 @@ import { authenticateToken, requireRole, requireFinancialOfficer } from '../../m
 
 const router = Router();
 
-// Admin oversight
-router.get('/agents', authenticateToken, requireRole(['Admin', 'Superadmin']), listAgentWallets);
+// Financial Admin oversight
+router.get('/agents', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), listAgentWallets);
 
-// Agent self-service
-router.get('/ledger', authenticateToken, requireRole(['Agent']), getMyLedger);
-router.post('/topup/request', authenticateToken, requireRole(['Agent']), requestTopUp);
+// Bookie self-service
+router.get('/ledger', authenticateToken, requireRole(['Bookie']), getMyLedger);
+router.post('/topup/request', authenticateToken, requireRole(['Bookie']), requestTopUp);
 
 // Financial Officer review
 router.get('/topup/pending', authenticateToken, requireFinancialOfficer, listPendingTopUps);

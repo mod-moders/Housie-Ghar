@@ -7,11 +7,15 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
 const THEMES = [
-  { id: "glamour_casino", label: "Glamour Casino", icon: "star" },
-  { id: "digital_neon", label: "Digital Neon", icon: "zap" },
   { id: "luxury_gold", label: "Luxury Gold", icon: "star" },
+  { id: "digital_neon", label: "Digital Neon", icon: "zap" },
   { id: "playful_kids", label: "Playful Kids", icon: "users" }
 ];
+
+interface WhatsAppShareGroup {
+  name: string;
+  url: string;
+}
 
 export function SettingsSection() {
   const { config, updateConfigLocally } = useConfigStore();
@@ -26,6 +30,9 @@ export function SettingsSection() {
   const [speed, setSpeed] = useState("10");
   const [isMuted, setIsMuted] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState("");
+  const [shareGroups, setShareGroups] = useState<WhatsAppShareGroup[]>([]);
+  const [groupName, setGroupName] = useState("");
+  const [groupUrl, setGroupUrl] = useState("");
 
   useEffect(() => {
     if (config) {
@@ -44,6 +51,26 @@ export function SettingsSection() {
       setIsMuted(config.announcements_muted === "true");
     }
   }, [config]);
+
+  useEffect(() => {
+    apiFetch<Array<{ config_key: string; config_value: string }>>("/api/config")
+      .then((items) => {
+        const raw = items.find((item) => item.config_key === "whatsapp_share_groups")?.config_value ?? "[]";
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setShareGroups(parsed.filter((group): group is WhatsAppShareGroup =>
+              !!group && typeof group === "object" &&
+              typeof (group as { name?: unknown }).name === "string" &&
+              typeof (group as { url?: unknown }).url === "string"
+            ));
+          }
+        } catch {
+          setShareGroups([]);
+        }
+      })
+      .catch(() => setShareGroups([]));
+  }, []);
 
   const handleSave = async (updates: Record<string, string>) => {
     setSaving(true);
@@ -199,46 +226,159 @@ export function SettingsSection() {
           )}
         </div>
 
-        {/* ── RIGHT: Theme Gallery ── */}
-        <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Icon name="spark" size={18} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: 16 }}>Theme</h3>
+        {/* ── RIGHT: Theme & Info Groups Column ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Theme Gallery Card */}
+          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="spark" size={18} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: 16 }}>Theme</h3>
+            </div>
+            <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
+              Select a theme. Changes apply instantly.
+            </p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {THEMES.map((theme) => {
+                const isActive = activeTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      setActiveTheme(theme.id);
+                      handleSave({ active_theme: theme.id });
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px", borderRadius: "var(--radius-sm)",
+                      border: `2px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                      background: isActive ? "var(--accent-soft)" : "var(--surface)",
+                      color: "var(--text)", cursor: "pointer", textAlign: "left",
+                      transition: "all 0.15s",
+                      boxShadow: isActive ? "0 0 12px var(--accent-soft)" : "none",
+                    }}
+                  >
+                    <Icon name={theme.icon} size={18} style={{ color: isActive ? "var(--accent)" : "var(--text-dim)" }} />
+                    <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{theme.label}</span>
+                    {isActive && (
+                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--accent)", background: "var(--accent-soft)", padding: "2px 8px", borderRadius: 99 }}>
+                        Active
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
-            Select a theme. Changes apply instantly.
-          </p>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {THEMES.map((theme) => {
-              const isActive = activeTheme === theme.id;
-              return (
-                <button
-                  key={theme.id}
-                  onClick={() => {
-                    setActiveTheme(theme.id);
-                    handleSave({ active_theme: theme.id });
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "10px 14px", borderRadius: "var(--radius-sm)",
-                    border: `2px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
-                    background: isActive ? "var(--accent-soft)" : "var(--surface)",
-                    color: "var(--text)", cursor: "pointer", textAlign: "left",
-                    transition: "all 0.15s",
-                    boxShadow: isActive ? "0 0 12px var(--accent-soft)" : "none",
-                  }}
-                >
-                  <Icon name={theme.icon} size={18} style={{ color: isActive ? "var(--accent)" : "var(--text-dim)" }} />
-                  <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{theme.label}</span>
-                  {isActive && (
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--accent)", background: "var(--accent-soft)", padding: "2px 8px", borderRadius: 99 }}>
-                      Active
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+
+          {/* Official Info Groups Card */}
+          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="chat" size={18} style={{ color: "var(--accent)" }} />
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>Official Info Groups</h3>
+                <p className="hg-dim" style={{ margin: "2px 0 0", fontSize: 11, lineHeight: 1.3 }}>Configure up to 5 WhatsApp groups for direct game &amp; winner sharing.</p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+              <input
+                className="hg-input"
+                value={groupName}
+                onChange={(event) => setGroupName(event.target.value)}
+                placeholder="Group name"
+                disabled={shareGroups.length >= 5}
+                style={{ width: "100%", padding: "7px 12px", borderRadius: 8, fontSize: 12.5 }}
+              />
+              <input
+                className="hg-input"
+                value={groupUrl}
+                onChange={(event) => setGroupUrl(event.target.value)}
+                placeholder="WhatsApp invite link"
+                disabled={shareGroups.length >= 5}
+                style={{ width: "100%", padding: "7px 12px", borderRadius: 8, fontSize: 12.5 }}
+              />
+              <Button
+                disabled={saving || !groupName.trim() || !/^https:\/\/(chat\.whatsapp\.com|web\.whatsapp\.com|wa\.me)\//i.test(groupUrl.trim()) || shareGroups.length >= 5}
+                onClick={() => {
+                  if (shareGroups.length >= 5) return;
+                  const next = [...shareGroups, { name: groupName.trim(), url: groupUrl.trim() }];
+                  setShareGroups(next);
+                  setGroupName("");
+                  setGroupUrl("");
+                  handleSave({ whatsapp_share_groups: JSON.stringify(next) });
+                }}
+                style={{ width: "100%", fontSize: 12.5 }}
+              >
+                Add Group ({shareGroups.length}/5)
+              </Button>
+            </div>
+
+            {shareGroups.length >= 5 && (
+              <p style={{ color: "var(--danger)", margin: 0, fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Maximum limit of 5 official info groups reached. Remove an existing group to add a new one.
+              </p>
+            )}
+
+            {shareGroups.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+                {shareGroups.map((group) => (
+                  <div
+                    key={`${group.name}-${group.url}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 10px",
+                      border: "1px solid var(--border-2)",
+                      borderRadius: 8,
+                      background: "var(--surface-2)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <Icon name="chat" size={13} style={{ color: "var(--success)", flexShrink: 0 }} />
+                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "var(--text)" }}>
+                        {group.name}
+                      </span>
+                    </div>
+                    <button
+                      title={`Remove ${group.name}`}
+                      onClick={() => {
+                        const next = shareGroups.filter((item) => item !== group);
+                        setShareGroups(next);
+                        handleSave({ whatsapp_share_groups: JSON.stringify(next) });
+                      }}
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 3,
+                        background: "none",
+                        border: 0,
+                        color: "var(--text-dim)",
+                        cursor: "pointer",
+                        borderRadius: "50%",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "var(--danger-soft)";
+                        e.currentTarget.style.color = "var(--danger)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--text-dim)";
+                      }}
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "12px", color: "var(--text-dim)", fontSize: 11.5, border: "1.5px dashed var(--border-2)", borderRadius: 8 }}>
+                No groups configured yet.
+              </div>
+            )}
           </div>
         </div>
       </div>
