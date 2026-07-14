@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   playerLogin,
   getCurrentPlayer,
+  updatePlayerProfile,
+  getMyPlayerStats,
   getMyTickets,
   getMyWins,
   playerLogout,
@@ -15,6 +17,8 @@ const router = Router();
 
 router.post('/login', playerLogin);
 router.get('/me', getCurrentPlayer);
+router.patch('/me', updatePlayerProfile);
+router.get('/me/stats', getMyPlayerStats);
 router.get('/me/tickets', getMyTickets);
 router.get('/me/wins', getMyWins);
 router.post('/logout', playerLogout);

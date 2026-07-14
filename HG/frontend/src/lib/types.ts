@@ -339,3 +339,32 @@ export interface PlayerWin {
 export interface MyWinsResponse {
   wins: PlayerWin[];
 }
+
+/** Full player profile (GET/PATCH /api/players/me). */
+export interface PlayerProfile {
+  player_id: string;
+  username: string;
+  full_name: string;
+  date_of_birth: string;
+  phone: string | null;
+  email: string | null;
+  sound_enabled: boolean;
+  has_password: boolean;
+}
+
+/** GET /api/players/me/stats — lifetime engagement + winnings. */
+export interface PlayerStats {
+  member_since: string | null;
+  games_played: number;
+  tickets_bought: number;
+  total_expenditure: number;
+  total_wins: number;
+  full_house_wins: number;
+  line_wins: number;
+  other_wins: number;
+  amount_won: number;
+  highest_amount_single_game: number;
+  luckiest_ticket_number: number | null;
+  longest_winning_run: number;
+  unluckiest_run: number;
+}

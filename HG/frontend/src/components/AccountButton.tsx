@@ -76,6 +76,12 @@ export function AccountButton({ compact = false }: { compact?: boolean }) {
           <button className="hg-acct-item" role="menuitem" onClick={() => { setOpen(false); router.push("/"); }}>
             <Icon name="grid" size={15} strokeWidth={2} /> Browse games
           </button>
+          <button className="hg-acct-item" role="menuitem" onClick={() => { setOpen(false); router.push("/profile"); }}>
+            <Icon name="user" size={15} strokeWidth={2} /> My profile
+          </button>
+          <button className="hg-acct-item" role="menuitem" onClick={() => { setOpen(false); router.push("/stats"); }}>
+            <Icon name="chart" size={15} strokeWidth={2} /> My stats
+          </button>
           <button className="hg-acct-item is-danger" role="menuitem" onClick={signOut}>
             <Icon name="arrowL" size={15} strokeWidth={2} /> Sign out
           </button>

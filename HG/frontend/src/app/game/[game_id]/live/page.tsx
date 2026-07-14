@@ -59,7 +59,9 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const [game, setGame] = useState<GameSummary | null>(null);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [revealed, setRevealed] = useState(true);
-  const [muted, setMuted] = useState(false);
+  // null = no manual toggle yet, so the player's saved sound preference
+  // (Profile → "Enable caller sounds") decides the default.
+  const [manualMuted, setManualMuted] = useState<boolean | null>(null);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [winOverlay, setWinOverlay] = useState<WinOverlay | null>(null);
   const [myTickets, setMyTickets] = useState<{ id: number; number: number; matrix: TicketMatrix }[]>([]);
@@ -74,6 +76,8 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const callsRef = useRef<Map<number, NumberCallConfig>>(new Map());
   const callerEnabledRef = useRef(true);
   const callAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const muted = manualMuted !== null ? manualMuted : player?.sound_enabled === false;
 
   const beep = useCallback(() => {
     if (muted) return;
@@ -343,7 +347,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
               {gameStatus === "Paused" && <span className="hg-live-badge">PAUSED</span>}
               {game?.title ?? ""}
             </div>
-            <button className="hg-mute" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"}>
+            <button className="hg-mute" onClick={() => setManualMuted(!muted)} aria-label={muted ? "Unmute" : "Mute"}>
               <Icon name={muted ? "volumeX" : "volume"} size={18} />
             </button>
             <AccountButton compact />

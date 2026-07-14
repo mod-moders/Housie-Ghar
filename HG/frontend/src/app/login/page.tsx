@@ -47,6 +47,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Most players never set a real password (username-only login), so this
+  // field only appears once the backend says this particular account has
+  // opted into one from Profile.
+  const [playerPassword, setPlayerPassword] = useState("");
+  const [needsPassword, setNeedsPassword] = useState(false);
+
   const switchMode = (m: "player" | "staff") => {
     setMode(m);
     setStaffDoor(null);
@@ -70,15 +76,20 @@ export default function LoginPage() {
           username: username.trim(),
           full_name: fullName.trim() || undefined,
           date_of_birth: dob || undefined,
+          password: needsPassword ? playerPassword : undefined,
         }),
       });
       setPlayer(res.player);
       router.push("/");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Login failed";
-      // The backend asks for name/DOB only when the username doesn't exist
-      // yet — flip to the sign-up tab instead of surfacing a raw error.
-      if (authTab === "signin" && (msg === "Full name is required" || msg === "A valid date of birth is required")) {
+      // This account has a real password set from Profile — show the field
+      // instead of surfacing a raw error, then let the player resubmit.
+      if (msg === "Password required") {
+        setNeedsPassword(true);
+      } else if (authTab === "signin" && (msg === "Full name is required" || msg === "A valid date of birth is required")) {
+        // The backend asks for name/DOB only when the username doesn't exist
+        // yet — flip to the sign-up tab instead of surfacing a raw error.
         setAuthTabOverride("signup");
       } else {
         setError(msg);
@@ -172,9 +183,25 @@ export default function LoginPage() {
                       placeholder="e.g. lucky_kong"
                       autoComplete="username"
                       maxLength={18}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        setNeedsPassword(false);
+                        setPlayerPassword("");
+                      }}
                     />
                   </label>
+                  {needsPassword && (
+                    <label className="hg-login-field">
+                      <span>Password</span>
+                      <PasswordInput
+                        value={playerPassword}
+                        placeholder="Your account password"
+                        autoComplete="current-password"
+                        autoFocus
+                        onChange={(e) => setPlayerPassword(e.target.value)}
+                      />
+                    </label>
+                  )}
                   {authTab === "signup" && (
                     <>
                       <div className="hg-login-hint" style={{ textAlign: "left" }}>
@@ -207,12 +234,18 @@ export default function LoginPage() {
                   {error && <div className="hg-login-err">{error}</div>}
                   <Button
                     variant="cta" size="lg" full type="submit"
-                    disabled={busy || !username.trim() || (authTab === "signup" && (!fullName.trim() || !dob))}
+                    disabled={
+                      busy || !username.trim() ||
+                      (authTab === "signup" && (!fullName.trim() || !dob)) ||
+                      (needsPassword && !playerPassword)
+                    }
                   >
-                    {busy ? "One moment…" : authTab === "signup" ? "Create account" : "Sign in"}
+                    {busy ? "One moment…" : needsPassword ? "Sign in" : authTab === "signup" ? "Create account" : "Sign in"}
                   </Button>
                   <div className="hg-login-hint">
-                    {authTab === "signup" ? (
+                    {needsPassword ? (
+                      <>This account is secured with a password — set from <strong>Profile</strong>.</>
+                    ) : authTab === "signup" ? (
                       <>Played before? Double-check your <code>username</code> spelling and tap <strong>Sign in</strong> above.</>
                     ) : (
                       <>Your <code>username</code> is your password too. New here? Tap <strong>Sign up</strong> above.</>

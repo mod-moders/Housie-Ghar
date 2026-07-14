@@ -6,6 +6,10 @@ export interface Player {
   username: string;
   full_name: string;
   date_of_birth: string;
+  phone?: string | null;
+  email?: string | null;
+  sound_enabled?: boolean;
+  has_password?: boolean;
 }
 
 interface PlayerStore {
