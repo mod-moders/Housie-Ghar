@@ -45,14 +45,14 @@ export default function StaffLogin() {
             <Icon name="arrowL" size={20} />
           </button>
           <div className="hg-login-card">
-            <div className="hg-login-brand">
+            <div className="hg-login-brand" style={{ marginBottom: "16px" }}>
               <Image
-                src="/HG Primary.png"
+                src="/HG Secondary.png"
                 alt="Housie Ghar Logo"
-                width={80}
-                height={80}
+                width={220}
+                height={220}
                 priority
-                className="object-contain"
+                className="object-contain filter drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]"
               />
             </div>
             <div className="hg-login-secure"><Icon name="shield" size={13} /> Secure staff portal</div>
