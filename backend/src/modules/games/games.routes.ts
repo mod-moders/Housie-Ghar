@@ -15,6 +15,8 @@ import {
   getGameSalesDetails,
   sendEmojiReaction,
   claimPrize,
+  disbursePrize,
+  getPrizeClaims,
 } from './games.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 import {
@@ -30,6 +32,9 @@ const router = Router();
 router.get('/number-calls', listNumberCalls);
 router.get('/', getGames);
 router.post('/:game_id/prizes/:prize_id/claim', claimPrize);
+
+// Financial Admin - Prize Claims
+router.get('/prize-claims', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), getPrizeClaims);
 
 // Game creation (Financial Admin, Superadmin or Operator)
 router.post('/', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), createGame);
@@ -50,5 +55,6 @@ router.post('/:game_id/resume', authenticateToken, requireRole(['Operator', 'Fin
 router.post('/:game_id/stop', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleStopGame);
 router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleSpeedChange);
 router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), getGameSalesDetails);
+router.post('/:game_id/prizes/:prize_id/disburse', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disbursePrize);
 
 export default router;

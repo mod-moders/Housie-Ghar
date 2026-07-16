@@ -14,7 +14,7 @@ import dynamic from "next/dynamic";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
-import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
+import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -290,12 +290,18 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const claimPrize = async (prizeId: number) => {
     setClaimingPrize(String(prizeId));
     try {
-      await apiFetch(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
+      const response = await apiFetch<ClaimPrizeResponse>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
         method: "POST",
       });
+      
       // Refresh prizes to show claim status
       const gameRes = await apiFetch<GameSummary>(`/api/games/${game_id}`);
       setPrizes(gameRes.prize_pool);
+      
+      // If WhatsApp URL is provided, open it in new tab
+      if (response.whatsapp_url) {
+        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+      }
     } catch (err) {
       console.error("Failed to claim prize:", err);
       alert("Failed to claim prize. Please try again.");
@@ -421,9 +427,11 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 <div className="hg-prizeboard-grid">
                   {prizes.map((p) => {
                     const isWinner = p.claimed && p.winner_housie_name === displayName;
-                    const showClaim = !isStaff && gameStatus === "Completed" && isWinner;
+                    const isClaimed = p.player_claimed;
+                    const showClaimBtn = !isStaff && gameStatus === "Completed" && isWinner && !isClaimed;
+                    const showClaimedBadge = isWinner && isClaimed;
                     return (
-                      <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}`}>
+                      <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${showClaimedBadge ? " player-claimed" : ""}`}>
                         <div className="hg-prize-l">
                           <span className="hg-prize-name">{p.pattern_name}</span>
                           <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
@@ -440,7 +448,21 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                                     </span>
                                   )}
                                 </span>
-                                {showClaim && (
+                                {showClaimedBadge && (
+                                  <span className="hg-claimed-badge" style={{
+                                    background: 'var(--success)',
+                                    color: '#fff',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                  }}>
+                                    Claimed
+                                  </span>
+                                )}
+                                {showClaimBtn && (
                                   <button
                                     className="hg-claim-btn"
                                     onClick={() => claimPrize(p.prize_id)}
