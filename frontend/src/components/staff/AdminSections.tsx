@@ -13,6 +13,7 @@ import type { AuthUser } from "@/lib/stores/authStore";
 import { CallVoiceSettings } from "./CallVoiceSettings";
 import { getPresetClass } from "@/lib/presetHelper";
 import { BookieQueueSection } from "./BookieSections";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 const DIVIDEND_METADATA = [
   { name: "1st Full House", pattern: "1st Full House", defaultAmount: 2000, desc: "The first ticket where all 15 numbers are marked. (Automatically becomes 'Full House' if 2nd and 3rd are not selected)." },
@@ -88,13 +89,14 @@ function gameTime(g: GameSummary): string {
 }
 
 // ── Games table with start/pause/resume controls ─────────────────────────────
-function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets, onManualBook }: {
+function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets, onManualBook, canManage }: {
   games: GameSummary[];
   controls?: boolean;
   onAction?: (id: string, action: "start" | "pause" | "resume" | "edit" | "delete" | "speed", speedValue?: number) => void;
   onCompletedClick?: (game: GameSummary) => void;
   onViewTickets?: (id: string) => void;
   onManualBook?: (id: string) => void;
+  canManage?: boolean;
 }) {
   const rowClass = controls ? "hg-tr hg-tr-games" : "hg-tr hg-tr-6";
 
@@ -176,12 +178,12 @@ function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets
                     </a>
                   </>
                 )}
-                {g.game_status === "Scheduled" && (
+                {g.game_status === "Scheduled" && canManage && (
                   <button className="hg-ic-btn" title="Edit" onClick={(e) => { e.stopPropagation(); onAction?.(g.game_id, "edit"); }}>
                     <Icon name="edit" size={14} />
                   </button>
                 )}
-                {g.game_status !== "Live" && g.game_status !== "Paused" && (
+                {g.game_status !== "Live" && g.game_status !== "Paused" && canManage && (
                   <button className="hg-ic-btn" title="Delete" style={{ color: "var(--danger)" }} onClick={(e) => { e.stopPropagation(); onAction?.(g.game_id, "delete"); }}>
                     <Icon name="trash" size={14} />
                   </button>
@@ -575,12 +577,12 @@ export function GamesSection({ me }: { me: AuthUser }) {
     apiFetch<GameSummary[]>("/api/games")
       .then((g) => {
         setGames(g.filter((x) => x.game_status !== "Completed"));
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
         setPastGames(g.filter((x) => {
           if (x.game_status !== "Completed") return false;
           const date = new Date(x.completed_at || x.scheduled_at);
-          return date >= sevenDaysAgo;
+          return date >= threeDaysAgo;
         }));
       })
       .catch(() => {});
@@ -605,6 +607,12 @@ export function GamesSection({ me }: { me: AuthUser }) {
     const id = setInterval(load, 10000);
     return () => clearInterval(id);
   }, [load]);
+
+  useSocket((event) => {
+    if (event === "game_list_update" || event === "ticket_status_change") {
+      load();
+    }
+  });
 
   const act = async (id: string, action: "start" | "pause" | "resume" | "edit" | "delete" | "speed", speedValue?: number) => {
     setError(null);
@@ -735,7 +743,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
               {managingVoice ? "Back to Games" : "Voice & TTS Settings"}
             </Button>
           )}
-          {(me.role_name === "Superadmin" || me.role_name === "Financial Admin" || me.role_name === "Operator") && (
+          {(me.role_name === "Superadmin" || me.role_name === "Financial Admin") && (
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
               setManagingVoice(false);
               if (creating) {
@@ -997,17 +1005,17 @@ export function GamesSection({ me }: { me: AuthUser }) {
         {games.length === 0 ? (
           <EmptyHint icon="grid" title="No games yet" sub="Create the first game to open bookings." />
         ) : (
-          <GamesTable games={games} controls={true} onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} />
+          <GamesTable games={games} controls={true} onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} canManage={me.role_name === "Superadmin" || me.role_name === "Financial Admin"} />
         )}
       </div>
 
       {/* Past Games Panel */}
       <div className="hg-panel hg-table-premium" style={{ marginTop: "24px" }}>
         <div className="hg-panel-head">
-          <h3>Past Games (Last 7 Days)</h3>
+          <h3>Past Games (Last 3 Days)</h3>
         </div>
         {pastGames.length === 0 ? (
-          <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 7 days will show up here." />
+          <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 3 days will show up here." />
         ) : (
           <div className="hg-table">
             <div className="hg-tr hg-tr-history hg-tr-head">

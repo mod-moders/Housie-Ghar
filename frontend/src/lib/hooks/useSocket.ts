@@ -9,7 +9,7 @@ const EVENTS = [
   "draw_update", "winner_announced", "paused", "resumed", "completed",
   "new_booking_request", "booking_expired", "wallet_credited",
   "booking_skipped", "overflow_booking", "ticket_status_change",
-  "config_update",
+  "config_update", "game_list_update",
 ];
 
 /**

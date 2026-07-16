@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import pool from '../../db';
+import { io } from '../../server';
 import { sseManager } from '../../utils/sseManager';
 import { CONSTANTS } from '../../config/constants';
 import { generateTicketsForGame } from '../../db/generateGameTickets';
@@ -257,6 +258,8 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
       userAgent: req.headers['user-agent'],
     });
 
+    io.emit('game_list_update', { action: 'create', game_id: gameId });
+
     res.status(201).json({ game_id: gameId, message: 'Game created and tickets generated' });
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -276,6 +279,7 @@ export async function handleStartGame(req: any, res: Response): Promise<void> {
 
   try {
     await startGame(game_id, operatorId);
+    io.emit('game_list_update', { action: 'start', game_id });
     res.json({ message: 'Game started successfully' });
   } catch (error: any) {
     console.error('Error starting game:', error);
@@ -292,6 +296,7 @@ export async function handlePauseGame(req: any, res: Response): Promise<void> {
 
   try {
     await pauseGame(game_id, operatorId);
+    io.emit('game_list_update', { action: 'pause', game_id });
     res.json({ message: 'Game paused successfully' });
   } catch (error: any) {
     console.error('Error pausing game:', error);
@@ -308,6 +313,7 @@ export async function handleResumeGame(req: any, res: Response): Promise<void> {
 
   try {
     await resumeGame(game_id, operatorId);
+    io.emit('game_list_update', { action: 'resume', game_id });
     res.json({ message: 'Game resumed successfully' });
   } catch (error: any) {
     console.error('Error resuming game:', error);
@@ -323,6 +329,7 @@ export async function handleStopGame(req: any, res: Response): Promise<void> {
 
   try {
     await completeGame(game_id);
+    io.emit('game_list_update', { action: 'stop', game_id });
     res.json({ message: 'Game completed/stopped successfully' });
   } catch (error: any) {
     console.error('Error stopping game:', error);
@@ -345,6 +352,7 @@ export async function handleSpeedChange(req: any, res: Response): Promise<void> 
 
   try {
     await changeGameSpeed(game_id, interval_ms, operatorId);
+    io.emit('game_list_update', { action: 'speed', game_id });
     res.json({ message: 'Speed updated successfully' });
   } catch (error: any) {
     console.error('Error changing speed:', error);
@@ -495,6 +503,7 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
       userAgent: req.headers['user-agent'],
     });
 
+    io.emit('game_list_update', { action: 'delete', game_id });
     res.json({ message: 'Game deleted successfully' });
   } catch (error) {
     console.error('Error deleting game:', error);
@@ -650,6 +659,7 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
         userAgent: req.headers['user-agent'],
       });
 
+      io.emit('game_list_update', { action: 'update', game_id });
       res.json({ message: 'Game updated successfully' });
     } catch (err) {
       await client.query('ROLLBACK');

@@ -13,6 +13,8 @@ const ICON_PATHS: Record<string, string> = {
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.5 2",
   chevR: "M9 6l6 6-6 6",
   chevL: "M15 6l-6 6 6 6",
+  chevD: "M6 9l6 6 6-6",
+  chevU: "M18 15l-6-6-6 6",
   arrowL: "M19 12H5M11 6l-6 6 6 6",
   chat: "M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-5.6A8.5 8.5 0 1 1 21 11.5z",
   volume: "M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13",
