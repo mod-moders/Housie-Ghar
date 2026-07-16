@@ -288,6 +288,39 @@ Single shell (`app/staff/page.tsx`); sections render from `components/staff/*` b
 
 ## Current State
 
+### ⚠️ Production cutover: `master` branch is now the live website (2026-07-15/16)
+
+**The single most important thing to know before touching anything in this repo:** the live `housieghar.in` site no longer runs the codebase documented in the Architecture/Design System/Staff Dashboard sections above. Those sections describe `frontend-v2-housieghar` (this checkout's branch), which is now **fully stopped** and serves nothing. Per explicit user instruction ("the master branch should be the live website"), production was cut over to the unrelated-history `master` branch — a separate, simpler codebase (no prize-settlement engine, no `node:test` suite, no auth hardening, Bearer-token localStorage auth instead of httpOnly cookies — see the "Master-branch staff-feature integration" entry further down for what master lacks). This checkout's local working tree was **not modified** by this cutover; only remote infra (Railway, Vercel, GitHub `master`) changed.
+
+**What changed, concretely:**
+
+1. **New backend** — Railway project `alluring-adventure`, service `housie-ghar-master`, built from `origin/master`. Fresh Postgres + Redis (not shared with the old deployment). Root Directory is the repo root (not `backend/` — `master`'s `backend/tsconfig.json` imports `@shared/types/*` from a sibling `shared/`, same constraint as `frontend-v2-housieghar`). Build `cd backend && npm ci && npm run build`, Pre-Deploy `cd backend && npm run migrate`, Start `cd backend && npm start`. Two commits pushed directly to `origin/master` (not present in this checkout's history, pushed from detached worktrees):
+   - `fe27343` — added root-level `railpack.json`/`package.json`/`package-lock.json` so Railway's Node auto-detection works (mirrors the fix already on `frontend-v2-housieghar`'s `HG/railpack.json`).
+   - `1d824ff` — empty `chore(deploy): trigger production deployment` commit, needed because Vercel's in-dashboard "Redeploy" kept trying to reuse a stale source snapshot instead of pulling `master`'s current HEAD under the corrected project settings.
+   - Live at `https://housie-ghar-master-production.up.railway.app` (Railway-generated domain only — **no custom domain attached yet**, see Known Issues below).
+   - A fresh JWT RS256 keypair was generated for this deployment (not reused from the old site).
+   - Seeded via `master`'s `seed_roles.sql` + `seed_superadmin.sql` (4 roles, 1 Superadmin, 11 `Platform_Config` rows), applied SSH-free through `railway connect Postgres --no-ssh < seed.sql` (no local SSH key existed, and generating one was correctly blocked as unauthorized persistence).
+   - **`master`'s seed ships a hardcoded, publicly-committed bcrypt hash for the Superadmin password (`Enterhg@01` for `superadmin@housieghar.in`)** — this is a real exposure in `backend/seeds/seed_superadmin.sql` on `origin/master`. Login was verified working with that password, then **immediately rotated** via `POST /api/auth/change-password`. Current live Superadmin credentials: `superadmin@housieghar.in` / `StR3pONsf93vCv3JG0me` (verified: old password now 401s). **This is different from every dev login in the Commands table above** — those are for local `frontend-v2-housieghar` dev only.
+
+2. **Vercel repointed** — project `housie-ghar` (bound to `mod-moders/Housie-Ghar`, domain `housieghar.in`):
+   - Production environment's Branch Tracking: `frontend-v2-housieghar` → **`master`**.
+   - Root Directory: `HG/frontend` → **`frontend`** (`master`'s repo layout has no `HG/` prefix — root-level `backend/`, `frontend/`, `shared/`).
+   - New env var `NEXT_PUBLIC_API_URL = https://housie-ghar-master-production.up.railway.app` (Production+Preview, not marked Sensitive — `master`'s `lib/api.ts` reads this directly, unlike `frontend-v2-housieghar`'s `BACKEND_ORIGIN` var, which is now unused dead config left in Vercel's project settings).
+   - Verified live end-to-end in a real browser: `housieghar.in` renders `master`'s distinct signup UI (comic-book logo, "Powered by MOD" footer); `/staff/login` → Superadmin dashboard loads with the rotated credentials, confirming the full Vercel→Railway→Postgres→auth chain works.
+
+3. **Old backend stopped, not deleted** — Railway project `exciting-rebirth`, service `Housie-Ghar` (was Online at `https://api.housieghar.in`, built from `frontend-v2-housieghar` @ `2b4b907`, same HEAD as this checkout). Per explicit user request ("disconnect the frontend-v2-housieghar, nothing should be running") with scope confirmed via AskUserQuestion (**stop app, keep data** — not a full teardown):
+   - `railway down --service Housie-Ghar --yes` removed the active deployment (service now shows `Failed`/offline; `curl https://api.housieghar.in` now 404s at Railway's edge).
+   - The `frontend-v2-housieghar` branch link was disconnected in the service's Settings → Source (so a future push to that branch cannot silently redeploy it).
+   - **Postgres + Redis for `exciting-rebirth` were left Online, untouched** — old data (if any real usage happened) is preserved but nothing reads/writes it anymore.
+
+**Known issues / open decisions from this cutover — read before doing more infra work:**
+- **`api.housieghar.in` DNS is now stale.** The Hostinger CNAME still points at the old Railway hostname (the now-stopped service). Nothing currently resolves it to the new backend — the new backend is only reachable via its raw Railway domain. Decide: repoint `api.housieghar.in` at `housie-ghar-master-production.up.railway.app` (or attach it as a Railway custom domain), or leave it retired if nothing hard-codes that URL.
+- **This is a different codebase, not a redeploy.** `master` lacks the prize-settlement engine, the `node:test` suite, and all the auth-hardening work documented throughout this file (temp-password gate, rate limiters, backdoor removal — see "Master-branch staff-feature integration" below for the fuller list of what was deliberately *not* ported from master into `frontend-v2-housieghar` because master regressed things). Anyone debugging "the live site" now needs `master`'s source, not this checkout's `HG/` tree.
+- **The Finance Hub "Withdrawal Queue ₹24,500 · 6 pending requests" card** shown on first Superadmin login looked like `master`'s pre-existing fabricated demo data rather than something backed by the fresh, freshly-seeded database — unconfirmed, worth checking before trusting any number on the new dashboard.
+- **`exciting-rebirth`'s Postgres/Redis are still running** (kept per user's choice) but serve no traffic — pure cost/cleanup item whenever the user wants to revisit it.
+- **Two GitHub repos** (see the dedicated section below) now matters even more: both `master` and `frontend-v2-housieghar` live in the same `mod-moders/Housie-Ghar` repo, so always confirm which **branch** each Railway/Vercel project tracks before making changes — it's no longer just a repo-identity check.
+- Local scratchpad files from this session (JWT keypair, seed SQL, the rotated-password note) live under this session's temp scratchpad directory, not in the repo — nothing was written into this checkout.
+
 ### Latest session (2026-07-14 evening): staff-account cleanup + player profile polish
 
 Most recent commit is **`a9921ef`** on top of a run of small player/staff-facing fixes made earlier the same day. In commit order (oldest → newest):
@@ -322,7 +355,7 @@ The user pushed a parallel "HG Final Website" codebase to `origin/master` (unrel
 
 **Deliberately NOT ported:** master's login backdoor (`ChangeMe123!` bcrypt fallback — our branch removed it), the theme gallery / `active_theme` (`Themes` is dropped), the fabricated dashboard charts/deltas/heatmap/retention (replaced with real SQL), and master's fake withdrawal queue. Gates green at integration: backend build clean + `npm test` 63 tests (38 pass / 25 skip, no `TEST_DATABASE_URL`), frontend `tsc` + `eslint` clean + production build clean; all new endpoints smoke-tested against the running dev backend (config/public, number-calls list + PATCH + restore, players, financial-analysis, auth/me PATCH, games PATCH/DELETE 404). **Excluded from these commits** (left in the working tree, pre-existing dirty state owned by the launch work): `manual.md`, `HG/frontend/src/app/globals.css`, this `CLAUDE.md`, and untracked `HG/nixpacks.toml`. Not yet pushed.
 
-### Most recent commits (as of 2026-07-13)
+### Most recent commits on `frontend-v2-housieghar` (as of 2026-07-13)
 ```
 c77d59b fix(nav): keep staff doors out of the mobile hamburger
 c812409 feat(login): progressive player sign-in — username first, register only if new
@@ -336,29 +369,27 @@ f790451 fix(deploy): force Node.js provider for Railway build
 6e51aa8 feat(admin): smart game presets + announcement marquee strip
 a35f44d docs: record WhatsApp payout rails + login-page desktop fix
 ```
+(Superseded as the live branch by the `master` cutover above — this branch's HEAD, `2b4b907`, is one commit newer than this list and is what the now-stopped `exciting-rebirth` backend was running.)
 
-**Two GitHub repos exist.** `origin` is now **`mod-moders/Housie-Ghar`** (canonical, up to date at `c812409`); **`flinchtheflincher/Housie-Ghar`** is the original and sits 3 commits behind at `4b93efb`. Mid-launch (2026-07-11) `origin` was silently repointed from flinchtheflincher to mod-moders while the mod-moders copy was 17 commits stale — Railway (watching the stale copy) kept building old code, making every deploy fix look ineffective for an evening ("npm: not found" across 6+ deployments). Since resolved: all work now lands on mod-moders. This machine's keychain credential can push to flinchtheflincher; mod-moders pushes worked as of `c812409` (auth fixed outside this session). See memory `hg-two-github-repos`. **Before debugging any deploy: confirm Railway's Settings → Source repo matches the repo you're pushing to.**
+**Two GitHub repos exist.** `origin` is now **`mod-moders/Housie-Ghar`** (canonical) — it hosts **both** `frontend-v2-housieghar` (this checkout) and `master` (now live) as unrelated-history branches of the same repo; **`flinchtheflincher/Housie-Ghar`** is the original and sits several commits behind. Mid-launch (2026-07-11) `origin` was silently repointed from flinchtheflincher to mod-moders while the mod-moders copy was 17 commits stale — Railway (watching the stale copy) kept building old code, making every deploy fix look ineffective for an evening ("npm: not found" across 6+ deployments). Since resolved: all work now lands on mod-moders. See memory `hg-two-github-repos`. **Before debugging any deploy: confirm both the Source repo AND the branch in Railway/Vercel Settings match what you're pushing to** — now that two branches of the same repo are both deployed (one to `alluring-adventure`+Vercel-production, one formerly to `exciting-rebirth`), branch confusion is the more likely failure mode than repo confusion.
 
-### Production launch in progress (2026-07-10 → 07-13) — Railway + Hostinger DNS + Vercel, following manual.md
+### Production launch history (2026-07-10 → 07-13) — original Railway + Hostinger DNS + Vercel setup for `frontend-v2-housieghar`
 
-The user (an infra beginner) is walking `manual.md` steps 4–8 with heavy hand-holding; the guide received ~370 lines of corrections (uncommitted) as reality diverged from the doc:
+This is the now-superseded original launch (see the cutover section at the top of Current State for what replaced it). Kept for reference since the same Railway/Node-detection gotchas apply to any future Railway service in this repo:
 
 - **Railway backend service config (the combination that builds):** Root Directory **`HG`** — NOT `HG/backend`; the backend imports `@shared/types/*` from the sibling `HG/shared`, which a narrower root excludes from the build context (tsc exit 2). All three commands are prefixed: Build `cd backend && npm ci && npm run build`, Start `cd backend && npm start`, Pre-Deploy `cd backend && npm run migrate`.
 - **Node detection at the HG root:** with Root Directory `HG` there is no `package.json` at the build root, so Railway's builder installed no Node at all → `sh: 1: npm: not found` (exit 127). Fixes committed: `HG/railpack.json` (`provider: node`, node 22 — the service builds with **Railpack**, so the earlier `nixpacks.toml` attempts were silently ignored), `HG/package.json` (root manifest: private, engines node 22.x, build/start scripts delegating into `backend/` — makes detection work under either builder; commit `c831021`, authored by a parallel session), and `HG/package-lock.json` (empty lockfile so a root `npm ci` can't fail; `4b93efb`).
-- **Railway state:** project `housie-ghar` with Postgres + Redis plugins + the repo service. Public domain generated: `housie-ghar-production.up.railway.app` (port 4000). Custom domain `api.housieghar.in` added — "Waiting for DNS update" at last check. `DATABASE_URL`/`REDIS_URL` must be added as **reference variables** via the Value-field picker (they are **not** auto-injected by project membership — older doc text claiming so was wrong; manual.md Step 6.1 has the corrected flow). Step 6 env vars were entered by the user; completeness verified only up to the last crash-loop.
-- **Hostinger DNS (Step 8):** apex A → `76.76.21.21` with the Name field left **blank** (hPanel rejects a literal `@`), `www` CNAME → `cname.vercel-dns.com`, `api` CNAME → `housie-ghar-production.up.railway.app`.
-- **Vercel:** connected (Step 7) — `24f0e75` is an empty commit to trigger a production deploy, implying the Vercel project exists and builds this repo. `NEXT_PUBLIC_API_URL` should hold the Railway URL until DNS lands, then `https://api.housieghar.in` + a manual Vercel redeploy.
-- **Unverified as of this checkpoint:** whether the newest Railway build is green now that mod-moders has all fixes; whether Step 6a (`seed:prod` via `railway ssh`) has been run; where the user stands in Steps 7–8's closing env swaps. A Railway-suggested **PR #1** (adds railpack.json) may still be open — close it unmerged, it's redundant.
+- **Railway state (now stopped, see cutover section):** project `housie-ghar`/`exciting-rebirth` with Postgres + Redis plugins + the `Housie-Ghar` repo service. Custom domain `api.housieghar.in` was attached here — **now stale**, points at a service with no active deployment.
+- **Hostinger DNS (Step 8, still live):** apex A → `76.76.21.21` with the Name field left **blank** (hPanel rejects a literal `@`), `www` CNAME → `cname.vercel-dns.com`, `api` CNAME → `housie-ghar-production.up.railway.app` (the old backend — needs a decision, see Known Issues in the cutover section).
+- **Vercel:** this project (`housie-ghar`) is the same one now repointed to `master` in the cutover above.
 
 Parallel-session features landed meanwhile: **`1a28383`** Superadmin hard-delete of staff (`DELETE /api/users/:id`, two-click trash in Workforce; 409 "suspend instead" when referenced by games/bookings/wallet/created-staff; migration **019** drops the `Audit_Log.user_id` FK so a past login doesn't block deletion; suite 52 → 58) and **`c812409`** progressive player sign-in (username-first; full-name/DOB fields appear only when the backend says the username is new).
 
-### Uncommitted working tree (as of 2026-07-13)
+### Uncommitted working tree (as of 2026-07-16, unchanged since 2026-07-13)
 
-- **`manual.md` (~372-line diff)** — launch-guide corrections from walking the real launch: Step 5 rewritten (Root Directory `HG`, `cd backend &&` commands, the railpack/npm-not-found correction blocks), Step 6 expanded for a first-time Railway user (6.1 reference-variable picker, 6.2 beginner walkthrough, 6.3 Raw Editor multi-line PEM format, 6.4 variables table with per-variable failure modes, 6.4a plain-terms explainer, 6.5 deploy verification), Step 8 corrections (blank apex Name, de-bracketed CNAME placeholder, "Waiting for DNS update" explainer with a beginner box).
-- **`HG/frontend/src/app/globals.css` (~262 insertions)** — the neon radiant layer (dark), compact banner, and candy daylight layer (light) from 2026-07-08/09, still awaiting a commit decision; full detail in the Design System bullets above. Verified in headless Chromium at the time. Dev-DB quirks found then: `superadmin@housieghar.com` rejects the seeded `Housie@2026` (memory `hg-dev-staff-creds-drift`); the CFO account was found Suspended and re-activated.
-- **`HG/frontend/src/components/TopNav.tsx`** — removes the per-role staff door links (`DROPDOWN_DOORS`) from the mobile menu sheet; parallel-session work, likely part of the `c812409` login consolidation.
-- **`CLAUDE.md`** — this checkpoint plus the parallel session's Staff Dashboard delete-feature note.
+- **`manual.md` (~372-line diff)** — launch-guide corrections from walking the real launch: Step 5 rewritten (Root Directory `HG`, `cd backend &&` commands, the railpack/npm-not-found correction blocks), Step 6 expanded for a first-time Railway user (6.1 reference-variable picker, 6.2 beginner walkthrough, 6.3 Raw Editor multi-line PEM format, 6.4 variables table with per-variable failure modes, 6.4a plain-terms explainer, 6.5 deploy verification), Step 8 corrections (blank apex Name, de-bracketed CNAME placeholder, "Waiting for DNS update" explainer with a beginner box). This guide now describes the **old, superseded** `frontend-v2-housieghar` launch path — it has not been updated for the `master` cutover.
 - **Untracked `HG/nixpacks.toml`** — inert leftover from the deploy debugging (Railpack ignores it); safe to delete.
+- Note: `HG/frontend/src/app/globals.css` (neon/candy CSS layers) and `HG/frontend/src/components/TopNav.tsx` (mobile staff-door removal), both previously listed here as uncommitted, **were committed** in `a9921ef`/earlier — no longer part of the dirty working tree. Only `manual.md` and `HG/nixpacks.toml` remain.
 
 ### Committed in `6e51aa8` (2026-07-07) — two new features from `do.md` triage
 
@@ -432,7 +463,7 @@ Backend-only feature: a ledger of prize money owed to selling agents, plus game-
 
 Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABASE_URL`.
 
-### Fully built & working (committed)
+### Fully built & working (committed, on `frontend-v2-housieghar` — this checkout; NOT what's currently live, see cutover section)
 - Public site: lobby (banner, game cards, skeleton loading), game room, live board (SSE draws, auto-marked tickets in left column, reveal-tease, win overlay), winners, how-to-play.
 - Player auth: `/login` gate, `hg_player_token` cookie, `playerStore`, TopNav chip, `PlayerSync` for cross-device rehydration.
 - Staff: role-door login flow (commits `23085ff`–`659b0f6`) + unified role-driven `/staff` dashboard.
@@ -441,24 +472,25 @@ Tests: **30 pass / 8 skip** without a DB, **38 pass / 0 skip** with `TEST_DATABA
 - WhatsApp payout rails (2026-07-03): winner "Collect" card on the live board, bookie "Claim on WhatsApp" card in the wallet, FO WhatsApp chip in Prize Payouts, `prize_owed` socket event. See **Prize Settlement Flow**.
 
 ### Known issues / TODOs
-- **Migrations 001–019 are committed** (018 = `Prize_Settlements`, 019 = drop `Audit_Log.user_id` FK for staff deletion) — Railway's pre-deploy `npm run migrate` applies them on deploy; for local dev run `cd HG/backend && npm run migrate`.
+- **The `master` cutover (top of Current State) supersedes the production-launch items below for the live site** — the DNS/rate-limiter/Sentry items still apply to `frontend-v2-housieghar` if it's ever redeployed, but they no longer describe what's serving `housieghar.in` today.
+- **Migrations 001–019 are committed** (018 = `Prize_Settlements`, 019 = drop `Audit_Log.user_id` FK for staff deletion) — for local dev run `cd HG/backend && npm run migrate`.
 - **Settlement UI — built (2026-07-02).** The Finance Hub **Prize Payouts** panel (`PrizePayoutsSection` in `components/staff/FinanceSections.tsx`, FO-only) lists Owed/Paid settlements with a two-click Settle → `POST /api/settlements/:id/settle` that credits the selling agent's wallet; a sidebar badge shows the owed count. The agent-facing wallet also shows the `Prize` credit once settled (`Wallet_Ledger`). Commits `ee1c46f` (amount coercion) + `43f6def` (UI). New CSS: `.hg-seg*`, `.hg-settle*`, `.hg-side-badge`, `.hg-payouts-*`.
 - **Settlement smoke-tested end-to-end (2026-07-02).** Full local flow verified via API + browser: player lock → bookie confirm (wallet −₹60) → live game → Early Five split ₹50/₹50 across co-winning tickets + Top Line ₹100 → Owed rows with `player_id` stamped → CFO settle (+₹100, `Wallet_Ledger` `Prize` credit, `settled_by` stamped) → second settle 409 `already_paid` → pending-count badge decremented.
 - **`housie_name` pre-fill — done.** The game-room name input pre-fills from `playerStore.player.username` (a username always satisfies the no-spaces / ≤18-char rule — `full_name` would not).
 - **`dev-bypass` endpoint — working, not a bug.** Frontend (`BookingModal`) and backend route both use `POST /api/bookings/:booking_id/dev-bypass`; `app.ts` mounts it correctly and the `NODE_ENV === 'production'` guard returns 404 in production. The old `dev-bypass-confirm` name in earlier docs was incorrect and has been corrected here and in `manual.md`.
-- **Sentry — fully wired, DSN-gated (2026-07-02).** Backend: `@sentry/node` guarded init at the top of `server.ts`. Frontend: `@sentry/nextjs` via `src/instrumentation.ts` (server, `onRequestError`) + `src/instrumentation-client.ts` (browser, `onRouterTransitionStart`). All no-ops until `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` are set (manual.md step 11 = accounts + env vars only; no wizard).
-- **npm audit — 0 vulnerabilities in both packages (2026-07-02).** Backend/frontend `ws` chain fixed via `npm audit fix`; the `postcss` copy nested in Next lifted via `"overrides": { "postcss": "^8.5.10" }` in `HG/frontend/package.json` (don't remove the override until Next ships postcss ≥8.5.10 itself). `.github/dependabot.yml` keeps weekly watch on both packages + Actions.
-- **Temp passwords are now enforced** — see Authentication & RBAC. The dev-seeded superadmin (`temp_password_required = TRUE`) hits the change-password gate on first login; sample staff (flag FALSE) don't.
-- OTP step intentionally skipped (password-only staff login remains).
-- **Two GitHub repos** (`mod-moders` canonical, `flinchtheflincher` 3 behind) — see Current State; always confirm Railway's Source repo before debugging a deploy (memory `hg-two-github-repos`).
-- **Auth rate limiters are still commented out in `app.ts`** (the user's own edit — don't silently revert, but they must be re-enabled before real users arrive; manual.md Step 16 flags it: without them staff passwords can be brute-forced at 100 attempts/15 min instead of 5).
-- **`ci.yml`'s deploy jobs are broken by design-drift** — they curl `RAILWAY_*_DEPLOY_HOOK` secrets for a Railway feature that doesn't exist; manual.md Step 9 documents the real mechanism (native autodeploy + the Wait for CI toggle). Delete the two curl jobs when convenient. Note CI only triggers on `main`/`staging` pushes — the working branch `frontend-v2-housieghar` gets no CI runs at all.
+- **Sentry — fully wired, DSN-gated (2026-07-02).** Backend: `@sentry/node` guarded init at the top of `server.ts`. Frontend: `@sentry/nextjs` via `src/instrumentation.ts` (server, `onRequestError`) + `src/instrumentation-client.ts` (browser, `onRouterTransitionStart`). All no-ops until `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` are set. (Applies to `frontend-v2-housieghar` only — unknown whether `master`'s deployment has Sentry wired.)
+- **npm audit — 0 vulnerabilities in both packages (2026-07-02, `frontend-v2-housieghar`).** Backend/frontend `ws` chain fixed via `npm audit fix`; the `postcss` copy nested in Next lifted via `"overrides": { "postcss": "^8.5.10" }` in `HG/frontend/package.json` (don't remove the override until Next ships postcss ≥8.5.10 itself). `.github/dependabot.yml` keeps weekly watch on both packages + Actions.
+- **Temp passwords are enforced on `frontend-v2-housieghar`** — see Authentication & RBAC. Not known whether `master` has an equivalent gate (likely not, per the "regressed" note in the master-integration section).
+- OTP step intentionally skipped (password-only staff login remains, on `frontend-v2-housieghar`).
+- **Two GitHub repos / two branches** — see the dedicated section above; always confirm both Source repo AND branch before debugging any deploy (memory `hg-two-github-repos`).
+- **Auth rate limiters are still commented out in `frontend-v2-housieghar`'s `app.ts`** (the user's own edit — don't silently revert). Moot for the live site until/unless this branch is redeployed, but re-enable before it ever serves real users again.
+- **`ci.yml`'s deploy jobs are broken by design-drift** — they curl `RAILWAY_*_DEPLOY_HOOK` secrets for a Railway feature that doesn't exist. Delete the two curl jobs when convenient. CI only triggers on `main`/`staging` pushes — neither `frontend-v2-housieghar` nor `master` get CI runs.
 
 ---
 
 ## Resuming Work
 
-**Start the local environment:**
+**Start the local environment** (this checkout, `frontend-v2-housieghar` — for local dev only, not what's live):
 ```bash
 brew services start postgresql@14 && brew services start redis
 cd HG/backend && npm run migrate && npm run seed && npm run dev   # :4000
@@ -467,15 +499,23 @@ cd HG/frontend && npm run dev                                      # :3000
 
 **Run migrate first** — migrations through 018 (`Prize_Settlements`) must be applied before the settlement engine works. Run `cd HG/backend && npm run migrate` (idempotent). If you're using the dev `seed`, note it now also runs `seed_platform_config.sql` (adds `seed:prod`'s default `Platform_Config` rows, `ON CONFLICT DO NOTHING`) — needed for the Announcement editor's `PUT /api/config` to succeed on a fresh DB.
 
-**What was last worked on (2026-07-14 evening): staff-account cleanup + player profile polish**
-See **Current State → Latest session** for full detail. Five commits landed, all pushed to `origin/frontend-v2-housieghar` (currently at `a9921ef`): removed leftover "Powered by MOD" branding (`8273e11`); ported player self-service profile/stats pages with real data (`14e1795`); tightened profile-page padding (`c229c93`); fixed the lobby so only Live/Paused games ever appear above "Upcoming Games" (`afefa6b`); and simplified the staff Add-Staff form (dropped email/phone fields, backend auto-generates a placeholder email, new staff skip the forced first-login password change), added staff self-service email editing in My Profile, and added bottom spacing to the lobby games list (`a9921ef`). Working tree is clean except the long-standing `CLAUDE.md`/`manual.md`/`HG/nixpacks.toml` items below (untouched, not part of this session's work).
+**What was last worked on (2026-07-15/16): production cutover to `master`**
+See **Current State → ⚠️ Production cutover** for full detail. `housieghar.in` now serves the `master` branch from a brand-new Railway backend (`alluring-adventure` project, service `housie-ghar-master`) with its own fresh Postgres/Redis; the old `frontend-v2-housieghar` backend (`exciting-rebirth` project) was stopped (deployment removed, GitHub branch disconnected) but its database was left running/untouched. This checkout's local files were not modified — the local branch, working tree, and dirty files (`manual.md`, `HG/nixpacks.toml`) are exactly as they were on 2026-07-13.
 
-**Most logical next step:** none of today's changes are blocking — pick up wherever the production launch checklist below left off, or address user-requested polish as it comes in. If resuming the launch, start from "Before that (2026-07-10 → 07-13)" further down.
+**Most logical next step:** this is now an infra/product decision point, not a coding task:
+1. **Fix `api.housieghar.in` DNS** — it still points at the stopped old backend. Either repoint it at the new Railway service or leave it retired if nothing depends on it.
+2. **Decide the long-term codebase direction.** `master` is live but architecturally simpler than `frontend-v2-housieghar` (no settlement engine, no test suite, weaker auth). Does the user want to keep iterating on `master` going forward, port `frontend-v2-housieghar`'s backend features onto `master` (mirroring the reverse port done 2026-07-14), or eventually cut back to `frontend-v2-housieghar`? Nothing in this session answered that — ask before assuming either direction.
+3. **Verify the Finance Hub "Withdrawal Queue" numbers** on the new live site aren't fabricated demo data before anyone relies on them.
+4. Routine cleanup whenever convenient: old `exciting-rebirth` Postgres/Redis (running, unused), `manual.md`'s stale launch guide (documents the now-superseded path), untracked `HG/nixpacks.toml`, the `ci.yml` deploy-hook jobs.
 
-Before that (2026-07-10 → 07-13): PRODUCTION LAUNCH — manual.md steps 4–8 on Railway/Hostinger/Vercel
-See **Current State → Production launch in progress** for the full picture: the working Railway service config (Root Directory `HG`, `cd backend &&` commands, railpack.json + HG-root package.json), the two-GitHub-repos incident (`origin` is now **mod-moders** — confirm Railway's Source repo matches before debugging anything), the Hostinger DNS records, and the open verification items. **The immediate task on resume: confirm the newest Railway deployment is green** — Build Logs must get past `npm ci` (Node detection was the blocker) and Deploy Logs must show the Pino "listening on port 4000" line. Then continue manual.md in order: Step 6a `seed:prod` via `railway ssh`, Step 8's closing env swaps (`FRONTEND_URL` → `https://housieghar.in` on Railway; `NEXT_PUBLIC_API_URL` → `https://api.housieghar.in` on Vercel + manual redeploy), then Steps 9–16 (Wait for CI, branch protection, Sentry DSNs, UptimeRobot, seeded-password rotation, **re-enable the auth rate limiters in `app.ts`**, production smoke test). A parallel session shipped `1a28383` (staff hard-delete, migration 019) and `c812409` (progressive player sign-in) during this window — **avoid two concurrent Claude sessions doing git work in this checkout**; it caused the repo confusion above.
+If instead picking up **local feature work on `frontend-v2-housieghar`** (independent of the live-site question above):
 
-Before that (2026-07-08/09): neon radiant layer + compact banner + candy daylight — still uncommitted in `globals.css` (see Current State). Turbopack stale-write gotcha applies when editing it twice in one turn (`touch` won't force a recompile; only a real content change does).
+Before the cutover (2026-07-14 evening): staff-account cleanup + player profile polish
+Five commits landed, all pushed to `origin/frontend-v2-housieghar` (currently at `a9921ef`): removed leftover "Powered by MOD" branding (`8273e11`); ported player self-service profile/stats pages with real data (`14e1795`); tightened profile-page padding (`c229c93`); fixed the lobby so only Live/Paused games ever appear above "Upcoming Games" (`afefa6b`); and simplified the staff Add-Staff form, added staff self-service email editing, and added bottom spacing to the lobby games list (`a9921ef`). See **Current State → Latest session** for full detail.
+
+Before that (2026-07-10 → 07-13): original production launch — manual.md steps 4–8 on Railway/Hostinger/Vercel, now superseded by the `master` cutover (see **Current State → Production launch history**). The Railway Root-Directory/Node-detection gotchas documented there still apply to any future Railway service in this repo.
+
+Before that (2026-07-08/09): neon radiant layer + compact banner + candy daylight in `globals.css` — since committed (no longer uncommitted work).
 
 Before that (2026-07-07): `do.md` triage — Smart Game Presets + Announcement strip, committed in `6e51aa8` (see Current State).
 
@@ -488,20 +528,14 @@ Product decision: prize money is never paid "via the website" — it flows perso
 Same day, earlier: staff/player login pages were stuck in the 452px phone column on desktop — the `:has(.hg-staff-login)` exclusion in the ≥900px de-phone block was removed and `.hg-staff-login` pinned to `100dvh` (a `min-height:100%` child can't resolve against a `height:auto` parent).
 
 Before that (2026-07-02, second batch): launch-prep sweep
-Everything automatable from `launch.md`/`manual.md` was built and verified, leaving only account/dashboard work for a human (see `manual.md` "What's left"):
+Everything automatable from `launch.md`/`manual.md` was built and verified, leaving only account/dashboard work for a human:
 1. **Auth hardening** — login backdoor removed (malformed hash + `ChangeMe123!` no longer authenticates); `POST /api/auth/change-password`; per-request DB check of `status` + `temp_password_required` in `authenticateToken` (suspension + temp-password now bite immediately); admin password reset via `PATCH /api/users/:id` re-flags temp. New env-free `modules/auth/auth.service.ts` + 6 integration tests (suite now 44).
-2. **Forced first-login password change (frontend)** — `ChangePasswordCard` rendered by `StaffShell` when `/api/auth/me` carries `temp_password_required`; covers all staff login paths. Verified in a real browser (headless Chromium): login as temp superadmin → gate renders → change → dashboard loads.
-3. **`seed:prod`** — production bootstrap (roles + `Platform_Config` + Superadmin from env, idempotent, refuses dev defaults in production). Closes the "fresh prod DB has no roles/superadmin" gap; wired into manual.md as Railway step 6a.
-4. **Dependencies** — `npm audit` → 0 vulnerabilities both packages (`ws` chain fixed; `postcss` override in frontend); Dependabot config added; `forceConsistentCasingInFileNames` added to frontend tsconfig.
+2. **Forced first-login password change (frontend)** — `ChangePasswordCard` rendered by `StaffShell` when `/api/auth/me` carries `temp_password_required`; covers all staff login paths.
+3. **`seed:prod`** — production bootstrap (roles + `Platform_Config` + Superadmin from env, idempotent, refuses dev defaults in production).
+4. **Dependencies** — `npm audit` → 0 vulnerabilities both packages; Dependabot config added; `forceConsistentCasingInFileNames` added to frontend tsconfig.
 5. **Frontend Sentry** — `@sentry/nextjs` wired wizard-free via `src/instrumentation.ts` + `src/instrumentation-client.ts`, DSN-gated.
-6. **Gates + smoke test** — migrate idempotency, backend build + 44/44 tests, frontend lint + tsc + production build, and the full settlement E2E (see Known issues). Note: after `next build`, `rm -rf .next` before restarting `next dev` or every route 404s.
+6. **Gates + smoke test** — migrate idempotency, backend build + 44/44 tests, frontend lint + tsc + production build, and the full settlement E2E.
 
 Before that (same day): Finance Hub **Prize Payouts UI** (`43f6def` + `ee1c46f`) — the FO-facing Owed/Paid ledger with two-click Settle; sidebar owed-count badge; `DECIMAL` amount coerced to number in the controller.
 
 Before that (2026-06-30): the prize-settlement **engine** (backend only) — committed across `0513e0f`→`9968f03`. Winning a prize records an Owed `Prize_Settlements` row in the same transaction that claims the prize; a Financial Officer settles it via `/api/settlements`, crediting the selling agent's wallet. Co-winners split exactly (no lost paisa). Win detection extracted to a pure, unit-tested module; first real backend test suite (`node:test`, gated DB integration harness). See **Prize Settlement Flow**, **Game Engine**, **Backend Testing**.
-
-**Most logical next steps:**
-1. **Verify the Railway build is green** after the repo/config fixes (see Current State → Production launch), then run Step 6a's `seed:prod` and walk manual.md Steps 7–16 through the production smoke test.
-2. **Deal with the uncommitted working tree** — commit the `manual.md` launch corrections (docs-only, safe), decide on the neon/candy CSS layers + the TopNav sheet edit, delete the inert `HG/nixpacks.toml`.
-3. **Sync or retire `flinchtheflincher/Housie-Ghar`** (3 commits behind) so the two-repo trap can't recur, and close Railway's PR #1 unmerged if it's still open.
-4. **Clean up `ci.yml`** — remove the two deploy-hook curl jobs (Step 9 correction); they fail on secrets for a Railway feature that doesn't exist.

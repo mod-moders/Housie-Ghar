@@ -6,7 +6,7 @@
 
 The AI-doable parts are already complete:
 
-- **CI/CD** — `.github/workflows/ci.yml` is fully wired: deploy-hook jobs for `main` / `staging` plus the `https://api.housieghar.in/health` post-deploy check.
+- **CI/CD** — `.github/workflows/ci.yml` typechecks/lints/builds on every push, plus the `https://api.housieghar.in/health` post-deploy check. ⚠️ **Its `deploy-staging`/`deploy-production` jobs curl a "Railway deploy hook" URL that Railway does not actually ship** — see Step 9, which now documents the real (simpler) mechanism: native GitHub autodeploy + the **Wait for CI** toggle. `ci.yml` itself hasn't been edited to match; its two curl jobs will fail on the missing secrets until you either fill them with a real substitute (Step 9's edge cases) or remove them.
 - **Sentry (backend + frontend)** — `@sentry/node` installed with a guarded `Sentry.init` at the top of `src/server.ts`; `@sentry/nextjs` installed with guarded `src/instrumentation.ts` / `src/instrumentation-client.ts`. Both are no-ops until the DSN env vars are set — **no wizard needed**, just create the Sentry projects and set the DSNs (Step 11).
 - **Secret scan** — `gitleaks` run across all 88 commits; the only two hits are placeholder PEM text in `HG/.env.example` and `PDR.md`, so no real key was ever committed.
 - **Dependency audit — fixed (2026-07-02)** — `npm audit` reports **0 vulnerabilities** in both packages (`npm audit fix` in both; the frontend's nested `postcss` was lifted to ≥8.5.10 via an npm `overrides` entry; build verified). Step 15 is done — just re-run the audit before launch day for new CVEs.
@@ -19,13 +19,13 @@ Everything below needs you — accounts, payment, secrets that must never touch 
 |---|---|---|
 | 1 | Generate **production** RSA keypair | Keys must never be seen by AI tools. Run `openssl`, paste into Railway, then shred the local files. |
 | 2 | Generate CI keypair + add GitHub Secrets | GitHub account + secret upload via the Actions UI. |
-| 3 | Buy domain on Cloudflare | Account creation and payment. |
+| 3 | Verify your Hostinger domain | Domain already registered at Hostinger — confirm it's active and on Hostinger nameservers in hPanel. |
 | 4 | Create Railway project | Account creation and the Railway UI. |
 | 5 | Configure Railway service settings | Railway UI — root directory, build / start / pre-deploy commands. |
 | 6 | Set environment variables in Railway | Security-sensitive; production JWT keys, DB URLs, and passwords must never touch an AI session. |
 | 7 | Deploy frontend to Vercel | Vercel account creation and UI setup. |
-| 8 | DNS records in Cloudflare | Cloudflare dashboard access. |
-| 9 | CI/CD deploy hooks | **`ci.yml` already wired.** Generate the Railway deploy-hook URLs, then add `RAILWAY_PRODUCTION_DEPLOY_HOOK` / `RAILWAY_STAGING_DEPLOY_HOOK` to GitHub Secrets. |
+| 8 | DNS records in Hostinger hPanel | hPanel dashboard access. |
+| 9 | Wire up Railway ↔ GitHub Actions | **Railway has no "Deploy Hook" URL feature** (confirmed against current Railway docs — it's still an open, unshipped feature request). Use native GitHub autodeploy + the **Wait for CI** service toggle instead; no GitHub Secrets needed for this step at all. |
 | 10 | Enable branch protection on GitHub | GitHub Settings UI. |
 | 11 | Sentry projects + DSNs | **Backend AND frontend code already wired — no wizard needed.** Create the two Sentry projects, then add `SENTRY_DSN` to Railway and `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` to Vercel. |
 | 12 | Set up UptimeRobot | UptimeRobot account creation and UI setup. |
@@ -44,8 +44,8 @@ Everything below needs you — accounts, payment, secrets that must never touch 
 | Backend (Express 5 + Node.js) | Railway Web Service | ~$5–10/month |
 | PostgreSQL 14 | Railway Postgres plugin | ~$5/month |
 | Redis | Railway Redis plugin | ~$2/month |
-| DNS + CDN + DDoS | Cloudflare (free plan) | $0/month |
-| Domain | Cloudflare Registrar | ~$10/year |
+| DNS | Hostinger hPanel (comes with your domain) | $0/month |
+| Domain | Already owned at Hostinger | renewal only (~₹700–1,000/year for `.in`) |
 | Error tracking | Sentry (free tier) | $0/month |
 | Uptime monitoring | UptimeRobot (free tier) | $0/month |
 
@@ -113,105 +113,212 @@ rm ci-private.pem ci-public.pem
 
 ---
 
-## 3. Buy your domain on Cloudflare Registrar
+## 3. Verify your domain in Hostinger hPanel
 
-1. Go to [cloudflare.com](https://cloudflare.com) → sign up for a free account.
-2. **Registrar → Register Domains** → search for `housieghar.in` (or your chosen domain).
-3. Cloudflare Registrar sells at cost with no markup (~$10–13/year for `.in`). You also get free CDN, DDoS protection, and DNS management automatically.
-4. Add the domain to your account. You'll point it at Railway and Vercel in Step 8.
+Your domain is already registered at Hostinger — there is nothing to buy. Two one-minute checks now save you a stuck Step 8 later:
+
+1. **hPanel → Domains** → your domain is listed with status **Active** (not "Pending verification" or expired).
+2. **Domains → (your domain) → DNS / Name Servers** → it shows **Hostinger's nameservers** (`ns1.dns-parking.com` / `ns2.dns-parking.com`). That's what makes hPanel's DNS editor authoritative — Step 8's records are created there.
 
 **If it fails / edge cases:**
 
-- **Already own the domain — e.g. registered at Hostinger?** Skip the purchase entirely. Two ways to proceed:
-  1. **Recommended:** add the domain to Cloudflare's free plan (**Add a site** — no transfer, registration stays at Hostinger, $0). Cloudflare shows you two nameservers; in Hostinger hPanel go to **Domains → (your domain) → DNS / Name Servers → Change nameservers** and replace Hostinger's with those two. Cloudflare emails you when it goes active (usually under an hour, up to 24h).
-  2. Keep DNS at Hostinger and create Step 8's records in hPanel instead — see the Hostinger note inside Step 8's edge cases.
-- Cloudflare stuck on "Pending nameserver update" → confirm you replaced **both** nameservers and removed the old ones; verify with `dig NS yourdomain.in +short` (must show only Cloudflare's pair).
-- Domain is brand new and pages 404 randomly for a while → old parking-page records are still cached; lower TTLs can't fix caches that already hold the old answer. It clears within the old record's TTL.
+- Nameservers show something else (a previous Cloudflare/other-host setup) → either create Step 8's records at whoever those nameservers belong to, or switch back to Hostinger's here and wait for propagation (up to 24h, usually much less) before Step 8.
+- The domain is currently attached to a Hostinger hosting plan or Website Builder site → its DNS zone contains A/CNAME records for `@` and `www` pointing at that hosting. You don't need to detach or cancel anything — Step 8 deletes those records, and DNS decides where traffic goes.
+- Domain status "Pending" with a verification email outstanding (new registrations) → click the registrant-verification link first; some TLD registries suspend unverified domains, which surfaces later as random resolution failures.
+- Want a CDN/DDoS shield later? You can add the domain to Cloudflare's free plan at any time (no transfer — just swap nameservers in hPanel). If you ever do: keep the `api` record **DNS only** (the proxy buffers the SSE live stream) and set SSL/TLS mode to **Full (strict)** (Flexible causes redirect loops). Not needed for launch.
 - Want to host everything on a **Hostinger VPS** instead of Railway + Vercel? That's a different (single-server) architecture — follow `host.md`, not this file.
 
 ---
 
 ## 4. Create a Railway project
 
-1. Sign up at [railway.app](https://railway.app) → choose the **Hobby plan** ($5/month base, plus usage).
-2. **New Project → Empty Project**.
-3. Inside the project, click **+ New** three times to add:
-   - **Postgres** plugin (railway provisions it automatically)
-   - **Redis** plugin (railway provisions it automatically)
-   - **GitHub Repo** → connect your repository → select the `main` branch
+1. Go to [railway.app](https://railway.app) → click **Login** (top right) → **Login with GitHub** → authorize.
+2. On the dashboard, click **New Project**.
+3. A template picker opens — click **Empty Project** (usually at the bottom of the list).
+4. Railway names the project something random (e.g. "improbable-happiness") — click that name at the top of the canvas to rename it, e.g. `housie-ghar`.
+5. On the empty canvas, click **+ New** (top right of the canvas, or right-click the canvas).
+6. Click **Database** → a submenu shows Postgres/MySQL/Redis/MongoDB icons → click **Add PostgreSQL**. It provisions in a few seconds and appears as a node on the canvas.
+7. Click **+ New** again → **Database** → **Add Redis**. Same thing.
+8. Click **+ New** a third time → **GitHub Repo**.
+   - First time only: a "Configure GitHub App" prompt appears → click it → GitHub opens an install screen → choose your account/org → pick **Only select repositories** → check the Housie Ghar repo → **Save**.
+   - Back in Railway, the repo now shows in the picker → click it → Railway asks which branch → select **main** (or `frontend-v2-housieghar` if you haven't merged yet — see the edge-case note below).
+9. You now have three nodes on the canvas: Postgres, Redis, and the repo service. Click the small **gear icon** near the project name → **Usage/Plan** → confirm **Hobby** plan is active ($5/month base, plus usage); if it still says Trial, go to your account avatar (top right) → **Billing** → add a payment method.
 
-The Postgres and Redis plugins automatically inject `DATABASE_URL` and `REDIS_URL` into any service in the same project. You do not need to copy-paste those values.
+The Postgres and Redis plugins expose `DATABASE_URL` and `REDIS_URL` for any service in the same project to consume — but this is **not automatic just by being in the same project**. You (or Step 6) still have to add a **reference variable** in the backend service that points at each plugin; that's what creates both the working connection and the connector arrow you'll see on the canvas afterward. See Step 6.1 for the exact click path.
 
 **If it fails / edge cases:**
 
 - Your repo doesn't appear in the picker → the Railway GitHub App was never granted access to it. GitHub → **Settings → Applications → Railway → Configure** → grant the `Housie-Ghar` repo (an org-owned repo needs an org admin to approve).
-- `DATABASE_URL` / `REDIS_URL` come up empty in the backend service → the plugins and the service must live in the **same project and environment**. If you created them elsewhere, use Railway's variable references instead of copy-pasting connection strings.
+- No arrow drawn between the repo service and Postgres/Redis on the canvas → this is expected until you add the reference variables in Step 6.1 — the canvas draws that connector *from* the reference, it doesn't infer it from project membership. Don't troubleshoot this now; it resolves itself in Step 6.
+- `DATABASE_URL` / `REDIS_URL` come up empty (or absent) in the backend service's Variables tab → either you haven't added the reference yet (see Step 6.1), or the plugins and the service don't live in the **same project and environment** — reference variables can only point at services within that same scope.
 - Selecting the branch: the service deploys whatever branch you pick here. If the launch code lives on `frontend-v2-housieghar` and hasn't been merged, either merge to `main` first (recommended — CI and branch protection are wired for `main`) or point the service at that branch and remember Step 9's hooks also deploy that branch.
 
 ---
 
 ## 5. Configure the Railway backend service
 
-In the GitHub Repo service settings:
+1. Click the **repo service node** on the canvas (not Postgres, not Redis) — this opens its detail panel with tabs along the top: **Deployments / Variables / Metrics / Settings**.
+2. Click **Settings**.
+3. Under the **Source** (or **General**) section, find **Root Directory** → click into the field, type `HG` (**not** `HG/backend` — see the correction below). It autosaves on blur (a small toast may confirm it).
+4. Scroll to the **Build** section:
+   - **Build Command** → click the override toggle/field → type `cd backend && npm ci && npm run build`.
+5. Scroll to the **Deploy** section:
+   - **Start Command** → `cd backend && npm start`
+   - **Pre-Deploy Command** → `cd backend && npm run migrate` (this may be its own collapsible sub-section just below Start Command).
+6. Scroll further to **Networking**:
+   - Click **Generate Domain**. Railway asks which port to expose — type `4000` (matches your `PORT` var) → confirm. It shows a URL like `housie-ghar-backend-production.up.railway.app`. Copy it somewhere — you need it twice (Vercel's env var in Step 7, and again for the custom domain in Step 8).
+   - Later, add your custom domain `api.housieghar.in` here too (Step 8).
+7. Click over to the **Deployments** tab to watch it attempt a build. It's expected to crash-loop right now — that's fine, keep going to Step 6.
 
-**General:**
-- **Root Directory:** `HG/backend`
-
-**Build & Deploy:**
-- **Build Command:** `npm ci && npm run build`
-- **Start Command:** `npm start`
-- **Pre-Deploy Command:** `npm run migrate`
+> ⚠️ **Correction (2026-07-11): Root Directory must be `HG`, not `HG/backend`.** An earlier draft of this step set Root Directory to `HG/backend` directly, which seemed like the obvious choice — but the backend's `tsconfig.json` imports shared types from a **sibling** directory (`HG/shared/types`, aliased as `@shared/types/*`, per the Architecture section's `shared/types/` note above). Root Directory controls what Railway copies into the build context — pin it to `HG/backend` and `HG/shared` is simply never copied in at all. The build then fails with `tsc` exiting code 2, unable to resolve `@shared/types/*` — not a path-alias misconfiguration, the files are just physically missing from the container. Setting Root Directory to the parent `HG` folder puts both `backend/` and `shared/` in the build context together (matching their real on-disk relationship), and prefixing every command with `cd backend &&` keeps the actual build/start/migrate work scoped to the backend package once inside.
+>
+> ⚠️ **Second-order correction, same day: that broader Root Directory breaks Node auto-detection — fixed via `HG/railpack.json`, now committed to the repo.** Railway's build system normally detects "this is a Node.js project" by finding a `package.json` sitting directly in Root Directory. Once Root Directory became `HG`, that detection broke (`package.json` only exists one level down, in `HG/backend` and `HG/frontend`), so the build image was created with **no Node.js/npm installed at all** — every command in this step failed with `sh: 1: npm: not found` (exit 127), regardless of the commands themselves being correct. This repo's Railway service builds with **Railpack** (Railway's current builder — an earlier attempt at fixing this with a `nixpacks.toml` file did nothing, because Railpack doesn't read that format). The fix, now committed at `HG/railpack.json`, declares the provider explicitly so Node gets installed regardless of `package.json` location:
+> ```json
+> { "$schema": "https://schema.railpack.com", "provider": "node", "packages": { "node": "22" } }
+> ```
+> This file is already in the repo — nothing further to do here unless you're setting this project up somewhere Railpack isn't the builder (check **Settings → Build** for a **Builder** field if you ever see `npm: not found` again despite this file existing).
 
 The pre-deploy command runs `ts-node src/db/migrate.ts` before every deploy, keeping the schema up to date without manual intervention.
 
-**Networking:**
-- Click **Generate Domain** to get a `*.up.railway.app` URL. Note it down — you'll use it as `NEXT_PUBLIC_API_URL` in Vercel and as the health check URL in the CI workflow.
-- Later, add your custom domain `api.housieghar.in` here (Step 8).
-
 **If it fails / edge cases:**
 
+- Build Logs show `sh: 1: npm: not found` (exit code 127) on the very first command → Node.js itself was never installed into the build image — see the second correction above. Confirm `HG/railpack.json` exists in the repo (it should, already committed) and that **Settings → Build → Builder** is actually set to a builder that reads it (Railpack). If you switch builders later, this file may need a different format.
 - Build fails `tsc: not found` — or the pre-deploy migrate fails `ts-node: not found` → devDependencies got pruned. Add the variable `NPM_CONFIG_PRODUCTION=false` and redeploy; both the compiler and the migration runner live in devDependencies.
-- "Could not find package.json" / instant build failure → **Root Directory** must be exactly `HG/backend` — case-sensitive, no leading or trailing slash.
-- Pre-deploy migrate fails with `ENOTFOUND postgres.railway.internal` or `ECONNREFUSED` → the Postgres plugin isn't in this environment, or someone overrode `DATABASE_URL` manually. Delete the manual value and let the plugin inject it.
+- Build fails with `tsc` exiting code 2, unable to resolve `@shared/types/*` → this is the Root Directory mistake described above. Root Directory must be `HG`, and Build/Start/Pre-Deploy Commands must all start with `cd backend &&` to compensate.
+- "Could not find package.json" / instant build failure → **Root Directory** must be exactly `HG` — case-sensitive, no leading or trailing slash. If it's still failing with Root Directory set correctly, check that the three commands all have the `cd backend &&` prefix — without it, Railway runs `npm ci`/`npm start`/`npm run migrate` against the `HG` root, which has no `package.json` of its own.
+- Pre-deploy migrate fails with `ENOTFOUND postgres.railway.internal` or `ECONNREFUSED` → either the Postgres plugin isn't in this environment, `DATABASE_URL` was never added as a reference variable at all (see Step 6.1), or someone overrode it with a manually-typed value. Add/re-add it as a reference to the Postgres service rather than typing a connection string.
 - First deploy crash-loops with `Missing required environment variable: …` → **expected** until Step 6's variables exist (`config/env.ts` throws on any missing var at boot). Do Steps 5 and 6 back-to-back and only then judge the deploy.
 - Deploys are slow or rebuild with no changes → confirm only one service watches the repo; two services watching the same repo double-deploy on every push.
+- With Root Directory now at the broader `HG` (covering both `backend/` and `frontend/`), a push that only touches frontend files will still trigger a backend redeploy (Railway watches the whole Root Directory by default). Harmless — the build is fast and idempotent — but if it bothers you, look for a **Watch Paths** setting in this same Settings page and scope it to `HG/backend/**` and `HG/shared/**`.
 
 ---
 
 ## 6. Set environment variables in Railway
 
-In the backend service → **Variables tab**, add each variable individually. Do **not** paste a raw `.env` file — Railway stores each value encrypted.
+**Why this step exists at all:** `HG/backend/src/config/env.ts` reads every one of these from `process.env` at process boot and **throws synchronously** if any required one is missing — this is why Step 5's first deploy crash-looped. Nothing in this step is optional; the backend will not start (not "start with a degraded feature," it will not start at all) until all required variables are present and well-formed.
 
-| Variable | Value |
-|---|---|
-| `NODE_ENV` | `production` |
-| `PORT` | `4000` |
-| `DATABASE_URL` | Auto-injected by the Postgres plugin — do not set manually |
-| `REDIS_URL` | Auto-injected by the Redis plugin — do not set manually |
-| `JWT_PRIVATE_KEY` | From Step 1 — the full private key. Railway accepts multi-line values: paste the PEM block as-is |
-| `JWT_PUBLIC_KEY` | From Step 1 — the full public key (same format) |
-| `FRONTEND_URL` | `https://housieghar.in` — exact scheme + host, no trailing slash. Use the Vercel domain until your custom domain is set up, then update it. |
-| `SUPERADMIN_EMAIL` | A real monitored mailbox |
-| `SUPERADMIN_TEMP_PASSWORD` | A strong random value — rotate it on first login |
-| `JWT_EXPIRY` | `8h` |
+**Security framing — why this step is flagged "must never touch an AI session":** `JWT_PRIVATE_KEY` signs every login cookie in the system; anyone who has it can mint a valid Superadmin session without a password. `SUPERADMIN_TEMP_PASSWORD` is the credential for the account that can create/suspend/reset every other account. Type or paste these directly into the Railway web UI in your own browser — never into a chat with an AI tool, a shell command an AI tool will see the output of, or a file an AI tool will read. Everything else in this table is lower-stakes but still: treat the whole Variables tab as production secrets storage, because that's what it is.
 
-After adding all variables, Railway will redeploy automatically. Watch the **Deploy Logs** tab for the Pino startup message confirming the server is listening on port 4000.
+### 6.1 — Open the Variables tab and connect Postgres + Redis
+
+1. On the Railway project canvas, click the **backend service node** (the one you configured in Step 5 — it has your repo's name, not "Postgres" or "Redis").
+2. Along the top of the detail panel: **Deployments / Variables / Metrics / Settings**. Click **Variables**.
+3. `DATABASE_URL` and `REDIS_URL` are **not** there automatically — being in the same Railway project does not, by itself, wire a plugin's variables into your service. You have to add each as a **reference variable** explicitly:
+   - Click **+ New Variable**. Type the Key as `DATABASE_URL`.
+   - Click into the **Value** field — look for a small database/chain-link icon at the edge of the input (sometimes it appears as a dropdown the moment you focus an empty Value box). Click it.
+   - A picker lists the other services in the project. Choose **Postgres → DATABASE_URL**. Railway inserts a reference expression (looks like `${{Postgres.DATABASE_URL}}`) and saves the row — the Value column now shows a small link/plug icon marking it as a reference rather than typed text.
+   - Repeat with Key `REDIS_URL`, picking **Redis → REDIS_URL** from the same picker.
+   - Back out to the project canvas view: you should now see connector arrows drawn from the Postgres and Redis nodes into the backend service node. If you don't see them yet, refresh the canvas — the connectors are drawn from these references and can lag a beat behind the Variables tab.
+4. Once both show the link/plug icon, **leave them alone** — do not click in and retype a value, and do not add a second row with the same name. A manually-typed connection string shadows the reference and silently disconnects you from the plugin's real, current credentials the moment you save it (see Step 5's edge cases for the `ENOTFOUND`/`ECONNREFUSED` symptom this causes).
+
+### 6.2 — Add each variable, one row at a time (recommended path — start here if you've never used Railway before)
+
+This sub-step assumes you have never touched Railway's Variables screen before. Read it slowly the first time; it only takes a minute per variable once you've done one.
+
+**What you're looking at.** After Step 6.1 you should be sitting on the backend service's **Variables** tab. This page is just a list of "settings" for your app, each one a **name** (Railway calls it the **Key**) paired with a **secret value** (the **Value**) — e.g. the Key `NODE_ENV` paired with the Value `production`. Your app reads these the moment it starts up. If you've never seen an "environment variable" before: think of it as a sealed envelope of settings that lives outside your code, so you can change how the app behaves (or store passwords) without editing and re-uploading any files.
+
+**Step by step, for one variable:**
+
+1. Look near the top of the Variables panel for a button labeled **+ New Variable** (sometimes just a **+** icon). Click it once.
+2. A new, empty row appears with two boxes side by side: a narrow one on the left (this is the **Key** box) and a wider one on the right (the **Value** box).
+3. Click inside the **left/Key box**. A text cursor should start blinking there. Type the variable's name **exactly** as it's spelled in the table in 6.4 below — capital letters and underscores matter. For example type `NODE_ENV` — not `node_env`, not `NodeEnv`, and don't add a space before or after it. Typos here are the #1 beginner mistake: `NODE_ENV ` (with a trailing space) is treated as a completely different, unrecognized variable, and your app will behave as if you never set it at all.
+4. Move to the **right/Value box** — either click into it directly, or press the **Tab** key on your keyboard to jump there automatically. Type or paste the value that belongs to that Key (the full list is in the table in section 6.4 below).
+   - For most rows this is a short, one-line answer, e.g. `production` or `4000` — just type it plainly, **no quotation marks** around it. (If you type `"production"` with the quote marks included, Railway saves those quote marks as literal characters, and the app will see a value it doesn't recognize — quotes are not needed here the way they might be in some code you've seen.)
+   - Two rows are different and deserve extra care: `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY`. These come from the `private.pem` and `public.pem` files you generated in Step 1 — each one is several lines of random-looking text, starting with a line like `-----BEGIN RSA PRIVATE KEY-----` and ending with a matching `-----END-----` line. Open that file (e.g. in a text editor, or print it in your terminal with `cat private.pem`), select **all** of its text including those first and last lines, copy it, then click into the Value box in Railway and paste. The box will grow taller automatically to fit it — you don't need to do anything special, and you don't need to make it fit on one line.
+5. Once the Value looks right, either press the **Enter** key, or look for a small checkmark (✓) icon at the end of that row and click it. This "saves" or "commits" the row — meaning Railway now stores it. The row will settle into place in the list, and the Value may show as a row of dots (••••••) instead of the real text — that's Railway automatically hiding anything that looks like a secret, purely so it's not visible to anyone glancing at your screen. It's still stored correctly. If you want to double-check exactly what you typed, look for a small eye icon on that row and click it to reveal the real value again.
+6. That's one variable done. Click **+ New Variable** again and repeat steps 3–5 for the next row in the table in 6.4, until all of them are added.
+
+**A few things that surprise first-timers:**
+- There is no single "Save all" button — each row is saved the moment you press Enter/click the checkmark on it, one at a time.
+- Every time you save a row, Railway may immediately start rebuilding and restarting your app in the background (you might see a small notification about a "new deployment"). This is normal and expected while you're adding many variables in a row — don't stop to investigate each one; just keep adding rows, and check the final result once in Step 6.5.
+- If you make a mistake on a row you already saved, just click into that row again (click on the Value text itself) to edit it, fix it, and press Enter again to re-save — you don't need to delete and recreate the row.
+
+### 6.3 — Alternative: the Raw Editor (bulk paste, optional)
+
+Railway's Variables tab also has a **Raw Editor** toggle/button (usually top-right, next to **+ New Variable**) that lets you paste many `KEY=VALUE` lines at once instead of adding rows one at a time. It is safe to use — Railway still encrypts each resulting variable individually, so "don't paste a raw `.env` file" above is not a security warning about this feature, it's a **format** warning:
+
+- In the Raw Editor, a value that spans multiple lines (your PEM keys) must be wrapped in quotes with real newlines escaped as `\n`, e.g. `JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----\n"`. This is the **opposite** of the single-row Value box, which wants the literal multi-line PEM with no escaping and no surrounding quotes.
+- If you're not confident converting your PEM files to that one-line escaped form correctly, use the per-row method in 6.2 for the two JWT keys specifically — it's the format-safe path — and reserve the Raw Editor (if you use it) for the plain single-line values.
+- Never paste your actual local `HG/.env` file wholesale into the Raw Editor even though the format would technically parse: that file may carry dev-only values (dev JWT keys, `NODE_ENV=development`, localhost URLs) that would silently overwrite the production-correct values you're setting here.
+
+### 6.4 — The variables, what each one does, and what breaks if it's wrong
+
+| Variable | Value | What it actually controls | What breaks if missing/wrong |
+|---|---|---|---|
+| `NODE_ENV` | `production` | Gates dev-only code paths: disables the `POST /api/bookings/:id/dev-bypass` endpoint (returns 404), disables `npm run seed` (throws instead of seeding fake data), changes some logging verbosity. | Left as `development` (or unset): the dev-bypass booking shortcut stays **live in production** — anyone who finds the route can auto-confirm a booking without an agent, and Step 16's smoke test check #3 will fail. |
+| `PORT` | `4000` | The port the Express server binds to inside the container. Must match the port you told Railway to expose when you clicked **Generate Domain** in Step 5. | Mismatch between this and the exposed port: the container is healthy internally but Railway's edge routes traffic to a port nothing is listening on — requests time out or 502, even though Deploy Logs show the server "running" fine. |
+| `DATABASE_URL` | *(added as a reference to Postgres in Step 6.1 — never type a value here)* | Postgres connection string, host/port/user/password/dbname all bundled. Read by `db/index.ts`'s pool singleton. | Typed manually instead of referenced, or never added at all: either you've frozen today's plugin-internal hostname/credentials into a static value that breaks the moment Railway rotates/moves the Postgres instance (`ENOTFOUND`/`ECONNREFUSED`), or the pool has nothing to connect to and the app never boots. |
+| `REDIS_URL` | *(added as a reference to Redis in Step 6.1 — never type a value here)* | Redis connection string for both clients in `db/redis.ts` (the pub/sub publisher and subscriber that fan out game events to SSE + Socket.io). | Same failure class as `DATABASE_URL` above, but the symptom is scoped to real-time features: the site loads, login works, but the live board never receives draws and staff dashboards never receive booking events. |
+| `JWT_PRIVATE_KEY` | Full contents of Step 1's `private.pem` | Signs every JWT this backend issues (both `hg_auth_token` for staff and `hg_player_token` for players) using RS256. | Missing: boot throws immediately (`env.ts` requires it). Malformed (truncated paste, missing header/footer, swapped with the public key): boot may still succeed but every login attempt 500s with `secretOrPrivateKey must be an asymmetric key when using RS256` in the logs. |
+| `JWT_PUBLIC_KEY` | Full contents of Step 1's `public.pem` | Verifies JWTs signed by the private key above — used on every authenticated request by `middleware/auth.ts`. | Mismatched with the private key (e.g. you regenerated one but not the other): tokens sign successfully at login, then fail verification on the very next request — users appear logged in for one screen, then get bounced. |
+| `FRONTEND_URL` | `https://housieghar.in` (add `,https://www.housieghar.in` once both apex and `www` are live — see Step 8) | The CORS allow-list (`app.ts` splits this string on commas) **and** the Socket.io allowed-origins list. Every browser request the backend accepts must originate from a URL in this list. | Wrong scheme, wrong host, trailing slash, or `www` missing when players land on `www`: the backend rejects the request at the CORS layer before your route code ever runs. Symptom is deceptive — pages render fine (that's just static assets/routing on Vercel's side), but every API call including login fails with a CORS error in the browser console, and staff dashboards silently never receive live Socket.io events because they fail the same origin check. |
+| `SUPERADMIN_EMAIL` | A real mailbox you can receive mail at | The email address `seed:prod` (Step 6a) uses to create the one production Superadmin account. | Left as a placeholder/dev value: `seed:prod` explicitly **refuses to run** ("Refusing to bootstrap production with dev defaults") rather than create an account you can't actually log into or recover. |
+| `SUPERADMIN_TEMP_PASSWORD` | A strong random value, generated once, used once | The initial password for that same Superadmin account. `temp_password_required` is set `TRUE` alongside it, so the app forces a real password to be chosen on first login. | Same refusal as above if left at the dev default. If you reuse a password you use elsewhere: it only has to work once (you'll be forced to change it immediately), but it sits in Railway's variable history and in your terminal/clipboard history until then — treat it as compromised the moment you type it anywhere else. |
+| `JWT_EXPIRY` | `8h` | How long an issued JWT stays valid before the cookie is rejected and the user must log in again — passed straight to the `jsonwebtoken` sign call. | Set too short (e.g. `5m`): staff get logged out mid-shift, mid-game even, which is disruptive for an operator running a live draw. Set too long or omitted (some libraries default to a long or infinite expiry): a stolen/leaked cookie stays valid far longer than intended. `8h` covers one full shift without being open-ended. |
+
+### 6.4a — FRONTEND_URL, SUPERADMIN_EMAIL, SUPERADMIN_TEMP_PASSWORD, JWT_EXPIRY — in plain terms
+
+The table above packs a lot into each cell. Here are the same four rows again, slower, as if you're typing them into Railway for the first time. For each one: what you type in the **Key** box (left), what you type in the **Value** box (right), and why.
+
+**Row 1 — `FRONTEND_URL`**
+- In the **Key** box, type exactly: `FRONTEND_URL`
+- In the **Value** box, type exactly: `https://housieghar.in`
+- What this is, in plain English: it's simply the web address of your player-facing site — the same address you'd type into a browser to visit it. You're telling the backend server "only accept requests that came from this website." Right now you might not have `https://housieghar.in` live yet (that happens in Step 8), so for now use whatever Vercel gave you in Step 7 instead (something like `https://housie-ghar-frontend.vercel.app`) — no trailing `/` at the very end either way. **After Step 8**, come back to this exact row, click on it, delete the old value, and replace it with `https://housieghar.in,https://www.housieghar.in` (both addresses, separated by one comma, no space after the comma) — that covers people who type `www.` in front and people who don't.
+- Why it matters: if this value doesn't exactly match the address the player is actually using in their browser, the browser's own security rules will block your app from talking to the server — pages will still appear, but nothing that needs the server (logging in, loading games) will work, and you'll see the word "CORS" in a red error in the browser's developer console.
+
+**Row 2 — `SUPERADMIN_EMAIL`**
+- In the **Key** box, type exactly: `SUPERADMIN_EMAIL`
+- In the **Value** box, type: an email address that's really yours and that you can actually open — e.g. `you@gmail.com`. It does not need to be a fancy company email; any inbox you personally check is fine.
+- What this is: this becomes the login username for the very first, most powerful account in the app (the "Superadmin," who can create every other staff account). Whatever you type here is what you'll type into the login form later, in Step 6a/13.
+- Why it matters: if you leave this at whatever placeholder value the project came with (a fake/example email), a safety check refuses to create the account at all, on purpose — so you don't end up with an account nobody can access.
+
+**Row 3 — `SUPERADMIN_TEMP_PASSWORD`**
+- In the **Key** box, type exactly: `SUPERADMIN_TEMP_PASSWORD`
+- In the **Value** box, type: any password you make up right now — for example mash your keyboard, or use a password manager's "generate" button. It just needs to be reasonably long and not something obvious like `password123`.
+- What this is: the very first password for that same Superadmin account from Row 2. It's called "temp" (temporary) because the app is built to immediately force you to pick a brand-new password the first time you log in with it — so this value only ever gets used once, for a few seconds, before you replace it yourself inside the app.
+- Why it matters: because it's only used once and then discarded, you don't need to memorize it or write it down carefully — you'll type it once at your very first login, then the app will immediately make you choose a real one on the spot.
+
+**Row 4 — `JWT_EXPIRY`**
+- In the **Key** box, type exactly: `JWT_EXPIRY`
+- In the **Value** box, type exactly: `8h`
+- What this is: it controls how long you (or any staff member) get to stay logged in before the app makes you log in again. `8h` means "8 hours" — roughly one work shift. You don't need to calculate anything or use a different format; `8h` is a ready-to-use value that this codebase understands directly.
+- Why it matters: this is the one row in the whole table where the exact value matters less than just "having a sensible one" — `8h` is already the recommended value, so unless you have a specific reason to change it, just copy it exactly as shown, including the lowercase `h` with no space before it (`8h`, not `8 h` or `8H`).
+
+### 6.5 — Confirm the deploy picked everything up
+
+1. After the last variable commits, look for a banner near the top of the service panel reading something like "New deployment triggered." If you don't see one within a few seconds, click **Deploy** (top-right of the service panel) to force it manually.
+2. Click the **Deployments** tab → click the newest entry (it should be at the top, timestamped just now) → this opens the deployment's detail view → click its **Deploy Logs** sub-tab.
+3. Read the log stream top to bottom. You're looking for a structured Pino JSON line that says the server is listening — something like `{"level":30,"msg":"Server listening on port 4000",...}`. That line is your confirmation every required variable was present and well-formed enough for `env.ts` to pass and for the HTTP server to bind.
+4. If the deployment instead shows a **crash/exit** status before that line appears, open Deploy Logs and read the **last** line printed before the crash — `env.ts` throws a specific `Missing required environment variable: <NAME>` message naming exactly which one is absent; fix that one variable and it will redeploy automatically.
 
 **If it fails / edge cases:**
 
-- Paste PEM values **without** surrounding double quotes — quotes are `.env`-file syntax, not part of the key. Railway stores the raw multi-line value.
-- Logins 500 and the logs show `secretOrPrivateKey must be an asymmetric key` or `error:0909006C:PEM routines` → a PEM got mangled: missing `BEGIN/END` line, trailing whitespace, or a partial paste. Re-paste both keys from the original files (Step 1's edge cases cover verifying the pair).
+- Paste PEM values **without** surrounding double quotes in the single-row Value box — quotes are `.env`-file/Raw-Editor syntax, not part of the key itself. Railway stores the raw multi-line value as you pasted it.
+- Logins 500 and the logs show `secretOrPrivateKey must be an asymmetric key` or `error:0909006C:PEM routines` → a PEM got mangled: missing `BEGIN/END` line, trailing whitespace, a partial paste, or the private/public values got swapped into each other's fields. Re-paste both keys from the original files (Step 1's edge cases cover verifying the pair matches with `openssl rsa -in private.pem -pubout | diff - public.pem`).
 - `FRONTEND_URL` is the most error-prone value in this table: exact scheme + host, **no trailing slash**. The backend splits it on commas, so covering both apex and www is `https://housieghar.in,https://www.housieghar.in`. Symptom when wrong: pages render fine, but every login dies with a CORS error in the browser console and staff dashboards never receive live events (Socket.io checks the same origin list).
-- Boot log shows a Redis or Postgres connection error rather than the Pino "running" line → you set `DATABASE_URL`/`REDIS_URL` manually and broke the plugin injection. Delete the manual values.
-- Changing a variable here redeploys the **backend** only. Frontend `NEXT_PUBLIC_*` values (Step 7) bake in at build time and need a Vercel redeploy separately.
+- Boot log shows a Redis or Postgres connection error rather than the Pino "running" line → check that variable's row for the link/plug icon. No icon means it's a typed value, not a reference (or the reference was never created) — delete the row and re-add it via **+ New Variable** → the reference picker, pointing at Postgres/Redis as in Step 6.1.
+- Changing a variable here redeploys the **backend** only. Frontend `NEXT_PUBLIC_*` values (Step 7) bake in at build time and need a separate Vercel redeploy — Railway changing does not touch Vercel at all.
+- Accidentally committed a typo'd variable and it already redeployed → just fix the value and save again; Railway redeploys on every variable change, there's no "undo" needed, the bad deploy is simply superseded by the next one.
 
 ### 6a. One-time production bootstrap (after the first successful deploy)
 
-A freshly migrated database has no Roles and no Superadmin — the app boots but nobody can log in. In the Railway backend service, open the **shell/one-off command** runner and execute:
+A freshly migrated database has no Roles and no Superadmin — the app boots but nobody can log in.
 
-```bash
-npm run seed:prod
-```
+**Getting a shell into the running service — this changed in June 2026.** Railway no longer relies on an in-browser terminal tab for this; the current, Railway-documented path is CLI-based SSH straight into the live container:
+
+1. Install the Railway CLI locally if you haven't: `npm i -g @railway/cli` (or `brew install railway` on macOS).
+2. `railway login` → opens a browser tab to authorize.
+3. `cd` into the repo, then `railway link` → pick the `housie-ghar` project, the right environment (`production`), and the backend service when prompted. This creates a local `.railway` link so subsequent commands know which service you mean.
+4. `railway ssh` → first run, the CLI notices you have no registered key and offers to register one (`~/.ssh/id_ed25519.pub` or similar) — accept it. This opens an interactive shell **inside the actual running container**, same env vars loaded, same filesystem.
+   - If you manage multiple services in the project, disambiguate with `railway ssh --service <name>` (or `--environment <env>` if it can't infer it).
+5. In that shell, type:
+   ```bash
+   npm run seed:prod
+   ```
+   Press Enter, watch it print confirmation of Roles/Platform_Config/Superadmin created.
+6. Type `exit` to close the SSH session when done.
+
+(If your Railway dashboard still shows a "Shell" option under a deployment's **⋯** menu, that also opens a shell in-browser — Railway hasn't announced removing it, `railway ssh` is simply the actively-developed, CLI-first path going forward and is what these steps assume.)
 
 It is idempotent (safe to re-run) and creates only: the four Roles, `Platform_Config` defaults, and one Superadmin from `SUPERADMIN_EMAIL` + `SUPERADMIN_TEMP_PASSWORD` with `temp_password_required = TRUE`. It **refuses** to run in production while those two variables still hold the dev defaults. On your first login the app forces you to set a real password.
 
@@ -221,29 +328,34 @@ It is idempotent (safe to re-run) and creates only: the four Roles, `Platform_Co
 - `Refusing to bootstrap production with dev defaults` → set real `SUPERADMIN_EMAIL` + `SUPERADMIN_TEMP_PASSWORD` in Variables first. This refusal is a feature.
 - Re-running is always safe, but know its limit: if **any** Superadmin already exists it skips creation entirely. Changing `SUPERADMIN_EMAIL` later and re-running does **not** create a second account, rename the first, or reset a password. Locked out? Use the database recovery in Step 13's edge cases.
 - Ran `npm run seed` by mistake → it throws immediately in production and writes nothing. Only `seed:prod` is production-safe.
+- `railway ssh` hangs or refuses to connect → the target service must actually be running (a crash-looping deploy has no container to attach to). Check the **Deployments** tab shows an active/healthy deployment first.
+- `railway link` picks the wrong project/service → re-run `railway link` any time to re-select; it's not sticky beyond the local directory it was run in.
 
 ---
 
 ## 7. Deploy the frontend to Vercel
 
-1. Go to [vercel.com](https://vercel.com) → sign up with your GitHub account.
-2. **Add New → Project → Import Git Repository** → select the Housie Ghar repo.
-3. Set these overrides before deploying:
+1. Go to [vercel.com](https://vercel.com) → **Sign Up** → **Continue with GitHub** → authorize.
+2. Dashboard → click **Add New…** (top right) → **Project**.
+3. On the "Import Git Repository" list, find the Housie Ghar repo. If it's not listed, click **Adjust GitHub App Permissions** (a link near the list) → grant Vercel access to the repo on GitHub's install screen → back on Vercel, it now appears → click **Import**.
+4. On the Configure Project screen, set these overrides before deploying:
 
 | Setting | Value |
 |---|---|
-| **Root Directory** | `HG/frontend` |
-| **Framework Preset** | Next.js (auto-detected) |
+| **Root Directory** | `HG/frontend` (click **Edit** next to it → a file-tree picker/text field opens → select/type it → confirm) |
+| **Framework Preset** | Next.js (flips to this automatically once Root Directory is correct) |
 | **Build Command** | `npm run build` (default) |
 | **Output Directory** | `.next` (default) |
 
-4. Add one environment variable:
+5. Expand the **Environment Variables** section on the same screen and add one:
 
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Your Railway backend URL — e.g. `https://housieghar-backend-production.up.railway.app` (the Railway-generated domain from Step 5). Update to `https://api.housieghar.in` after Step 8. |
 
-5. Click **Deploy**. Vercel builds and deploys in ~2 minutes. The generated URL will be `housieghar.vercel.app` until you attach the custom domain.
+Type the Key and Value, click **Add**.
+
+6. Click **Deploy** (big button, bottom of the form). Watch the build log stream for ~2 minutes; it ends on a congratulations screen with the live `*.vercel.app` URL.
 
 **If it fails / edge cases:**
 
@@ -254,63 +366,109 @@ It is idempotent (safe to re-run) and creates only: the four Roles, `Platform_Co
 
 ---
 
-## 8. Point your domain at Railway and Vercel (Cloudflare DNS)
+## 8. Point your domain at Railway and Vercel (Hostinger hPanel DNS)
 
-Go to **Cloudflare → your domain → DNS → Records**.
+1. Log into **hPanel** (hpanel.hostinger.com).
+2. **Domains** (left sidebar or top nav) → click your domain name → opens its dashboard.
+3. Find the **DNS / Nameservers** section — often a top tab reading **DNS Zone Editor**, sometimes nested under **Advanced**.
+4. **First, delete the stale records:** for every row where **Name** is `@` or `www` and **Type** is A/AAAA/CNAME, click the **trash/delete icon** on the right of that row → confirm. Hostinger pre-fills these to point at its parking page (or at your hosting plan, if the domain was ever attached to one). Leave `MX`/`TXT` records alone if the domain handles email.
+5. Click **Add New Record** (usually above the table) and add these three, one at a time (fill Type → Name → Points to → save each row before starting the next):
 
-Add these four records:
-
-| Type | Name | Target | Proxy |
+| Type | Name | Points to | TTL |
 |---|---|---|---|
-| CNAME | `@` (root) | `cname.vercel-dns.com` | DNS only (grey cloud) — Vercel requires this |
-| CNAME | `www` | `cname.vercel-dns.com` | DNS only |
-| CNAME | `api` | `<your-railway-domain>.up.railway.app` | Proxied (orange cloud) |
+| A | *(leave blank — see correction below)* | Vercel's apex IP — shown on Vercel's Domains screen when you add the domain (currently `76.76.21.21`) | 300 (or default) |
+| CNAME | `www` | `cname.vercel-dns.com` | 300 (or default) |
+| CNAME | `api` | your Railway backend domain from Step 5 (e.g. `housie-ghar-production.up.railway.app`) — **type your real value, no angle brackets, no `https://`, no trailing slash** | 300 (or default) |
 
-Set TTL to **Auto** (300s). Once DNS propagates (~5 minutes with Cloudflare), continue.
+(The root is an `A` record, not a CNAME, because Hostinger — like most DNS hosts — doesn't allow a CNAME on `@`.)
 
-**Attach the custom domains:**
+> ⚠️ **Correction (2026-07-11): don't type `@` into the Name field for the root/apex row.** Most DNS providers use `@` as shorthand for "the domain itself," and it's tempting to type it literally — but Hostinger's DNS Zone Editor already labels that field with a `(root)` hint and rejects a literal `@` on top of it, throwing `DNS record validation error: Invalid RRset name @ (root).housieghar.in`. **Leave the Name field completely empty** for this row instead — an empty Name is how Hostinger represents the apex internally. If an empty field also won't save, try typing the full domain (`housieghar.in`) into Name instead of `@`. This only affects the root row — the `www` and `api` CNAME rows still want their literal names (`www`, `api`) typed in as shown.
 
-- **Vercel:** Project Settings → Domains → Add `housieghar.in` and `www.housieghar.in`. Vercel auto-issues a Let's Encrypt certificate.
-- **Railway:** Backend service → Settings → Networking → Custom Domain → Add `api.housieghar.in`. Railway auto-issues a certificate.
+6. Hostinger DNS usually propagates in minutes but can take a few hours. Verify before continuing:
 
-After both are live, update two values:
-- In Railway Variables: change `FRONTEND_URL` to `https://housieghar.in`
-- In Vercel Environment Variables: change `NEXT_PUBLIC_API_URL` to `https://api.housieghar.in`
+```bash
+dig +short housieghar.in api.housieghar.in
+```
 
-Trigger a redeploy on both after updating (Vercel: Deployments → Redeploy; Railway: redeploys automatically on variable change).
+Expected: the apex prints Vercel's IP; `api` resolves through the Railway CNAME.
+
+7. **Attach the custom domains:**
+
+- **Vercel:** open the project → **Settings** tab → left sidebar **Domains** → type `housieghar.in` in the input box → **Add**. Repeat for `www.housieghar.in`. The Domains screen shows the exact record values it expects — if they differ from the table above, Vercel's values win, and if it asks for an extra TXT verification record, copy it and add it in hPanel's DNS editor the same way as above. It auto-issues a Let's Encrypt certificate.
+- **Railway:** backend service → **Settings** → **Networking** section → under **Custom Domain** click **+ Custom Domain** → type `api.housieghar.in` → **Add**. Railway shows the CNAME it expects (should already match what you set in step 5) and auto-issues a certificate.
+
+**In plain terms — what to actually do (read this first if the rest of this box is too technical):**
+
+1. This is **not an error** — nothing is broken, and there is no button to click to "fix" it.
+2. It just means the DNS instruction you gave Hostinger in Step 8.5 hasn't finished spreading across the internet yet — that takes real time, from minutes to a few hours.
+3. Go back and double-check the row in Hostinger where **Name = `api`**: confirm **Type = CNAME** and **Points to** is your clean Railway domain (no `https://`, no `/` at the end, no `< >` brackets). Fix it if it's wrong.
+4. If that row looks correct, just wait 15–30 minutes, then refresh the Railway page. The status will flip to a green checkmark on its own — nothing else to do.
+5. Only if it's still stuck after **several hours** (not minutes) is something actually wrong — at that point, work through the detailed explanation below.
+
+**What you'll see right after clicking Add, in detail:** Railway doesn't validate anything instantly — it can't, because DNS lives outside Railway entirely, on Hostinger's servers, and changes there take real time to spread across the internet. So the moment you add `api.housieghar.in`, Railway shows a row for it with a status line like:
+
+```
+api.housieghar.in
+Port 4000 · Waiting for DNS update · Show DNS records
+```
+
+This is a **normal, expected waiting state** — not an error, and not something to retry or re-add. Here's what each part means and what to do:
+
+- **`Port 4000`** — confirms Railway correctly picked up that your app listens on port 4000 (from your `PORT` variable / the domain you generated in Step 5). Nothing to check here unless this number looks wrong.
+- **`Waiting for DNS update`** — Railway is periodically re-checking, in the background, whether `api.housieghar.in` on the public internet actually points to your backend yet. It hasn't seen that yet, so it's still waiting. It will keep checking on its own; you don't need to click anything to make it re-check.
+- **`Show DNS records`** — click this link/button to open a small panel showing you exactly what Railway expects to see: a CNAME record named `api` pointing at your `*.up.railway.app` domain. This is worth clicking once right away, purely to **compare it against what you actually typed into Hostinger's DNS editor in Step 8.5** — if there's a typo in either place, this comparison is how you catch it without waiting around first.
+- Once the DNS Railway sees out in the world matches what it expects, this line will change on its own — the "Waiting for DNS update" text is replaced with a green checkmark / "Valid" / padlock icon, and a TLS certificate is automatically issued a moment later. No button to click to "finish" it; it resolves itself.
+
+**How long this actually takes, and how to check without just staring at the Railway page:** DNS propagation is not instant — when you save a record in Hostinger, that change has to spread from Hostinger's nameservers out to every DNS resolver on the internet (including whichever one your own laptop/phone is using), and different resolvers refresh at different speeds. In this setup it's typically minutes, occasionally up to a few hours. Rather than repeatedly refreshing the Railway dashboard, check propagation directly from your terminal:
+
+```bash
+dig +short api.housieghar.in
+```
+
+- If this prints **nothing at all**, the DNS record hasn't propagated to your resolver yet (or wasn't saved correctly in Hostinger — go re-check that CNAME row). Keep waiting, or see the edge cases below if it's been a long time.
+- If this prints something — a hostname (through the CNAME chain) or an IP address — DNS has propagated, at least as far as your own machine can see. Railway's own check should catch up shortly after and flip the status to Valid on its own.
+
+With plain Hostinger DNS there's no proxy between the certificate authority and your services, so both certs normally issue within minutes of DNS propagating.
+
+8. Once both show a green "Valid"/padlock status, update two values:
+   - Railway → **Variables** tab → click the `FRONTEND_URL` value → edit to `https://housieghar.in` → save (auto-redeploys).
+   - Vercel → **Settings** → **Environment Variables** → edit `NEXT_PUBLIC_API_URL` to `https://api.housieghar.in` → **Save** → go to **Deployments** tab → click **⋯** on the latest deployment → **Redeploy** (Vercel does **not** auto-redeploy on env var change, unlike Railway).
 
 **If it fails / edge cases:**
 
-- **Infinite redirect loop** (`ERR_TOO_MANY_REDIRECTS`) → Cloudflare **SSL/TLS mode must be "Full (strict)"**, not "Flexible". Flexible speaks plain HTTP to origins that force HTTPS, which bounces forever.
-- Railway's custom-domain certificate stuck on "pending" → temporarily switch the `api` record to **DNS only** (grey cloud) so the ACME challenge reaches Railway directly; re-enable the proxy after it's issued.
-- Vercel shows "Invalid Configuration" on the domain → the `@`/`www` records must be **DNS only** exactly as the table says, and complete any TXT verification record Vercel asks for.
-- **Live board frozen in production but fine locally** → the Cloudflare proxy on `api` is buffering the SSE stream. Grey-cloud the `api` record and retest; if that fixes it, leave `api` DNS-only permanently (the site keeps Cloudflare's shield, the API connects direct).
-- **Kept DNS at Hostinger** (Step 3, option 2)? Create the same records in hPanel's DNS zone editor with one substitution: Hostinger doesn't allow a CNAME on the root, so use an **A record on `@`** pointing at the IP Vercel's Domains screen tells you to use, keep `www` and `api` as CNAMEs. hPanel has no proxy toggle — everything behaves like "DNS only", so the two grey-cloud caveats above never apply.
+- Vercel shows "Invalid Configuration" on the domain → use exactly the values its Domains screen displays (the apex IP shown there is authoritative if it ever differs from `76.76.21.21`), and complete any TXT verification record it asks for — that also goes into the hPanel DNS editor.
+- Certificates stuck on "pending" (Vercel or Railway) → DNS hasn't propagated yet, or a stale record survived step one. `dig +short` each name; if you still see a Hostinger parking IP, the old record wasn't deleted. Fix, wait, retry — no other trick needed.
+- You still see the Hostinger parking page intermittently after the switch → caches holding the old answer mixed with the new one. It clears within the old record's TTL (Hostinger's defaults can be long); nothing to fix.
+- hPanel refuses a record ("record already exists" / validation error) → there's a leftover conflicting record of another type on the same name — e.g. an `AAAA` on `@` pointing at parking. Delete it; don't leave an IPv6 record aimed at the old host or some visitors will land on parking.
+- **No CDN in this setup, by design:** SSE and Socket.io traffic go straight to Railway, so there's nothing in the path to buffer the live stream — one whole class of Cloudflare problems gone. The trade-off is no DDoS shield in front of the API; if you ever want one, see the Cloudflare note in Step 3's edge cases (and keep `api` DNS-only when you do).
 - Skipping the two env updates + redeploys at the end of this step is the single most common cause of "CORS error on launch day". Do them now, not later.
 
 ---
 
-## 9. Wire up CI/CD deploy hooks
+## 9. Wire up Railway's autodeploy + wait-for-CI (not "deploy hooks")
 
-> ✅ **The `ci.yml` edits are already done and committed** — the deploy-hook jobs and the `api.housieghar.in` health check are in place. Only the Railway-hook generation and the GitHub Secrets below remain.
+> ⚠️ **Correction (2026-07-09): Railway does not have a "Deploy Hooks" feature.** Earlier drafts of this manual (and `ci.yml`'s `deploy-staging`/`deploy-production` jobs) assumed Railway's Settings tab has a section that mints a URL you `curl -X POST` to trigger a redeploy. That feature does not exist — it's an open, unimplemented request on Railway's own feedback board (2+ upvotes, no ETA, as of this writing). If you've been looking for it and can't find it, that's why.
+>
+> The good news: what CI/CD actually needs is simpler than a webhook, and Railway already does most of it natively.
 
-In Railway: backend service → Settings → **Deploy Hooks** → Generate a deploy hook URL for the `main` branch and another for a `staging` branch (create the staging service separately if you want one).
+**How Railway deploys actually work today:**
 
-Go to **GitHub → repo → Settings → Secrets and variables → Actions** and add:
+1. **Autodeploy is already on.** The GitHub Repo service you connected in Step 4 redeploys automatically on every push to the branch it's watching (you picked that branch when you added the service) — nothing to configure, no secret, no curl. This has been true since Step 4; Steps 5–8 already relied on it (every variable/domain change you made triggered a redeploy).
+2. **Gate it on your CI passing, so a red build never ships.** Railway service → **Settings** tab → **Source** section → find the **Wait for CI** toggle → turn it on. With it on, Railway holds the deploy until the GitHub commit status for that SHA is green — i.e. until `ci.yml`'s `verify` job (`Test · Lint · Build`) passes. A failing test now blocks production the same way branch protection blocks a bad merge.
+3. **Same toggle on Postgres/Redis isn't a thing** — it's per deploy-triggering service, so only your backend (and frontend, if you also deployed it on Railway instead of Vercel) needs it.
+4. **Want a real staging environment?** Two options, in order of how "native" they are:
+   - **Railway Environments** (Project → **Environments** dropdown near the project name → **+ New Environment**) — duplicates your service config into a second environment you can point at the `staging` branch, with its own variables and its own domain. This is Railway's own primary answer to "staging," not a second deploy hook.
+   - **PR Environments** (Project **Settings → Environments** → enable **PR Environments**) — Railway spins up a full temporary environment for every open pull request and tears it down on merge/close. For a solo-maintainer repo this can replace a persistent `staging` branch entirely: open a PR, get a real preview URL, merge, it's gone.
+5. Manually need to force a deploy right now without pushing a commit? Command Palette (**Cmd/Ctrl+K**) → **Deploy Latest Commit** — no hook required for this either.
 
-| Secret name | Value |
-|---|---|
-| `RAILWAY_PRODUCTION_DEPLOY_HOOK` | The deploy hook URL for your production service |
-| `RAILWAY_STAGING_DEPLOY_HOOK` | The deploy hook URL for staging (or duplicate the production value if you have only one environment) |
-
-Once added, every push to `main` will typecheck, lint, build, then trigger the Railway deploy hook automatically.
+**What this means for `ci.yml` (not edited here — flagging for you to decide):** the `deploy-staging` / `deploy-production` jobs that curl `RAILWAY_STAGING_DEPLOY_HOOK` / `RAILWAY_PRODUCTION_DEPLOY_HOOK` will fail every run (missing secrets → curl errors) because that mechanism was never real. Once Wait for CI is on, those jobs are redundant anyway — Railway is already refusing to deploy a red commit on its own. Simplest fix: delete the two `curl` steps (keep the health-check step if you still want a post-deploy assertion, or move it to a `workflow_run` trigger). Say the word and this can be done in the same session.
 
 **If it fails / edge cases:**
 
-- CI goes green but nothing deploys → secret-name typo. The workflow reads exactly `RAILWAY_PRODUCTION_DEPLOY_HOOK` and `RAILWAY_STAGING_DEPLOY_HOOK` — check for stray spaces or different casing.
-- The hook URL returns 401/404 when curled → it was regenerated or revoked in Railway. Generate a new one and update the GitHub secret; the old URL dies immediately.
-- A deploy hook deploys **the branch the Railway service is configured on**, regardless of which branch triggered CI. If the service watches `main` but you pushed elsewhere, the hook still redeploys `main` — harmless, but it can look like "my change didn't deploy".
-- No staging service? Duplicating the production hook into `RAILWAY_STAGING_DEPLOY_HOOK` (as the table suggests) means a `staging`-branch push deploys **production**. If that's not what you want, leave the staging secret unset and let that job fail instead.
+- **Wait for CI doesn't appear in Settings** → it only shows once Railway has seen at least one GitHub commit-status check on the connected repo. Push any commit (or open a throwaway PR) so `ci.yml`'s `verify` job reports a status, then check again.
+- **Deploys still happen on a red commit** → Wait for CI keys off the **commit status API**, which requires the workflow to actually report back to GitHub (the default `actions/checkout` + standard job structure in `ci.yml` already does this — no extra step needed). If it's still not gating, confirm the toggle is on for the correct service *and* the correct branch is the one CI is running against.
+- **Two services (or a service + a duplicated environment) both watching the same branch** double-deploy on every push — same failure mode as before, just without a hook in the picture. Confirm only one deploy target per branch.
+- **You genuinely need an externally-triggered redeploy** (e.g. a CMS webhook, a cron, a Slack bot) — since there's no per-service hook URL, use the Railway **Public API** (GraphQL, authenticated with a project token from Railway → account **Settings → Tokens**) to call the deploy mutation, or trigger it via `railway up`/`railway redeploy` from the Railway CLI in whatever external system needs it. This is more setup than a hook would have been, which is exactly why it's worth confirming you actually need it before building it.
 
 ---
 
@@ -392,13 +550,13 @@ If dev-seeded accounts ever made it into a database you're promoting: log in as 
 
 **If it fails / edge cases:**
 
-- **Locked out of the only Superadmin** (forgot the password you set at the forced change — `seed:prod` will *not* rescue you, it skips whenever a Superadmin exists): recover through the database. Generate a bcrypt hash in the Railway backend shell:
+- **Locked out of the only Superadmin** (forgot the password you set at the forced change — `seed:prod` will *not* rescue you, it skips whenever a Superadmin exists): recover through the database. Generate a bcrypt hash via `railway ssh` into the backend service (Step 6a):
 
   ```bash
   node -e "require('bcrypt').hash(process.argv[1], 12).then(h => console.log(h))" 'TempReset123!'
   ```
 
-  then run this against Postgres (Railway → Postgres service → Data/Query tab):
+  then run this against Postgres via `railway connect` (Railway CLI → `railway connect` → pick the Postgres service → drops you into a real `psql` shell; the dashboard's own SQL query tab is behind a feature flag most accounts don't have enabled, so the CLI is the reliable path):
 
   ```sql
   UPDATE Users SET password_hash = '<paste the hash>', temp_password_required = TRUE
@@ -487,7 +645,7 @@ If something breaks, check the Railway Deploy Logs tab (structured Pino JSON). O
 |---|---|---|
 | Login does nothing, or you're logged out on refresh | Testing on the temporary `vercel.app` / `railway.app` URLs — SameSite cookies are dropped cross-site | Test on the real domain only (Step 7's edge cases explain why) |
 | CORS errors in the browser console | `FRONTEND_URL` mismatch — scheme, `www`, or a trailing slash | Fix the Railway variable (Step 6); it redeploys automatically |
-| Live board connects but never updates | The SSE stream is being buffered by the Cloudflare proxy on `api` | Grey-cloud the `api` record (Step 8's edge cases) |
+| Live board connects but never updates | Something in the path is buffering the SSE stream — with plain Hostinger DNS there's no proxy, so suspect a later-added CDN, a corporate/ISP proxy, or a VPN on the test device | `curl -N https://api.housieghar.in/api/games/<id>/live-stream` — if events print in real time the server is fine and the problem is on the client's network; if you added Cloudflare, set `api` to DNS-only |
 | Bookie/staff dashboards never receive live bookings | Same `FRONTEND_URL` origin check (Socket.io), or a wrong `NEXT_PUBLIC_API_URL` | Verify both variables; sockets connect directly to `api.housieghar.in`, not through Vercel |
 | Every request returns 429 | The global limiter is 100 requests / 15 min **per IP** — one office NAT or hostel Wi-Fi can trip it | Acceptable on day one; if it bites real users, raise the global `max` in `app.ts` and redeploy |
 | Every API call 500s | Read the actual Pino error in Railway logs before guessing | `Missing required environment variable` → Step 6; PEM/`secretOrPrivateKey` errors → Steps 1 & 6 |
