@@ -14,6 +14,7 @@ import {
   deleteGame,
   getGameSalesDetails,
   sendEmojiReaction,
+  claimPrize,
 } from './games.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 import {
@@ -28,6 +29,7 @@ const router = Router();
 // Player endpoints (Public)
 router.get('/number-calls', listNumberCalls);
 router.get('/', getGames);
+router.post('/:game_id/prizes/:prize_id/claim', claimPrize);
 
 // Game creation (Financial Admin, Superadmin or Operator)
 router.post('/', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), createGame);

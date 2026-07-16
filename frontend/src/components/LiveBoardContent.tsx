@@ -60,6 +60,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [isSearching, setIsSearching] = useState(false);
   const [displayName, setDisplayName] = useState<string>("Player");
   const [showAllCalled, setShowAllCalled] = useState(false);
+  const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const booking = useBookingStore();
@@ -286,6 +287,23 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
+  const claimPrize = async (prizeId: number) => {
+    setClaimingPrize(String(prizeId));
+    try {
+      await apiFetch(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
+        method: "POST",
+      });
+      // Refresh prizes to show claim status
+      const gameRes = await apiFetch<GameSummary>(`/api/games/${game_id}`);
+      setPrizes(gameRes.prize_pool);
+    } catch (err) {
+      console.error("Failed to claim prize:", err);
+      alert("Failed to claim prize. Please try again.");
+    } finally {
+      setClaimingPrize(null);
+    }
+  };
+
   const drawn = new Set(drawnNumbers);
   const count = drawnNumbers.length;
   const recent = drawnNumbers.slice(Math.max(0, count - 9)).reverse();
@@ -401,31 +419,58 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-prizeboard">
                 <h2 className="hg-section-title">Prizes</h2>
                 <div className="hg-prizeboard-grid">
-                  {prizes.map((p) => (
-                    <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}`}>
-                      <div className="hg-prize-l">
-                        <span className="hg-prize-name">{p.pattern_name}</span>
-                        <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
-                      </div>
-                      <div className="hg-prize-r">
-                        {p.claimed && p.winner_housie_name ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                            <span className="hg-prize-winner">
-                              {p.winner_housie_name}
-                              {p.winner_ticket_number && (
-                                <span style={{ opacity: 0.8, fontSize: '0.85em', marginLeft: '4px' }}>
-                                  (Tk #{p.winner_ticket_number})
+                  {prizes.map((p) => {
+                    const isWinner = p.claimed && p.winner_housie_name === displayName;
+                    const showClaim = !isStaff && gameStatus === "Completed" && isWinner;
+                    return (
+                      <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}`}>
+                        <div className="hg-prize-l">
+                          <span className="hg-prize-name">{p.pattern_name}</span>
+                          <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                        </div>
+                        <div className="hg-prize-r">
+                          {p.claimed && p.winner_housie_name ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span className="hg-prize-winner">
+                                  {p.winner_housie_name}
+                                  {p.winner_ticket_number && (
+                                    <span style={{ opacity: 0.8, fontSize: '0.85em', marginLeft: '4px' }}>
+                                      (Tk #{p.winner_ticket_number})
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
-                          </div>
-                        ) : (
-                          <span className="hg-prize-open">Open</span>
-                        )}
+                                {showClaim && (
+                                  <button
+                                    className="hg-claim-btn"
+                                    onClick={() => claimPrize(p.prize_id)}
+                                    disabled={claimingPrize === String(p.prize_id)}
+                                    style={{
+                                      background: 'var(--accent)',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      padding: '6px 12px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
+                                      opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
+                                      transition: 'opacity 0.2s',
+                                    }}
+                                  >
+                                    {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
+                                  </button>
+                                )}
+                              </div>
+                              {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
+                            </div>
+                          ) : (
+                            <span className="hg-prize-open">Open</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

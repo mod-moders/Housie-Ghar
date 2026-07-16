@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Games Controller
  */
 
@@ -214,7 +214,7 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   const grossRevenue = price * tickets;
   if (totalPrize > grossRevenue) {
     res.status(400).json({
-      message: `Total prize pool (₹${totalPrize}) exceeds projected collection (₹${grossRevenue.toFixed(2)})`,
+      message: `Total prize pool (â‚¹${totalPrize}) exceeds projected collection (â‚¹${grossRevenue.toFixed(2)})`,
     });
     return;
   }
@@ -602,7 +602,7 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
       const grossRevenue = updatedPrice * updatedTickets;
       if (totalPrize > grossRevenue) {
         res.status(400).json({
-          message: `Total prize pool (₹${totalPrize}) exceeds projected collection (₹${grossRevenue.toFixed(2)})`,
+          message: `Total prize pool (â‚¹${totalPrize}) exceeds projected collection (â‚¹${grossRevenue.toFixed(2)})`,
         });
         return;
       }
@@ -666,11 +666,64 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
       throw err;
     } finally {
       client.release();
-    }
-  } catch (error: any) {
-    console.error('Error updating game:', error);
-    res.status(500).json({ message: error.message || 'Internal server error' });
+}
+  } catch (error) {
+    console.error('Error claiming prize:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
+}
+
+/**
+ * Send Emoji Reaction (Player / Staff)
+ */
+export async function sendEmojiReaction(req: Request, res: Response): Promise<void> {
+  const game_id = req.params.game_id as string;
+  const { emoji, sender_name } = req.body;
+
+  if (!emoji) {
+    res.status(400).json({ message: 'emoji is required' });
+    return;
+  }
+
+  // Resolve sender name from authenticated session cookies if possible
+  let resolvedName = sender_name || 'Guest';
+
+  // 1. Try player session token
+  const playerToken = req.cookies?.hg_player_token;
+  if (playerToken) {
+    try {
+      const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+      if (decoded && decoded.housieName) {
+        resolvedName = decoded.housieName;
+      }
+    } catch (err) {
+      // Ignored: fallback to staff token or sender_name
+    }
+  }
+
+  // 2. Try staff session token if name not resolved as player
+  if (resolvedName === 'Guest' || resolvedName === sender_name) {
+    const staffToken = req.cookies?.[CONSTANTS.JWT_COOKIE_NAME];
+    if (staffToken) {
+      try {
+        const decoded = jwt.verify(staffToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        if (decoded && decoded.fullName) {
+          resolvedName = decoded.fullName;
+        }
+      } catch (err) {
+        // Ignored
+      }
+    }
+  }
+
+  // Broadcast to all SSE clients listening to this game
+  sseManager.broadcast(game_id, {
+    event: 'emoji_reaction',
+    emoji,
+    player_id: resolvedName,
+  });
+
+res.json({ success: true });
 }
 
 /**
@@ -739,54 +792,83 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
 }
 
 /**
- * Send Emoji Reaction (Player / Staff)
+ * Claim a prize (Player)
  */
-export async function sendEmojiReaction(req: Request, res: Response): Promise<void> {
-  const game_id = req.params.game_id as string;
-  const { emoji, sender_name } = req.body;
+export async function claimPrize(req: Request, res: Response): Promise<void> {
+  const { game_id, prize_id } = req.params;
 
-  if (!emoji) {
-    res.status(400).json({ message: 'emoji is required' });
+  // Get player identity from token
+  const playerToken = req.cookies?.hg_player_token;
+  if (!playerToken) {
+    res.status(401).json({ message: 'Player authentication required' });
     return;
   }
 
-  // Resolve sender name from authenticated session cookies if possible
-  let resolvedName = sender_name || 'Guest';
+  try {
+    const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+    const playerHousieName = decoded.housieName;
 
-  // 1. Try player session token
-  const playerToken = req.cookies?.hg_player_token;
-  if (playerToken) {
-    try {
-      const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-      if (decoded && decoded.housieName) {
-        resolvedName = decoded.housieName;
-      }
-    } catch (err) {
-      // Ignored: fallback to staff token or sender_name
+    if (!playerHousieName) {
+      res.status(401).json({ message: 'Invalid player token' });
+      return;
     }
-  }
 
-  // 2. Try staff session token if name not resolved as player
-  if (resolvedName === 'Guest' || resolvedName === sender_name) {
-    const staffToken = req.cookies?.[CONSTANTS.JWT_COOKIE_NAME];
-    if (staffToken) {
-      try {
-        const decoded = jwt.verify(staffToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-        if (decoded && decoded.fullName) {
-          resolvedName = decoded.fullName;
-        }
-      } catch (err) {
-        // Ignored
-      }
+    // Verify the game is completed
+    const gameRes = await pool.query(
+      `SELECT game_status FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
     }
+
+    if (gameRes.rows[0].game_status !== 'Completed') {
+      res.status(400).json({ message: 'Game is not completed yet' });
+      return;
+    }
+
+    // Check if this prize belongs to this player and is claimed
+    const prizeRes = await pool.query(
+      `SELECT p.prize_id, p.pattern_name, p.claimed, p.winner_housie_name, p.amount_per_winner, p.prize_amount, p.split_count,
+              t.ticket_number AS winner_ticket_number
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       WHERE p.prize_id = $1 AND p.game_id = $2`,
+      [prize_id, game_id]
+    );
+
+    if (prizeRes.rowCount === 0) {
+      res.status(404).json({ message: 'Prize not found' });
+      return;
+    }
+
+    const prize = prizeRes.rows[0];
+
+    if (!prize.claimed) {
+      res.status(400).json({ message: 'Prize has not been claimed yet' });
+      return;
+    }
+
+    if (prize.winner_housie_name !== playerHousieName) {
+      res.status(403).json({ message: 'You are not the winner of this prize' });
+      return;
+    }
+
+    // Check if already claimed by player (we could add a claimed_by_player flag, but for now just return success)
+    res.json({
+      message: 'Prize claim confirmed',
+      prize: {
+        prize_id: prize.prize_id,
+        pattern_name: prize.pattern_name,
+        amount: prize.amount_per_winner ?? prize.prize_amount,
+        winner_ticket_number: prize.winner_ticket_number,
+        split_count: prize.split_count,
+      },
+    });
+  } catch (error) {
+    console.error('Error claiming prize:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
-
-  // Broadcast to all SSE clients listening to this game
-  sseManager.broadcast(game_id, {
-    event: 'emoji_reaction',
-    emoji,
-    player_id: resolvedName,
-  });
-
-  res.json({ success: true });
 }
