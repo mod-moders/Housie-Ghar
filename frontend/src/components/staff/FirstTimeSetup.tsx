@@ -24,6 +24,10 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Survives a failed submit: if the password change already went through but a
+  // later step failed, a retry must NOT re-attempt it (the "current" temp
+  // password would no longer match and the retry would confusingly fail).
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,25 +65,50 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
 
     setBusy(true);
     try {
-      // 1. Update profile
-      await apiFetch("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({
-          full_name: form.full_name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim(),
-          upi_id: form.upi_id.trim(),
-        }),
-      });
+      // 1. Change the password FIRST. These are two separate API calls, so one
+      //    can succeed while the other fails — and updating the profile first
+      //    could change the LOGIN EMAIL and then fail here, leaving the account
+      //    half-migrated (new email, old temp password) with an error message
+      //    that doesn't say which half saved. The credential is the critical
+      //    step, so it goes first, and every failure names its step.
+      if (!passwordChanged) {
+        try {
+          await apiFetch("/api/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify({
+              current_password: form.current_password,
+              new_password: form.new_password,
+            }),
+          });
+          setPasswordChanged(true);
+        } catch (err) {
+          setError(
+            `Password change failed — nothing has been saved yet. ` +
+            `${err instanceof Error ? err.message : "Check your temporary password."}`
+          );
+          return;
+        }
+      }
 
-      // 2. Change password
-      await apiFetch("/api/auth/change-password", {
-        method: "POST",
-        body: JSON.stringify({
-          current_password: form.current_password,
-          new_password: form.new_password,
-        }),
-      });
+      // 2. Update profile
+      try {
+        await apiFetch("/api/auth/me", {
+          method: "PATCH",
+          body: JSON.stringify({
+            full_name: form.full_name.trim(),
+            phone: form.phone.trim(),
+            email: form.email.trim(),
+            upi_id: form.upi_id.trim(),
+          }),
+        });
+      } catch (err) {
+        setError(
+          `Your NEW password is saved and working, but the profile update failed: ` +
+          `${err instanceof Error ? err.message : "unknown error"}. ` +
+          `Fix the field and press the button again (your password will not be re-changed).`
+        );
+        return;
+      }
 
       // 3. Re-fetch final session state
       const res = await apiFetch<{ user: AuthUser }>("/api/auth/me");
