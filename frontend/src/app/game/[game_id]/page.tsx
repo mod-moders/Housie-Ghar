@@ -49,7 +49,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
         setName(res.player.housie_name || "");
       })
       .catch(() => {
-        router.push("/signup");
+        router.push("/login");
       });
   }, [router]);
 

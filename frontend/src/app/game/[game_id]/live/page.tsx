@@ -108,7 +108,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   useEffect(() => {
     apiFetch("/api/player/me").catch(() => {
       return apiFetch("/api/auth/me").catch(() => {
-        router.push("/signup");
+        router.push("/login");
       });
     });
   }, [router]);

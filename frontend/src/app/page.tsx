@@ -269,14 +269,14 @@ export default function Lobby() {
 
     const token = localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token");
     if (!token) {
-      router.push("/signup");
+      router.push("/login");
     } else {
       apiFetch("/api/player/me")
         .then(() => {
           setIsCheckingAuth(false);
         })
         .catch(() => {
-          router.push("/signup");
+          router.push("/login");
         });
     }
   }, [router]);
