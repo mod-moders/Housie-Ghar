@@ -160,9 +160,21 @@ export default function StaffDashboard() {
   useEffect(() => {
     apiFetch<{ user: AuthUser }>("/api/auth/me")
       .then((res) => { setUser(res.user); setChecked(true); })
-      .catch(() => {
+      .catch((e) => {
         if (typeof window !== "undefined") {
+          // If we HELD a token and the server still rejected it, the bounce is
+          // anomalous (expired session, or a server-side JWT key problem where
+          // login signs tokens that verification then refuses). Carry the reason
+          // to the login page instead of bouncing back silently — a silent loop
+          // here is indistinguishable from "the login button did nothing".
+          const hadToken = !!sessionStorage.getItem("hg_staff_token");
           sessionStorage.removeItem("hg_staff_token");
+          if (hadToken) {
+            sessionStorage.setItem(
+              "hg_staff_login_notice",
+              e instanceof Error && e.message ? e.message : "Your session could not be verified."
+            );
+          }
         }
         router.replace("/staff/login");
       });

@@ -3,6 +3,7 @@
  */
 
 import http from 'http';
+import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import app from './app';
 import { env } from './config/env';
@@ -77,6 +78,17 @@ async function boot() {
     //     SUPERADMIN_TEMP_PASSWORD). No-op unless that env var is set and the
     //     stored password is missing/not-a-real-bcrypt-hash.
     await ensureSuperadminAccess();
+
+    // 2c. JWT keypair self-check. A private/public mismatch is invisible at
+    //     login (signing succeeds) but kills every session (verify fails), so
+    //     staff bounce straight back to the login page. Fail loudly at boot.
+    try {
+      const probe = jwt.sign({ probe: true }, env.JWT_PRIVATE_KEY, { algorithm: 'RS256' as any, expiresIn: '1m' as any });
+      jwt.verify(probe, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
+      console.log('✅ JWT keypair self-check passed (sign → verify round-trip OK)');
+    } catch (e) {
+      console.error('❌ JWT keypair self-check FAILED — logins will return 200 but no session will survive:', e);
+    }
 
     // 3. Start Game Engine Redis pub/sub listener
     await initGameEngineSubscription();

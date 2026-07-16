@@ -1,7 +1,7 @@
 "use client";
 /** Staff login — password-only (no OTP). */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
@@ -16,13 +16,26 @@ export default function StaffLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Reason we were bounced back here AFTER a successful login (set by the
+  // staff dashboard when /api/auth/me rejects a token we were just issued).
+  // Without this the failure is a silent loop back to this page.
+  useEffect(() => {
+    const n = sessionStorage.getItem("hg_staff_login_notice");
+    if (n) {
+      sessionStorage.removeItem("hg_staff_login_notice");
+      setNotice(n);
+    }
+  }, []);
 
   const submit = async () => {
     if (!email || !password || busy) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await apiFetch<{ token: string; user: AuthUser }>("/api/auth/login", {
         method: "POST",
@@ -69,6 +82,16 @@ export default function StaffLogin() {
         {error && (
           <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3 text-red-200 text-sm mb-6 text-center">
             {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="bg-amber-900/30 border border-amber-500/50 rounded-lg p-3 text-amber-200 text-sm mb-6 text-center">
+            Signed in, but the session was rejected: {notice}
+            <br />
+            <span className="text-amber-200/70 text-xs">
+              If this happens right after every login, the server&apos;s JWT keys are misconfigured — contact the administrator.
+            </span>
           </div>
         )}
 

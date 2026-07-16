@@ -3,6 +3,7 @@
  * Reads and validates all environment variables (throws on missing)
  */
 
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -34,6 +35,47 @@ function optionalEnv(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
+const JWT_PRIVATE_KEY = requireEnv('JWT_PRIVATE_KEY');
+
+/**
+ * The verification key is DERIVED from the signing key so the pair can never
+ * drift apart. A JWT_PUBLIC_KEY env var from a different keypair breaks auth
+ * in the worst possible way: login succeeds (signing only needs the private
+ * key), but every subsequent request 403s at jwt.verify — so staff "log in"
+ * and silently bounce straight back to the login page.
+ *
+ * An explicit JWT_PUBLIC_KEY is only consulted as a fallback when derivation
+ * is impossible (non-RSA/encrypted key). If one is set but disagrees with the
+ * derived key, we log loudly and use the derived (correct) one.
+ */
+function resolveJwtPublicKey(): string {
+  let derived: string;
+  try {
+    derived = crypto.createPublicKey(JWT_PRIVATE_KEY).export({ type: 'spki', format: 'pem' }).toString();
+  } catch {
+    console.warn('⚠️  Could not derive a public key from JWT_PRIVATE_KEY — falling back to the JWT_PUBLIC_KEY env var.');
+    return requireEnv('JWT_PUBLIC_KEY');
+  }
+
+  const explicit = process.env.JWT_PUBLIC_KEY;
+  if (explicit) {
+    try {
+      // Normalize to SPKI PEM before comparing so a pkcs1-formatted env var
+      // doesn't false-alarm.
+      const normalized = crypto.createPublicKey(explicit).export({ type: 'spki', format: 'pem' }).toString();
+      if (normalized !== derived) {
+        console.error(
+          '❌ JWT_PUBLIC_KEY does not match JWT_PRIVATE_KEY (they are halves of different keypairs). ' +
+            'Using the public key derived from JWT_PRIVATE_KEY instead — update or remove the JWT_PUBLIC_KEY env var.'
+        );
+      }
+    } catch {
+      console.error('❌ JWT_PUBLIC_KEY env var is not a parseable public key. Using the key derived from JWT_PRIVATE_KEY.');
+    }
+  }
+  return derived;
+}
+
 export const env = {
   // Database
   DATABASE_URL: requireEnv('DATABASE_URL'),
@@ -42,8 +84,8 @@ export const env = {
   REDIS_URL: requireEnv('REDIS_URL'),
 
   // Authentication
-  JWT_PRIVATE_KEY: requireEnv('JWT_PRIVATE_KEY'),
-  JWT_PUBLIC_KEY: requireEnv('JWT_PUBLIC_KEY'),
+  JWT_PRIVATE_KEY,
+  JWT_PUBLIC_KEY: resolveJwtPublicKey(),
   JWT_EXPIRY: optionalEnv('JWT_EXPIRY', '24h'),
 
   // Application
