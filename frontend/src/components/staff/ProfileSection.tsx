@@ -22,6 +22,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [fullName, setFullName] = useState(me.full_name);
   const [phone, setPhone] = useState(me.phone ?? "");
   const [upiId, setUpiId] = useState(me.upi_id ?? "");
+  const [email, setEmail] = useState(me.email ?? "");
+  const [nationality, setNationality] = useState(me.nationality ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -31,10 +33,17 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [confirmPw, setConfirmPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  const [showCurPw, setShowCurPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const roleLabel = me.role_name;
-  const showUpi = me.role_name === "Bookie";
-  const dirty = fullName.trim() !== me.full_name || phone.trim() !== (me.phone ?? "") || upiId.trim() !== (me.upi_id ?? "");
+  
+  const dirty = fullName.trim() !== me.full_name || 
+                phone.trim() !== (me.phone ?? "") || 
+                upiId.trim() !== (me.upi_id ?? "") || 
+                email.trim() !== (me.email ?? "") ||
+                nationality.trim() !== (me.nationality ?? "");
 
   const handleSave = async () => {
     if (!fullName.trim() || !phone.trim()) {
@@ -49,10 +58,19 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         body: JSON.stringify({
           full_name: fullName.trim(),
           phone: phone.trim(),
-          upi_id: showUpi ? (upiId.trim() || null) : undefined,
+          upi_id: upiId.trim() || null,
+          email: email.trim() || null,
+          nationality: nationality.trim() || null,
         }),
       });
-      onUpdated({ ...me, full_name: res.user.full_name, phone: res.user.phone, upi_id: res.user.upi_id });
+      onUpdated({ 
+        ...me, 
+        full_name: res.user.full_name, 
+        phone: res.user.phone, 
+        upi_id: res.user.upi_id, 
+        email: res.user.email,
+        nationality: res.user.nationality
+      });
       setMessage({ text: "Profile updated successfully." });
     } catch (e: any) {
       setMessage({ text: e.message || "Failed to update profile.", error: true });
@@ -125,22 +143,41 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
             <label style={labelStyle}>WhatsApp Number <span style={{ color: "var(--danger)" }}>*</span></label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="e.g. 9876543210" />
             <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              Used for booking coordination and account recovery — keep this current.
+              Used for booking coordination and account recovery.
             </span>
           </div>
 
-          {showUpi && (
-            <div>
-              <label style={labelStyle}>UPI ID</label>
-              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} style={inputStyle} placeholder="yourname@upi" />
-            </div>
-          )}
+          <div>
+            <label style={labelStyle}>UPI ID <span style={{ color: "var(--danger)" }}>*</span></label>
+            <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} style={inputStyle} placeholder="e.g. yourname@upi" />
+            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
+              Required to verify booking payments directly.
+            </span>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Nationality</label>
+            <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} style={inputStyle} placeholder="e.g. Indian" />
+            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
+              Your home nationality context.
+            </span>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Username</label>
+            <input type="text" value={me.username} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
+            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
+              {me.role_name === "Superadmin"
+                ? "Your unique login username — preset by Developer and cannot be changed."
+                : "Your unique login username — preset by Superadmin and cannot be changed."}
+            </span>
+          </div>
 
           <div>
             <label style={labelStyle}>Email</label>
-            <input type="text" value={me.email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
+            <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="e.g. you@example.com" />
             <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              Your login email — contact an administrator to change it.
+              Your login email — can be used along with username to sign in.
             </span>
           </div>
 
@@ -168,17 +205,47 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
 
           <div>
             <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
-            <input type="password" value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+            <div className="hg-password-wrapper">
+              <input type={showCurPw ? "text" : "password"} value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+              <button
+                type="button"
+                className="hg-password-toggle"
+                onClick={() => setShowCurPw(!showCurPw)}
+                title={showCurPw ? "Hide Password" : "Show Password"}
+              >
+                <Icon name={showCurPw ? "eye" : "eyeOff"} size={16} />
+              </button>
+            </div>
           </div>
 
           <div>
             <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
-            <input type="password" value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
+            <div className="hg-password-wrapper">
+              <input type={showNewPw ? "text" : "password"} value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
+              <button
+                type="button"
+                className="hg-password-toggle"
+                onClick={() => setShowNewPw(!showNewPw)}
+                title={showNewPw ? "Hide Password" : "Show Password"}
+              >
+                <Icon name={showNewPw ? "eye" : "eyeOff"} size={16} />
+              </button>
+            </div>
           </div>
 
           <div>
             <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
-            <input type="password" value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+            <div className="hg-password-wrapper">
+              <input type={showConfirmPw ? "text" : "password"} value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+              <button
+                type="button"
+                className="hg-password-toggle"
+                onClick={() => setShowConfirmPw(!showConfirmPw)}
+                title={showConfirmPw ? "Hide Password" : "Show Password"}
+              >
+                <Icon name={showConfirmPw ? "eye" : "eyeOff"} size={16} />
+              </button>
+            </div>
           </div>
 
           <Button onClick={handleChangePassword} disabled={pwSaving || !pwValid} style={{ marginTop: 8 }}>

@@ -140,17 +140,14 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
     res.status(400).json({ message: 'requested_amount must be a positive number' });
     return;
   }
-  if (!payment_reference) {
-    res.status(400).json({ message: 'payment_reference is required' });
-    return;
-  }
+  const ref = (payment_reference && String(payment_reference).trim()) ? String(payment_reference).trim() : 'Requested UPI ID';
 
   try {
     const result = await pool.query(
       `INSERT INTO TopUp_Requests (agent_id, requested_amount, payment_reference, payment_method, proof_screenshot_url, request_status)
        VALUES ($1, $2, $3, $4, $5, 'Pending')
        RETURNING request_id, requested_at`,
-      [agent.userId, amount, payment_reference, payment_method || null, proof_screenshot_url || null]
+      [agent.userId, amount, ref, payment_method || null, proof_screenshot_url || null]
     );
 
     const request = result.rows[0];
@@ -160,14 +157,19 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
     const contactRes = await pool.query(
       `SELECT full_name, phone
        FROM Users
-       WHERE status = 'Active' AND phone IS NOT NULL
-         AND ((role_id = 2 AND is_cfo = TRUE) OR role_id = 1)
-       ORDER BY (role_id = 2 AND is_cfo = TRUE) DESC, role_id ASC
+       WHERE status = 'Active' AND phone IS NOT NULL AND role_id = 2
        LIMIT 1`
     );
+    const configRes = await pool.query(
+      `SELECT config_value FROM Platform_Config WHERE config_key = 'bookie_commission_per_ticket'`
+    );
+    const commPerTicket = parseFloat(configRes.rows[0]?.config_value ?? '10');
+    const commission = amount * (commPerTicket / 100);
+    const payableAmount = amount - commission;
+
     let recharge_wa_link: string | null = null;
     if (contactRes.rowCount && contactRes.rows[0].phone) {
-      const msg = buildRechargeMessage(agent.fullName, amount, payment_reference);
+      const msg = buildRechargeMessage(agent.fullName, amount, payableAmount, commPerTicket);
       recharge_wa_link = buildWaLink(contactRes.rows[0].phone, msg);
     }
 
@@ -375,13 +377,14 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
  */
 export async function getFinancialHud(_req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const [overallCol, overallPay, todayCol, todayPay, monthCol, monthPay] = await Promise.all([
+    const [overallCol, overallPay, todayCol, todayPay, monthCol, monthPay, pendingRes] = await Promise.all([
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold'`),
       pool.query(`SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE claimed = TRUE`),
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW())`),
       pool.query(`SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE claimed = TRUE AND claimed_at >= date_trunc('day', NOW())`),
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('month', NOW())`),
       pool.query(`SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE claimed = TRUE AND claimed_at >= date_trunc('month', NOW())`),
+      pool.query(`SELECT COUNT(*)::INTEGER AS count FROM TopUp_Requests WHERE request_status = 'Pending'`),
     ]);
 
     const overallProfit = parseFloat(overallCol.rows[0].total) - parseFloat(overallPay.rows[0].total);
@@ -394,6 +397,7 @@ export async function getFinancialHud(_req: AuthenticatedRequest, res: Response)
       today_collection: todayCollection,
       today_profit: Math.max(0, todayProfit),
       monthly_profit: Math.max(0, monthlyProfit),
+      pending_topups: pendingRes.rows[0].count,
     });
   } catch (error) {
     console.error('Error building financial HUD:', error);

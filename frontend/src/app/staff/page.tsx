@@ -9,6 +9,7 @@ import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
 import { Logo, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
+import { useSocket } from "@/lib/hooks/useSocket";
 import {
   OverviewSection, GamesSection, HistorySection, FillingSection, WorkforceSection, AuditSection,
 } from "@/components/staff/AdminSections";
@@ -18,39 +19,66 @@ import { FinanceHubSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection, ShareGamesSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
 import { ProfileSection } from "@/components/staff/ProfileSection";
+import { FirstTimeSetup } from "@/components/staff/FirstTimeSetup";
+import { BookieManagementSection } from "@/components/staff/BookieManagementSection";
+import { BookieLiveHudSection } from "@/components/staff/BookieLiveHudSection";
 import type { FinancialHud } from "@/lib/types";
 
 type NavItem = [key: string, label: string, icon: string];
 
 function navFor(user: AuthUser): NavItem[] {
-  const isFo = user.role_name === "Superadmin" || (user.role_name === "Financial Admin" && user.is_cfo === true);
-  if (user.role_id <= 2) {
-    const items: NavItem[] = [];
-    if (isFo) items.push(["finance", "Finance Hub", "wallet"]);
-    items.push(
-      ["games", "Games", "grid"],
-      ["history", "Past Games", "clock"],
-      ["overflow", "Overflow Queue", "bell"],
-      ["players", "Player Management", "users"],
-      ["staff", "Staff Management", "shieldCheck"],
-      ["audit", "Website Audits", "shield"],
-    );
-    if (user.role_name === "Superadmin") {
-      items.push(["settings", "Website Settings", "edit"]);
-    }
-    items.push(["profile", "My Profile", "user"]);
-    return items;
-  }
-  if (user.role_name === "Operator") {
+  if (user.role_name === "Superadmin") {
     return [
       ["hud", "Live HUD", "play"],
-      ["overflow", "Overflow Queue", "bell"],
-      ["filling", "Filling Status", "ticket"],
+      ["finance", "Finance Hub", "wallet"],
+      ["games", "Games", "grid"],
       ["broadcast", "Share to WhatsApp", "chat"],
+      ["overflow", "Overflow Queue", "bell"],
+      ["staff", "Staff Management", "shieldCheck"],
+      ["bookies", "Bookie Management", "users"],
+      ["players", "Player Management", "users"],
+      ["settings", "Website Settings", "edit"],
+      ["audit", "Website Audits", "shield"],
       ["profile", "My Profile", "user"],
     ];
   }
-  return [["queue", "Booking Queue", "bell"], ["wallet", "My Wallet", "wallet"], ["filling", "Filling Status", "ticket"], ["profile", "My Profile", "user"]];
+
+  if (user.role_name === "Financial Admin") {
+    return [
+      ["hud", "Live HUD", "play"],
+      ["finance", "Finance Hub", "wallet"],
+      ["games", "Games", "grid"],
+      ["broadcast", "Share to WhatsApp", "chat"],
+      ["overflow", "Overflow Queue", "bell"],
+      ["staff", "Staff Management", "shieldCheck"],
+      ["bookies", "Bookie Management", "users"],
+      ["players", "Player Management", "users"],
+      ["audit", "Website Audits", "shield"],
+      ["profile", "My Profile", "user"],
+    ];
+  }
+
+  if (user.role_name === "Operator") {
+    return [
+      ["hud", "Live HUD", "play"],
+      ["games", "Games", "grid"],
+      ["broadcast", "Share to WhatsApp", "chat"],
+      ["overflow", "Overflow Queue", "bell"],
+      ["profile", "My Profile", "user"],
+    ];
+  }
+
+  if (user.role_name === "Bookie") {
+    return [
+      ["live-hud", "Live HUD", "play"],
+      ["bookings", "Bookings", "bell"],
+      ["games", "Games", "grid"],
+      ["wallet", "My Wallet", "wallet"],
+      ["profile", "My Profile", "user"],
+    ];
+  }
+
+  return [];
 }
 
 export default function StaffDashboard() {
@@ -88,7 +116,7 @@ export default function StaffDashboard() {
   }, [user]);
 
   const nav = useMemo(() => (user ? navFor(user) : []), [user]);
-  const isFo = !!user && (user.role_name === "Superadmin" || (user.role_name === "Financial Admin" && user.is_cfo === true));
+  const isFo = !!user && (user.role_name === "Superadmin" || user.role_name === "Financial Admin");
   const active = section ?? nav[0]?.[0] ?? null;
 
   const loadHud = useCallback(() => {
@@ -98,6 +126,12 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (checked && isFo) loadHud();
   }, [checked, isFo, loadHud]);
+
+  useSocket((event) => {
+    if (isFo && (event === "topup_request_received" || event === "wallet_credited" || event === "wallet_debited" || event === "wallet_adjusted")) {
+      loadHud();
+    }
+  });
 
   const logout = async () => {
     try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* cookie may already be gone */ }
@@ -120,26 +154,33 @@ export default function StaffDashboard() {
     );
   }
 
+  if (user.temp_password_required) {
+    return <FirstTimeSetup user={user} onCompleted={(u) => setUser(u)} onLogout={logout} />;
+  }
+
   const roleLabel = user.role_name;
   const showFinanceBar = isFo && hud && (active === "finance" || active === "overview");
 
   const renderSection = () => {
     switch (active) {
       case "overview": return <OverviewSection goSection={setSection} />;
-      case "finance": return <FinanceHubSection onResolved={loadHud} />;
-      case "games": return <GamesSection />;
+      case "finance": return <FinanceHubSection me={user} onResolved={loadHud} />;
+      case "games": return <GamesSection me={user} />;
       case "history": return <HistorySection />;
       case "players": return <PlayersSection />;
       case "filling": return <FillingSection />;
       case "staff": return <WorkforceSection me={user} />;
       case "audit": return <AuditSection />;
+      case "bookies": return <BookieManagementSection me={user} goSection={setSection} />;
       case "settings": return <SettingsSection />;
       case "hud": return <OperatorHudSection />;
-      case "overflow": return <OverflowSection />;
+      case "overflow": return <OverflowSection me={user} />;
       case "broadcast": return <ShareGamesSection />;
       case "queue": return <BookieQueueSection me={user} />;
+      case "bookings": return <BookieQueueSection me={user} />;
       case "wallet": return <BookieWalletSection me={user} />;
       case "profile": return <ProfileSection me={user} onUpdated={setUser} />;
+      case "live-hud": return <BookieLiveHudSection />;
       default: return null;
     }
   };
@@ -150,16 +191,43 @@ export default function StaffDashboard() {
         <div className="hg-dash">
           <aside className={`hg-side${collapsed ? " is-collapsed" : ""}`}>
             <div className="hg-side-brand"><Logo size={18} /></div>
-            <nav className="hg-side-nav" style={{ gap: "4px" }}>
-              {nav.map(([key, lbl, ic]) => (
-                <button
-                  key={key}
-                  className={`hg-side-link${active === key ? " is-active" : ""}`}
-                  onClick={() => setSection(key)}
-                >
-                  <Icon name={ic} size={18} /> <span>{lbl}</span>
-                </button>
-              ))}
+             <nav className="hg-side-nav" style={{ gap: "4px" }}>
+              {nav.map(([key, lbl, ic]) => {
+                const isFinance = key === "finance";
+                const showBadge = isFinance && user.role_name === "Financial Admin" && hud && hud.pending_topups > 0;
+                return (
+                  <button
+                    key={key}
+                    className={`hg-side-link${active === key ? " is-active" : ""}`}
+                    onClick={() => setSection(key)}
+                    style={{ position: "relative" }}
+                  >
+                    <Icon name={ic} size={18} />
+                    <span>{lbl}</span>
+                    {showBadge && (
+                      <span
+                        className="hg-badge"
+                        style={{
+                          position: "absolute",
+                          right: "12px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "var(--accent)",
+                          color: "#121214",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          padding: "2px 6px",
+                          borderRadius: "10px",
+                          lineHeight: "1",
+                          boxShadow: "0 0 8px var(--accent-soft)"
+                        }}
+                      >
+                        {hud.pending_topups}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </nav>
             <div className="hg-side-foot">
               <button className="hg-side-link" onClick={() => router.push("/")}>
@@ -187,6 +255,50 @@ export default function StaffDashboard() {
                 <div className="hg-status-title">{(nav.find((n) => n[0] === active) ?? nav[0])[1]}</div>
               )}
               <div className="hg-status-right">
+                {user.role_name === "Bookie" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginRight: "12px", background: "rgba(255,255,255,0.03)", padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: user.receive_overflow ? "#10B981" : "#EF4444" }}>
+                      {user.receive_overflow ? "Available" : "Skipped"}
+                    </span>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const nextVal = !user.receive_overflow;
+                          const res = await apiFetch<{ user: AuthUser }>("/api/auth/me", {
+                            method: "PATCH",
+                            body: JSON.stringify({ receive_overflow: nextVal })
+                          });
+                          setUser({ ...user, ...res.user });
+                        } catch {}
+                      }}
+                      style={{
+                        position: "relative",
+                        width: "36px",
+                        height: "20px",
+                        borderRadius: "10px",
+                        background: user.receive_overflow ? "#10B981" : "#EF4444",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        transition: "background 0.25s ease"
+                      }}
+                      title={user.receive_overflow ? "Set skipped / unavailable" : "Set active / available"}
+                    >
+                      <span style={{
+                        display: "block",
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        background: "white",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                        transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                        transform: user.receive_overflow ? "translateX(18px)" : "translateX(2px)"
+                      }} />
+                    </button>
+                  </div>
+                )}
                 <span className="hg-status-role">{user.full_name} · {roleLabel}</span>
                 <Avatar src={roleAvatar(user)} name={user.full_name} />
               </div>

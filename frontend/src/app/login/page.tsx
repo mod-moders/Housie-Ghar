@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
 export default function Login() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function Login() {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showBookieForm, setShowBookieForm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     // Check if there is an active session
@@ -137,16 +140,26 @@ export default function Login() {
                   Change Name
                 </button>
               </div>
-              <input
-                id="password"
-                type="password"
-                required
-                autoFocus
-                placeholder="Enter your account password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
-              />
+              <div className="hg-password-wrapper">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoFocus
+                  placeholder="Enter your account password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  className="hg-password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide Password" : "Show Password"}
+                >
+                  <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -155,13 +168,42 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500">
-          New to Housie Ghar?{" "}
-          <Link href="/signup" className="text-[#06B6D4] hover:underline">
-            Sign Up now!
-          </Link>
+        <div className="mt-6 text-center text-sm text-gray-500 flex flex-col gap-4">
+          <div>
+            New to Housie Ghar?{" "}
+            <Link href="/signup" className="text-[#06B6D4] hover:underline font-semibold">
+              Sign Up now!
+            </Link>
+          </div>
+          <div className="pt-3 border-t border-gray-800/60">
+            <button 
+              type="button" 
+              onClick={() => setShowBookieForm(true)} 
+              style={{
+                background: "linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(255, 223, 0, 0.05) 100%)",
+                border: "1px solid rgba(212, 175, 55, 0.4)",
+                color: "#D4AF37",
+                borderRadius: "var(--radius)",
+                width: "100%",
+                padding: "10px 16px",
+                fontSize: "13px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                transition: "all 0.2s"
+              }}
+              className="hover:border-[#D4AF37] hover:brightness-110"
+            >
+              <Icon name="shieldCheck" size={16} />
+              Apply as Bookie for Housie Ghar
+            </button>
+          </div>
         </div>
       </div>
+
+      <BookieApplicationModal isOpen={showBookieForm} onClose={() => setShowBookieForm(false)} />
     </div>
   );
 }

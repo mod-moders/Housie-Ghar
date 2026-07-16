@@ -21,7 +21,7 @@ export interface AuthenticatedRequest extends Request {
 /**
  * Middleware to authenticate requests using JWT HttpOnly cookie
  */
-export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   let token = null;
 
   if (req.headers['authorization']) {
@@ -42,6 +42,19 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
 
   try {
     const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+
+    // Check user status in DB
+    const dbUser = await pool.query('SELECT status FROM Users WHERE user_id = $1', [decoded.userId]);
+    if (dbUser.rowCount === 0 || dbUser.rows[0].status === 'Suspended' || dbUser.rows[0].status === 'Deleted') {
+      res.clearCookie(CONSTANTS.JWT_COOKIE_NAME, {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+      res.status(401).json({ message: 'Your session has expired or account is deactivated.' });
+      return;
+    }
+
     req.user = {
       userId: decoded.userId,
       roleName: decoded.roleName,
@@ -91,25 +104,32 @@ export async function requireFinancialOfficer(
     return;
   }
 
-  if (req.user.roleName === 'Superadmin') {
+  if (req.user.roleName === 'Superadmin' || req.user.roleName === 'Financial Admin') {
     next();
     return;
   }
 
-  if (req.user.roleName !== 'Financial Admin') {
-    res.status(403).json({ message: 'Forbidden: Financial Officer access required' });
+  res.status(403).json({ message: 'Forbidden: Financial Officer access required' });
+}
+
+/**
+ * Middleware to restrict route access strictly to Financial Admins designated as CFO.
+ * Does not allow Superadmin.
+ */
+export async function requireCfoOnly(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: 'Authentication required' });
     return;
   }
 
-  try {
-    const result = await pool.query(`SELECT is_cfo FROM Users WHERE user_id = $1`, [req.user.userId]);
-    if (result.rows[0]?.is_cfo === true) {
-      next();
-      return;
-    }
-    res.status(403).json({ message: 'Forbidden: you are not designated as Financial Officer' });
-  } catch (error) {
-    console.error('requireFinancialOfficer check failed:', error);
-    res.status(500).json({ message: 'Internal server error' });
+  if (req.user.roleName !== 'Financial Admin') {
+    res.status(403).json({ message: 'Forbidden: Financial Admin access required' });
+    return;
   }
+
+  next();
 }

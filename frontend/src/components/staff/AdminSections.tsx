@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import Link from "next/link";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint, KpiCard, Avatar } from "@/components/ui";
@@ -11,6 +12,7 @@ import type { AuditEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/ty
 import type { AuthUser } from "@/lib/stores/authStore";
 import { CallVoiceSettings } from "./CallVoiceSettings";
 import { getPresetClass } from "@/lib/presetHelper";
+import { BookieQueueSection } from "./BookieSections";
 
 const DIVIDEND_METADATA = [
   { name: "1st Full House", pattern: "1st Full House", defaultAmount: 2000, desc: "The first ticket where all 15 numbers are marked. (Automatically becomes 'Full House' if 2nd and 3rd are not selected)." },
@@ -94,9 +96,11 @@ function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets
   onViewTickets?: (id: string) => void;
   onManualBook?: (id: string) => void;
 }) {
+  const rowClass = controls ? "hg-tr hg-tr-games" : "hg-tr hg-tr-6";
+
   return (
     <div className="hg-table">
-      <div className="hg-tr hg-tr-head">
+      <div className={`${rowClass} hg-tr-head`}>
         <span>Game</span>
         <span>Time</span>
         <span>Fill Rate</span>
@@ -115,7 +119,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets
         return (
           <div 
             key={g.game_id} 
-            className="hg-tr"
+            className={rowClass}
             onClick={() => {
               if (isCompleted && onCompletedClick) {
                 onCompletedClick(g);
@@ -136,15 +140,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets
             <span className="hg-dim">{playerCount}</span>
             <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span></span>
             {controls && (
-              <span className="hg-row-ctrls" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <button className="hg-ic-btn" title="View Tickets" onClick={(e) => { e.stopPropagation(); onViewTickets?.(g.game_id); }}>
-                  <Icon name="ticket" size={14} />
-                </button>
-                {g.game_status !== "Completed" && (
-                  <button className="hg-ic-btn" title="Manual Booking" onClick={(e) => { e.stopPropagation(); onManualBook?.(g.game_id); }}>
-                    <Icon name="users" size={14} />
-                  </button>
-                )}
+              <span className="hg-row-ctrls" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap" }}>
                 {g.game_status === "Scheduled" && (
                   <button className="hg-ic-btn" title="Start" onClick={(e) => { e.stopPropagation(); onAction?.(g.game_id, "start"); }}>
                     <Icon name="play" size={14} />
@@ -558,8 +554,9 @@ function formatDateForLocalInput(isoString: string): string {
 }
 
 // ── Games management ─────────────────────────────────────────────────────────
-export function GamesSection() {
+export function GamesSection({ me }: { me: AuthUser }) {
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [pastGames, setPastGames] = useState<GameSummary[]>([]);
   const [creating, setCreating] = useState(false);
   const [managingVoice, setManagingVoice] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
@@ -570,11 +567,38 @@ export function GamesSection() {
   const [bookingGameId, setBookingGameId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
 
+  const [selectedGame, setSelectedGame] = useState<GameSummary | null>(null);
+  const [drawnData, setDrawnData] = useState<{ drawn_numbers: number[]; current_index: number } | null>(null);
+  const [loadingDrawn, setLoadingDrawn] = useState(false);
+
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
-      .then((g) => setGames(g.filter((x) => x.game_status !== "Completed")))
+      .then((g) => {
+        setGames(g.filter((x) => x.game_status !== "Completed"));
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        setPastGames(g.filter((x) => {
+          if (x.game_status !== "Completed") return false;
+          const date = new Date(x.completed_at || x.scheduled_at);
+          return date >= sevenDaysAgo;
+        }));
+      })
       .catch(() => {});
   }, []);
+
+  const viewResults = async (game: GameSummary) => {
+    setSelectedGame(game);
+    setDrawnData(null);
+    setLoadingDrawn(true);
+    try {
+      const drawn = await apiFetch<{ drawn_numbers: number[]; current_index: number }>(`/api/games/${game.game_id}/drawn`);
+      setDrawnData(drawn);
+    } catch (e) {
+      console.error("Failed to load drawn numbers", e);
+    } finally {
+      setLoadingDrawn(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -694,25 +718,36 @@ export function GamesSection() {
   return (
     <div className="hg-sec">
       <div className="hg-sec-head">
-        <p className="hg-sec-sub">Schedule, start, pause or resume any game.</p>
+        <div>
+          <h2 className="hg-sec-title">Games &amp; Draw Management</h2>
+          {(me.role_name === "Superadmin" || me.role_name === "Financial Admin" || me.role_name === "Operator") ? (
+            <p className="hg-sec-sub">Schedule, start, pause or resume any game.</p>
+          ) : (
+            <p className="hg-sec-sub">Monitor live ticket sales, booking fill rates, and past game draws.</p>
+          )}
+        </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          <Button variant="ghost" size="sm" icon="volume" onClick={() => {
-            setCreating(false);
-            setManagingVoice(!managingVoice);
-          }}>
-            {managingVoice ? "Back to Games" : "Voice & TTS Settings"}
-          </Button>
-          <Button variant="cta" size="sm" icon="grid" onClick={() => {
-            setManagingVoice(false);
-            if (creating) {
-              setEditingGameId(null);
-              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
-              setPrizes(PATTERN_DEFAULTS);
-            }
-            setCreating(!creating);
-          }}>
-            {creating ? "Close" : "Create Game"}
-          </Button>
+          {me.role_name === "Superadmin" && (
+            <Button variant="ghost" size="sm" icon="volume" onClick={() => {
+              setCreating(false);
+              setManagingVoice(!managingVoice);
+            }}>
+              {managingVoice ? "Back to Games" : "Voice & TTS Settings"}
+            </Button>
+          )}
+          {(me.role_name === "Superadmin" || me.role_name === "Financial Admin" || me.role_name === "Operator") && (
+            <Button variant="cta" size="sm" icon="grid" onClick={() => {
+              setManagingVoice(false);
+              if (creating) {
+                setEditingGameId(null);
+                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
+                setPrizes(PATTERN_DEFAULTS);
+              }
+              setCreating(!creating);
+            }}>
+              {creating ? "Close" : "Create Game"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -929,24 +964,26 @@ export function GamesSection() {
                   </div>
                   <div className="hg-fill-bar"><i style={{ width: pct + "%" }} className={pct >= 80 ? "is-hot" : ""} /></div>
                   <div className="hg-fill-pct">{pct}% full</div>
-                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    <button
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon="ticket"
+                      full
                       onClick={() => setSalesGameId(g.game_id)}
-                      className="hg-ic-btn"
-                      title="View Tickets"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                     >
-                      <Icon name="ticket" size={14} /> View Tickets
-                    </button>
+                      View Tickets
+                    </Button>
                     {g.game_status !== "Completed" && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon="users"
+                        full
                         onClick={() => setBookingGameId(g.game_id)}
-                        className="hg-ic-btn"
-                        title="Book Ticket"
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                       >
-                        <Icon name="users" size={14} /> Book Ticket
-                      </button>
+                        Book Ticket
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -956,11 +993,45 @@ export function GamesSection() {
         </div>
       )}
 
-      <div className="hg-panel">
+      <div className="hg-panel hg-table-premium">
         {games.length === 0 ? (
           <EmptyHint icon="grid" title="No games yet" sub="Create the first game to open bookings." />
         ) : (
-          <GamesTable games={games} controls onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} />
+          <GamesTable games={games} controls={true} onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} />
+        )}
+      </div>
+
+      {/* Past Games Panel */}
+      <div className="hg-panel hg-table-premium" style={{ marginTop: "24px" }}>
+        <div className="hg-panel-head">
+          <h3>Past Games (Last 7 Days)</h3>
+        </div>
+        {pastGames.length === 0 ? (
+          <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 7 days will show up here." />
+        ) : (
+          <div className="hg-table">
+            <div className="hg-tr hg-tr-history hg-tr-head">
+              <span>Game Name</span><span>Date &amp; Time</span><span>Tickets Sold</span><span>Revenue</span><span>Action</span>
+            </div>
+            {pastGames.map((g) => {
+              const totalRevenue = g.sold_count * g.ticket_price;
+              const dateStr = g.completed_at
+                ? new Date(g.completed_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+                : new Date(g.scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+              return (
+                <div key={g.game_id} className="hg-tr hg-tr-history">
+                  <span className="hg-td-name">{g.title}</span>
+                  <span className="hg-dim">{dateStr}</span>
+                  <span>{g.sold_count} / {g.total_tickets}</span>
+                  <strong>{money(totalRevenue)}</strong>
+                  <span className="hg-row-ctrls" style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                    <Button variant="ghost" size="sm" onClick={() => viewResults(g)}>View Results</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSalesGameId(g.game_id)}>View Tickets</Button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </>
@@ -990,6 +1061,106 @@ export function GamesSection() {
       )}
       {salesGameId && <TicketSalesModal gameId={salesGameId} onClose={() => setSalesGameId(null)} />}
       {bookingGameId && <StaffManualBookingModal gameId={bookingGameId} onClose={() => setBookingGameId(null)} onSuccess={load} />}
+
+      {selectedGame && (
+        <div className="hg-modal-scrim" onClick={() => setSelectedGame(null)}>
+          <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ background: "var(--surface)", color: "var(--text)", maxWidth: "600px", width: "90%" }}>
+            <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 className="font-semibold text-lg">{selectedGame.title} Results</h3>
+              <button onClick={() => setSelectedGame(null)} style={{ border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "20px" }}>×</button>
+            </div>
+            
+            <div className="mt-4" style={{ overflowY: "auto", maxHeight: "400px", paddingRight: "4px" }}>
+              {/* Stats Block */}
+              <div className="grid grid-cols-3 gap-2 mb-4 bg-surface-2 p-3 rounded" style={{ backgroundColor: "var(--surface-2)", borderRadius: "var(--radius-sm)" }}>
+                <div>
+                  <span className="block text-xs text-dim" style={{ color: "var(--text-dim)" }}>Ticket Price</span>
+                  <strong className="text-sm">{money(selectedGame.ticket_price)}</strong>
+                </div>
+                <div>
+                  <span className="block text-xs text-dim" style={{ color: "var(--text-dim)" }}>Tickets Sold</span>
+                  <strong className="text-sm">{selectedGame.sold_count}</strong>
+                </div>
+                <div>
+                  <span className="block text-xs text-dim" style={{ color: "var(--text-dim)" }}>Total Collection</span>
+                  <strong className="text-sm" style={{ color: "var(--brand)" }}>{money(selectedGame.sold_count * selectedGame.ticket_price)}</strong>
+                </div>
+              </div>
+
+              {/* Dividends & Winners */}
+              <div className="mb-4">
+                <h4 className="font-semibold text-sm mb-2" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "4px" }}>Dividends &amp; Winners</h4>
+                <div className="space-y-2 flex flex-col gap-2">
+                  {selectedGame.prize_pool.map((p) => {
+                    return (
+                      <div key={p.prize_id} className="flex justify-between items-start p-2 rounded border border-border" style={{ borderColor: "var(--border-2)", borderRadius: "var(--radius-sm)" }}>
+                        <div>
+                          <div className="font-semibold text-sm">{p.pattern_name}</div>
+                          <div className="text-xs text-dim" style={{ color: "var(--text-dim)" }}>Prize: {money(p.prize_amount)}</div>
+                        </div>
+                        <div className="text-right">
+                          {p.claimed ? (
+                            <div>
+                              <span className="hg-pill hg-pill-completed text-xs mb-1 inline-block" style={{ backgroundColor: "var(--emerald-500)", color: "white" }}>Claimed</span>
+                              <div className="text-xs font-semibold">{p.winner_housie_name}</div>
+                              {p.split_count > 1 && (
+                                <div className="text-xxs text-dim" style={{ fontSize: "10px", color: "var(--text-dim)" }}>
+                                  Split: {p.split_count} winners ({money(p.amount_per_winner || 0)} each)
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="hg-pill text-xs" style={{ backgroundColor: "var(--border-2)", color: "var(--text-dim)" }}>Unclaimed</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Drawn Numbers Sequence */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "4px" }}>Drawn Numbers Sequence</h4>
+                {loadingDrawn ? (
+                  <div className="flex justify-center py-4">
+                    <span className="hg-poll-spin" />
+                  </div>
+                ) : drawnData && drawnData.drawn_numbers && drawnData.drawn_numbers.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {drawnData.drawn_numbers.map((num, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-center font-mono font-bold text-xs"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "50%",
+                          backgroundColor: "var(--brand-dim, var(--surface-2))",
+                          color: "var(--brand, var(--text))",
+                          border: "1px solid var(--brand)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                        title={`Drawn #${i + 1}`}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-dim py-2" style={{ color: "var(--text-dim)" }}>No numbers were drawn.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <Button variant="cta" size="sm" onClick={() => setSelectedGame(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1218,11 +1389,10 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
   const [selectedTicketIds, setSelectedTicketIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tnoInput, setTnoInput] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    apiFetch<any>(`/api/tickets/games/${gameId}/tickets`)
+    apiFetch<any>(`/api/games/${gameId}/tickets`)
       .then((res) => {
         setTickets(res.tickets || []);
       })
@@ -1236,32 +1406,24 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
       if (prev.includes(ticketId)) {
         return prev.filter((id) => id !== ticketId);
       }
-      if (prev.length >= 6) {
-        setError("Maximum 6 tickets can be booked at once.");
-        return prev;
-      }
       return [...prev, ticketId];
     });
   };
 
-  const handleAddTno = () => {
-    setError(null);
-    const num = parseInt(tnoInput, 10);
-    if (isNaN(num)) return;
-    
-    const found = tickets.find((t) => t.ticket_number === num);
-    if (!found) {
-      setError(`Ticket #${num} not found.`);
-      return;
-    }
-    if (found.status !== "Available") {
-      setError(`Ticket #${num} is already ${found.status}.`);
-      return;
-    }
-    
-    toggleSelect(found.ticket_id);
-    setTnoInput("");
+  const formatSelectedTickets = () => {
+    if (selectedTicketIds.length === 0) return "None";
+    const nums = selectedTicketIds
+      .map((id) => tickets.find((t) => t.ticket_id === id)?.ticket_number)
+      .filter((n): n is number => n !== undefined)
+      .sort((a, b) => a - b);
+    if (nums.length === 1) return nums[0].toString();
+    if (nums.length === 2) return `${nums[0]} & ${nums[1]}`;
+    const lastNum = nums[nums.length - 1];
+    const otherNums = nums.slice(0, -1).join(", ");
+    return `${otherNums} & ${lastNum}`;
   };
+
+
 
   const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1318,7 +1480,7 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
           <form onSubmit={handleBook} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14 }}>
             {error && <div className="hg-sec-err" style={{ padding: 10, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 6, fontSize: 13, margin: 0 }}>{error}</div>}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, alignItems: "flex-end" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>
                   Housie Name (Player) <span style={{ color: "var(--danger)" }}>*</span>
@@ -1342,79 +1504,28 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
                 />
               </div>
 
-              {/* Enter TNO input block */}
-              <div style={{
-                display: "flex",
-                gap: 6,
-                alignItems: "center",
-                padding: "4px 8px",
-                borderRadius: 24,
-                border: "2px solid var(--brand)",
-                background: "rgba(0,0,0,0.15)"
-              }}>
-                <input
-                  type="number"
-                  value={tnoInput}
-                  onChange={(e) => setTnoInput(e.target.value)}
-                  placeholder="Enter TNO"
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text)",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    outline: "none",
-                    width: "72px",
-                    textAlign: "center"
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddTno();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddTno}
-                  style={{
-                    background: "var(--text)",
-                    color: "var(--surface)",
-                    border: "none",
-                    borderRadius: 16,
-                    padding: "3px 10px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer"
-                  }}
-                >
-                  ADD
-                </button>
+              {/* Selected tickets section */}
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>
+                  Selected Tickets
+                </label>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: "40px",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1.5px dashed var(--border)",
+                  background: "rgba(0,0,0,0.15)",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  color: selectedTicketIds.length === 0 ? "var(--text-mute)" : "var(--text)",
+                  fontStyle: selectedTicketIds.length === 0 ? "italic" : "normal"
+                }}>
+                  {formatSelectedTickets()}
+                </div>
               </div>
             </div>
-
-            {/* Red BOOK NOW button */}
-            <button
-              type="submit"
-              disabled={saving || !housieName.trim() || selectedTicketIds.length === 0}
-              style={{
-                width: "100%",
-                padding: "11px",
-                background: "var(--danger)",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "13px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: ".06em",
-                cursor: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? "not-allowed" : "pointer",
-                opacity: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? 0.5 : 1,
-                transition: "background 0.2s"
-              }}
-            >
-              {saving ? "Booking..." : "Book Now"}
-            </button>
 
             {/* 6-column spreadsheet-like grid layout */}
             <div>
@@ -1422,56 +1533,110 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
                 <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
                   Select Tickets
                 </label>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>
-                  ({selectedTicketIds.length}/6 selected)
-                </span>
-              </div>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(6, 1fr)",
-                gap: "1px",
-                background: "var(--border-light)",
-                border: "1px solid var(--border-light)",
-                borderRadius: "8px",
-                overflow: "hidden",
-                maxHeight: "260px",
-                overflowY: "auto"
-              }}>
-                {tickets.map((t) => {
-                  const isAvailable = t.status === "Available";
-                  const isSelected = selectedTicketIds.includes(t.ticket_id);
-                  return (
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {selectedTicketIds.length > 0 && (
                     <button
-                      key={t.ticket_id}
                       type="button"
-                      disabled={!isAvailable}
-                      onClick={() => toggleSelect(t.ticket_id)}
+                      onClick={() => setSelectedTicketIds([])}
                       style={{
-                        padding: "10px 0",
+                        background: "none",
                         border: "none",
-                        background: isSelected
-                          ? "var(--brand)"
-                          : isAvailable
-                          ? "var(--surface)"
-                          : "var(--surface-3)",
-                        color: isSelected
-                          ? "var(--accent-ink)"
-                          : isAvailable
-                          ? "var(--text)"
-                          : "var(--text-mute)",
-                        fontFamily: "var(--font-mono)",
+                        color: "var(--brand)",
+                        fontSize: 11,
                         fontWeight: 700,
-                        fontSize: 14,
-                        cursor: isAvailable ? "pointer" : "not-allowed",
-                        opacity: isAvailable ? 1 : 0.5,
-                        transition: "all 0.15s",
-                        textDecoration: isAvailable ? "none" : "line-through"
+                        cursor: "pointer",
+                        padding: 0
                       }}
                     >
-                      {t.ticket_number}
+                      CLEAR SELECTION
                     </button>
-                  );
-                })}
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>
+                    ({selectedTicketIds.length} selected)
+                  </span>
+                </div>
+              </div>
+
+              <div style={{
+                background: "var(--surface-2)",
+                padding: "16px",
+                borderRadius: "var(--radius-sm, 8px)",
+                border: "2px solid var(--border)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px",
+                boxShadow: "var(--shadow, 0 4px 12px rgba(0,0,0,0.15))"
+              }}>
+                {/* Red BOOK NOW button */}
+                <button
+                  type="submit"
+                  disabled={saving || !housieName.trim() || selectedTicketIds.length === 0}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "var(--brand)",
+                    color: "var(--accent-ink)",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "15px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    letterSpacing: ".06em",
+                    cursor: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? "not-allowed" : "pointer",
+                    opacity: (saving || !housieName.trim() || selectedTicketIds.length === 0) ? 0.5 : 1,
+                    transition: "background 0.2s"
+                  }}
+                >
+                  {saving ? "Booking..." : "Book Now"}
+                </button>
+
+                {/* Grid Box */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(6, 1fr)",
+                  gap: "1px",
+                  background: "var(--border)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "4px",
+                  overflow: "hidden",
+                  maxHeight: "320px",
+                  overflowY: "auto"
+                }}>
+                  {tickets.map((t) => {
+                    const isAvailable = t.status === "Available";
+                    const isSelected = selectedTicketIds.includes(t.ticket_id);
+                    return (
+                      <button
+                        key={t.ticket_id}
+                        type="button"
+                        disabled={!isAvailable}
+                        onClick={() => toggleSelect(t.ticket_id)}
+                        style={{
+                          padding: "12px 0",
+                          border: "none",
+                          background: isSelected
+                            ? "var(--success)"
+                            : isAvailable
+                            ? "var(--surface)"
+                            : "var(--surface-3)",
+                          color: isSelected
+                            ? "#ffffff"
+                            : isAvailable
+                            ? "var(--text)"
+                            : "var(--text-mute)",
+                          fontFamily: "var(--font-body)",
+                          fontWeight: "bold",
+                          fontSize: "15px",
+                          cursor: isAvailable ? "pointer" : "not-allowed",
+                          transition: "all 0.15s",
+                          textDecoration: isAvailable ? "none" : "line-through"
+                        }}
+                      >
+                        {t.ticket_number}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -1523,36 +1688,31 @@ export function FillingSection() {
               </div>
               <div className="hg-fill-bar"><i style={{ width: pct + "%" }} className={pct >= 80 ? "is-hot" : ""} /></div>
               <div className="hg-fill-pct">{pct}% full</div>
-              <div style={{ display: "flex", gap: 12, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
                 {(g.game_status === "Live" || g.game_status === "Paused") && (
-                  <a
-                    href={`/game/${g.game_id}/live`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hg-ic-btn"
-                    title="Watch Live"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600 }}
-                  >
-                    <Icon name="eye" size={14} /> Watch Live
-                  </a>
+                  <Link href={`/game/${g.game_id}/live`} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+                    <Button variant="cta" size="sm" icon="eye" full>Watch Live</Button>
+                  </Link>
                 )}
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="ticket"
+                  full
                   onClick={() => setSalesGameId(g.game_id)}
-                  className="hg-ic-btn"
-                  title="View Tickets"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                 >
-                  <Icon name="ticket" size={14} /> View Tickets
-                </button>
+                  View Tickets
+                </Button>
                 {g.game_status !== "Completed" && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon="users"
+                    full
                     onClick={() => setBookingGameId(g.game_id)}
-                    className="hg-ic-btn"
-                    title="Book Ticket"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand)", fontSize: 12, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                   >
-                    <Icon name="users" size={14} /> Book Ticket
-                  </button>
+                    Book Ticket
+                  </Button>
                 )}
               </div>
             </div>
@@ -1572,7 +1732,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "", town: "", role_id: "4", password: "" });
+  const [form, setForm] = useState({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "" });
 
   const load = useCallback(() => {
     apiFetch<StaffUser[]>("/api/users").then(setUsers).catch(() => {});
@@ -1580,20 +1740,45 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const prefill = sessionStorage.getItem("hg_prefill_staff");
+      if (prefill) {
+        try {
+          const data = JSON.parse(prefill);
+          setForm({
+            full_name: data.full_name || "",
+            username: data.username || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            town: data.town || "",
+            role_id: "4",
+            password: data.password || ""
+          });
+          setAdding(true);
+        } catch {}
+        sessionStorage.removeItem("hg_prefill_staff");
+      }
+    }
+  }, []);
+
   const addStaff = async () => {
     setError(null);
     try {
       await apiFetch("/api/users", {
         method: "POST",
         body: JSON.stringify({
-          full_name: form.email.trim(), // fallback full name to username
-          email: form.email.trim(),
+          full_name: form.full_name.trim() || form.username.trim(),
+          username: form.username.trim(),
+          email: form.email.trim() || null,
+          phone: form.phone.trim() || null,
+          town: form.town.trim() || null,
           role_id: parseInt(form.role_id, 10),
           password: form.password,
         }),
       });
       setAdding(false);
-      setForm({ full_name: "", email: "", phone: "", town: "", role_id: "4", password: "" });
+      setForm({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "" });
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create user");
@@ -1610,15 +1795,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
     }
   };
 
-  const makeFo = async (u: StaffUser) => {
-    setError(null);
-    try {
-      await apiFetch(`/api/users/${u.user_id}/cfo`, { method: "PATCH", body: JSON.stringify({ is_cfo: !u.is_cfo }) });
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
-    }
-  };
+
 
   const deleteUser = async (u: StaffUser) => {
     if (!window.confirm(`Delete ${u.full_name} (${roleLabel(u)})? This action cannot be undone.`)) return;
@@ -1644,14 +1821,30 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
 
       {adding && (
         <div className="hg-form">
+          {form.full_name && (
+            <div style={{ background: "rgba(212, 175, 55, 0.05)", border: "1px solid rgba(212, 175, 55, 0.2)", padding: "10px 14px", borderRadius: "8px", color: "var(--accent)", fontSize: "12px", display: "flex", gap: "8px", alignItems: "center", marginBottom: "16px" }}>
+              <Icon name="check" size={14} />
+              <span>Pre-filled from Application: <b>{form.full_name}</b> · WhatsApp: <b>{form.phone}</b> · Email: <b>{form.email}</b></span>
+            </div>
+          )}
           <div className="hg-form-row">
             <label className="hg-form-field">
               <span>Username</span>
-              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
             </label>
             <label className="hg-form-field">
               <span>Role</span>
-              <select value={form.role_id} onChange={(e) => setForm({ ...form, role_id: e.target.value })}>
+              <select
+                value={form.role_id}
+                onChange={(e) => {
+                  const roleId = e.target.value;
+                  let defaultUsername = "";
+                  if (roleId === "2") defaultUsername = "admin";
+                  else if (roleId === "3") defaultUsername = "operator";
+                  else if (roleId === "4") defaultUsername = "bookie";
+                  setForm({ ...form, role_id: roleId, username: defaultUsername });
+                }}
+              >
                 {ROLE_OPTIONS.filter(([id]) => me.role_name === "Superadmin" || id > 2).map(([id, lbl]) => (
                   <option key={id} value={id}>{lbl}</option>
                 ))}
@@ -1666,7 +1859,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>
             <Button
               variant="cta" size="sm"
-              disabled={!form.email.trim() || form.password.length < 6}
+              disabled={!form.username.trim() || form.password.length < 6}
               onClick={addStaff}
             >
               Create account
@@ -1678,21 +1871,42 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       {error && <p className="hg-sec-err">{error}</p>}
       <div className="hg-panel">
         <div className="hg-table">
-          <div className="hg-tr hg-tr-6 hg-tr-head">
-            <span>Staff</span><span>Role</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
+          <div
+            className={me.role_name === "Superadmin" ? "hg-tr hg-tr-head" : "hg-tr hg-tr-6 hg-tr-head"}
+            style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 1.3fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
+          >
+            {me.role_name === "Superadmin" ? (
+              <>
+                <span>Staff</span><span>Role</span><span>Username</span><span>Password</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
+              </>
+            ) : (
+              <>
+                <span>Staff</span><span>Role</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
+              </>
+            )}
           </div>
           {users.map((u) => (
-            <div key={u.user_id} className="hg-tr hg-tr-6">
+            <div
+              key={u.user_id}
+              className={me.role_name === "Superadmin" ? "hg-tr" : "hg-tr hg-tr-6"}
+              style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 1.3fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
+            >
               <span className="hg-td-name">
                 <Avatar src={roleAvatar(u)} name={u.full_name} />{u.full_name}
-                {u.is_cfo && <span className="hg-pill hg-pill-trusted">FA</span>}
               </span>
               <span className="hg-dim">{roleLabel(u)}</span>
+              {me.role_name === "Superadmin" && (
+                <>
+                  <span className="hg-dim" style={{ wordBreak: "break-all" }}>{u.username}</span>
+                  <span style={{ fontFamily: "monospace", color: "var(--accent)", fontSize: "12px", wordBreak: "break-all" }}>{u.password_plain || "—"}</span>
+                </>
+              )}
               <span className="hg-dim">{u.town ?? "—"}</span>
               <span>{u.role_id === 4 ? money(u.current_balance) : "—"}</span>
               <span><span className={`hg-pill hg-pill-${u.status.toLowerCase()}`}>{u.status}</span></span>
               <span className="hg-row-ctrls">
-                {u.user_id !== me.user_id && (
+                {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
+                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
                   u.status === "Active" ? (
                     <button className="hg-ic-btn" title="Suspend" onClick={() => setStatus(u, "Suspended")}>
                       <Icon name="x" size={14} />
@@ -1703,12 +1917,9 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                     </button>
                   )
                 )}
-                {me.role_name === "Superadmin" && u.role_id === 2 && (
-                  <button className="hg-ic-btn" title={u.is_cfo ? "Revoke Financial Officer" : "Make Financial Officer"} onClick={() => makeFo(u)}>
-                    <Icon name="wallet" size={14} />
-                  </button>
-                )}
-                {me.role_name === "Superadmin" && u.user_id !== me.user_id && (
+
+                {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
+                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
                   <button className="hg-ic-btn" title="Delete" style={{ color: "var(--danger)" }} onClick={() => deleteUser(u)}>
                     <Icon name="trash" size={14} />
                   </button>

@@ -34,7 +34,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -120,7 +120,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {

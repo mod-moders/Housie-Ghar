@@ -2,8 +2,8 @@
 -- Default password: Enterhg@01 (real bcrypt hash, work factor 12)
 -- Regenerate with: node -e "require('bcrypt').hash('Enterhg@01',12).then(console.log)"
 
-INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status) VALUES
-(1, 'Super Admin', 'superadmin@housieghar.in', '+919999999999', '$2b$12$iGA4WNJA84o5xEKTUc7EKeLmgBm21qOaB4pN0nq9q4daNAKg.4E06', TRUE, 'Active')
+INSERT INTO Users (role_id, full_name, username, email, phone, password_hash, temp_password_required, status) VALUES
+(1, 'Super Admin', 'superadmin', 'superadmin@housieghar.in', '+919999999999', '$2b$12$iGA4WNJA84o5xEKTUc7EKeLmgBm21qOaB4pN0nq9q4daNAKg.4E06', TRUE, 'Active')
 ON CONFLICT (email) DO NOTHING;
 
 -- Seed platform config

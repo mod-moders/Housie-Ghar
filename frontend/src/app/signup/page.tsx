@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
 export default function SignUp() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refId, setRefId] = useState<string | null>(null);
+  const [showBookieForm, setShowBookieForm] = useState(false);
 
   useEffect(() => {
     // Check if there is an active session
@@ -122,13 +124,42 @@ export default function SignUp() {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500">
-          Already registered?{" "}
-          <Link href="/login" className="text-[#06B6D4] hover:underline">
-            Log in with Housie Name
-          </Link>
+        <div className="mt-6 text-center text-sm text-gray-500 flex flex-col gap-4">
+          <div>
+            Already registered?{" "}
+            <Link href="/login" className="text-[#06B6D4] hover:underline font-semibold">
+              Log in with Housie Name
+            </Link>
+          </div>
+          <div className="pt-3 border-t border-gray-800/60">
+            <button 
+              type="button" 
+              onClick={() => setShowBookieForm(true)} 
+              style={{
+                background: "linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(255, 223, 0, 0.05) 100%)",
+                border: "1px solid rgba(212, 175, 55, 0.4)",
+                color: "#D4AF37",
+                borderRadius: "var(--radius)",
+                width: "100%",
+                padding: "10px 16px",
+                fontSize: "13px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                transition: "all 0.2s"
+              }}
+              className="hover:border-[#D4AF37] hover:brightness-110"
+            >
+              <Icon name="shieldCheck" size={16} />
+              Apply as Bookie for Housie Ghar
+            </button>
+          </div>
         </div>
       </div>
+
+      <BookieApplicationModal isOpen={showBookieForm} onClose={() => setShowBookieForm(false)} />
     </div>
   );
 }

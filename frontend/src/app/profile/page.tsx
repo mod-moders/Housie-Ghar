@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import type { PlayerProfile } from "@/lib/types";
 
 export default function ProfilePage() {
@@ -24,6 +25,7 @@ export default function ProfilePage() {
   const [password, setPassword] = useState("");
   const [removePassword, setRemovePassword] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     apiFetch<{ player: PlayerProfile }>("/api/player/me")
@@ -192,14 +194,26 @@ export default function ProfilePage() {
                     <label style={labelStyle}>
                       {hasPassword ? "Change Password (Optional)" : "Set Password to Secure Account (Leave Blank if Not Required)"}
                     </label>
-                    <input
-                      type="password"
-                      value={password}
-                      disabled={removePassword}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
-                      style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
-                    />
+                    <div className="hg-password-wrapper">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        disabled={removePassword}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
+                        style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
+                      />
+                      <button
+                        type="button"
+                        className="hg-password-toggle"
+                        onClick={() => setShowPassword(!showPassword)}
+                        title={showPassword ? "Hide Password" : "Show Password"}
+                        disabled={removePassword}
+                        style={{ opacity: removePassword ? 0.5 : 1 }}
+                      >
+                        <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
+                      </button>
+                    </div>
                   </div>
 
                   {hasPassword && (
