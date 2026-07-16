@@ -21,7 +21,11 @@ export interface AuthenticatedRequest extends Request {
 /**
  * Middleware to authenticate requests using JWT HttpOnly cookie
  */
-export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export async function authenticateToken(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   let token = null;
 
   if (req.headers['authorization']) {
@@ -40,19 +44,44 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     return;
   }
 
+  let decoded: any;
   try {
-    const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-    req.user = {
-      userId: decoded.userId,
-      roleName: decoded.roleName,
-      fullName: decoded.fullName,
-      email: decoded.email,
-    };
-    next();
+    decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
   } catch (error) {
     console.error('JWT Verification failed:', error);
     res.status(403).json({ message: 'Invalid or expired session. Please log in again.' });
+    return;
   }
+
+  // Re-check the account against the DB on every request so a suspension takes
+  // effect immediately instead of surviving for the token's full 24h lifetime
+  // (a live cookie/token used to outlive suspension). This mirrors the login-time
+  // status gate and has no effect on Active accounts. NOTE: temp_password_required
+  // is deliberately NOT enforced here — the frontend has no forced-change-password
+  // flow, so gating on it would break the dashboard for temp-flagged users.
+  try {
+    const result = await pool.query('SELECT status FROM Users WHERE user_id = $1', [decoded.userId]);
+    if (result.rowCount === 0) {
+      res.status(403).json({ message: 'Account no longer exists. Please log in again.' });
+      return;
+    }
+    if (result.rows[0].status !== 'Active') {
+      res.status(403).json({ message: 'Account is suspended. Contact admin.' });
+      return;
+    }
+  } catch (error) {
+    console.error('Account status check failed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+    return;
+  }
+
+  req.user = {
+    userId: decoded.userId,
+    roleName: decoded.roleName,
+    fullName: decoded.fullName,
+    email: decoded.email,
+  };
+  next();
 }
 
 /**

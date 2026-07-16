@@ -370,7 +370,10 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // 1. Establish SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    // 'no-transform' is critical: without it, a gzipping proxy (Next dev proxy,
+    // nginx, some CDNs) buffers the whole stream and the browser's EventSource
+    // receives headers but never any events.
+    'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // For Nginx compatibility
   });

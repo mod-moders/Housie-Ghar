@@ -1,10 +1,10 @@
--- Seed default Superadmin and platform config
--- Default password: Enterhg@01 (real bcrypt hash, work factor 12)
--- Regenerate with: node -e "require('bcrypt').hash('Enterhg@01',12).then(console.log)"
-
-INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status) VALUES
-(1, 'Super Admin', 'superadmin@housieghar.in', '+919999999999', '$2b$12$iGA4WNJA84o5xEKTUc7EKeLmgBm21qOaB4pN0nq9q4daNAKg.4E06', TRUE, 'Active')
-ON CONFLICT (email) DO NOTHING;
+-- Seed platform config and the default Superadmin.
+--
+-- NOTE: the Superadmin *user* is no longer created here. It is seeded by
+-- src/db/seed.ts, which bcrypt-hashes the password from the SUPERADMIN_EMAIL /
+-- SUPERADMIN_TEMP_PASSWORD environment variables at seed time. This keeps a real
+-- credential out of version control. (temp_password_required is set TRUE so the
+-- first login forces a password change.)
 
 -- Seed platform config
 INSERT INTO Platform_Config (config_key, config_value, description) VALUES

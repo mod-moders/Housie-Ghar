@@ -239,19 +239,24 @@ export async function getFinancialAnalysis(req: AuthenticatedRequest, res: Respo
          ) last_balances`
       ),
       pool.query(
-        `SELECT 
+        // Per-game tickets_sold and payout are computed as independent scalar
+        // subqueries. The previous version LEFT JOINed Tickets and Prize_Pool in one
+        // query, producing a tickets×prizes cartesian product; the SUM(DISTINCT ...)
+        // used to undo that collapsed two prizes of equal amount into one, undercounting
+        // the payout. Subqueries sum every claimed prize exactly once.
+        `SELECT
            g.game_id,
            g.title,
            g.completed_at,
            g.ticket_price,
-           COUNT(DISTINCT t.ticket_id)::INTEGER AS tickets_sold,
-           (COUNT(DISTINCT t.ticket_id) * g.ticket_price) AS gross_collection,
-           COALESCE(SUM(DISTINCT p.prize_amount) FILTER (WHERE p.claimed = TRUE), 0) AS payout
+           (SELECT COUNT(*) FROM Tickets t
+              WHERE t.game_id = g.game_id AND t.status = 'Sold')::INTEGER AS tickets_sold,
+           ((SELECT COUNT(*) FROM Tickets t
+              WHERE t.game_id = g.game_id AND t.status = 'Sold') * g.ticket_price) AS gross_collection,
+           COALESCE((SELECT SUM(p.prize_amount) FROM Prize_Pool p
+              WHERE p.game_id = g.game_id AND p.claimed = TRUE), 0) AS payout
          FROM Scheduled_Games g
-         LEFT JOIN Tickets t ON t.game_id = g.game_id AND t.status = 'Sold'
-         LEFT JOIN Prize_Pool p ON p.game_id = g.game_id
          WHERE g.game_status = 'Completed'
-         GROUP BY g.game_id, g.title, g.completed_at, g.ticket_price
          ORDER BY g.completed_at DESC
          LIMIT 10`
       )

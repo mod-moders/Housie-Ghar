@@ -10,6 +10,19 @@ web_modules/
 .env.*
 !.env.example
 
+# Private keys, certificates and secrets (NEVER commit — this repo is public)
+RSA/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+*.crt
+!**/ca-certificates.crt
+
 # Build outputs
 frontend/.next/
 frontend/out/

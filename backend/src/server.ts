@@ -9,6 +9,7 @@ import { env } from './config/env';
 import { connectRedis } from './db/redis';
 import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
+import { socketAuth, authorizeRoomJoin } from './middleware/socketAuth';
 
 const server = http.createServer(app);
 
@@ -23,32 +24,35 @@ export const io = new Server(server, {
   pingInterval: 15000,
 });
 
+// Authenticate every socket best-effort (attaches socket.data.user for a valid
+// staff cookie). The connection stays open for anonymous clients so the public
+// config_update / game-draw broadcasts keep working; sensitive room joins are
+// gated below by authorizeRoomJoin.
+io.use(socketAuth);
+
 // Socket.io Connection Logic
 io.on('connection', (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
 
-  // Handle staff authentication / room entry
-  socket.on('join_game_room', (gameId: string) => {
-    socket.join(`game-${gameId}`);
-    console.log(`🔌 Client ${socket.id} joined room game-${gameId}`);
-  });
+  // Join a room only if the socket is authorized for it. Sensitive rooms
+  // (admin/agent/operator) require a verified staff token + role/identity;
+  // game rooms carry public draw data and are open to anyone.
+  const tryJoin = (room: string) => {
+    if (!authorizeRoomJoin(socket, room)) {
+      console.warn(`⛔ Socket ${socket.id} denied join to room ${room}`);
+      socket.emit('room_join_denied', { room });
+      return;
+    }
+    socket.join(room);
+    console.log(`🔌 Client ${socket.id} joined room ${room}`);
+  };
 
-  socket.on('join_agent_room', (agentId: string) => {
-    socket.join(`agent-${agentId}`);
-    console.log(`🔌 Agent ${socket.id} joined room agent-${agentId}`);
-  });
-
+  socket.on('join_game_room', (gameId: string) => tryJoin(`game-${gameId}`));
+  socket.on('join_agent_room', (agentId: string) => tryJoin(`agent-${agentId}`));
   // Operators join their own room to receive overflow-failsafe booking requests
-  socket.on('join_operator_room', (operatorId: string) => {
-    socket.join(`operator-${operatorId}`);
-    console.log(`🔌 Operator ${socket.id} joined room operator-${operatorId}`);
-  });
-
+  socket.on('join_operator_room', (operatorId: string) => tryJoin(`operator-${operatorId}`));
   // Admins/Superadmins join a shared room to receive top-up requests and platform events
-  socket.on('join_admin_room', () => {
-    socket.join('admin-room');
-    console.log(`🔌 Staff ${socket.id} joined admin-room`);
-  });
+  socket.on('join_admin_room', () => tryJoin('admin-room'));
 
   socket.on('leave_game_room', (gameId: string) => {
     socket.leave(`game-${gameId}`);
