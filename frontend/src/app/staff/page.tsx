@@ -70,7 +70,7 @@ function navFor(user: AuthUser): NavItem[] {
 
   if (user.role_name === "Bookie") {
     return [
-      ["live-hud", "Live HUD", "play"],
+      ["live-hud", "Live HUD & Games", "play"],
       ["bookings", "Bookings", "bell"],
       ["games", "Games", "grid"],
       ["wallet", "My Wallet", "wallet"],

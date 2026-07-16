@@ -150,7 +150,7 @@ export function BookieLiveHudSection() {
   return (
     <div className="hg-sec" style={{ padding: "0 10px" }}>
       <div className="hg-sec-head">
-        <h2 className="hg-sec-title">Live & Upcoming Games HUD</h2>
+        <h2 className="hg-sec-title">Live HUD & Games</h2>
         <p className="hg-sec-sub">Watch active draws and monitor upcoming schedules in real-time.</p>
       </div>
 
