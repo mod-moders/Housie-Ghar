@@ -6,8 +6,9 @@ import { money } from "@/lib/money";
 import { getPresetClass } from "@/lib/presetHelper";
 import { Icon } from "@/components/Icon";
 import { Badge, Button, EmptyHint } from "@/components/ui";
+import { useSocket } from "@/lib/hooks/useSocket";
 import type { GameSummary } from "@/lib/types";
-import LiveBoard from "@/app/game/[game_id]/live/page";
+import { LiveBoardContent } from "@/components/LiveBoardContent";
 
 function formatWhen(iso: string): { date: string; time: string } {
   const d = new Date(iso);
@@ -121,18 +122,16 @@ export function BookieLiveHudSection() {
     return () => clearInterval(id);
   }, [load]);
 
+  useSocket((event) => {
+    if (event === "game_list_update" || event === "ticket_status_change") {
+      load();
+    }
+  });
+
   if (activeGameId) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }} className="no-print">
-          <Button variant="ghost" size="sm" onClick={() => setActiveGameId(null)}>
-            <Icon name="arrowL" size={14} style={{ marginRight: 6 }} /> Back to HUD
-          </Button>
-          <span style={{ fontSize: "14px", color: "var(--text-dim)" }}>
-            Monitoring Live Stream: <b>{games?.find(g => g.game_id === activeGameId)?.title || activeGameId}</b>
-          </span>
-        </div>
-        <LiveBoard params={Promise.resolve({ game_id: activeGameId })} />
+        <LiveBoardContent gameId={activeGameId} isStaff={true} onBack={() => setActiveGameId(null)} />
       </div>
     );
   }

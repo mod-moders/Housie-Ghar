@@ -49,6 +49,7 @@ export function OperatorHudSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchedTickets, setSearchedTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showAllCalled, setShowAllCalled] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
@@ -270,12 +271,48 @@ export function OperatorHudSection() {
           </div>
 
           {/* Recent numbers called panel */}
-          <div className="hg-numbers-area" style={{ padding: "16px 24px" }}>
-            <div className="hg-recent">
-              {recent.map((n, i) => (
-                <span key={n} className={`hg-recent-chip${i === 0 ? " is-now" : ""}`}>{n}</span>
-              ))}
-              <span className="hg-recent-count">{count}/90 called</span>
+          <div className="hg-numbers-area" style={{ padding: "16px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--accent)" }}>
+                {showAllCalled ? "Calling Sequence (Newest First)" : "Recent Calls"}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>
+                  {count}/90 called
+                </span>
+                {count > 9 && (
+                  <button 
+                    onClick={() => setShowAllCalled(!showAllCalled)}
+                    style={{ background: "transparent", border: "none", color: "var(--cyan)", fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: "2px 6px", borderRadius: "4px", transition: "background 0.2s" }}
+                    className="hover-bg"
+                  >
+                    {showAllCalled ? "Show Less" : "Show All"}
+                    <Icon name={showAllCalled ? "chevU" : "chevD"} size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexWrap: showAllCalled ? "wrap" : "nowrap", gap: "6px", justifyContent: "flex-start", alignItems: "center" }}>
+              {(showAllCalled ? [...drawnNumbers].reverse() : recent).map((n, i) => {
+                const isCurrent = i === 0 && !showAllCalled;
+                return (
+                  <span 
+                    key={n} 
+                    className={`hg-recent-chip${isCurrent ? " is-now" : ""}`}
+                    style={{ 
+                      width: isCurrent ? "32px" : "29px", 
+                      height: isCurrent ? "32px" : "29px", 
+                      fontSize: isCurrent ? "13px" : "11.5px", 
+                      borderRadius: isCurrent ? "10px" : "9px",
+                      transition: "all 0.2s ease",
+                      flexShrink: 0
+                    }}
+                  >
+                    {n}
+                  </span>
+                );
+              })}
             </div>
           </div>
 

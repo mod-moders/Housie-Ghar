@@ -29,10 +29,9 @@ type NavItem = [key: string, label: string, icon: string];
 function navFor(user: AuthUser): NavItem[] {
   if (user.role_name === "Superadmin") {
     return [
-      ["hud", "Live HUD", "play"],
-      ["finance", "Finance Hub", "wallet"],
-      ["games", "Games", "grid"],
+      ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
+      ["finance", "Finance Hub", "wallet"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
@@ -45,10 +44,9 @@ function navFor(user: AuthUser): NavItem[] {
 
   if (user.role_name === "Financial Admin") {
     return [
-      ["hud", "Live HUD", "play"],
-      ["finance", "Finance Hub", "wallet"],
-      ["games", "Games", "grid"],
+      ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
+      ["finance", "Finance Hub", "wallet"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
@@ -60,8 +58,7 @@ function navFor(user: AuthUser): NavItem[] {
 
   if (user.role_name === "Operator") {
     return [
-      ["hud", "Live HUD", "play"],
-      ["games", "Games", "grid"],
+      ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["overflow", "Overflow Queue", "bell"],
       ["profile", "My Profile", "user"],
@@ -72,7 +69,6 @@ function navFor(user: AuthUser): NavItem[] {
     return [
       ["live-hud", "Live HUD & Games", "play"],
       ["bookings", "Bookings", "bell"],
-      ["games", "Games", "grid"],
       ["wallet", "My Wallet", "wallet"],
       ["profile", "My Profile", "user"],
     ];
@@ -81,13 +77,84 @@ function navFor(user: AuthUser): NavItem[] {
   return [];
 }
 
+function LiveHudAndGamesSection({ me }: { me: AuthUser }) {
+  const [activeTab, setActiveTab] = useState<"live" | "manage">("live");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }} className="no-print">
+        <button
+          onClick={() => setActiveTab("live")}
+          style={{
+            background: activeTab === "live" ? "var(--brand)" : "rgba(255,255,255,0.03)",
+            color: activeTab === "live" ? "var(--accent-ink)" : "var(--text)",
+            border: activeTab === "live" ? "1px solid var(--brand)" : "1px solid rgba(255,255,255,0.08)",
+            padding: "8px 16px",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "13px",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          <Icon name="play" size={14} />
+          Live HUD
+        </button>
+        <button
+          onClick={() => setActiveTab("manage")}
+          style={{
+            background: activeTab === "manage" ? "var(--brand)" : "rgba(255,255,255,0.03)",
+            color: activeTab === "manage" ? "var(--accent-ink)" : "var(--text)",
+            border: activeTab === "manage" ? "1px solid var(--brand)" : "1px solid rgba(255,255,255,0.08)",
+            padding: "8px 16px",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "13px",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          <Icon name="grid" size={14} />
+          Manage Games
+        </button>
+      </div>
+
+      <div>
+        {activeTab === "live" ? <OperatorHudSection /> : <GamesSection me={me} />}
+      </div>
+    </div>
+  );
+}
+
 export default function StaffDashboard() {
   const router = useRouter();
   const { user, setUser } = useAuthStore();
-  const [section, setSection] = useState<string | null>(null);
+  const [section, setSection] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("hg_staff_section") || null;
+    }
+    return null;
+  });
   const [collapsed, setCollapsed] = useState(false);
   const [hud, setHud] = useState<FinancialHud | null>(null);
   const [checked, setChecked] = useState(false);
+
+  const setSectionAndPersist = (newSec: string | null) => {
+    setSection(newSec);
+    if (typeof window !== "undefined") {
+      if (newSec) {
+        localStorage.setItem("hg_staff_section", newSec);
+      } else {
+        localStorage.removeItem("hg_staff_section");
+      }
+    }
+  };
 
   // Authoritative profile (also restores the session after a reload)
   useEffect(() => {
@@ -117,7 +184,7 @@ export default function StaffDashboard() {
 
   const nav = useMemo(() => (user ? navFor(user) : []), [user]);
   const isFo = !!user && (user.role_name === "Superadmin" || user.role_name === "Financial Admin");
-  const active = section ?? nav[0]?.[0] ?? null;
+  const active = section && nav.some((n) => n[0] === section) ? section : (nav[0]?.[0] ?? null);
 
   const loadHud = useCallback(() => {
     apiFetch<FinancialHud>("/api/wallet/hud").then(setHud).catch(() => {});
@@ -137,6 +204,7 @@ export default function StaffDashboard() {
     try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* cookie may already be gone */ }
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("hg_staff_token");
+      localStorage.removeItem("hg_staff_section");
     }
     setUser(null);
     router.replace("/staff/login");
@@ -163,7 +231,7 @@ export default function StaffDashboard() {
 
   const renderSection = () => {
     switch (active) {
-      case "overview": return <OverviewSection goSection={setSection} />;
+      case "overview": return <OverviewSection goSection={setSectionAndPersist} />;
       case "finance": return <FinanceHubSection me={user} onResolved={loadHud} />;
       case "games": return <GamesSection me={user} />;
       case "history": return <HistorySection />;
@@ -171,9 +239,9 @@ export default function StaffDashboard() {
       case "filling": return <FillingSection />;
       case "staff": return <WorkforceSection me={user} />;
       case "audit": return <AuditSection />;
-      case "bookies": return <BookieManagementSection me={user} goSection={setSection} />;
+      case "bookies": return <BookieManagementSection me={user} goSection={setSectionAndPersist} />;
       case "settings": return <SettingsSection />;
-      case "hud": return <OperatorHudSection />;
+      case "hud": return <LiveHudAndGamesSection me={user} />;
       case "overflow": return <OverflowSection me={user} />;
       case "broadcast": return <ShareGamesSection />;
       case "queue": return <BookieQueueSection me={user} />;
@@ -199,7 +267,7 @@ export default function StaffDashboard() {
                   <button
                     key={key}
                     className={`hg-side-link${active === key ? " is-active" : ""}`}
-                    onClick={() => setSection(key)}
+                    onClick={() => setSectionAndPersist(key)}
                     style={{ position: "relative" }}
                   >
                     <Icon name={ic} size={18} />
