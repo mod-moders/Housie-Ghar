@@ -9,6 +9,7 @@ import { EmptyHint, Avatar } from "@/components/ui";
 import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
 import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
+import type { AuthUser } from "@/lib/stores/authStore";
 
 interface QueueItem {
   request_id: string;
@@ -40,8 +41,16 @@ interface FinancialAnalysis {
   recent_games: GameBreakdown[];
 }
 
-export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
+export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
+  const showRequestsTab = me.role_name === "Financial Admin";
   const [activeTab, setActiveTab] = useState<"requests" | "ledgers" | "analysis">("analysis");
+
+  useEffect(() => {
+    if (!showRequestsTab && activeTab === "requests") {
+      setActiveTab("analysis");
+    }
+  }, [showRequestsTab, activeTab]);
+
   const [agents, setAgents] = useState<LedgerAgent[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -154,26 +163,28 @@ export function FinanceHubSection({ onResolved }: { onResolved?: () => void }) {
         >
           Bookie Ledgers
         </button>
-        <button
-          onClick={() => setActiveTab("requests")}
-          style={{
-            background: activeTab === "requests" ? "var(--surface)" : "none",
-            color: activeTab === "requests" ? "var(--cyan)" : "var(--text-dim)",
-            border: "none",
-            outline: "none",
-            boxShadow: "none",
-            borderRadius: "6px",
-            padding: "6px 16px",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-            margin: 0,
-            whiteSpace: "nowrap"
-          }}
-        >
-          Pending Requests ({queue.length})
-        </button>
+        {showRequestsTab && (
+          <button
+            onClick={() => setActiveTab("requests")}
+            style={{
+              background: activeTab === "requests" ? "var(--surface)" : "none",
+              color: activeTab === "requests" ? "var(--cyan)" : "var(--text-dim)",
+              border: "none",
+              outline: "none",
+              boxShadow: "none",
+              borderRadius: "6px",
+              padding: "6px 16px",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              margin: 0,
+              whiteSpace: "nowrap"
+            }}
+          >
+            Pending Requests ({queue.length})
+          </button>
+        )}
       </div>
 
       {activeTab === "requests" ? (

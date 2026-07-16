@@ -33,13 +33,14 @@ interface WinOverlay {
 interface FloatingReaction {
   id: number;
   emoji: string;
+  senderName: string;
   x: number;
 }
 
 let reactionSeq = 0;
-function makeReaction(emoji: string): FloatingReaction {
+function makeReaction(emoji: string, senderName: string): FloatingReaction {
   reactionSeq += 1;
-  return { id: reactionSeq, emoji, x: 8 + Math.random() * 70 };
+  return { id: reactionSeq, emoji, senderName, x: 8 + Math.random() * 70 };
 }
 
 export default function LiveBoard({ params }: { params: Promise<{ game_id: string }> }) {
@@ -56,6 +57,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   const [searchQuery, setSearchQuery] = useState("");
   const [searchedTickets, setSearchedTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [displayName, setDisplayName] = useState<string>("Player");
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const booking = useBookingStore();
@@ -106,11 +108,19 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
 
   // Player or Staff session check
   useEffect(() => {
-    apiFetch("/api/player/me").catch(() => {
-      return apiFetch("/api/auth/me").catch(() => {
-        router.push("/login");
+    apiFetch<{ player: { housie_name: string } }>("/api/player/me")
+      .then((res) => {
+        setDisplayName(res.player?.housie_name || "Player");
+      })
+      .catch(() => {
+        return apiFetch<{ user: { full_name: string } }>("/api/auth/me")
+          .then((res) => {
+            setDisplayName(res.user?.full_name || "Staff");
+          })
+          .catch(() => {
+            router.push("/login");
+          });
       });
-    });
   }, [router]);
 
   // Game meta + prize board
@@ -232,6 +242,10 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
            setRecentWinners(prev => prev.filter(win => win.ticket_id !== w.ticket_id)); // cleanup
         }, 6000);
       }, 1400);
+    } else if (data.event === "emoji_reaction") {
+      const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
+      setReactions((r) => [...r, next]);
+      setTimeout(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     }
   }, [beep, playNumberCall, playCelebration, addDrawn]);
 
@@ -254,9 +268,10 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
   };
 
   const react = (emoji: string) => {
-    const next = makeReaction(emoji);
-    setReactions((r) => [...r, next]);
-    setTimeout(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
+    apiFetch(`/api/games/${game_id}/reactions`, {
+      method: "POST",
+      body: JSON.stringify({ emoji, sender_name: displayName }),
+    }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
   const drawn = new Set(drawnNumbers);
@@ -283,9 +298,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             </button>
           </div>
 
-          <div className="hg-wakelock">
-            <Icon name="zap" size={11} strokeWidth={2.4} /> Numbers are called automatically — just watch and cheer
-          </div>
+
 
           <div className="hg-live-body">
             <div className="hg-live-left">
@@ -450,7 +463,15 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
 
           <div className="hg-reactions" aria-hidden="true">
             {reactions.map((r) => (
-              <span key={r.id} className="hg-react-float" style={{ left: `${r.x}%` }}>{r.emoji}</span>
+              <div
+                key={r.id}
+                className="hg-react-float hg-react-pill"
+                style={{ left: `${r.x}%` }}
+              >
+                <span className="hg-react-avatar">{r.senderName.slice(0, 2).toUpperCase()}</span>
+                <span className="hg-react-name">{r.senderName}</span>
+                <span className="hg-react-emoji">{r.emoji}</span>
+              </div>
             ))}
           </div>
 

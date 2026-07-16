@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import pool from '../db';
 
 export interface AuthenticatedPlayerRequest extends Request {
   player?: {
@@ -10,7 +11,7 @@ export interface AuthenticatedPlayerRequest extends Request {
   };
 }
 
-export function authenticatePlayer(req: AuthenticatedPlayerRequest, res: Response, next: NextFunction): void {
+export async function authenticatePlayer(req: AuthenticatedPlayerRequest, res: Response, next: NextFunction): Promise<void> {
   let token = null;
 
   if (req.headers['authorization']) {
@@ -31,6 +32,19 @@ export function authenticatePlayer(req: AuthenticatedPlayerRequest, res: Respons
 
   try {
     const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+
+    // Check player status in DB
+    const dbPlayer = await pool.query('SELECT status FROM Players WHERE player_id = $1', [decoded.playerId]);
+    if (dbPlayer.rowCount === 0 || dbPlayer.rows[0].status === 'Suspended') {
+      res.clearCookie('hg_player_token', {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+      res.status(401).json({ message: 'Your session has expired or account is deactivated.' });
+      return;
+    }
+
     req.player = {
       playerId: decoded.playerId,
       fullName: decoded.fullName,

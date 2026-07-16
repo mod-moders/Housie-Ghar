@@ -281,25 +281,55 @@ export function SettingsSection() {
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-              <input
-                className="hg-input"
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
-                placeholder="Group name"
-                disabled={shareGroups.length >= 5}
-                style={{ width: "100%", padding: "7px 12px", borderRadius: 8, fontSize: 12.5 }}
-              />
-              <input
-                className="hg-input"
-                value={groupUrl}
-                onChange={(event) => setGroupUrl(event.target.value)}
-                placeholder="WhatsApp invite link"
-                disabled={shareGroups.length >= 5}
-                style={{ width: "100%", padding: "7px 12px", borderRadius: 8, fontSize: 12.5 }}
-              />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Group Name
+                </span>
+                <input
+                  className="hg-input"
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  placeholder="e.g. Official Group A"
+                  disabled={shareGroups.length >= 5}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border-2)",
+                    background: "var(--bg)",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  WhatsApp Group Link
+                </span>
+                <input
+                  className="hg-input"
+                  value={groupUrl}
+                  onChange={(event) => setGroupUrl(event.target.value)}
+                  placeholder="https://chat.whatsapp.com/..."
+                  disabled={shareGroups.length >= 5}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border-2)",
+                    background: "var(--bg)",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    outline: "none"
+                  }}
+                />
+              </div>
+
               <Button
-                disabled={saving || !groupName.trim() || !/^https:\/\/(chat\.whatsapp\.com|web\.whatsapp\.com|wa\.me)\//i.test(groupUrl.trim()) || shareGroups.length >= 5}
+                disabled={saving || !groupName.trim() || !groupUrl.trim().startsWith("http") || shareGroups.length >= 5}
                 onClick={() => {
                   if (shareGroups.length >= 5) return;
                   const next = [...shareGroups, { name: groupName.trim(), url: groupUrl.trim() }];
@@ -308,7 +338,7 @@ export function SettingsSection() {
                   setGroupUrl("");
                   handleSave({ whatsapp_share_groups: JSON.stringify(next) });
                 }}
-                style={{ width: "100%", fontSize: 12.5 }}
+                style={{ width: "100%", fontSize: 12.5, marginTop: 4 }}
               >
                 Add Group ({shareGroups.length}/5)
               </Button>
@@ -321,7 +351,10 @@ export function SettingsSection() {
             )}
 
             {shareGroups.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 2 }}>
+                  Configured Groups
+                </span>
                 {shareGroups.map((group) => (
                   <div
                     key={`${group.name}-${group.url}`}
@@ -329,19 +362,24 @@ export function SettingsSection() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "8px 10px",
+                      padding: "8px 12px",
                       border: "1px solid var(--border-2)",
                       borderRadius: 8,
                       background: "var(--surface-2)",
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: 600,
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                      <Icon name="chat" size={13} style={{ color: "var(--success)", flexShrink: 0 }} />
-                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "var(--text)" }}>
-                        {group.name}
-                      </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                      <Icon name="chat" size={14} style={{ color: "var(--success)", flexShrink: 0 }} />
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                        <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "var(--text)" }}>
+                          {group.name}
+                        </span>
+                        <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "var(--text-mute)", fontSize: 10.5, fontWeight: 400 }}>
+                          {group.url}
+                        </span>
+                      </div>
                     </div>
                     <button
                       title={`Remove ${group.name}`}
@@ -353,12 +391,13 @@ export function SettingsSection() {
                       style={{
                         display: "grid",
                         placeItems: "center",
-                        padding: 3,
+                        padding: 4,
                         background: "none",
                         border: 0,
                         color: "var(--text-dim)",
                         cursor: "pointer",
                         borderRadius: "50%",
+                        transition: "all 0.15s"
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = "var(--danger-soft)";
@@ -375,7 +414,7 @@ export function SettingsSection() {
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: "center", padding: "12px", color: "var(--text-dim)", fontSize: 11.5, border: "1.5px dashed var(--border-2)", borderRadius: 8 }}>
+              <div style={{ textAlign: "center", padding: "16px", color: "var(--text-mute)", fontSize: 12, border: "1.5px dashed var(--border)", borderRadius: 8, marginTop: 8, fontStyle: "italic" }}>
                 No groups configured yet.
               </div>
             )}

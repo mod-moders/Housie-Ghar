@@ -79,7 +79,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     const agentsRes = await client.query(
       `SELECT user_id, full_name, phone, town, current_balance
        FROM Users
-       WHERE role_id = 4 AND status = 'Active'
+       WHERE role_id = 4 AND status = 'Active' AND receive_overflow = TRUE
        ORDER BY user_id`
     );
     const agents = agentsRes.rows.map((a) => ({
@@ -133,43 +133,16 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
     // 5. Overflow Failsafe: no bookie had sufficient inventory → route to Superadmin, Financial Admin, or Operator turn wise.
     if (!assigned) {
-      // Find the last overflow booking's assigned role to determine the sequence
-      const lastOverflowRes = await client.query(
-        `SELECT u.role_id
-         FROM Bookings b
-         JOIN Users u ON b.assigned_agent_id = u.user_id
-         WHERE b.is_overflow = TRUE
-         ORDER BY b.locked_at DESC LIMIT 1`
+      const staffRes = await client.query(
+        `SELECT u.user_id, u.full_name, u.phone, u.town, u.role_id, MAX(b.locked_at) as last_assigned
+         FROM Users u
+         LEFT JOIN Bookings b ON u.user_id = b.assigned_agent_id AND b.is_overflow = TRUE
+         WHERE u.role_id IN (1, 2, 3) AND u.status = 'Active' AND u.receive_overflow = TRUE AND u.phone IS NOT NULL AND u.phone != ''
+         GROUP BY u.user_id, u.full_name, u.phone, u.town, u.role_id
+         ORDER BY last_assigned ASC NULLS FIRST, u.user_id ASC`
       );
-      const lastRole = lastOverflowRes.rows[0]?.role_id ?? null;
 
-      // Define preferred role sequence based on lastRole (Superadmin=1, Financial Admin=2, Operator=3)
-      let preferredRoles = [1, 2, 3];
-      if (lastRole === 1) {
-        preferredRoles = [2, 3, 1];
-      } else if (lastRole === 2) {
-        preferredRoles = [3, 1, 2];
-      } else if (lastRole === 3) {
-        preferredRoles = [1, 2, 3];
-      }
-
-      let selectedStaff = null;
-      for (const roleId of preferredRoles) {
-        const staffRes = await client.query(
-          `SELECT u.user_id, u.full_name, u.phone, u.town, MAX(b.locked_at) as last_assigned
-           FROM Users u
-           LEFT JOIN Bookings b ON u.user_id = b.assigned_agent_id AND b.is_overflow = TRUE
-           WHERE u.role_id = $1 AND u.status = 'Active' AND u.phone IS NOT NULL AND u.phone != ''
-           GROUP BY u.user_id, u.full_name, u.phone, u.town
-           ORDER BY last_assigned ASC NULLS FIRST, u.user_id ASC
-           LIMIT 1`,
-          [roleId]
-        );
-        if (staffRes.rows.length > 0) {
-          selectedStaff = staffRes.rows[0];
-          break;
-        }
-      }
+      const selectedStaff = staffRes.rows[0] ?? null;
 
       if (!selectedStaff) {
         await client.query('ROLLBACK');
@@ -949,10 +922,6 @@ export async function staffManualBooking(req: AuthenticatedRequest, res: Respons
     res.status(400).json({ message: 'game_id, ticket_ids, and housie_name are required' });
     return;
   }
-  if (ticket_ids.length > 6) {
-    res.status(400).json({ message: 'A maximum of 6 tickets can be booked at once' });
-    return;
-  }
   if (housie_name.length < 3 || housie_name.length > 20) {
     res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
     return;
@@ -1053,5 +1022,41 @@ export async function staffManualBooking(req: AuthenticatedRequest, res: Respons
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();
+  }
+}
+
+export async function getAgentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const agentId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT b.booking_id, b.housie_name, b.total_amount, b.booking_status,
+              COALESCE(b.confirmed_at, b.rejected_at, b.locked_at) as processed_at,
+              g.title AS game_title,
+              array_agg(t.ticket_number ORDER BY t.ticket_number) AS ticket_numbers
+       FROM Bookings b
+       JOIN Scheduled_Games g ON b.game_id = g.game_id
+       JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
+       WHERE b.assigned_agent_id = $1 AND b.booking_status IN ('Sold', 'Cancelled')
+       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.booking_status, b.confirmed_at, b.rejected_at, b.locked_at, g.title
+       ORDER BY processed_at DESC
+       LIMIT 10`,
+      [agentId]
+    );
+
+    const history = result.rows.map((row) => ({
+      booking_id: row.booking_id,
+      housie_name: row.housie_name,
+      game_title: row.game_title,
+      ticket_numbers: row.ticket_numbers as number[],
+      total_amount: parseFloat(row.total_amount),
+      booking_status: row.booking_status,
+      processed_at: row.processed_at,
+    }));
+
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching agent history:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 }

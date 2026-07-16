@@ -4,17 +4,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
-import { useSSE } from "@/lib/hooks/useSSE";
+import { useSSE, type SSEEventData } from "@/lib/hooks/useSSE";
+import { useSocket } from "@/lib/hooks/useSocket";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { Icon } from "@/components/Icon";
-import { EmptyHint, KpiCard } from "@/components/ui";
+import { Button, EmptyHint, KpiCard } from "@/components/ui";
 import { downloadPoster, type PosterKind } from "@/lib/sharePoster";
-import type { GameSummary, QueueBooking } from "@/lib/types";
+import type { GameSummary, QueueBooking, Prize } from "@/lib/types";
+import { type AuthUser } from "@/lib/stores/authStore";
 import { getPresetClass } from "@/lib/presetHelper";
+import { HousieTicket, gridToMatrix, type TicketMatrix } from "@/components/HousieTicket";
+import dynamic from "next/dynamic";
+
+const RealisticBingoCage = dynamic(
+  () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
+  { ssr: false }
+);
 
 interface WhatsAppShareGroup {
   name: string;
   url: string;
+}
+
+function fmtDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("en-IN", {
+      weekday: "short", day: "2-digit", month: "short", hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  } catch {
+    return iso;
+  }
 }
 
 export function OperatorHudSection() {
@@ -23,31 +42,64 @@ export function OperatorHudSection() {
   const [speed, setSpeed] = useState(8);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
+  
+  const { drawnNumbers, lastDrawn, gameStatus, reset, addDrawn } = useGameStore();
+  const [revealed, setRevealed] = useState(true);
+  const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchedTickets, setSearchedTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
       .then((g) => {
         const open = g.filter((x) => x.game_status !== "Completed");
         setGames(open);
-        setSelectedId((cur) => {
-          if (cur && open.some((x) => x.game_id === cur)) return cur;
-          const live = open.find((x) => x.game_status === "Live" || x.game_status === "Paused");
-          return (live ?? open[0])?.game_id ?? null;
-        });
       })
       .catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { reset(); }, [selectedId, reset]);
+  const onEvent = useCallback((data: SSEEventData) => {
+    if (data.event === "draw") {
+      const num = data.draw_number as number;
+      setRevealed(false);
+      setTimeout(() => {
+        addDrawn(num);
+        setRevealed(true);
+      }, 2000);
+    } else if (data.event === "winner") {
+      const w = data as any;
+      setPrizes((prev) =>
+        prev.map((p) =>
+          p.pattern_name === w.prize
+            ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
+            : p
+        )
+      );
+    }
+  }, [addDrawn]);
 
-  useSSE(selectedId);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    reset();
+    setSearchedTickets([]);
+    setSearchQuery("");
+  }, [selectedId, reset]);
+
+  useSSE(selectedId, onEvent);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    apiFetch<GameSummary>(`/api/games/${selectedId}`)
+      .then((g) => {
+        setPrizes(g.prize_pool || []);
+      })
+      .catch(() => {});
+  }, [selectedId]);
 
   const game = games.find((g) => g.game_id === selectedId) ?? null;
-  const running = gameStatus === "Live";
 
-  const act = async (action: "start" | "pause" | "resume") => {
+  const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;
     setBusy(true);
     setError(null);
@@ -74,96 +126,295 @@ export function OperatorHudSection() {
     }
   };
 
-  if (!game) {
+  const handleSearch = () => {
+    if (!selectedId || !searchQuery.trim()) return;
+    setIsSearching(true);
+    apiFetch<any[]>(`/api/games/${selectedId}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
+      .then((tickets) => {
+        const mapped = tickets.map((t) => ({
+          number: t.ticket_number,
+          matrix: gridToMatrix(t.grid_data),
+          owner: t.owner_housie_name,
+        }));
+        setSearchedTickets((prev) => {
+          const existing = new Set(prev.map((x) => x.number));
+          const unique = mapped.filter((x) => !existing.has(x.number));
+          return [...prev, ...unique];
+        });
+        setSearchQuery("");
+      })
+      .catch((err) => {
+        console.error("Search failed:", err);
+      })
+      .finally(() => {
+        setIsSearching(false);
+      });
+  };
+
+  if (!selectedId) {
     return (
       <div className="hg-sec">
-        <EmptyHint icon="play" title="No game to run" sub="Once a game is scheduled, its live controls appear here." />
+        <p className="hg-sec-sub">Select an active or scheduled game to launch the LIVE HUD gameplay control deck.</p>
+        {games.length === 0 ? (
+          <EmptyHint icon="play" title="No games to run" sub="Once a game is scheduled, its live controls appear here." />
+        ) : (
+          <div className="hg-fill-grid" style={{ marginTop: "16px" }}>
+            {games.map((g) => {
+              const pct = Math.round((g.sold_count / g.total_tickets) * 100) || 0;
+              const dateStr = fmtDateTime(g.scheduled_at);
+              const presetClass = getPresetClass(g.title) || "";
+              return (
+                <div 
+                  key={g.game_id} 
+                  className={`hg-fill-card hg-card hover-glow ${presetClass}`}
+                  onClick={() => setSelectedId(g.game_id)}
+                  style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s" }}
+                >
+                  <div className="hg-fill-top">
+                    <strong className="hg-card-title" style={{ fontSize: "16px" }}>{g.title}</strong>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+                  </div>
+                  <div className="hg-fill-meta" style={{ marginTop: "6px" }}>
+                    <span className="hg-card-when">{dateStr}</span>
+                  </div>
+                  <div className="hg-fill-bar" style={{ marginTop: "12px" }}>
+                    <i style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="hg-fill-pct" style={{ marginTop: "6px" }}>
+                    <span>{g.sold_count} / {g.total_tickets} tickets sold ({pct}%)</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
+  if (!game) return null;
+
   const status = gameStatus === "Scheduled" ? game.game_status : gameStatus;
+  const drawn = new Set(drawnNumbers);
+  const count = drawnNumbers.length;
+  const recent = drawnNumbers.slice(Math.max(0, count - 9)).reverse();
 
   return (
     <div className="hg-sec">
-      {games.length > 1 && (
-        <div className="hg-form-row" style={{ maxWidth: 360 }}>
-          <label className="hg-form-field">
-            <span>Game</span>
-            <select value={selectedId ?? ""} onChange={(e) => setSelectedId(e.target.value)}>
-              {games.map((g) => (
-                <option key={g.game_id} value={g.game_id}>{g.title} ({g.game_status})</option>
-              ))}
-            </select>
-          </label>
+      {/* Operator controls header card */}
+      <div className="hg-panel" style={{ padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", border: "1px solid var(--accent)", background: "rgba(212, 175, 55, 0.05)", borderRadius: "var(--radius)" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <button className="hg-ic-btn" title="Back to game list" onClick={() => setSelectedId(null)}>
+            <Icon name="arrowL" size={16} />
+          </button>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "16px" }}>{game.title} LIVE Deck</h3>
+            <span className="hg-dim" style={{ fontSize: "12px" }}>Operator Console</span>
+          </div>
         </div>
-      )}
 
-      <div className="hg-hud-grid">
-        <div className="hg-hud-main">
-          <div className="hg-hud-game">
-            {game.title} · <span className={`hg-pill hg-pill-${status.toLowerCase()}`}>{status.toUpperCase()}</span>
-          </div>
-          <div className="hg-hud-num">{lastDrawn ?? "—"}</div>
-          <div className="hg-hud-sub">{drawnNumbers.length} of 90 numbers called</div>
-          <div className="hg-hud-controls">
-            {status === "Scheduled" && (
-              <button className="hg-hud-btn is-on" disabled={busy} onClick={() => act("start")}>
-                <Icon name="play" size={18} /> Start draw
-              </button>
-            )}
-            {status === "Live" && (
-              <button className="hg-hud-btn is-on" disabled={busy} onClick={() => act("pause")}>
-                <Icon name="pause" size={18} /> Pause draw
-              </button>
-            )}
-            {status === "Paused" && (
-              <button className="hg-hud-btn" disabled={busy} onClick={() => act("resume")}>
-                <Icon name="play" size={18} /> Resume draw
-              </button>
-            )}
-          </div>
-          <div className="hg-speed">
-            <div className="hg-speed-lbl"><span>Call speed</span><b>{speed}s interval</b></div>
-            <input
-              type="range" min={5} max={12} value={speed}
-              onChange={(e) => applySpeed(+e.target.value)}
-              className="hg-speed-range"
-              disabled={!running}
-            />
-            <div className="hg-speed-ends"><span>Fast 5s</span><span>Slow 12s</span></div>
-          </div>
-          {error && <p className="hg-sec-err" style={{ marginTop: 10 }}>{error}</p>}
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          {/* Controls buttons */}
+          {status === "Scheduled" && (
+            <Button variant="cta" size="sm" icon="play" disabled={busy} onClick={() => act("start")}>
+              Start Draw
+            </Button>
+          )}
+          {status === "Live" && (
+            <Button variant="ghost" size="sm" icon="pause" disabled={busy} style={{ color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => act("pause")}>
+              Pause Draw
+            </Button>
+          )}
+          {status === "Paused" && (
+            <Button variant="cta" size="sm" icon="play" disabled={busy} onClick={() => act("resume")}>
+              Resume Draw
+            </Button>
+          )}
+          {(status === "Live" || status === "Paused") && (
+            <Button variant="ghost" size="sm" icon="trash" disabled={busy} style={{ color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => act("stop")}>
+              Stop Draw
+            </Button>
+          )}
         </div>
-        <div className="hg-hud-side">
-          <KpiCard
-            label="Tickets sold"
-            value={`${game.sold_count} / ${game.total_tickets}`}
-            sub={`${Math.round((game.sold_count / game.total_tickets) * 100)}% full`}
+
+        {/* Speed settings slider */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600 }}>
+            <span>Call Speed</span>
+            <span>{speed}s interval</span>
+          </div>
+          <input
+            type="range" min={5} max={12} value={speed}
+            onChange={(e) => applySpeed(+e.target.value)}
+            disabled={status !== "Live"}
+            style={{ width: "100%", accentColor: "var(--accent)" }}
           />
-          <KpiCard label="Prize pool" value={money(game.prize_pool.reduce((s, p) => s + p.prize_amount, 0))} />
-          <div className="hg-ghost-note">
-            <Icon name="shield" size={14} /> Ghost-Host auto-resume is armed. If you disconnect, the draw continues on its own.
+        </div>
+      </div>
+
+      <div className="hg-live-body" style={{ marginTop: "12px" }}>
+        <div className="hg-live-left">
+          {/* Cage + status */}
+          <div className="hg-cage-area">
+            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} />
+            
+            <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
+              {status === "Completed"
+                ? "Game over — thanks for playing!"
+                : status === "Paused"
+                  ? "Draw paused…"
+                  : !revealed
+                    ? "Spinning…"
+                    : count > 0 ? `Number ${lastDrawn} called` : "Waiting for the first call…"}
+            </div>
+          </div>
+
+          {/* Recent numbers called panel */}
+          <div className="hg-numbers-area" style={{ padding: "16px 24px" }}>
+            <div className="hg-recent">
+              {recent.map((n, i) => (
+                <span key={n} className={`hg-recent-chip${i === 0 ? " is-now" : ""}`}>{n}</span>
+              ))}
+              <span className="hg-recent-count">{count}/90 called</span>
+            </div>
+          </div>
+
+          {/* 90 number box */}
+          <div className="hg-numbers-area" style={{ marginTop: "12px" }}>
+            <div className="hg-board90">
+              {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
+                <span
+                  key={n}
+                  className={`hg-b90${drawn.has(n) ? " is-called" : ""}${n === lastDrawn && revealed ? " is-current" : ""}`}
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="hg-live-right">
+          <div className="hg-prizeboard">
+            <h2 className="hg-section-title">Prizes</h2>
+            <div className="hg-prizeboard-grid">
+              {prizes.map((p) => (
+                <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}`}>
+                  <div className="hg-prize-l">
+                    <span className="hg-prize-name">{p.pattern_name}</span>
+                    <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                  </div>
+                  <div className="hg-prize-r">
+                    {p.claimed && p.winner_housie_name ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <span className="hg-prize-winner">
+                          {p.winner_housie_name}
+                          {p.winner_ticket_number && (
+                            <span style={{ opacity: 0.8, fontSize: '0.85em', marginLeft: '4px' }}>
+                              (Tk #{p.winner_ticket_number})
+                            </span>
+                          )}
+                        </span>
+                        {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
+                      </div>
+                    ) : (
+                      <span className="hg-prize-open">Open</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Search Tickets Section */}
+          <div className="hg-ticket-search-box" style={{ marginTop: "12px" }}>
+            <h2 className="hg-section-title">Search Game Tickets</h2>
+            <div className="hg-search-input-wrapper">
+              <input
+                type="text"
+                placeholder="Search ticket # or player name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="hg-search-input"
+              />
+              <button onClick={handleSearch} className="hg-search-btn" disabled={isSearching} aria-label="Search">
+                {isSearching ? <span className="hg-search-spinner" /> : <Icon name="search" size={16} />}
+              </button>
+            </div>
+            {searchedTickets.length > 0 && (
+              <div className="hg-searched-results">
+                <div className="hg-searched-results-head">
+                  <span>Search Results ({searchedTickets.length})</span>
+                  <button onClick={() => { setSearchedTickets([]); setSearchQuery(""); }} className="hg-clear-search-btn">
+                    Clear
+                  </button>
+                </div>
+                <div className="hg-mytickets-row">
+                  {searchedTickets.map((t) => (
+                    <div key={t.number} className="hg-live-ticket-card">
+                      <HousieTicket
+                        matrix={t.matrix}
+                        drawn={drawn}
+                        compact
+                      />
+                      <div className="hg-live-ticket-footer">
+                        <span className="hg-live-ticket-number">Ticket #{t.number}</span>
+                        <span className="hg-live-ticket-player-name">{t.owner || "Player"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+      {error && <p className="hg-sec-err" style={{ marginTop: 10 }}>{error}</p>}
     </div>
   );
 }
 
-export function OverflowSection() {
+export function OverflowSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<{ user_id: string; full_name: string; role_name: string; receive_overflow: boolean }[]>([]);
+  const [updatingSettings, setUpdatingSettings] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/operator/overflow-queue").then(setQueue).catch(() => {});
   }, []);
+
+  const loadSettings = useCallback(() => {
+    if (me.role_name !== "Superadmin") return;
+    apiFetch<any[]>("/api/users/overflow-settings")
+      .then(setSettings)
+      .catch(() => {});
+  }, [me]);
 
   useEffect(() => {
     load();
     const id = setInterval(load, 10000);
     return () => clearInterval(id);
   }, [load]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  useSocket(
+    (event) => {
+      if (event === "overflow_booking") {
+        load();
+        try {
+          const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav");
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch {}
+      }
+    },
+    { event: "join_operator_room", arg: me.user_id }
+  );
 
   const forceConfirm = async (id: string) => {
     setError(null);
@@ -175,8 +426,64 @@ export function OverflowSection() {
     }
   };
 
+  const toggleSetting = async (userId: string, currentVal: boolean) => {
+    setUpdatingSettings(true);
+    try {
+      await apiFetch(`/api/users/${userId}/overflow-settings`, {
+        method: "PATCH",
+        body: JSON.stringify({ receive_overflow: !currentVal }),
+      });
+      loadSettings();
+    } catch (e) {
+      console.error("Failed to update overflow setting:", e);
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
   return (
     <div className="hg-sec">
+      {me.role_name === "Superadmin" && (
+        <div className="hg-panel" style={{ padding: "16px 20px", marginBottom: "24px" }}>
+          <div className="hg-panel-head" style={{ marginBottom: "12px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 600, color: "var(--accent)" }}>Overflow Routing Settings</h3>
+            <p className="hg-sec-sub" style={{ fontSize: "11px", marginTop: "2px" }}>
+              Select which active staff members participate in the overflow queue (round-robin turn wise sequence).
+            </p>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            {settings.map((s) => (
+              <label 
+                key={s.user_id} 
+                className="hover-glow"
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "8px", 
+                  background: "rgba(255,255,255,0.03)", 
+                  padding: "8px 14px", 
+                  borderRadius: "var(--radius)", 
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  cursor: updatingSettings ? "not-allowed" : "pointer" 
+                }}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={s.receive_overflow}
+                  disabled={updatingSettings}
+                  onChange={() => toggleSetting(s.user_id, s.receive_overflow)}
+                  style={{ accentColor: "var(--accent)" }}
+                />
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 500 }}>{s.full_name}</span>
+                  <span className="hg-dim" style={{ fontSize: "10px" }}>{s.role_name}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="hg-sec-sub">Bookie overflow failsafe — bookings routed to you when no agent has wallet balance.</p>
       {error && <p className="hg-sec-err">{error}</p>}
       {queue.length === 0 ? (
@@ -196,21 +503,7 @@ export function OverflowSection() {
   );
 }
 
-// ── Share to WhatsApp ───────────────────────────────────────────────────────
-// Generates a JPEG poster (Canvas 2D — see lib/sharePoster.ts) with a matching
-// prewritten caption. Every click always downloads the image (no OS share
-// sheet — that path was unpredictable and could swallow the caption with no
-// way to recover it). The caption stays visible on screen afterward so the
-// operator can copy it or open WhatsApp with it whenever they're ready.
-function fmtDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("en-IN", {
-      weekday: "short", day: "2-digit", month: "short", hour: "numeric", minute: "2-digit", hour12: true,
-    });
-  } catch {
-    return iso;
-  }
-}
+
 
 export function ShareGamesSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
@@ -343,6 +636,8 @@ export function ShareGamesSection() {
                       className="hg-share-group"
                       onClick={() => {
                         navigator.clipboard.writeText(result.caption).catch(() => {});
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2500);
                         window.open(group.url, "_blank", "noopener,noreferrer");
                       }}
                     >
@@ -355,7 +650,12 @@ export function ShareGamesSection() {
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
                     className="hg-share-group"
-                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer")}
+                    onClick={() => {
+                      navigator.clipboard.writeText(result.caption).catch(() => {});
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2500);
+                      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(result.caption)}`, "_blank", "noopener,noreferrer");
+                    }}
                   >
                     <Icon name="chat" size={14} style={{ color: "var(--success)" }} />
                     <span>Share via WhatsApp</span>

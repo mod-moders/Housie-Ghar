@@ -3,6 +3,8 @@
  */
 
 import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { env } from '../../config/env';
 import pool from '../../db';
 import { sseManager } from '../../utils/sseManager';
 import { CONSTANTS } from '../../config/constants';
@@ -14,6 +16,7 @@ import {
   pauseGame,
   resumeGame,
   changeGameSpeed,
+  completeGame,
 } from '../../services/gameEngine';
 
 const VALID_PATTERNS = new Set<string>(CONSTANTS.PRIZE_PATTERNS as readonly string[]);
@@ -309,6 +312,21 @@ export async function handleResumeGame(req: any, res: Response): Promise<void> {
   } catch (error: any) {
     console.error('Error resuming game:', error);
     res.status(400).json({ message: error.message || 'Failed to resume game' });
+  }
+}
+
+/**
+ * Stop/Complete Game Early (Operator/Admin)
+ */
+export async function handleStopGame(req: any, res: Response): Promise<void> {
+  const { game_id } = req.params;
+
+  try {
+    await completeGame(game_id);
+    res.json({ message: 'Game completed/stopped successfully' });
+  } catch (error: any) {
+    console.error('Error stopping game:', error);
+    res.status(400).json({ message: error.message || 'Failed to stop game' });
   }
 }
 
@@ -708,4 +726,57 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
     console.error('Error fetching game sales details:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+}
+
+/**
+ * Send Emoji Reaction (Player / Staff)
+ */
+export async function sendEmojiReaction(req: Request, res: Response): Promise<void> {
+  const game_id = req.params.game_id as string;
+  const { emoji, sender_name } = req.body;
+
+  if (!emoji) {
+    res.status(400).json({ message: 'emoji is required' });
+    return;
+  }
+
+  // Resolve sender name from authenticated session cookies if possible
+  let resolvedName = sender_name || 'Guest';
+
+  // 1. Try player session token
+  const playerToken = req.cookies?.hg_player_token;
+  if (playerToken) {
+    try {
+      const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+      if (decoded && decoded.housieName) {
+        resolvedName = decoded.housieName;
+      }
+    } catch (err) {
+      // Ignored: fallback to staff token or sender_name
+    }
+  }
+
+  // 2. Try staff session token if name not resolved as player
+  if (resolvedName === 'Guest' || resolvedName === sender_name) {
+    const staffToken = req.cookies?.[CONSTANTS.JWT_COOKIE_NAME];
+    if (staffToken) {
+      try {
+        const decoded = jwt.verify(staffToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        if (decoded && decoded.fullName) {
+          resolvedName = decoded.fullName;
+        }
+      } catch (err) {
+        // Ignored
+      }
+    }
+  }
+
+  // Broadcast to all SSE clients listening to this game
+  sseManager.broadcast(game_id, {
+    event: 'emoji_reaction',
+    emoji,
+    player_id: resolvedName,
+  });
+
+  res.json({ success: true });
 }

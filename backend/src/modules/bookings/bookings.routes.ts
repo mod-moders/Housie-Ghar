@@ -11,6 +11,7 @@ import {
   forceConfirmBooking,
   getSkipAlerts,
   staffManualBooking,
+  getAgentHistory,
 } from './bookings.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -23,6 +24,7 @@ router.get('/status/:booking_id', getBookingStatus);
 // Bookie endpoints (Authenticated)
 router.get('/agent/queue', authenticateToken, requireRole(['Bookie']), getAgentQueue);
 router.get('/agent/sales', authenticateToken, requireRole(['Bookie']), getAgentSales);
+router.get('/agent/history', authenticateToken, requireRole(['Bookie']), getAgentHistory);
 router.get('/agent/skip-alerts', authenticateToken, requireRole(['Bookie']), getSkipAlerts);
 router.post('/agent/direct-sale', authenticateToken, requireRole(['Bookie']), directSale);
 router.post('/agent/:booking_id/confirm', authenticateToken, requireRole(['Bookie']), confirmBooking);

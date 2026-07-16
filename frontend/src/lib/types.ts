@@ -101,7 +101,8 @@ export interface StaffUser {
   role_name: "Superadmin" | "Financial Admin" | "Operator" | "Bookie";
   role_id: number;
   is_cfo: boolean;
-  email: string;
+  email: string | null;
+  username: string;
   phone: string | null;
   upi_id: string | null;
   town: string | null;
@@ -110,6 +111,7 @@ export interface StaffUser {
   assigned_games_count: number;
   trust: TrustTier | null;
   last_login: string | null;
+  password_plain?: string | null;
 }
 
 export interface AuditEntry {
@@ -150,6 +152,7 @@ export interface FinancialHud {
   today_collection: number;
   today_profit: number;
   monthly_profit: number;
+  pending_topups: number;
 }
 
 export interface QueueBooking {

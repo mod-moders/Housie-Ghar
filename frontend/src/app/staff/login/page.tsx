@@ -17,6 +17,7 @@ export default function StaffLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async () => {
     if (!email || !password || busy) return;
@@ -92,16 +93,26 @@ export default function StaffLogin() {
             <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="password">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
-            />
+            <div className="hg-password-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+              />
+              <button
+                type="button"
+                className="hg-password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide Password" : "Show Password"}
+              >
+                <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
+              </button>
+            </div>
           </div>
 
           <Button type="submit" variant="cta" full disabled={busy || !email || !password}>

@@ -1914,9 +1914,55 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-emoji-btn:hover{transform:scale(1.15)}
 .hg-emoji-btn:active{transform:scale(.9)}
 .hg-reactions{position:fixed;inset:0;pointer-events:none;z-index:90;max-width:452px;margin:0 auto}
-.hg-react-float{position:absolute;bottom:70px;font-size:30px;animation:hg-rise 2.6s ease-out forwards}
+.hg-react-float{position:absolute;bottom:70px;animation:hg-rise 2.6s ease-out forwards}
 @keyframes hg-rise{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-10px) scale(1)}
   100%{transform:translateY(-78vh) scale(1.1) rotate(12deg);opacity:0}}
+
+.hg-react-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 4px 10px 4px 6px;
+  color: #fff;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.hg-react-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand, #d4af37), #f3e5ab);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-shadow: none;
+}
+
+.hg-react-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  color: #f3e5ab;
+}
+
+.hg-react-emoji {
+  font-size: 16px;
+  flex-shrink: 0;
+}
 
 /* ---- win overlay ---- */
 .hg-win-overlay{position:fixed;inset:0;z-index:95;display:grid;place-items:center;
@@ -2089,6 +2135,27 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-tr-head{font:700 10.5px var(--font-head);letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute);
   background:var(--surface-2)}
 .hg-tr-6{grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr}
+.hg-tr-games{grid-template-columns:2fr 1fr 1.2fr 1fr 1.2fr 1fr 180px}
+.hg-tr-history{grid-template-columns:2fr 1fr 1.2fr 1fr 200px}
+
+/* premium table styles */
+.hg-table-premium .hg-tr {
+  padding: 0;
+  align-items: stretch;
+  gap: 0;
+}
+.hg-table-premium .hg-tr > span,
+.hg-table-premium .hg-tr > strong,
+.hg-table-premium .hg-tr > div {
+  border-right: 1px solid var(--border-light);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+}
+.hg-table-premium .hg-tr > :last-child {
+  border-right: none;
+}
 .hg-td-name{display:flex;align-items:center;gap:9px;font-family:var(--font-head);font-weight:600}
 .hg-td-fill{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px}
 .hg-mini-bar{display:inline-block;width:56px;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
@@ -3479,6 +3546,48 @@ select option {
   background: var(--success);
   color: #fff;
   border-color: var(--ink);
+}
+
+/* Hide default browser password reveal/eye icons */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Custom password toggler wrapper styles */
+.hg-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.hg-password-wrapper input {
+  padding-right: 40px !important;
+  width: 100%;
+}
+.hg-password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-mute) !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+  z-index: 5;
+}
+.hg-password-toggle:hover {
+  color: var(--accent) !important;
 }
 
 

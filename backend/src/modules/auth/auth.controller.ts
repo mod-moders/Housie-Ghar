@@ -27,12 +27,12 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.password_hash, u.temp_password_required, u.status,
-              u.role_id, u.current_balance, u.is_cfo, u.town, r.role_name
+      `SELECT u.user_id, u.full_name, u.email, u.username, u.password_hash, u.temp_password_required, u.status,
+              u.role_id, u.current_balance, u.is_cfo, u.town, u.receive_overflow, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
-       WHERE u.email = $1`,
-      [loginEmail]
+       WHERE u.email = $1 OR u.username = $1 OR u.username = $2 OR (r.role_name = 'Superadmin' AND $1 = 'superadmin@housieghar.in')`,
+      [loginEmail, email.toLowerCase().trim()]
     );
 
     if (result.rowCount === 0) {
@@ -73,6 +73,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       roleName: user.role_name,
       fullName: user.full_name,
       email: user.email,
+      username: user.username,
     };
 
     const token = jwt.sign(payload, env.JWT_PRIVATE_KEY, {
@@ -96,10 +97,12 @@ export async function login(req: Request, res: Response): Promise<void> {
         role_id: user.role_id,
         role_name: user.role_name,
         email: user.email,
+        username: user.username,
         current_balance: parseFloat(user.current_balance),
         temp_password_required: user.temp_password_required,
         is_cfo: user.is_cfo === true,
         town: user.town ?? null,
+        receive_overflow: user.receive_overflow === true,
       },
     });
   } catch (error) {
@@ -120,16 +123,21 @@ export function logout(req: Request, res: Response): void {
 export async function getCurrentProfile(req: any, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.phone, u.upi_id, u.town, u.status,
-              u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, r.role_name
+      `SELECT u.user_id, u.full_name, u.email, u.username, u.phone, u.upi_id, u.town, u.status,
+              u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, u.receive_overflow, u.nationality, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        WHERE u.user_id = $1`,
       [req.user.userId]
     );
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: 'User not found' });
+    if (result.rowCount === 0 || result.rows[0].status === 'Deleted' || result.rows[0].status === 'Suspended') {
+      res.clearCookie(CONSTANTS.JWT_COOKIE_NAME, {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+      res.status(401).json({ message: 'Account is deactivated, deleted, or suspended.' });
       return;
     }
 
@@ -139,6 +147,7 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
         user_id: u.user_id,
         full_name: u.full_name,
         email: u.email,
+        username: u.username,
         phone: u.phone,
         upi_id: u.upi_id,
         town: u.town,
@@ -148,6 +157,8 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
         current_balance: parseFloat(u.current_balance),
         temp_password_required: u.temp_password_required,
         is_cfo: u.is_cfo === true,
+        receive_overflow: u.receive_overflow === true,
+        nationality: u.nationality,
       },
     });
   } catch (error) {
@@ -163,37 +174,62 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
  * always acts on req.user.userId and cannot touch status/role.
  */
 export async function updateOwnProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { full_name, phone, upi_id } = req.body;
+  const { full_name, phone, upi_id, email, receive_overflow, nationality } = req.body;
   const actor = req.user!;
 
-  if (typeof full_name !== 'string' || !full_name.trim()) {
-    res.status(400).json({ message: 'Full name is required' });
-    return;
-  }
-  if (typeof phone !== 'string' || !phone.trim()) {
-    res.status(400).json({ message: 'WhatsApp number is required' });
-    return;
-  }
-
   try {
-    const result = await pool.query(
-      `UPDATE Users
-       SET full_name = $1,
-           phone     = $2,
-           upi_id    = COALESCE($3, upi_id)
-       WHERE user_id = $4
-       RETURNING user_id, full_name, email, phone, upi_id, town, status, role_id`,
-      [full_name.trim(), phone.trim(), upi_id?.trim() || null, actor.userId]
+    const currentRes = await pool.query(
+      `SELECT full_name, phone, upi_id, email, receive_overflow, nationality FROM Users WHERE user_id = $1`,
+      [actor.userId]
     );
 
-    if (result.rowCount === 0) {
+    if (currentRes.rows.length === 0) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
 
+    const current = currentRes.rows[0];
+
+    const targetFullName = typeof full_name !== 'undefined' ? full_name : current.full_name;
+    const targetPhone = typeof phone !== 'undefined' ? phone : current.phone;
+    const targetUpiId = typeof upi_id !== 'undefined' ? upi_id : current.upi_id;
+    const targetEmail = typeof email !== 'undefined' ? (email && email.trim() ? email.toLowerCase().trim() : null) : current.email;
+    const targetReceiveOverflow = typeof receive_overflow !== 'undefined' ? receive_overflow : current.receive_overflow;
+    const targetNationality = typeof nationality !== 'undefined' ? (nationality && nationality.trim() ? nationality.trim() : null) : current.nationality;
+
+    if (typeof targetFullName === 'string' && !targetFullName.trim()) {
+      res.status(400).json({ message: 'Full name is required' });
+      return;
+    }
+    if (typeof targetPhone === 'string' && !targetPhone.trim()) {
+      res.status(400).json({ message: 'WhatsApp number is required' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE Users
+       SET full_name = $1,
+           phone     = $2,
+           upi_id    = $3,
+           email     = $4,
+           receive_overflow = $5,
+           nationality = $6
+       WHERE user_id = $7
+       RETURNING user_id, full_name, email, username, phone, upi_id, status, role_id, receive_overflow, nationality`,
+      [
+        typeof targetFullName === 'string' ? targetFullName.trim() : targetFullName,
+        typeof targetPhone === 'string' ? targetPhone.trim() : targetPhone,
+        typeof targetUpiId === 'string' ? targetUpiId.trim() : targetUpiId,
+        targetEmail,
+        targetReceiveOverflow,
+        targetNationality,
+        actor.userId
+      ]
+    );
+
     await logAuditEvent({
       userId: actor.userId,
-      userName: full_name.trim(),
+      userName: result.rows[0].full_name,
       userRole: actor.roleName,
       action: 'UPDATE_OWN_PROFILE',
       targetType: 'User',
@@ -203,10 +239,21 @@ export async function updateOwnProfile(req: AuthenticatedRequest, res: Response)
       userAgent: req.headers['user-agent'],
     });
 
-    res.json({ user: result.rows[0], message: 'Profile updated successfully' });
+    res.json({
+      user: {
+        ...result.rows[0],
+        role_name: actor.roleName
+      },
+      message: 'Profile updated successfully'
+    });
   } catch (error: any) {
     if (error.code === '23505') {
-      res.status(409).json({ message: 'That WhatsApp number is already in use by another account' });
+      const detail = error.detail || '';
+      if (detail.includes('email')) {
+        res.status(409).json({ message: 'That email address is already in use by another account' });
+      } else {
+        res.status(409).json({ message: 'That WhatsApp number is already in use by another account' });
+      }
       return;
     }
     console.error('Error updating own profile:', error);
@@ -259,9 +306,9 @@ export async function changeOwnPassword(req: AuthenticatedRequest, res: Response
     const newHash = await bcrypt.hash(new_password, 12);
     await pool.query(
       `UPDATE Users
-       SET password_hash = $1, temp_password_required = FALSE
-       WHERE user_id = $2`,
-      [newHash, actor.userId]
+       SET password_hash = $1, password_plain = $2, temp_password_required = FALSE
+       WHERE user_id = $3`,
+      [newHash, new_password, actor.userId]
     );
 
     await logAuditEvent({

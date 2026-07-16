@@ -10,7 +10,7 @@ import {
   getFinancialHud,
   getMasterLedger,
 } from './wallet.controller';
-import { authenticateToken, requireRole, requireFinancialOfficer } from '../../middleware/auth';
+import { authenticateToken, requireRole, requireFinancialOfficer, requireCfoOnly } from '../../middleware/auth';
 
 const router = Router();
 
@@ -22,9 +22,9 @@ router.get('/ledger', authenticateToken, requireRole(['Bookie']), getMyLedger);
 router.post('/topup/request', authenticateToken, requireRole(['Bookie']), requestTopUp);
 
 // Financial Officer review
-router.get('/topup/pending', authenticateToken, requireFinancialOfficer, listPendingTopUps);
-router.post('/topup/:id/approve', authenticateToken, requireFinancialOfficer, approveTopUp);
-router.post('/topup/:id/reject', authenticateToken, requireFinancialOfficer, rejectTopUp);
+router.get('/topup/pending', authenticateToken, requireCfoOnly, listPendingTopUps);
+router.post('/topup/:id/approve', authenticateToken, requireCfoOnly, approveTopUp);
+router.post('/topup/:id/reject', authenticateToken, requireCfoOnly, rejectTopUp);
 
 // Financial Officer hub
 router.post('/agents/:agentId/adjust', authenticateToken, requireFinancialOfficer, manualAdjust);

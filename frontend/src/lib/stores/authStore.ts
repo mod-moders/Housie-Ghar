@@ -3,7 +3,8 @@ import { create } from "zustand";
 export interface AuthUser {
   user_id: string;
   full_name: string;
-  email: string;
+  email: string | null;
+  username: string;
   role_id: number;
   role_name: "Superadmin" | "Financial Admin" | "Operator" | "Bookie";
   current_balance?: number;
@@ -11,6 +12,9 @@ export interface AuthUser {
   town?: string | null;
   phone?: string | null;
   upi_id?: string | null;
+  temp_password_required?: boolean;
+  receive_overflow?: boolean;
+  nationality?: string | null;
 }
 
 interface AuthStore {
