@@ -36,6 +36,9 @@ export async function login(req: Request, res: Response): Promise<void> {
     );
 
     if (result.rowCount === 0) {
+      // Diagnostic only — the client still sees the generic message below. This
+      // distinguishes "no such account" from a password mismatch in the logs.
+      console.warn(`[login] 401 no-account-found identifier="${loginEmail}"`);
       res.status(401).json({ message: 'Invalid email or password' });
       return;
     }
@@ -49,9 +52,11 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     // 2. Verify password. A malformed or absent hash MUST fail closed — never fall
     //    back to a substring match or a hardcoded password (that was an auth bypass).
+    const hashPresent = typeof user.password_hash === 'string' && user.password_hash.length > 0;
+    const hashLooksBcrypt = hashPresent && /^\$2[aby]\$/.test(user.password_hash) && user.password_hash.length === 60;
     let passwordMatch = false;
     try {
-      if (typeof user.password_hash === 'string' && user.password_hash.length > 0) {
+      if (hashPresent) {
         passwordMatch = await bcrypt.compare(password, user.password_hash);
       }
     } catch (e) {
@@ -60,6 +65,13 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     if (!passwordMatch) {
+      // Diagnostic only (never logs the password). `hashLooksBcrypt=false` means the
+      // account is locked out by a malformed/stale hash and needs an admin reset;
+      // `hashLooksBcrypt=true` means the account is fine and the typed password is wrong.
+      console.warn(
+        `[login] 401 password-mismatch user_id=${user.user_id} email="${user.email}" ` +
+        `username="${user.username}" hashPresent=${hashPresent} hashLooksBcrypt=${hashLooksBcrypt}`
+      );
       res.status(401).json({ message: 'Invalid email or password' });
       return;
     }

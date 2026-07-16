@@ -1808,6 +1808,27 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
     }
   };
 
+  const resetPassword = async (u: StaffUser) => {
+    const pw = window.prompt(
+      `Set a new password for ${u.full_name} (${roleLabel(u)}). Minimum 6 characters — they can change it themselves after signing in.`
+    );
+    if (pw === null) return; // cancelled
+    if (pw.length < 6) {
+      setError("New password must be at least 6 characters");
+      return;
+    }
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${u.user_id}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ new_password: pw }),
+      });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Password reset failed");
+    }
+  };
+
   const roleLabel = (u: StaffUser) => u.role_name;
 
   return (
@@ -1916,6 +1937,13 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                       <Icon name="check" size={14} />
                     </button>
                   )
+                )}
+
+                {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
+                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
+                  <button className="hg-ic-btn" title="Reset password" onClick={() => resetPassword(u)}>
+                    <Icon name="key" size={14} />
+                  </button>
                 )}
 
                 {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||

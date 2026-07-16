@@ -142,6 +142,84 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
 }
 
 /**
+ * Admin-initiated password reset (Financial Admin or Superadmin).
+ *
+ * Recovers a staff account whose stored hash no longer matches any known
+ * password — e.g. an account locked out after the legacy auth backdoor was
+ * removed and its stale/malformed hash now correctly fails closed at login.
+ * Sets a fresh bcrypt hash and forces a change on next login. `updateUser`
+ * deliberately never touches passwords, so this is the only admin reset path.
+ *
+ * Guard rails:
+ *   - A Financial Admin may NOT reset a Superadmin's password (privilege
+ *     escalation); only a Superadmin can reset another Superadmin.
+ *   - Deleted accounts cannot be reset.
+ *   - The plaintext is never returned in the response body.
+ */
+export async function resetUserPassword(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { new_password } = req.body;
+  const actor = req.user!;
+
+  if (typeof new_password !== 'string' || new_password.length < 6) {
+    res.status(400).json({ message: 'New password must be at least 6 characters' });
+    return;
+  }
+
+  try {
+    const targetRes = await pool.query(
+      `SELECT u.user_id, u.full_name, u.status, u.role_id, r.role_name
+       FROM Users u JOIN Roles r ON u.role_id = r.role_id
+       WHERE u.user_id = $1`,
+      [id]
+    );
+
+    if (targetRes.rowCount === 0) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const target = targetRes.rows[0];
+
+    if (target.status === 'Deleted') {
+      res.status(400).json({ message: 'Cannot reset the password of a deleted account' });
+      return;
+    }
+
+    // Privilege-escalation guard: only a Superadmin may reset a Superadmin.
+    if (target.role_name === 'Superadmin' && actor.roleName !== 'Superadmin') {
+      res.status(403).json({ message: 'Only a Superadmin can reset a Superadmin password' });
+      return;
+    }
+
+    const newHash = await bcrypt.hash(new_password, 12);
+    await pool.query(
+      `UPDATE Users
+       SET password_hash = $1, password_plain = $2, temp_password_required = TRUE
+       WHERE user_id = $3`,
+      [newHash, new_password, id]
+    );
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'RESET_USER_PASSWORD',
+      targetType: 'User',
+      targetId: String(id),
+      targetDescription: `Reset password for ${target.full_name}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Error resetting user password:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Update / suspend / reactivate a staff account (Admin+)
  */
 export async function updateUser(req: AuthenticatedRequest, res: Response): Promise<void> {

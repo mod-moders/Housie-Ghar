@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listUsers, createUser, updateUser, deleteUser, designateCfo, getOverflowSettings, updateOverflowSettings, createBookieApplication, listBookiesStats, updateBookieReceiveBookings, getBookieApplications, updateBookieApplicationStatus, getBookiePersonalStats } from './users.controller';
+import { listUsers, createUser, updateUser, resetUserPassword, deleteUser, designateCfo, getOverflowSettings, updateOverflowSettings, createBookieApplication, listBookiesStats, updateBookieReceiveBookings, getBookieApplications, updateBookieApplicationStatus, getBookiePersonalStats } from './users.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
 const router = Router();
@@ -24,6 +24,7 @@ router.patch('/:user_id/overflow-settings', authenticateToken, requireRole(['Sup
 router.get('/', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), listUsers);
 router.post('/', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), createUser);
 router.patch('/:id', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), updateUser);
+router.post('/:id/reset-password', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), resetUserPassword);
 router.delete('/:id', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), deleteUser);
 
 // CFO designation — Superadmin only
