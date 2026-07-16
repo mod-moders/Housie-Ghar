@@ -187,7 +187,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
         )}
       </div>
 
-      {activeTab === "requests" ? (
+      ({activeTab === "requests" ? (
         <div className="hg-split" style={{ height: "calc(100% - 60px)" }}>
           <div className="hg-split-l">
             <div className="hg-split-head">Pending requests <span className="hg-q-count">{queue.length}</span></div>

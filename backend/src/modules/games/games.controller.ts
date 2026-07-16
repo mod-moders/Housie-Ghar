@@ -23,6 +23,23 @@ import {
 const VALID_PATTERNS = new Set<string>(CONSTANTS.PRIZE_PATTERNS as readonly string[]);
 
 /**
+ * Get Financial Officer's WhatsApp number from config
+ */
+async function getFinancialOfficerWhatsApp(): Promise<string | null> {
+  try {
+    const result = await pool.query(
+      `SELECT config_value FROM Platform_Config WHERE config_key = 'financial_officer_whatsapp'`
+    );
+    if (result.rows.length > 0 && result.rows[0].config_value) {
+      return result.rows[0].config_value;
+    }
+  } catch (error) {
+    console.error('Error fetching financial officer WhatsApp:', error);
+  }
+  return null;
+}
+
+/**
  * Get all games
  */
 export async function getGames(req: Request, res: Response): Promise<void> {
@@ -856,19 +873,221 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Check if already claimed by player (we could add a claimed_by_player flag, but for now just return success)
+    // Fetch game details for WhatsApp message
+    const gameDetailRes = await pool.query(
+      `SELECT title, scheduled_at FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    const game = gameDetailRes.rows[0] || { title: 'Housie Ghar Game', scheduled_at: null };
+
+    // Check if already claimed by player
+    if (prize.player_claimed) {
+      res.json({
+        message: 'Prize already claimed',
+        prize: {
+          prize_id: prize.prize_id,
+          pattern_name: prize.pattern_name,
+          amount: prize.amount_per_winner ?? prize.prize_amount,
+          winner_ticket_number: prize.winner_ticket_number,
+          split_count: prize.split_count,
+          player_claimed: true,
+          player_claimed_at: prize.player_claimed_at,
+        },
+      });
+      return;
+    }
+
+    // Mark as player claimed
+    await pool.query(
+      `UPDATE Prize_Pool 
+       SET player_claimed = TRUE, player_claimed_at = NOW()
+       WHERE prize_id = $1`,
+      [prize_id]
+    );
+
+    // Get Financial Officer's WhatsApp
+    const foWhatsApp = await getFinancialOfficerWhatsApp();
+    
+    // Generate WhatsApp message
+    const gameTitle = game.title || 'Housie Ghar Game';
+    const gameDate = game.scheduled_at ? new Date(game.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
+    const amount = prize.amount_per_winner ?? prize.prize_amount;
+    const whatsappMessage = `Hi, I am ${playerHousieName} and I have won the "${prize.pattern_name}" prize for ticket #${prize.winner_ticket_number} respectively for Housie Ghar's ${gameTitle} dated ${gameDate}. My total claim is ₹${amount.toFixed(2)}. Here is my UPI ID/QR code for disbursement.`;
+    const whatsappUrl = foWhatsApp 
+      ? `https://wa.me/${foWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
+      : null;
+
     res.json({
       message: 'Prize claim confirmed',
       prize: {
         prize_id: prize.prize_id,
         pattern_name: prize.pattern_name,
-        amount: prize.amount_per_winner ?? prize.prize_amount,
+        amount: amount,
         winner_ticket_number: prize.winner_ticket_number,
         split_count: prize.split_count,
+        player_claimed: true,
+        player_claimed_at: new Date().toISOString(),
       },
+      whatsapp_url: whatsappUrl,
+      whatsapp_message: whatsappMessage,
     });
   } catch (error) {
     console.error('Error claiming prize:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Get all pending prize claims for Financial Admin dashboard
+ */
+export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    // Only allow Financial Admin and Superadmin
+    if (req.user!.roleName !== 'Financial Admin' && req.user!.roleName !== 'Superadmin') {
+      res.status(403).json({ message: 'Forbidden: Financial Admin access required' });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT 
+        p.prize_id,
+        p.game_id,
+        p.pattern_name,
+        p.amount_per_winner,
+        p.prize_amount,
+        p.player_claimed,
+        p.player_claimed_at,
+        p.disbursed,
+        p.disbursed_at,
+        p.winner_housie_name,
+        p.winner_ticket_id,
+        t.ticket_number AS winner_ticket_number,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE p.player_claimed = TRUE AND p.disbursed = FALSE
+       ORDER BY p.player_claimed_at DESC`
+    );
+
+    const claims = result.rows.map((row) => ({
+      game_id: row.game_id,
+      prize_id: row.prize_id,
+      game_title: row.game_title,
+      game_date: row.game_date,
+      pattern_name: row.pattern_name,
+      amount: parseFloat(row.amount_per_winner ?? row.prize_amount),
+      winner_housie_name: row.winner_housie_name,
+      winner_ticket_number: row.winner_ticket_number,
+      player_claimed_at: row.player_claimed_at,
+      disbursed: row.disbursed,
+      disbursed_at: row.disbursed_at,
+    }));
+
+    res.json(claims);
+  } catch (error) {
+    console.error('Error fetching prize claims:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Disburse a prize (Financial Admin)
+ */
+export async function disbursePrize(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { game_id, prize_id } = req.params;
+  const admin = req.user!;
+
+  try {
+    // Verify the game exists
+    const gameRes = await pool.query(
+      `SELECT game_status FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+
+    // Get prize details
+    const prizeRes = await pool.query(
+      `SELECT p.prize_id, p.pattern_name, p.amount_per_winner, p.prize_amount, p.player_claimed, p.disbursed, p.winner_housie_name, p.winner_ticket_id,
+              t.ticket_number AS winner_ticket_number
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       WHERE p.prize_id = $1 AND p.game_id = $2`,
+      [prize_id, game_id]
+    );
+
+    if (prizeRes.rowCount === 0) {
+      res.status(404).json({ message: 'Prize not found' });
+      return;
+    }
+
+    const prize = prizeRes.rows[0];
+
+    if (!prize.player_claimed) {
+      res.status(400).json({ message: 'Prize has not been claimed by player yet' });
+      return;
+    }
+
+    if (prize.disbursed) {
+      res.json({
+        message: 'Prize already disbursed',
+        prize: {
+          prize_id: prize.prize_id,
+          pattern_name: prize.pattern_name,
+          amount: prize.amount_per_winner ?? prize.prize_amount,
+          winner_ticket_number: prize.winner_ticket_number,
+          disbursed: true,
+          disbursed_at: prize.disbursed_at,
+        },
+      });
+      return;
+    }
+
+    // Mark as disbursed
+    await pool.query(
+      `UPDATE Prize_Pool 
+       SET disbursed = TRUE, disbursed_at = NOW(), disbursed_by = $1
+       WHERE prize_id = $2`,
+      [admin.userId, prize_id]
+    );
+
+    // Check if all prizes for this game are now disbursed
+    const allPrizesRes = await pool.query(
+      `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE disbursed = TRUE) as disbursed_count
+       FROM Prize_Pool WHERE game_id = $1`,
+      [game_id]
+    );
+
+    const { total, disbursed_count } = allPrizesRes.rows[0];
+
+    // If all prizes disbursed, mark game as Completed
+    if (parseInt(total) === parseInt(disbursed_count) && total > 0) {
+      await pool.query(
+        `UPDATE Scheduled_Games 
+         SET game_status = 'Completed', completed_at = NOW()
+         WHERE game_id = $1 AND game_status != 'Completed'`,
+        [game_id]
+      );
+    }
+
+    res.json({
+      message: 'Prize disbursed successfully',
+      prize: {
+        prize_id: prize.prize_id,
+        pattern_name: prize.pattern_name,
+        amount: prize.amount_per_winner ?? prize.prize_amount,
+        winner_ticket_number: prize.winner_ticket_number,
+        disbursed: true,
+        disbursed_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Error disbursing prize:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

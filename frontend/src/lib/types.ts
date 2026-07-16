@@ -10,6 +10,25 @@ export interface Prize {
   claimed_at: string | null;
   split_count: number;
   amount_per_winner: number | null;
+  player_claimed?: boolean;
+  player_claimed_at?: string | null;
+  disbursed?: boolean;
+  disbursed_at?: string | null;
+}
+
+export interface ClaimPrizeResponse {
+  message: string;
+  prize: {
+    prize_id: number;
+    pattern_name: string;
+    amount: number;
+    winner_ticket_number: number | null;
+    split_count: number;
+    player_claimed: boolean;
+    player_claimed_at: string | null;
+  };
+  whatsapp_url: string | null;
+  whatsapp_message: string | null;
 }
 
 export interface GameSummary {

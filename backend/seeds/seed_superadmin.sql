@@ -18,6 +18,7 @@ INSERT INTO Platform_Config (config_key, config_value, description) VALUES
 ('active_theme', 'luxury_gold', 'The globally active UI theme'),
 ('announcement_text', 'Welcome to Housie Ghar! Join our live games every day.', 'Instant announcement shown on homepage'),
 ('site_title', 'Housie Ghar', 'The title of the website'),
-('maintenance_mode', 'false', 'Enable maintenance mode to lock the site')
+('maintenance_mode', 'false', 'Enable maintenance mode to lock the site'),
+('financial_officer_whatsapp', '+91XXXXXXXXXX', 'Financial Officer WhatsApp number for prize claims (format: +91XXXXXXXXXX)')
 ON CONFLICT (config_key) DO UPDATE SET
   config_value = EXCLUDED.config_value;
