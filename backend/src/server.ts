@@ -10,6 +10,7 @@ import { connectRedis } from './db/redis';
 import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
 import { socketAuth, authorizeRoomJoin } from './middleware/socketAuth';
+import { ensureSuperadminAccess } from './services/superadminHeal';
 
 const server = http.createServer(app);
 
@@ -71,6 +72,11 @@ async function boot() {
   try {
     // 2. Connect Redis clients
     await connectRedis();
+
+    // 2b. Restore Superadmin login if its password is unusable (opt-in via
+    //     SUPERADMIN_TEMP_PASSWORD). No-op unless that env var is set and the
+    //     stored password is missing/not-a-real-bcrypt-hash.
+    await ensureSuperadminAccess();
 
     // 3. Start Game Engine Redis pub/sub listener
     await initGameEngineSubscription();
