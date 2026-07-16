@@ -375,15 +375,18 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
     }
 
     if (patternWinners.length > 0) {
-      // Mark prize as claimed in memory
-      prize.claimed = true;
-
       // Split amount if multiple winners on the same draw tick
       const splitCount = patternWinners.length;
       const amountPerWinner = parseFloat((prize.prizeAmount / splitCount).toFixed(2));
 
-      // Record winners in database
+      // Persist the claim FIRST. Only after the DB commit succeeds do we mark the
+      // prize claimed in memory and add it to the announced winners. If the write
+      // fails we roll back and leave the prize unclaimed (in memory and in the DB)
+      // so a later tick can retry — we never announce a winner that was never
+      // recorded. (Previously prize.claimed was flipped before the write and not
+      // reset on rollback, so a DB failure announced a phantom, unpersisted win.)
       const client = await pool.connect();
+      let committed = false;
       try {
         await client.query('BEGIN');
         // Update Prize_Pool
@@ -405,6 +408,7 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
           ]
         );
         await client.query('COMMIT');
+        committed = true;
       } catch (err) {
         await client.query('ROLLBACK');
         console.error('Error updating prize claim in DB:', err);
@@ -412,13 +416,16 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
         client.release();
       }
 
-      patternWinners.forEach((win) => {
-        detectedWinners.push({
-          ...win,
-          amountPerWinner,
-          splitCount,
+      if (committed) {
+        prize.claimed = true;
+        patternWinners.forEach((win) => {
+          detectedWinners.push({
+            ...win,
+            amountPerWinner,
+            splitCount,
+          });
         });
-      });
+      }
     }
   }
 
@@ -455,7 +462,22 @@ export async function pauseGame(gameId: string, operatorId: string): Promise<voi
  */
 export async function resumeGame(gameId: string, operatorId: string): Promise<void> {
   const game = activeGames.get(gameId);
-  if (!game) throw new Error('Game state not loaded');
+
+  // If the process restarted while the game was Paused, the in-memory runtime
+  // state is gone. Rebuild it from Game_Logs via startGame (which accepts the
+  // Paused state and restores drawn_numbers/current_index and the conductor loop)
+  // rather than failing with "Game state not loaded".
+  if (!game) {
+    await startGame(gameId, operatorId);
+    const resumeEvent = {
+      event: 'game_resumed' as const,
+      timestamp: new Date().toISOString(),
+      interval_ms: activeGames.get(gameId)?.intervalMs,
+    };
+    await publishGameEvent(gameId, resumeEvent);
+    console.log(`▶ Game ${gameId} resumed (rebuilt from logs) by Operator ${operatorId}`);
+    return;
+  }
 
   await pool.query(
     `UPDATE Scheduled_Games SET game_status = 'Live' WHERE game_id = $1`,

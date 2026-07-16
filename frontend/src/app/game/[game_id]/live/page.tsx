@@ -118,7 +118,7 @@ export default function LiveBoard({ params }: { params: Promise<{ game_id: strin
             setDisplayName(res.user?.full_name || "Staff");
           })
           .catch(() => {
-            router.push("/signup");
+            router.push("/login");
           });
       });
   }, [router]);

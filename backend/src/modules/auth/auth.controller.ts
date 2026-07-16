@@ -47,13 +47,16 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 2. Verify password (fallback to direct compare if crypt fail, but using bcrypt)
+    // 2. Verify password. A malformed or absent hash MUST fail closed — never fall
+    //    back to a substring match or a hardcoded password (that was an auth bypass).
     let passwordMatch = false;
     try {
-      passwordMatch = await bcrypt.compare(password, user.password_hash);
+      if (typeof user.password_hash === 'string' && user.password_hash.length > 0) {
+        passwordMatch = await bcrypt.compare(password, user.password_hash);
+      }
     } catch (e) {
-      // For seed testing fallback if salt rounds don't match standard
-      passwordMatch = user.password_hash.includes(password) || password === 'ChangeMe123!';
+      console.error('Password verification error for user', user.user_id, e);
+      passwordMatch = false;
     }
 
     if (!passwordMatch) {

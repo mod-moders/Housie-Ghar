@@ -24,6 +24,27 @@ import promoterRoutes from './modules/promoter/promoter.routes';
 
 const app = express();
 
+// Trust the reverse proxy (nginx / Railway) so req.ip and secure-cookie logic
+// see the real client address and protocol instead of the proxy's.
+app.set('trust proxy', 1);
+
+// 0. Security headers (dependency-free; this is a JSON/SSE API, no HTML/CSP).
+//    Adds defense-in-depth headers on every response.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  // API returns JSON/SSE only, so a strict CSP that forbids any active content
+  // is safe and blocks a whole class of response-injection escalation.
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  res.removeHeader('X-Powered-By');
+  if (env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 // 1. CORS Configuration
 app.use(
   cors({

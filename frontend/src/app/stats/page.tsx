@@ -51,7 +51,7 @@ export default function StatsPage() {
   useEffect(() => {
     apiFetch<PlayerStats>("/api/player/stats")
       .then((res) => { setStats(res); setLoading(false); })
-      .catch((err) => { console.error("Failed to load stats", err); router.push("/signup"); });
+      .catch((err) => { console.error("Failed to load stats", err); router.push("/login"); });
   }, [router]);
 
   // Percentile rank: cross-reference this player against the public leaderboard by earnings

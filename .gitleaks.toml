@@ -1,0 +1,36 @@
+# gitleaks configuration for Housie Ghar (public repo — keep secrets out of history)
+# Run locally:   gitleaks detect --source . --redact
+# Pre-commit:    gitleaks protect --staged --redact
+# See https://github.com/gitleaks/gitleaks
+title = "Housie Ghar secret scanning"
+
+[extend]
+# Start from gitleaks' built-in ruleset (AWS, GitHub, Stripe, private keys, JWTs, etc.)
+useDefault = true
+
+[[rules]]
+id = "hg-jwt-private-key"
+description = "RSA/PKCS8 private key material (JWT signing key)"
+regex = '''-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----'''
+keywords = ["PRIVATE KEY"]
+
+[[rules]]
+id = "hg-postgres-url-with-creds"
+description = "Postgres connection string carrying a password (dev/localhost values are allowlisted below)"
+# RE2-safe (no lookahead). Local/dev creds are filtered by the [allowlist] regexes.
+regex = '''postgres(ql)?://[a-zA-Z0-9_]+:[^@\s]+@[^\s/'"]+'''
+keywords = ["postgres://", "postgresql://"]
+
+[allowlist]
+description = "Ignore local dev placeholders, examples, and docs"
+paths = [
+  '''\.env\.example$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)ruflo/''',            # separate project vendored in the working tree, not part of this app
+]
+regexes = [
+  '''\[your (private|public) key\]''',   # .env.example placeholder
+  '''housie_user:housie_password@localhost''',  # docker-compose / dev DB
+  '''ChangeMe123!''',                    # documented seed placeholder
+  '''your_|changeme|placeholder|example''',
+]

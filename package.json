@@ -1,0 +1,11 @@
+{
+  "name": "housie-ghar",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "cd backend && npm ci && npm run build",
+    "start": "cd backend && npm start"
+  }
+}
