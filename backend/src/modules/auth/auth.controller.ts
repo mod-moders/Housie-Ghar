@@ -23,7 +23,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     // 1. Fetch user
     let loginEmail = email.toLowerCase().trim();
     if (loginEmail === 'superadmin') {
-      loginEmail = 'superadmin@housieghar.in';
+      loginEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@housieghar.in').toLowerCase().trim();
     }
 
     const result = await pool.query(
