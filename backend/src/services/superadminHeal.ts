@@ -40,36 +40,55 @@ export async function ensureSuperadminAccess(): Promise<void> {
 
   const email = (process.env.SUPERADMIN_EMAIL || 'superadmin@housieghar.in').toLowerCase().trim();
 
+  // Escape hatch for a superadmin whose stored hash is VALID bcrypt but of an
+  // unknown password (e.g. onboarding changed the email but the password step
+  // silently failed, leaving credentials nobody knows). The default heal
+  // refuses to touch a valid hash, so this explicit second opt-in forces the
+  // reset. Set it, let the boot run once, then UNSET both env vars.
+  const forceReset = process.env.SUPERADMIN_FORCE_PASSWORD_RESET === 'true';
+
   try {
+    // Look up by email OR the canonical 'superadmin' username: self-service
+    // profile edits can change the superadmin's email, and an email-only
+    // lookup would then strand the account (and worse, fall through to the
+    // INSERT branch and try to create a duplicate superadmin).
     const existing = await pool.query(
-      `SELECT user_id, password_hash FROM Users WHERE email = $1 AND role_id = $2`,
+      `SELECT user_id, email, password_hash FROM Users
+        WHERE role_id = $2 AND (email = $1 OR username = 'superadmin')
+        ORDER BY (email = $1) DESC
+        LIMIT 1`,
       [email, SUPERADMIN_ROLE_ID]
     );
 
-    // A working password is sacrosanct — leave it untouched.
-    if (existing.rowCount && isValidBcryptHash(existing.rows[0].password_hash)) {
+    // A working password is sacrosanct — leave it untouched unless the
+    // operator explicitly forces the reset.
+    if (existing.rowCount && isValidBcryptHash(existing.rows[0].password_hash) && !forceReset) {
       return;
     }
 
     const passwordHash = await bcrypt.hash(resetPassword, 12);
 
     if (existing.rowCount) {
+      // Keep password_plain in sync — the Workforce UI shows it to the
+      // Superadmin as the source of truth, and a heal that updates only the
+      // hash silently desynchronizes the two.
       await pool.query(
         `UPDATE Users
-            SET password_hash = $1, temp_password_required = TRUE, status = 'Active'
-          WHERE user_id = $2`,
-        [passwordHash, existing.rows[0].user_id]
+            SET password_hash = $1, password_plain = $2, temp_password_required = TRUE, status = 'Active'
+          WHERE user_id = $3`,
+        [passwordHash, resetPassword, existing.rows[0].user_id]
       );
       console.warn(
-        `⚠️  Superadmin (${email}) had no usable password — reset from SUPERADMIN_TEMP_PASSWORD. ` +
-          `Log in, change it, then unset SUPERADMIN_TEMP_PASSWORD.`
+        `⚠️  Superadmin (${existing.rows[0].email}) password ${forceReset ? 'FORCE-' : ''}reset from ` +
+          `SUPERADMIN_TEMP_PASSWORD. Log in, change it, then unset SUPERADMIN_TEMP_PASSWORD` +
+          `${forceReset ? ' and SUPERADMIN_FORCE_PASSWORD_RESET' : ''}.`
       );
     } else {
       await pool.query(
-        `INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status)
-         VALUES ($1, 'Super Admin', $2, '+919999999999', $3, TRUE, 'Active')
+        `INSERT INTO Users (role_id, full_name, username, email, phone, password_hash, password_plain, temp_password_required, status)
+         VALUES ($1, 'Super Admin', 'superadmin', $2, '+919999999999', $3, $4, TRUE, 'Active')
          ON CONFLICT (email) DO NOTHING`,
-        [SUPERADMIN_ROLE_ID, email, passwordHash]
+        [SUPERADMIN_ROLE_ID, email, passwordHash, resetPassword]
       );
       console.warn(
         `⚠️  Superadmin (${email}) did not exist — created from SUPERADMIN_TEMP_PASSWORD. ` +
