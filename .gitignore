@@ -71,3 +71,4 @@ coverage/
 *.md
 docs/
 references/
+.gstack/

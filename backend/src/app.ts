@@ -63,7 +63,7 @@ app.use(cookieParser());
 // 3. Global Rate Limiter
 const globalLimiter = rateLimit({
   windowMs: CONSTANTS.RATE_LIMIT_WINDOW_MS,
-  max: 1000, // Limit each IP to 1000 requests per windowMs to handle high concurrency & shared Wi-Fi
+  max: 100, // Limit each IP to 100 requests per windowMs
   message: { message: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -79,6 +79,24 @@ const bookingLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/bookings/lock', bookingLimiter);
+
+// 4b. Login brute-force limiter — guards the staff login route specifically.
+// Only FAILED attempts count (skipSuccessfulRequests skips 2xx/3xx responses),
+// so a staff member signing in normally is never throttled, while an IP guessing
+// passwords is locked out after MAX_LOCK_ATTEMPTS_PER_MINUTE failures for
+// LOCK_DURATION_MINUTES. This wires up the LOCK_DURATION_MINUTES /
+// MAX_LOCK_ATTEMPTS_PER_MINUTE env vars, which were defined but never applied to a
+// route (the shared 100-req/min global limiter was the only prior guard on login).
+// IP-based (not per-account) so an attacker can't lock a victim out of their account.
+const loginLimiter = rateLimit({
+  windowMs: env.LOCK_DURATION_MINUTES * 60 * 1000,
+  max: env.MAX_LOCK_ATTEMPTS_PER_MINUTE,
+  skipSuccessfulRequests: true,
+  message: { message: 'Too many failed login attempts. Please wait a few minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', loginLimiter);
 
 // 5. Mount Routes
 app.use('/api/auth', authRoutes);
