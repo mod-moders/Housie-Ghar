@@ -443,7 +443,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                     </button>
                   </div>
                   <div className="hg-detail-head">
-                    <Avatar src={BOOKIE_AVATAR} name={activeClaim.winner_housie_name} className="hg-avatar-lg" />
+                    <Avatar src={null} name={activeClaim.winner_housie_name} className="hg-avatar-lg" />
                     <div>
                       <b>{activeClaim.winner_housie_name}</b>
                       <span>Winning Ticket #{activeClaim.winner_ticket_number}</span>

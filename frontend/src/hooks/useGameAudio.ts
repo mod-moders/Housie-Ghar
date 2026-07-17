@@ -15,7 +15,7 @@ interface NumberCallConfig {
 
 export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
-  const { config } = useConfigStore();
+  const { config: platformConfig } = useConfigStore();
   
   const activeAudiosRef = useRef<HTMLAudioElement[]>([]);
   const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
@@ -73,9 +73,9 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
 
   // Handle Gameplay Background Music Playback
   useEffect(() => {
-    const bgEnabled = config?.background_music_enabled === "true";
-    const bgUrl = config?.background_music_url;
-    const bgVol = parseFloat(config?.background_music_volume || "0.15");
+    const bgEnabled = platformConfig?.background_music_enabled === "true";
+    const bgUrl = platformConfig?.background_music_url;
+    const bgVol = parseFloat(platformConfig?.background_music_volume || "0.15");
 
     if (isGameLive && bgEnabled && bgUrl) {
       if (!bgMusicRef.current || bgMusicRef.current.src !== bgUrl) {
@@ -111,7 +111,7 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
         bgMusicRef.current = null;
       }
     };
-  }, [isGameLive, config?.background_music_enabled, config?.background_music_url, config?.background_music_volume]);
+  }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, platformConfig?.background_music_volume]);
 
   const stopAllActiveAudios = () => {
     activeAudiosRef.current.forEach((audio) => {
@@ -140,8 +140,8 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     
     try {
       // 1. Play Welcome Voice Note (url or fallback text)
-      const welcomeUrl = config?.welcome_voice_url;
-      const welcomeText = config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
+      const welcomeUrl = platformConfig?.welcome_voice_url;
+      const welcomeText = platformConfig?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
       const welcomeVoiceName = typeof window !== "undefined" ? localStorage.getItem("welcome_voice_name") : null;
       await playAudioOrFallback(
         welcomeUrl || "",
@@ -153,8 +153,8 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
       if (!isMountedRef.current) return;
 
       // 2. Play Instruction Voice Note (url or fallback text)
-      const instructionUrl = config?.instruction_voice_url;
-      const instructionText = config?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
+      const instructionUrl = platformConfig?.instruction_voice_url;
+      const instructionText = platformConfig?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
       const instructionVoiceName = typeof window !== "undefined" ? localStorage.getItem("instruction_voice_name") : null;
       await playAudioOrFallback(
         instructionUrl || "",
@@ -190,8 +190,11 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     const audioUrl = config?.audio_url;
     const vol = config?.volume !== undefined ? config.volume : 1.0;
 
+    const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+    const effectiveVol = vol * masterVol;
+
     if (mode === "Audio" && audioUrl) {
-      await playAudioOrFallback(audioUrl, phrase, vol);
+      await playAudioOrFallback(audioUrl, phrase, effectiveVol);
     } else {
       await fallbackToTTS(phrase);
     }
@@ -226,8 +229,8 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
 
       const audio = new Audio(mp3Path);
       activeAudiosRef.current.push(audio);
-      audio.volume = customVolume;
-      soundSynthesizer.applyLiveAnnouncementEcho(audio);
+      audio.volume = 1.0;
+      soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
       
       audio.onended = () => {
         activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);

@@ -110,6 +110,7 @@ export async function ensurePlatformConfig(): Promise<void> {
     { key: 'background_music_url', val: '', desc: 'Background music audio URL or Base64 data' },
     { key: 'background_music_enabled', val: 'false', desc: 'Enable background music during game' },
     { key: 'background_music_volume', val: '0.15', desc: 'Background music volume (0.0 to 1.0)' },
+    { key: 'master_calls_volume', val: '1.0', desc: 'Master calls volume gain multiplier (0.0 to 2.0)' },
   ];
 
   try {

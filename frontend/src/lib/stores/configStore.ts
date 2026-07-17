@@ -21,6 +21,7 @@ export interface PublicConfig {
   background_music_url?: string;
   background_music_enabled?: string;
   background_music_volume?: string;
+  master_calls_volume?: string;
 }
 
 interface ConfigState {

@@ -207,16 +207,19 @@ class SoundSynthesizer {
    * Apply a real-time live announcement echo/reverb feedback delay effect to any HTMLAudioElement.
    * This models a spacious gaming hall or stadium PA system.
    */
-  applyLiveAnnouncementEcho(audio: HTMLAudioElement) {
+  applyLiveAnnouncementEcho(audio: HTMLAudioElement, customVolume: number = 1.0) {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
+      if (!AudioContextClass) {
+        audio.volume = Math.min(1.0, customVolume);
+        return null;
+      }
       const ctx = new AudioContextClass();
       
       const source = ctx.createMediaElementSource(audio);
       
       const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.95; // direct dry sound (clear, direct announcement)
+      dryGain.gain.value = 0.95 * customVolume; // direct dry sound (clear, direct announcement)
       
       const delayNode = ctx.createDelay(1.0);
       delayNode.delayTime.value = 0.18; // tight 180ms room reflection delay
@@ -225,7 +228,7 @@ class SoundSynthesizer {
       feedbackGain.gain.value = 0.22; // very fast echo decay (ends after 1 or 2 quick taps)
       
       const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.18; // subtle mix volume of the echo
+      wetGain.gain.value = 0.18 * customVolume; // subtle mix volume of the echo
       
       // Feedback loop
       delayNode.connect(feedbackGain);
@@ -244,8 +247,16 @@ class SoundSynthesizer {
           ctx.resume();
         }
       });
+
+      return {
+        updateVolume: (newVolume: number) => {
+          dryGain.gain.value = 0.95 * newVolume;
+          wetGain.gain.value = 0.18 * newVolume;
+        }
+      };
     } catch (e) {
-      console.warn("Could not apply live announcement echo effect:", e);
+      audio.volume = Math.min(1.0, customVolume);
+      return null;
     }
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
@@ -26,6 +26,8 @@ export function CallVoiceSettings() {
   const [uploadingNum, setUploadingNum] = useState<number | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
+  const activePreviewRef = useRef<{ number: number; updateVolume: (v: number) => void; audio: HTMLAudioElement } | null>(null);
+  const masterVolumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sound effects and custom speech notes states
   const [cageSound, setCageSound] = useState(config?.cage_sound_enabled !== "false");
@@ -35,6 +37,7 @@ export function CallVoiceSettings() {
   const [bgMusicUrl, setBgMusicUrl] = useState(config?.background_music_url || "");
   const [bgMusicEnabled, setBgMusicEnabled] = useState(config?.background_music_enabled === "true");
   const [bgMusicVolume, setBgMusicVolume] = useState(parseFloat(config?.background_music_volume || "0.15"));
+  const [masterCallsVolume, setMasterCallsVolume] = useState(parseFloat(config?.master_calls_volume || "1.0"));
   const [uploadingVoiceKey, setUploadingVoiceKey] = useState<string | null>(null);
   const [previewingUrl, setPreviewingUrl] = useState<string | null>(null);
 
@@ -54,10 +57,25 @@ export function CallVoiceSettings() {
       setBgMusicUrl(config.background_music_url || "");
       setBgMusicEnabled(config.background_music_enabled === "true");
       setBgMusicVolume(parseFloat(config.background_music_volume || "0.15"));
+      setMasterCallsVolume(parseFloat(config.master_calls_volume || "1.0"));
       setWelcomeText(config.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
       setInstructionText(config.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.");
     }
   }, [config]);
+
+  useEffect(() => {
+    return () => {
+      if (masterVolumeSaveTimeoutRef.current) {
+        clearTimeout(masterVolumeSaveTimeoutRef.current);
+      }
+      if (activePreviewRef.current) {
+        try {
+          activePreviewRef.current.audio.pause();
+          activePreviewRef.current.audio.src = "";
+        } catch {}
+      }
+    };
+  }, []);
 
   const handleSaveConfig = async (updates: Record<string, string>) => {
     try {
@@ -331,6 +349,12 @@ export function CallVoiceSettings() {
     try {
       // Optimistically update local state first for smooth slider dragging
       setSettings(prev => prev.map(s => s.number === num ? { ...s, volume: vol } : s));
+
+      // Update currently playing preview volume if it matches
+      if (activePreviewRef.current && activePreviewRef.current.number === num) {
+        const effectiveVol = vol * masterCallsVolume;
+        activePreviewRef.current.updateVolume(effectiveVol);
+      }
       
       await apiFetch(`/api/games/number-calls/${num}`, {
         method: "PATCH",
@@ -363,10 +387,35 @@ export function CallVoiceSettings() {
   };
 
   const playCallPreview = (item: NumberCallConfig) => {
+    if (activePreviewRef.current) {
+      try {
+        activePreviewRef.current.audio.pause();
+        activePreviewRef.current.audio.src = "";
+      } catch {}
+      activePreviewRef.current = null;
+    }
+
     if (item.call_mode === "Audio" && item.audio_url) {
       const audio = new Audio(item.audio_url);
-      audio.volume = item.volume !== undefined ? item.volume : 1.0;
-      soundSynthesizer.applyLiveAnnouncementEcho(audio);
+      audio.volume = 1.0;
+      const itemVol = item.volume !== undefined ? item.volume : 1.0;
+      const effectiveVol = itemVol * masterCallsVolume;
+      const handle = soundSynthesizer.applyLiveAnnouncementEcho(audio, effectiveVol);
+      
+      if (handle) {
+        activePreviewRef.current = {
+          number: item.number,
+          updateVolume: handle.updateVolume,
+          audio
+        };
+      }
+
+      audio.onended = () => {
+        if (activePreviewRef.current?.audio === audio) {
+          activePreviewRef.current = null;
+        }
+      };
+
       audio.play().catch(() => {
         alert("Failed to play audio file. Falling back to TTS.");
         speakTTS(item.call_text);
@@ -819,6 +868,50 @@ export function CallVoiceSettings() {
               />
             </div>
 
+            {/* Master call audio volume fader */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface-2)", padding: "6px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", marginTop: "8px" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
+                Master Voice Vol: {Math.round(masterCallsVolume * 50)}%
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={Math.round(masterCallsVolume * 50)}
+                onChange={(e) => {
+                  const sliderVal = parseInt(e.target.value, 10);
+                  const gainVal = sliderVal / 50;
+                  setMasterCallsVolume(gainVal);
+
+                  // Update all individual call volumes to match the new value immediately in local state
+                  setSettings(prev => prev.map(s => ({ ...s, volume: gainVal })));
+
+                  // Dynamically adjust currently playing preview volume if exists
+                  if (activePreviewRef.current) {
+                    const item = settings.find(s => s.number === activePreviewRef.current?.number);
+                    const itemVol = item?.volume !== undefined ? item.volume : 1.0;
+                    activePreviewRef.current.updateVolume(itemVol * gainVal);
+                  }
+
+                  // Debounce DB saves to avoid overloading on drag
+                  if (masterVolumeSaveTimeoutRef.current) {
+                    clearTimeout(masterVolumeSaveTimeoutRef.current);
+                  }
+                  masterVolumeSaveTimeoutRef.current = setTimeout(async () => {
+                    try {
+                      await handleSaveConfig({ master_calls_volume: String(gainVal) });
+                      await apiFetch("/api/games/number-calls-bulk-volume", {
+                        method: "PATCH",
+                        body: JSON.stringify({ volume: gainVal }),
+                      });
+                    } catch {}
+                  }, 250);
+                }}
+                style={{ flex: 1, accentColor: "var(--accent)", height: 4, cursor: "pointer" }}
+              />
+            </div>
+
             {/* Sound Toggles */}
             <div style={{ display: "flex", gap: 16, marginTop: 4, borderTop: "1px solid var(--border-2)", paddingTop: 10 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", userSelect: "none" }}>
@@ -994,15 +1087,19 @@ export function CallVoiceSettings() {
                       }}
                     >
                       <span className="text-[10px] text-mute font-bold" style={{ whiteSpace: "nowrap" }}>
-                        Vol: {Math.round((item.volume ?? 1) * 100)}%
+                        Vol: {Math.round((item.volume !== undefined ? item.volume : 1.0) * 50)}%
                       </span>
                       <input 
                         type="range" 
                         min="0" 
-                        max="1" 
-                        step="0.05" 
-                        value={item.volume ?? 1} 
-                        onChange={(e) => handleVolumeChange(item.number, parseFloat(e.target.value))} 
+                        max="100" 
+                        step="1" 
+                        value={Math.round((item.volume !== undefined ? item.volume : 1.0) * 50)} 
+                        onChange={(e) => {
+                          const sliderVal = parseInt(e.target.value, 10);
+                          const gainVal = sliderVal / 50;
+                          handleVolumeChange(item.number, gainVal);
+                        }} 
                         style={{ 
                           width: "70px", 
                           accentColor: "var(--brand)", 

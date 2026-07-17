@@ -186,3 +186,29 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * Update volume for all number calls in bulk (Superadmin only)
+ */
+export async function updateBulkVolume(req: Request, res: Response): Promise<void> {
+  const { volume } = req.body;
+
+  if (volume === undefined) {
+    res.status(400).json({ message: 'Volume is required' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE Number_Calls 
+       SET volume = $1
+       RETURNING *`,
+      [parseFloat(volume)]
+    );
+
+    res.json({ message: `Updated volume for ${result.rowCount} numbers`, volume: parseFloat(volume) });
+  } catch (error) {
+    console.error('Error bulk updating volumes:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}

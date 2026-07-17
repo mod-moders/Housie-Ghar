@@ -34,7 +34,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -120,7 +120,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {

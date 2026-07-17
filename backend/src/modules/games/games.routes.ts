@@ -26,6 +26,7 @@ import {
   restoreDefaultCallText,
   uploadNumberAudio,
   deleteNumberAudio,
+  updateBulkVolume,
 } from './numberCalls.controller';
 
 const router = Router();
@@ -43,6 +44,7 @@ router.get('/prize-claims', authenticateToken, requireRole(['Financial Admin', '
 router.post('/', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), createGame);
 router.patch('/:game_id', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), updateGame);
 router.delete('/:game_id', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), deleteGame);
+router.patch('/number-calls-bulk-volume', authenticateToken, requireRole(['Superadmin']), updateBulkVolume);
 router.patch('/number-calls/:number', authenticateToken, requireRole(['Superadmin']), updateNumberCall);
 router.post('/number-calls/:number/restore', authenticateToken, requireRole(['Superadmin']), restoreDefaultCallText);
 router.post('/number-calls/:number/upload', authenticateToken, requireRole(['Superadmin']), uploadNumberAudio);
