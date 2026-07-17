@@ -894,6 +894,14 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
 .hg-frame-wide{max-width:none;width:100%;height:100vh;height:100dvh;overflow:hidden}
 .hg-screen{display:flex;flex-direction:column;min-height:100%}
 
+/* Custom pull-to-refresh indicator — see usePullToRefresh.ts for why this can't just be the
+   browser's native gesture in this frame-scrolled layout. */
+.hg-ptr-indicator{position:absolute;top:0;left:50%;width:32px;height:32px;margin-top:-32px;
+  display:flex;align-items:center;justify-content:center;border-radius:999px;
+  background:var(--surface);border:1.5px solid var(--border);color:var(--text-dim);
+  font-size:16px;z-index:50;pointer-events:none;}
+@keyframes hg-ptr-spin{from{transform:translate(-50%,0) rotate(0deg)}to{transform:translate(-50%,0) rotate(360deg)}}
+
 /* ---- Headings ---- */
 h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-section-title{font-family:var(--font-head);font-weight:700;color:var(--text);margin:0}
@@ -2369,11 +2377,21 @@ select option {
 
 /* ============ STAFF DASHBOARD — narrow-screen handling ============ */
 @media(max-width:720px){
+  .hg-dash{position:relative}
   .hg-side{width:60px;padding:14px 8px}
   .hg-side .hg-side-link span,.hg-side .hg-side-mod,.hg-side .hg-logo-word{display:none}
   .hg-side .hg-side-link{justify-content:center;padding:11px 0}
   .hg-side-brand{display:flex;justify-content:center;padding:4px 0 0}
-  .hg-side-toggle{display:none}
+  /* On mobile the sidebar starts as this narrow icon rail (above), not the
+     224px labeled panel — so here .is-collapsed is repurposed as the "open"
+     state: the hamburger becomes a drawer toggle instead of a narrow/wide
+     toggle, overlaying the content instead of squeezing it. */
+  .hg-side.is-collapsed{position:absolute;top:0;left:0;bottom:0;width:224px;z-index:50;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+  .hg-side.is-collapsed .hg-side-link span{display:inline}
+  .hg-side.is-collapsed .hg-logo-word{display:flex}
+  .hg-side.is-collapsed .hg-side-link{justify-content:flex-start;padding:8px 10px}
+  .hg-side.is-collapsed .hg-side-brand{justify-content:flex-start;padding:4px 8px 0}
   .hg-statusbar{padding:12px 14px;gap:8px}
   .hg-status-title{font-size:14px}
   .hg-fin-hud{gap:12px}
@@ -2474,6 +2492,7 @@ select option {
 .hg-ls-row span{white-space:nowrap}
 .hg-cd-lbl{white-space:nowrap}
 .hg-btn span{white-space:nowrap}
+.hg-logo-word{display:flex;gap:4px}
 .hg-logo-word,.hg-login-secure,.hg-footer-mod,.hg-live-badge{white-space:nowrap}
 .hg-logo{white-space:nowrap}
 
