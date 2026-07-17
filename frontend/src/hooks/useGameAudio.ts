@@ -298,5 +298,5 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     });
   };
 
-  return { playGreeting, playNumberCall, playCelebration };
+  return { playGreeting, playNumberCall, playCelebration, introPlayingRef: isIntroPlayingRef };
 }
