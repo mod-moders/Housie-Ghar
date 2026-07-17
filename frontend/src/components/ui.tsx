@@ -26,13 +26,11 @@ export function Logo({
         priority
         className="object-contain"
       />
-      <span style={{ 
-        fontFamily: "var(--font-head)", 
-        fontSize: "20px", 
-        letterSpacing: "-0.03em", 
-        color: "var(--text)", 
-        display: "flex", 
-        gap: "4px" 
+      <span style={{
+        fontFamily: "var(--font-head)",
+        fontSize: "20px",
+        letterSpacing: "-0.03em",
+        color: "var(--text)"
       }} className="hg-logo-word">
         <span style={{ fontWeight: 500 }}>Housie</span>
         <b style={{ fontWeight: 800 }}>Ghar</b>
