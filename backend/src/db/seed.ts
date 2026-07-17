@@ -21,12 +21,14 @@ async function seedSuperadmin(): Promise<void> {
   const password = process.env.SUPERADMIN_TEMP_PASSWORD || 'ChangeMe123!';
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await pool.query(
-    `INSERT INTO Users (role_id, full_name, email, phone, password_hash, temp_password_required, status)
-     VALUES (1, 'Super Admin', $1, '+919999999999', $2, TRUE, 'Active')
-     ON CONFLICT (email) DO NOTHING`,
-    [email, passwordHash]
-  );
+  const existing = await pool.query(`SELECT user_id FROM Users WHERE email = $1 OR username = 'superadmin'`, [email]);
+  if (existing.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO Users (role_id, full_name, username, email, phone, password_hash, temp_password_required, status)
+       VALUES (1, 'Super Admin', 'superadmin', $1, '+919999999999', $2, TRUE, 'Active')`,
+      [email, passwordHash]
+    );
+  }
   console.log(`  ✅ Seeded: superadmin (${email}, password from env, temp-flagged)`);
 }
 
