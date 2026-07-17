@@ -169,6 +169,10 @@ export default function StaffDashboard() {
           // here is indistinguishable from "the login button did nothing".
           const hadToken = !!sessionStorage.getItem("hg_staff_token");
           sessionStorage.removeItem("hg_staff_token");
+          // Clear the first-party middleware cookie too, so a rejected session
+          // can't keep /staff "unlocked" (cookie present) while the real bearer
+          // check keeps failing — that would be a silent bounce loop.
+          document.cookie = "hg_auth_token=; path=/; max-age=0; SameSite=Lax; Secure";
           if (hadToken) {
             sessionStorage.setItem(
               "hg_staff_login_notice",
@@ -217,6 +221,7 @@ export default function StaffDashboard() {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("hg_staff_token");
       localStorage.removeItem("hg_staff_section");
+      document.cookie = "hg_auth_token=; path=/; max-age=0; SameSite=Lax; Secure";
     }
     setUser(null);
     router.replace("/staff/login");
