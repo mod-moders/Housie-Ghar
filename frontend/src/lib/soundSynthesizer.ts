@@ -206,16 +206,27 @@ class SoundSynthesizer {
   /**
    * Apply a real-time live announcement echo/reverb feedback delay effect to any HTMLAudioElement.
    * This models a spacious gaming hall or stadium PA system.
+   *
+   * Reuses the SAME shared AudioContext as the cage/celebration sounds (via
+   * initCtx()) instead of constructing a fresh one per call. A live game calls
+   * this once per number (up to 90 times), and each number call fires from an
+   * async SSE event, not a direct click — a brand-new AudioContext created
+   * outside a user-gesture call stack starts (and can stay) suspended under the
+   * browser's autoplay policy, so uploaded-MP3 number calls played silently even
+   * though the identical code path worked fine from the Settings page's "Listen"
+   * button (a real click). Reusing one context that's already been unlocked
+   * avoids re-triggering that policy on every single call, and stops leaking an
+   * unclosed AudioContext per number.
    */
   applyLiveAnnouncementEcho(audio: HTMLAudioElement, customVolume: number = 1.0) {
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) {
+      this.initCtx();
+      if (!this.ctx) {
         audio.volume = Math.min(1.0, customVolume);
         return null;
       }
-      const ctx = new AudioContextClass();
-      
+      const ctx = this.ctx;
+
       const source = ctx.createMediaElementSource(audio);
       
       const dryGain = ctx.createGain();
