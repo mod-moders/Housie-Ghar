@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
+import { soundSynthesizer } from "@/lib/soundSynthesizer";
 
 interface NumberCallConfig {
   number: number;
@@ -11,6 +12,7 @@ interface NumberCallConfig {
   default_text: string;
   audio_url: string | null;
   call_mode: "Text" | "Audio";
+  volume?: number;
 }
 
 export function CallVoiceSettings() {
@@ -156,17 +158,18 @@ export function CallVoiceSettings() {
     if (!file) return;
 
     const fileName = file.name.toLowerCase().trim();
-    const hasAudioExtension = fileName.endsWith(".mp3") ||
-                              fileName.endsWith(".wav") ||
-                              fileName.endsWith(".m4a") ||
-                              fileName.endsWith(".mpeg") ||
-                              fileName.endsWith(".aac") ||
-                              fileName.endsWith(".ogg") ||
-                              fileName.endsWith(".wma");
-    const isAudio = hasAudioExtension || file.type.startsWith("audio/");
+    const hasAudioOrVideoExtension = fileName.endsWith(".mp3") ||
+                                     fileName.endsWith(".wav") ||
+                                     fileName.endsWith(".m4a") ||
+                                     fileName.endsWith(".mpeg") ||
+                                     fileName.endsWith(".aac") ||
+                                     fileName.endsWith(".ogg") ||
+                                     fileName.endsWith(".wma") ||
+                                     fileName.endsWith(".mp4");
+    const isAudioOrVideo = hasAudioOrVideoExtension || file.type.startsWith("audio/") || file.type === "video/mp4";
 
-    if (!isAudio) {
-      alert(`Please upload an MP3 or standard audio file only. (Detected file: ${file.name}, type: ${file.type || "unknown"})`);
+    if (!isAudioOrVideo) {
+      alert(`Please upload an MP3, MP4 or standard audio/video file only. (Detected file: ${file.name}, type: ${file.type || "unknown"})`);
       return;
     }
 
@@ -187,6 +190,33 @@ export function CallVoiceSettings() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDeleteAudio = async (num: number) => {
+    if (!window.confirm(`Are you sure you want to delete the uploaded audio file for number ${num}?`)) return;
+    try {
+      await apiFetch(`/api/games/number-calls/${num}/audio`, {
+        method: "DELETE",
+      });
+      load();
+    } catch {
+      alert("Failed to delete audio file.");
+    }
+  };
+
+  const handleVolumeChange = async (num: number, vol: number) => {
+    try {
+      // Optimistically update local state first for smooth slider dragging
+      setSettings(prev => prev.map(s => s.number === num ? { ...s, volume: vol } : s));
+      
+      await apiFetch(`/api/games/number-calls/${num}`, {
+        method: "PATCH",
+        body: JSON.stringify({ volume: vol }),
+      });
+    } catch {
+      alert("Failed to update volume.");
+      load();
+    }
   };
 
   const speakTTS = (text: string) => {
@@ -212,6 +242,8 @@ export function CallVoiceSettings() {
   const playCallPreview = (item: NumberCallConfig) => {
     if (item.call_mode === "Audio" && item.audio_url) {
       const audio = new Audio(item.audio_url);
+      audio.volume = item.volume !== undefined ? item.volume : 1.0;
+      soundSynthesizer.applyLiveAnnouncementEcho(audio);
       audio.play().catch(() => {
         alert("Failed to play audio file. Falling back to TTS.");
         speakTTS(item.call_text);
@@ -453,11 +485,11 @@ export function CallVoiceSettings() {
                     >
                       <input 
                         type="file" 
-                        accept="audio/*,.mp3,.wav,.m4a,.mpeg,.aac,.ogg,.wma" 
+                        accept="audio/*,video/mp4,.mp3,.wav,.m4a,.mpeg,.aac,.ogg,.wma,.mp4" 
                         onChange={(e) => handleFileUpload(item.number, e)}
                         style={{ display: "none" }}
                       />
-                      <span>{uploadingNum === item.number ? "Uploading..." : item.audio_url ? "Replace MP3" : "Upload MP3"}</span>
+                      <span>{uploadingNum === item.number ? "Uploading..." : item.audio_url ? "Replace File" : "Upload File"}</span>
                     </label>
                     
                     <Button 
@@ -468,7 +500,52 @@ export function CallVoiceSettings() {
                     >
                       🔊 Listen
                     </Button>
+
+                    {item.audio_url && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        style={{ padding: "6px", color: "var(--danger)" }}
+                        onClick={() => handleDeleteAudio(item.number)}
+                      >
+                        🗑️ Delete
+                      </Button>
+                    )}
                   </div>
+
+                  {/* Volume Slider (Shown only if audio is uploaded) */}
+                  {item.audio_url && (
+                    <div 
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "8px", 
+                        background: "var(--surface)", 
+                        padding: "4px 10px", 
+                        borderRadius: "var(--radius-sm)", 
+                        border: "1px solid var(--border-2)", 
+                        minWidth: "125px" 
+                      }}
+                    >
+                      <span className="text-[10px] text-mute font-bold" style={{ whiteSpace: "nowrap" }}>
+                        Vol: {Math.round((item.volume ?? 1) * 100)}%
+                      </span>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05" 
+                        value={item.volume ?? 1} 
+                        onChange={(e) => handleVolumeChange(item.number, parseFloat(e.target.value))} 
+                        style={{ 
+                          width: "70px", 
+                          accentColor: "var(--brand)", 
+                          cursor: "pointer",
+                          height: "4px"
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {/* Mode Ticks (Shown only if audio is uploaded) */}
                   {item.audio_url ? (

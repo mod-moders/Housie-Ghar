@@ -19,7 +19,7 @@ function formatWhen(iso: string): { date: string; time: string } {
 }
 
 function GameCard({ game, goLive }: { game: GameSummary; goLive: (id: string) => void }) {
-  const isLive = game.game_status === "Live" || game.game_status === "Paused";
+  const isLive = game.game_status === "Live" || game.game_status === "Paused" || game.game_status === "Draw_Ended";
   const pct = Math.round((game.sold_count / game.total_tickets) * 100) || 0;
   const dateStr = formatWhen(game.scheduled_at).date + ", " + formatWhen(game.scheduled_at).time;
   const presetClass = getPresetClass(game.title) || "";
@@ -32,7 +32,19 @@ function GameCard({ game, goLive }: { game: GameSummary; goLive: (id: string) =>
     >
       <div className="hg-fill-top">
         <strong className="hg-card-title" style={{ fontSize: "16px" }}>{game.title}</strong>
-        <span className={`hg-pill hg-pill-${game.game_status.toLowerCase()}`}>{game.game_status}</span>
+        <span className={`hg-pill hg-pill-${
+          game.game_status === "Paused" 
+            ? "paused" 
+            : game.game_status === "Draw_Ended" 
+              ? "draw-ended" 
+              : "live"
+        }`}>
+          {game.game_status === "Paused" 
+            ? "Paused" 
+            : game.game_status === "Draw_Ended" 
+              ? "Claiming" 
+              : "Ongoing"}
+        </span>
       </div>
       <div className="hg-fill-meta" style={{ marginTop: "6px" }}>
         <span className="hg-card-when">{dateStr}</span>
@@ -76,7 +88,9 @@ function PastGameCard({ game }: { game: GameSummary }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0 }}>
                   <span style={{ fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", fontSize: "9px", whiteSpace: "nowrap" }}>{p.pattern_name}:</span>
                   <span style={{ color: "var(--text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                    {p.winner_housie_name} <span style={{ color: "var(--text-mute)", fontSize: "9.5px" }}>(Tk #{p.winner_ticket_number})</span>
+                    {p.winner_housie_name} {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
+                      <span style={{ color: "var(--text-mute)", fontSize: "9.5px" }}>(Tk #{p.winner_ticket_number})</span>
+                    )}
                   </span>
                 </div>
                 <strong style={{ fontFamily: "var(--font-mono)", color: "var(--brand)", whiteSpace: "nowrap", marginLeft: "8px" }}>{money(p.amount_per_winner ?? p.prize_amount)}</strong>
@@ -137,7 +151,7 @@ export function BookieLiveHudSection() {
   }
 
   const all = games ?? [];
-  const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused");
+  const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
   const scheduled = all
     .filter((g) => g.game_status === "Scheduled")
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());

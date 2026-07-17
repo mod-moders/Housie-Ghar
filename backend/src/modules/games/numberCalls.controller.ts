@@ -9,7 +9,7 @@ import pool from '../../db';
 export async function listNumberCalls(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      'SELECT number, call_text, default_text, audio_url, call_mode FROM Number_Calls ORDER BY number ASC'
+      'SELECT number, call_text, default_text, audio_url, call_mode, volume FROM Number_Calls ORDER BY number ASC'
     );
     res.json(result.rows);
   } catch (error) {
@@ -19,20 +19,21 @@ export async function listNumberCalls(req: Request, res: Response): Promise<void
 }
 
 /**
- * Update call_text and/or call_mode for a number (Admin+)
+ * Update call_text, call_mode, and/or volume for a number (Admin+)
  */
 export async function updateNumberCall(req: Request, res: Response): Promise<void> {
   const { number } = req.params;
-  const { call_text, call_mode } = req.body;
+  const { call_text, call_mode, volume } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE Number_Calls 
        SET call_text = COALESCE($1, call_text), 
-           call_mode = COALESCE($2, call_mode) 
-       WHERE number = $3 
+           call_mode = COALESCE($2, call_mode),
+           volume = CASE WHEN $3::float IS NOT NULL THEN $3::float ELSE volume END
+       WHERE number = $4 
        RETURNING *`,
-      [call_text, call_mode, parseInt(number as string, 10)]
+      [call_text, call_mode, volume !== undefined ? parseFloat(volume) : null, parseInt(number as string, 10)]
     );
 
     if (result.rowCount === 0) {
@@ -88,6 +89,18 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
   }
 
   try {
+    const mimeMatch = audio_data.match(/^data:([^;]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : '';
+    
+    let ext = 'mp3';
+    if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) {
+      ext = 'mp4';
+    } else if (mimeType.includes('wav')) {
+      ext = 'wav';
+    } else if (mimeType.includes('m4a')) {
+      ext = 'm4a';
+    }
+
     const base64Data = audio_data.split(';base64,').pop();
     if (!base64Data) {
       res.status(400).json({ message: 'Invalid base64 audio data' });
@@ -99,11 +112,20 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     // Resolve destination: frontend/public/audio/calls/
     const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');
     fs.mkdirSync(destDir, { recursive: true });
-    const destPath = path.join(destDir, `${number}.mp3`);
 
+    // Clean up any existing files for this number with common extensions so we don't have duplicate file forms
+    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
+    possibleExts.forEach((e) => {
+      const oldPath = path.join(destDir, `${number}.${e}`);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch {}
+      }
+    });
+
+    const destPath = path.join(destDir, `${number}.${ext}`);
     fs.writeFileSync(destPath, buffer);
 
-    const audioUrl = `/audio/calls/${number}.mp3`;
+    const audioUrl = `/audio/calls/${number}.${ext}`;
 
     const result = await pool.query(
       `UPDATE Number_Calls 
@@ -122,6 +144,45 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error uploading number audio:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Delete audio file for a number and reset call mode back to 'Text' (Admin+)
+ */
+export async function deleteNumberAudio(req: Request, res: Response): Promise<void> {
+  const { number } = req.params;
+
+  try {
+    // 1. Resolve path and clean up existing files
+    const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');
+    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
+    possibleExts.forEach((e) => {
+      const filePath = path.join(destDir, `${number}.${e}`);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+    });
+
+    // 2. Clear audio_url and reset call_mode to 'Text' in DB
+    const result = await pool.query(
+      `UPDATE Number_Calls 
+       SET audio_url = NULL, 
+           call_mode = 'Text'
+       WHERE number = $1 
+       RETURNING *`,
+      [parseInt(number as string, 10)]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Number call setting not found' });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error deleting number audio:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

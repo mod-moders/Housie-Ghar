@@ -8,6 +8,20 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { PlayerProfile } from "@/lib/types";
 
+interface WinningItem {
+  prize_id: number;
+  game_id: string;
+  game_title: string;
+  game_date: string;
+  pattern_name: string;
+  amount: number;
+  winner_ticket_number: string;
+  player_claimed: boolean;
+  player_claimed_at: string | null;
+  disbursed: boolean;
+  disbursed_at: string | null;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -27,6 +41,42 @@ export default function ProfilePage() {
   const [hasPassword, setHasPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Winnings states
+  const [winnings, setWinnings] = useState<WinningItem[]>([]);
+  const [winningsLoading, setWinningsLoading] = useState(true);
+  const [claimingId, setClaimingId] = useState<number | null>(null);
+
+  const fetchWinnings = () => {
+    setWinningsLoading(true);
+    apiFetch<WinningItem[]>("/api/player/winnings")
+      .then((data) => {
+        setWinnings(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load winnings:", err);
+      })
+      .finally(() => {
+        setWinningsLoading(false);
+      });
+  };
+
+  const initiateClaim = async (gameId: string, prizeId: number) => {
+    setClaimingId(prizeId);
+    try {
+      const response = await apiFetch<{whatsapp_url?: string}>(`/api/games/${gameId}/prizes/${prizeId}/claim`, {
+        method: "POST",
+      });
+      fetchWinnings();
+      if (response.whatsapp_url) {
+        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to initiate claim");
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   useEffect(() => {
     apiFetch<{ player: PlayerProfile }>("/api/player/me")
       .then((res) => {
@@ -42,7 +92,22 @@ export default function ProfilePage() {
         console.error("Failed to load profile", err);
         router.push("/login"); // redirect to login/signup
       });
+
+    fetchWinnings();
   }, [router]);
+
+  useEffect(() => {
+    if (!loading && !winningsLoading && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const claimPrizeId = params.get("claim_prize_id");
+      const gameId = params.get("game_id");
+      if (claimPrizeId && gameId) {
+        initiateClaim(gameId, parseInt(claimPrizeId, 10));
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [loading, winningsLoading]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,11 +266,15 @@ export default function ProfilePage() {
                         disabled={removePassword}
                         onChange={e => setPassword(e.target.value)}
                         placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-bitwarden-ignore="true"
                         style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
                       />
                       <button
                         type="button"
                         className="hg-password-toggle"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setShowPassword(!showPassword)}
                         title={showPassword ? "Hide Password" : "Show Password"}
                         disabled={removePassword}
@@ -267,6 +336,118 @@ export default function ProfilePage() {
             </div>
 
           </form>
+
+          {/* My Winnings & Claims Card */}
+          <div 
+            id="winnings-section"
+            style={{ 
+              marginTop: 24, 
+              background: "var(--surface)", 
+              padding: "24px 28px", 
+              borderRadius: 12, 
+              border: "1px solid var(--border-light)", 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: 16 
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+              <Icon name="award" size={18} style={{ color: "var(--accent)" }} />
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>
+                My Winnings & Claims
+              </h3>
+            </div>
+            
+            {winningsLoading ? (
+              <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>Loading winnings...</div>
+            ) : winnings.length === 0 ? (
+              <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
+                You have no recorded winnings yet. Keep playing to win exciting prizes!
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {winnings.map((w) => {
+                  const isClaimed = w.player_claimed;
+                  const isDisbursed = w.disbursed;
+                  
+                  return (
+                    <div 
+                      key={w.prize_id}
+                      style={{
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border-light)",
+                        borderRadius: 8,
+                        padding: "12px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 12
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)" }}>{w.pattern_name}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
+                          {w.game_title} • Ticket #{w.winner_ticket_number}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        <span style={{ fontWeight: 700, fontSize: 16, color: "var(--accent)" }}>
+                          ₹{w.amount.toFixed(2)}
+                        </span>
+                        
+                        {isDisbursed ? (
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                            Disbursed
+                          </span>
+                        ) : isClaimed ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                              Pending Disbursal
+                            </span>
+                            <button
+                              onClick={() => initiateClaim(w.game_id, w.prize_id)}
+                              style={{
+                                background: "none",
+                                border: "1px solid var(--border-light)",
+                                color: "var(--text)",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                fontWeight: 500,
+                                cursor: "pointer"
+                              }}
+                            >
+                              WhatsApp FO
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => initiateClaim(w.game_id, w.prize_id)}
+                            disabled={claimingId === w.prize_id}
+                            style={{
+                              background: "var(--accent)",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 6,
+                              padding: "6px 12px",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              opacity: claimingId === w.prize_id ? 0.6 : 1
+                            }}
+                          >
+                            {claimingId === w.prize_id ? "Claiming..." : "Claim Now"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </PublicShell>

@@ -149,11 +149,15 @@ export default function Login() {
                   placeholder="Enter your account password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-bitwarden-ignore="true"
                   className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
                 />
                 <button
                   type="button"
                   className="hg-password-toggle"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setShowPassword(!showPassword)}
                   title={showPassword ? "Hide Password" : "Show Password"}
                 >

@@ -2,13 +2,12 @@ import pool from './db';
 
 async function main() {
   try {
-    const requests = await pool.query('SELECT * FROM TopUp_Requests');
-    console.log('TOPUP REQUESTS IN DB:');
-    console.log(requests.rows);
-
-    const foadmins = await pool.query("SELECT user_id, full_name, phone, role_id, is_cfo FROM Users WHERE role_id IN (1, 2)");
-    console.log('FO / ADMIN USERS IN DB:');
-    console.log(foadmins.rows);
+    const prizes = await pool.query(
+      `SELECT * FROM Prize_Pool WHERE game_id = $1`,
+      ['d2090e27-d8a6-45b3-8210-a797e2df5fd6']
+    );
+    console.log('PRIZES:');
+    console.log(prizes.rows);
   } catch (err) {
     console.error('DB query error:', err);
   } finally {

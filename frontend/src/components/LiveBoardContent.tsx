@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
+import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
@@ -41,7 +42,8 @@ interface FloatingReaction {
 let reactionSeq = 0;
 function makeReaction(emoji: string, senderName: string): FloatingReaction {
   reactionSeq += 1;
-  return { id: reactionSeq, emoji, senderName, x: 8 + Math.random() * 70 };
+  // Float from the right side of the screen (between 72% and 88%) to look like Facebook/Instagram Live
+  return { id: reactionSeq, emoji, senderName, x: 72 + Math.random() * 16 };
 }
 
 export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; isStaff?: boolean; onBack?: () => void }) {
@@ -58,16 +60,70 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchedTickets, setSearchedTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [displayName, setDisplayName] = useState<string>("Player");
+  const [displayName, setDisplayName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const token = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const payload = JSON.parse(window.atob(base64));
+          return payload.housieName || "Player";
+        } catch {
+          // ignore
+        }
+      }
+      const staffToken = sessionStorage.getItem("hg_staff_token");
+      if (staffToken) {
+        try {
+          const base64Url = staffToken.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const payload = JSON.parse(window.atob(base64));
+          return payload.fullName || "Staff";
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return "Player";
+  });
   const [showAllCalled, setShowAllCalled] = useState(false);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
+  const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
+
+  useEffect(() => {
+    if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
+      setShowWinnersOverlay(true);
+    } else {
+      setShowWinnersOverlay(false);
+    }
+  }, [gameStatus]);
+
+  const timersRef = useRef<NodeJS.Timeout[]>([]);
+
+  const delay = useCallback((fn: () => void, ms: number) => {
+    const t = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((x) => x !== t);
+      fn();
+    }, ms);
+    timersRef.current.push(t);
+    return t;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current = [];
+    };
+  }, []);
+
   const booking = useBookingStore();
   const { config } = useConfigStore();
   
   const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
-    config?.english_caller_enabled === "true"
+    config?.english_caller_enabled === "true" && !muted
   );
 
   const gameStartedAnnouncedRef = useRef<boolean>(false);
@@ -93,7 +149,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       o.frequency.value = 660;
       o.type = "sine";
       g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.38, ctx.currentTime + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
       o.connect(g);
       g.connect(ctx.destination);
@@ -126,14 +182,19 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       });
   }, [router]);
 
+  const loadGameData = useCallback(() => {
+    apiFetch<GameSummary>(`/api/games/${game_id}`)
+      .then((g) => {
+        setGame(g);
+        setPrizes(g.prize_pool || []);
+      })
+      .catch(() => {});
+  }, [game_id]);
+
   // Game meta + prize board
   useEffect(() => {
-    let alive = true;
-    apiFetch<GameSummary>(`/api/games/${game_id}`)
-      .then((g) => { if (alive) { setGame(g); setPrizes(g.prize_pool); } })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [game_id]);
+    loadGameData();
+  }, [loadGameData]);
 
   const loadMyTickets = useCallback(() => {
     let alive = true;
@@ -191,8 +252,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   }, [loadMyTickets]);
 
   useSocket((event) => {
-    if (event === "ticket_status_change") {
+    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received") {
       loadMyTickets();
+      loadGameData();
     }
   });
 
@@ -231,7 +293,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       setRevealed(false);
 
       // Step 2 — After spin (2s), show badge + play audio together (number set in same tick)
-      setTimeout(() => {
+      delay(() => {
         beep();
         addDrawn(num);       // set new number FIRST
         setRevealed(true);   // THEN reveal badge — no stale flash
@@ -247,10 +309,15 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         )
       );
       playCelebration();
-      setTimeout(() => {
+      delay(() => {
+        const config = useConfigStore.getState().config;
+        const isSoundEnabled = config?.celebration_sound_enabled !== "false";
+        if (isSoundEnabled) {
+          soundSynthesizer.playCelebration();
+        }
         setWinOverlay(w);
         setRecentWinners(prev => [...prev, w]); 
-        setTimeout(() => {
+        delay(() => {
            setWinOverlay(null);
            setRecentWinners(prev => prev.filter(win => win.ticket_id !== w.ticket_id)); // cleanup
         }, 6000);
@@ -258,9 +325,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     } else if (data.event === "emoji_reaction") {
       const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
       setReactions((r) => [...r, next]);
-      setTimeout(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
+      delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     }
-  }, [beep, playNumberCall, playCelebration, addDrawn]);
+  }, [beep, playNumberCall, playCelebration, addDrawn, delay]);
 
   useSSE(game_id, onEvent);
 
@@ -287,27 +354,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
-  const claimPrize = async (prizeId: number) => {
-    setClaimingPrize(String(prizeId));
-    try {
-      const response = await apiFetch<ClaimPrizeResponse>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
-        method: "POST",
-      });
-      
-      // Refresh prizes to show claim status
-      const gameRes = await apiFetch<GameSummary>(`/api/games/${game_id}`);
-      setPrizes(gameRes.prize_pool);
-      
-      // If WhatsApp URL is provided, open it in new tab
-      if (response.whatsapp_url) {
-        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
-      }
-    } catch (err) {
-      console.error("Failed to claim prize:", err);
-      alert("Failed to claim prize. Please try again.");
-    } finally {
-      setClaimingPrize(null);
-    }
+  const claimPrize = (prizeId: number) => {
+    router.push(`/profile?claim_prize_id=${prizeId}&game_id=${game_id}`);
   };
 
   const drawn = new Set(drawnNumbers);
@@ -358,6 +406,39 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                         ? "Spinning…"
                         : count > 0 ? `Number ${lastDrawn} called` : "Waiting for the first call…"}
                 </div>
+                {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && !showWinnersOverlay && (
+                  <button
+                    onClick={() => setShowWinnersOverlay(true)}
+                    style={{
+                      marginTop: "12px",
+                      width: "100%",
+                      padding: "10px 16px",
+                      background: "linear-gradient(135deg, var(--accent) 0%, #ff7043 100%)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(244, 63, 94, 0.6)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 15px rgba(244, 63, 94, 0.4)";
+                    }}
+                  >
+                    <Icon name="trophy" size={16} /> View Winners & Claim Prizes
+                  </button>
+                )}
               </div>
 
               {/* Recent numbers called panel — in a separate card just below the cage & call notification */}
@@ -426,15 +507,53 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 <h2 className="hg-section-title">Prizes</h2>
                 <div className="hg-prizeboard-grid">
                   {prizes.map((p) => {
-                    const isWinner = p.claimed && p.winner_housie_name === displayName;
+                    const isWinner = p.winner_housie_name === displayName || 
+                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
                     const isClaimed = p.player_claimed;
-                    const showClaimBtn = !isStaff && gameStatus === "Completed" && isWinner && !isClaimed;
-                    const showClaimedBadge = isWinner && isClaimed;
+                    const isDrawFinished = gameStatus === "Completed" || gameStatus === "Draw_Ended";
+                    const showClaimBtn = !isStaff && isDrawFinished && isWinner && !isClaimed;
                     return (
-                      <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${showClaimedBadge ? " player-claimed" : ""}`}>
+                      <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${isWinner && isClaimed ? " player-claimed" : ""}`}>
                         <div className="hg-prize-l">
                           <span className="hg-prize-name">{p.pattern_name}</span>
-                          <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                            {isClaimed && (
+                              <span className="hg-claimed-badge" style={{
+                                background: p.disbursed ? 'var(--success)' : '#d97706',
+                                color: '#fff',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                {p.disbursed ? 'Disbursed' : isWinner ? 'Claimed (Pending)' : 'Claimed'}
+                              </span>
+                            )}
+                            {showClaimBtn && (
+                              <button
+                                className="hg-claim-btn"
+                                onClick={() => claimPrize(p.prize_id)}
+                                disabled={claimingPrize === String(p.prize_id)}
+                                style={{
+                                  background: 'var(--accent)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '4px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
+                                  opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
+                                  transition: 'opacity 0.2s',
+                                }}
+                              >
+                                {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="hg-prize-r">
                           {p.claimed && p.winner_housie_name ? (
@@ -442,47 +561,12 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span className="hg-prize-winner">
                                   {p.winner_housie_name}
-                                  {p.winner_ticket_number && (
+                                  {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
                                     <span style={{ opacity: 0.8, fontSize: '0.85em', marginLeft: '4px' }}>
                                       (Tk #{p.winner_ticket_number})
                                     </span>
                                   )}
                                 </span>
-                                {showClaimedBadge && (
-                                  <span className="hg-claimed-badge" style={{
-                                    background: 'var(--success)',
-                                    color: '#fff',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.5px',
-                                  }}>
-                                    Claimed
-                                  </span>
-                                )}
-                                {showClaimBtn && (
-                                  <button
-                                    className="hg-claim-btn"
-                                    onClick={() => claimPrize(p.prize_id)}
-                                    disabled={claimingPrize === String(p.prize_id)}
-                                    style={{
-                                      background: 'var(--accent)',
-                                      color: '#fff',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      padding: '6px 12px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
-                                      opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
-                                      transition: 'opacity 0.2s',
-                                    }}
-                                  >
-                                    {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
-                                  </button>
-                                )}
                               </div>
                               {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
                             </div>
@@ -619,34 +703,117 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             </>
           )}
 
-          {gameStatus === "Completed" && (
+          {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && showWinnersOverlay && (
             <div className="hg-game-over-overlay" style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.5s ease" }}>
               <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-                <Confetti recycle={false} numberOfPieces={800} gravity={0.1} />
+                <Confetti recycle={gameStatus === "Draw_Ended"} numberOfPieces={600} gravity={0.08} />
               </div>
               <div className="hg-card" style={{ padding: 40, width: "90%", maxWidth: 600, textAlign: "center", background: "var(--surface)", border: "2px solid var(--accent)", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
-                <h1 style={{ color: "var(--accent)", fontSize: "2.5rem", marginBottom: 8 }}>Game Over!</h1>
-                <p style={{ color: "var(--text-dim)", marginBottom: 32 }}>All prizes have been claimed. Thank you for playing Housie Ghar.</p>
+                <h1 style={{ color: "var(--accent)", fontSize: "2.5rem", marginBottom: 8 }}>
+                  {gameStatus === "Completed" ? "Game Completed!" : "Draw Concluded!"}
+                </h1>
+                <p style={{ color: "var(--text-dim)", marginBottom: 32 }}>
+                  {gameStatus === "Completed" 
+                    ? "All prizes have been claimed and disbursed. Thank you for playing Housie Ghar." 
+                    : "The draw has concluded. Winners can claim their prize rewards directly below."}
+                </p>
                 
                 <h3 style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12, marginBottom: 16, textAlign: "left" }}>Final Winners List</h3>
                 <div style={{ maxHeight: "40vh", overflowY: "auto", textAlign: "left" }}>
-                  {prizes.filter(p => p.claimed).map((p) => (
-                    <div key={p.prize_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: "bold", fontSize: 16 }}>{p.pattern_name}</div>
-                        <div style={{ color: "var(--accent)", fontSize: 14 }}>{p.winner_housie_name}</div>
+                  {prizes.filter(p => p.claimed).map((p) => {
+                    const isWinner = p.winner_housie_name === displayName;
+                    const isClaimed = p.player_claimed;
+                    const showRowClaimBtn = !isStaff && gameStatus === "Draw_Ended" && isWinner && !isClaimed;
+                    return (
+                      <div key={p.prize_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "bold", fontSize: 16 }}>{p.pattern_name}</div>
+                          <div style={{ color: "var(--accent)", fontSize: 14, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{p.winner_housie_name}</span>
+                            {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
+                              <span style={{ color: 'var(--text-mute)', fontSize: '12px' }}>
+                                (Tk #{p.winner_ticket_number})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontWeight: 600 }}>{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                          
+                          {showRowClaimBtn && (
+                            <button
+                              onClick={() => claimPrize(p.prize_id)}
+                              disabled={claimingPrize === String(p.prize_id)}
+                              style={{
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
+                                opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
+                                transition: 'opacity 0.2s',
+                              }}
+                            >
+                              {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
+                            </button>
+                          )}
+
+                          {isClaimed && (
+                            <span style={{
+                              background: p.disbursed ? 'var(--success)' : '#d97706',
+                              color: '#fff',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              {p.disbursed ? 'Disbursed' : isWinner ? 'Claimed (Pending)' : 'Claimed'}
+                            </span>
+                          )}
+
+                          {!isClaimed && !showRowClaimBtn && (
+                            <span style={{
+                              background: 'rgba(255,255,255,0.05)',
+                              color: 'var(--text-dim)',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              Pending Claim
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontWeight: 600 }}>{money(p.amount_per_winner ?? p.prize_amount)}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 
-                <button 
-                  onClick={() => router.push("/")} 
-                  style={{ marginTop: 32, padding: "12px 24px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%" }}
-                >
-                  Return to Lobby
-                </button>
+                <div style={{ display: 'flex', gap: '12px', marginTop: 32 }}>
+                  <button 
+                    onClick={() => setShowWinnersOverlay(false)} 
+                    style={{ flex: 1, padding: "12px 24px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", transition: "opacity 0.2s" }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                  >
+                    Close Winners List
+                  </button>
+                  <button 
+                    onClick={() => router.push("/")} 
+                    style={{ flex: 1, padding: "12px 24px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", transition: "background 0.2s" }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                  >
+                    Return to Lobby
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -34,11 +34,17 @@ export function SettingsSection() {
   const [groupName, setGroupName] = useState("");
   const [groupUrl, setGroupUrl] = useState("");
 
+  // Sound effects configuration states
+  const [cageSound, setCageSound] = useState(true);
+  const [celebrationSound, setCelebrationSound] = useState(true);
+
   useEffect(() => {
     if (config) {
       setAnnouncement(config.announcement_text || "");
       setSiteTitle(config.site_title || "");
       setActiveTheme(config.active_theme || "");
+      setCageSound(config.cage_sound_enabled !== "false");
+      setCelebrationSound(config.celebration_sound_enabled !== "false");
       
       // Parse announcements list
       try {
@@ -268,6 +274,47 @@ export function SettingsSection() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Sound Effects Card */}
+          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="volume" size={18} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: 16 }}>Sound Effects</h3>
+            </div>
+            <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
+              Enable or disable live game audio effects.
+            </p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", userSelect: "none" }}>
+                <input 
+                  type="checkbox" 
+                  checked={cageSound} 
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setCageSound(val);
+                    handleSave({ cage_sound_enabled: String(val) });
+                  }}
+                  style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
+                />
+                Cage Spinning Sound
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", userSelect: "none" }}>
+                <input 
+                  type="checkbox" 
+                  checked={celebrationSound} 
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setCelebrationSound(val);
+                    handleSave({ celebration_sound_enabled: String(val) });
+                  }}
+                  style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
+                />
+                Celebratory Winner Sound
+              </label>
             </div>
           </div>
 

@@ -121,7 +121,7 @@ export function Button({
 // ── Badge ────────────────────────────────────────────────────────────────────
 export function Badge({ tone = "neutral", icon, children }: { tone?: string; icon?: string; children: React.ReactNode }) {
   return (
-    <span className={`hg-badge hg-badge-${tone}`}>
+    <span className={`hg-badge hg-badge-${tone}`} style={{ flexShrink: 0 }}>
       {icon && <Icon name={icon} size={12} strokeWidth={2.4} />}
       {children}
     </span>

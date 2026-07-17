@@ -286,11 +286,15 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                           placeholder="Enter password you used to log in"
                           value={form.current_password} 
                           onChange={(e) => setForm({ ...form, current_password: e.target.value })} 
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-bitwarden-ignore="true"
                           required 
                         />
                         <button 
                           type="button" 
                           className="hg-password-toggle"
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => setShowCurPw(!showCurPw)}
                           title={showCurPw ? "Hide Password" : "Show Password"}
                         >
@@ -298,7 +302,7 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                         </button>
                       </div>
                     </label>
-
+ 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
                       <label className="hg-form-field">
                         <span>New Password (min 6 chars)</span>
@@ -308,11 +312,15 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                             placeholder="Enter a secure password"
                             value={form.new_password} 
                             onChange={(e) => setForm({ ...form, new_password: e.target.value })} 
+                            data-lpignore="true"
+                            data-1p-ignore="true"
+                            data-bitwarden-ignore="true"
                             required 
                           />
                           <button 
                             type="button" 
                             className="hg-password-toggle"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setShowNewPw(!showNewPw)}
                             title={showNewPw ? "Hide Password" : "Show Password"}
                           >
@@ -320,7 +328,7 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                           </button>
                         </div>
                       </label>
-
+ 
                       <label className="hg-form-field">
                         <span>Confirm New Password</span>
                         <div className="hg-password-wrapper">
@@ -329,11 +337,15 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                             placeholder="Re-enter new password"
                             value={form.confirm_password} 
                             onChange={(e) => setForm({ ...form, confirm_password: e.target.value })} 
+                            data-lpignore="true"
+                            data-1p-ignore="true"
+                            data-bitwarden-ignore="true"
                             required 
                           />
                           <button 
                             type="button" 
                             className="hg-password-toggle"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setShowConfirmPw(!showConfirmPw)}
                             title={showConfirmPw ? "Hide Password" : "Show Password"}
                           >

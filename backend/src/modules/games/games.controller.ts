@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Games Controller
  */
 
@@ -18,9 +18,129 @@ import {
   resumeGame,
   changeGameSpeed,
   completeGame,
+  endGameDraw,
 } from '../../services/gameEngine';
 
 const VALID_PATTERNS = new Set<string>(CONSTANTS.PRIZE_PATTERNS as readonly string[]);
+
+function isSubset(subset: number[], superset: Set<number>): boolean {
+  return subset.every(num => superset.has(num));
+}
+
+function getRowNumbers(row: any[]): number[] {
+  return row.filter(cell => cell && typeof cell === 'object' && cell.number !== null).map(cell => cell.number);
+}
+
+function getFourCorners(gridData: any): number[] {
+  const row1 = gridData.row1;
+  const row3 = gridData.row3;
+  const corners: number[] = [];
+  
+  const r1Nums = row1.filter((c: any) => c && c.number !== null);
+  if (r1Nums.length > 0) {
+    corners.push(r1Nums[0].number);
+    corners.push(r1Nums[r1Nums.length - 1].number);
+  }
+  
+  const r3Nums = row3.filter((c: any) => c && c.number !== null);
+  if (r3Nums.length > 0) {
+    corners.push(r3Nums[0].number);
+    corners.push(r3Nums[r3Nums.length - 1].number);
+  }
+  
+  return corners;
+}
+
+function evaluateTicketPattern(gridData: any, drawnNumbers: number[], patternName: string): boolean {
+  const drawnSet = new Set(drawnNumbers);
+  const allNums = [
+    ...getRowNumbers(gridData.row1),
+    ...getRowNumbers(gridData.row2),
+    ...getRowNumbers(gridData.row3),
+  ];
+
+  if (patternName === 'Early Five') {
+    const matching = allNums.filter(n => drawnSet.has(n));
+    return matching.length >= 5;
+  } else if (patternName === 'Quick 7') {
+    const matching = allNums.filter(n => drawnSet.has(n));
+    return matching.length >= 7;
+  } else if (patternName === 'Corner') {
+    const corners = getFourCorners(gridData);
+    return corners.length === 4 && isSubset(corners, drawnSet);
+  } else if (patternName === 'Star') {
+    const corners = getFourCorners(gridData);
+    const row2Nums = getRowNumbers(gridData.row2);
+    const centerNum = row2Nums[2];
+    return corners.length === 4 && isSubset(corners, drawnSet) && drawnSet.has(centerNum);
+  } else if (patternName === 'Top Line') {
+    const row1 = getRowNumbers(gridData.row1);
+    return isSubset(row1, drawnSet);
+  } else if (patternName === 'Middle Line') {
+    const row2 = getRowNumbers(gridData.row2);
+    return isSubset(row2, drawnSet);
+  } else if (patternName === 'Bottom Line') {
+    const row3 = getRowNumbers(gridData.row3);
+    return isSubset(row3, drawnSet);
+  } else if (patternName === 'Box Bonus') {
+    const row1 = getRowNumbers(gridData.row1).filter(n => drawnSet.has(n));
+    const row2 = getRowNumbers(gridData.row2).filter(n => drawnSet.has(n));
+    const row3 = getRowNumbers(gridData.row3).filter(n => drawnSet.has(n));
+    return row1.length >= 2 && row2.length >= 2 && row3.length >= 2;
+  } else if (
+    patternName === 'Full House' ||
+    patternName === '1st Full House' ||
+    patternName === '2nd Full House' ||
+    patternName === '3rd Full House'
+  ) {
+    return isSubset(allNums, drawnSet);
+  }
+  return false;
+}
+
+function formatPrizes(
+  prizes: any[],
+  gameId: string,
+  drawnNumbers: number[],
+  soldTickets: any[]
+): any[] {
+  const ticketMap = new Map<string, any[]>();
+  for (const t of soldTickets) {
+    const list = ticketMap.get(t.owner_housie_name) || [];
+    list.push(t);
+    ticketMap.set(t.owner_housie_name, list);
+  }
+
+  return prizes.map((row) => {
+    let name = row.winner_housie_name;
+    if (row.claimed && name && name.includes(',') && !name.includes('(')) {
+      const names = name.split(',').map((n: string) => n.trim());
+      const uniqueNames = Array.from(new Set(names)) as string[];
+      
+      const winnerParts = uniqueNames.map((pName) => {
+        const pTickets = ticketMap.get(pName) || [];
+        const winningNums: number[] = [];
+        for (const t of pTickets) {
+          if (evaluateTicketPattern(t.grid_data, drawnNumbers, row.pattern_name)) {
+            winningNums.push(t.ticket_number);
+          }
+        }
+        if (winningNums.length === 0) {
+          return pName;
+        } else if (winningNums.length === 1) {
+          return `${pName} (${winningNums[0]})`;
+        } else {
+          return `${pName} (${winningNums.join(' & ')})`;
+        }
+      });
+      name = winnerParts.join(' & ');
+    }
+    return {
+      ...row,
+      winner_housie_name: name,
+    };
+  });
+}
 
 /**
  * Get Financial Officer's WhatsApp number from config
@@ -31,7 +151,22 @@ async function getFinancialOfficerWhatsApp(): Promise<string | null> {
       `SELECT config_value FROM Platform_Config WHERE config_key = 'financial_officer_whatsapp'`
     );
     if (result.rows.length > 0 && result.rows[0].config_value) {
-      return result.rows[0].config_value;
+      const val = result.rows[0].config_value;
+      if (!val.includes('X') && !val.includes('x')) {
+        return val;
+      }
+    }
+
+    // Fallback: Fetch from active Financial Admin user
+    const userResult = await pool.query(
+      `SELECT u.phone 
+       FROM Users u
+       JOIN Roles r ON u.role_id = r.role_id
+       WHERE r.role_name = 'Financial Admin' AND u.phone IS NOT NULL AND u.phone != ''
+       LIMIT 1`
+    );
+    if (userResult.rows.length > 0 && userResult.rows[0].phone) {
+      return userResult.rows[0].phone;
     }
   } catch (error) {
     console.error('Error fetching financial officer WhatsApp:', error);
@@ -73,6 +208,14 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         [game.game_id]
       );
 
+      const ticketsRes = await pool.query(
+        `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
+        [game.game_id]
+      );
+      const logRes = await pool.query(`SELECT drawn_numbers FROM game_logs WHERE game_id = $1`, [game.game_id]);
+      const drawnNumbers = logRes.rows[0]?.drawn_numbers || [];
+      const formattedPrizes = formatPrizes(prizesRes.rows, game.game_id, drawnNumbers, ticketsRes.rows);
+
       games.push({
         game_id: game.game_id,
         title: game.title,
@@ -86,7 +229,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         player_count: playerCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
-        prize_pool: prizesRes.rows.map((row) => ({
+        prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
           pattern_name: row.pattern_name,
           prize_amount: parseFloat(row.prize_amount),
@@ -137,6 +280,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
 
     const prizesRes = await pool.query(
       `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
+              p.player_claimed, p.disbursed,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
@@ -144,6 +288,14 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
        ORDER BY p.prize_id ASC`,
       [game_id]
     );
+
+    const ticketsRes = await pool.query(
+      `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
+      [game_id]
+    );
+    const logRes = await pool.query(`SELECT drawn_numbers FROM game_logs WHERE game_id = $1`, [game_id]);
+    const drawnNumbers = logRes.rows[0]?.drawn_numbers || [];
+    const formattedPrizes = formatPrizes(prizesRes.rows, game_id as string, drawnNumbers, ticketsRes.rows);
 
     res.json({
       game_id: game.game_id,
@@ -158,7 +310,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       player_count: playerCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
-      prize_pool: prizesRes.rows.map((row) => ({
+      prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
         pattern_name: row.pattern_name,
         prize_amount: parseFloat(row.prize_amount),
@@ -168,6 +320,8 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
         claimed_at: row.claimed_at,
         split_count: row.split_count,
         amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
+        player_claimed: row.player_claimed,
+        disbursed: row.disbursed,
       })),
     });
   } catch (error) {
@@ -345,7 +499,7 @@ export async function handleStopGame(req: any, res: Response): Promise<void> {
   const { game_id } = req.params;
 
   try {
-    await completeGame(game_id);
+    await endGameDraw(game_id);
     io.emit('game_list_update', { action: 'stop', game_id });
     res.json({ message: 'Game completed/stopped successfully' });
   } catch (error: any) {
@@ -441,6 +595,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
     );
     const prizesRes = await pool.query(
       `SELECT p.pattern_name, p.winner_housie_name, p.amount_per_winner, p.claimed,
+              p.player_claimed, p.disbursed,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
@@ -448,18 +603,26 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       [game_id]
     );
 
+    const ticketsRes = await pool.query(
+      `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
+      [game_id]
+    );
+    const formattedPrizes = formatPrizes(prizesRes.rows, game_id, gameLogRes.rows[0]?.drawn_numbers || [], ticketsRes.rows);
+
     const initialPayload = {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
       game_status: gameRes.rows[0]?.game_status || 'Scheduled',
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,
-      claimed_prizes: prizesRes.rows.map((row) => ({
+      claimed_prizes: formattedPrizes.map((row) => ({
         pattern_name: row.pattern_name,
         claimed: row.claimed,
         winner_housie_name: row.winner_housie_name,
         winner_ticket_number: row.winner_ticket_number,
         amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
+        player_claimed: row.player_claimed,
+        disbursed: row.disbursed,
       })),
     };
 
@@ -695,18 +858,27 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function sendEmojiReaction(req: Request, res: Response): Promise<void> {
   const game_id = req.params.game_id as string;
-  const { emoji, sender_name } = req.body;
+  const { emoji } = req.body;
 
   if (!emoji) {
     res.status(400).json({ message: 'emoji is required' });
     return;
   }
 
-  // Resolve sender name from authenticated session cookies if possible
-  let resolvedName = sender_name || 'Guest';
+  let resolvedName = '';
 
-  // 1. Try player session token
-  const playerToken = req.cookies?.hg_player_token;
+  // 1. Try player session token (check Authorization header first, then cookies)
+  let playerToken = null;
+  if (req.headers['authorization']) {
+    const authHeader = req.headers['authorization'] as string;
+    if (authHeader.startsWith('Bearer ')) {
+      playerToken = authHeader.substring(7);
+    }
+  }
+  if (!playerToken) {
+    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
+  }
+
   if (playerToken) {
     try {
       const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
@@ -714,13 +886,20 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
         resolvedName = decoded.housieName;
       }
     } catch (err) {
-      // Ignored: fallback to staff token or sender_name
+      // Ignored
     }
   }
 
-  // 2. Try staff session token if name not resolved as player
-  if (resolvedName === 'Guest' || resolvedName === sender_name) {
-    const staffToken = req.cookies?.[CONSTANTS.JWT_COOKIE_NAME];
+  // 2. Try staff session token if not resolved as player (check cookies or Authorization header)
+  if (!resolvedName) {
+    let staffToken = req.cookies?.[CONSTANTS.JWT_COOKIE_NAME];
+    if (!staffToken && req.headers['authorization']) {
+      const authHeader = req.headers['authorization'] as string;
+      if (authHeader.startsWith('Bearer ')) {
+        staffToken = authHeader.substring(7);
+      }
+    }
+
     if (staffToken) {
       try {
         const decoded = jwt.verify(staffToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
@@ -733,6 +912,12 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
     }
   }
 
+  // Reject if not authenticated
+  if (!resolvedName) {
+    res.status(401).json({ message: 'Unauthorized: Registered player or staff session required' });
+    return;
+  }
+
   // Broadcast to all SSE clients listening to this game
   sseManager.broadcast(game_id, {
     event: 'emoji_reaction',
@@ -740,7 +925,7 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
     player_id: resolvedName,
   });
 
-res.json({ success: true });
+  res.json({ success: true });
 }
 
 /**
@@ -748,6 +933,7 @@ res.json({ success: true });
  */
 export async function getGameSalesDetails(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   try {
     const gameRes = await pool.query('SELECT game_id, title FROM Scheduled_Games WHERE game_id = $1', [game_id]);
@@ -758,10 +944,12 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
 
     const ticketsRes = await pool.query(
       `SELECT t.ticket_number, t.status, t.owner_housie_name,
-              u.email as bookie_username, u.full_name as bookie_name
+              u.email as bookie_username, u.full_name as bookie_name,
+              r.role_name as bookie_role
        FROM Tickets t
        LEFT JOIN Bookings b ON (b.booking_id = t.locked_by_booking) OR (t.status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = t.game_id AND b.booking_status = 'Sold')
        LEFT JOIN Users u ON u.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       LEFT JOIN Roles r ON u.role_id = r.role_id
        WHERE t.game_id = $1 AND t.status IN ('Sold', 'Locked')
        ORDER BY t.ticket_number ASC`,
       [game_id]
@@ -772,20 +960,22 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
       status: row.status,
       owner_housie_name: row.owner_housie_name,
       bookie_username: row.bookie_username || 'System/Operator',
-      bookie_name: row.bookie_name || 'System/Operator'
+      bookie_name: row.bookie_name || 'System/Operator',
+      bookie_role: row.bookie_role || 'System'
     }));
 
     // Aggregate Agent Total Sales count
-    const agentMap = new Map<string, { name: string; total: number }>();
+    const agentMap = new Map<string, { name: string; role: string; total: number }>();
     tickets.forEach((t) => {
       if (t.status === 'Sold') {
         const username = t.bookie_username;
         const name = t.bookie_name;
+        const role = t.bookie_role;
         const existing = agentMap.get(username);
         if (existing) {
           existing.total += 1;
         } else {
-          agentMap.set(username, { name, total: 1 });
+          agentMap.set(username, { name, role, total: 1 });
         }
       }
     });
@@ -793,6 +983,7 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
     const agents = Array.from(agentMap.entries()).map(([username, data]) => ({
       bookie_username: username,
       bookie_name: data.name,
+      bookie_role: data.role,
       total_sold: data.total
     })).sort((a, b) => b.total_sold - a.total_sold);
 
@@ -814,8 +1005,18 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
 export async function claimPrize(req: Request, res: Response): Promise<void> {
   const { game_id, prize_id } = req.params;
 
-  // Get player identity from token
-  const playerToken = req.cookies?.hg_player_token;
+  // Get player identity from token (check Authorization header first, then cookies)
+  let playerToken = null;
+  if (req.headers['authorization']) {
+    const authHeader = req.headers['authorization'] as string;
+    if (authHeader.startsWith('Bearer ')) {
+      playerToken = authHeader.substring(7);
+    }
+  }
+  if (!playerToken) {
+    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
+  }
+
   if (!playerToken) {
     res.status(401).json({ message: 'Player authentication required' });
     return;
@@ -841,15 +1042,16 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (gameRes.rows[0].game_status !== 'Completed') {
-      res.status(400).json({ message: 'Game is not completed yet' });
+    const status = gameRes.rows[0].game_status;
+    if (status !== 'Completed' && status !== 'Draw_Ended') {
+      res.status(400).json({ message: 'Game is not completed/ended yet' });
       return;
     }
 
     // Check if this prize belongs to this player and is claimed
     const prizeRes = await pool.query(
       `SELECT p.prize_id, p.pattern_name, p.claimed, p.winner_housie_name, p.amount_per_winner, p.prize_amount, p.split_count,
-              t.ticket_number AS winner_ticket_number
+              p.winner_ticket_id, t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
        WHERE p.prize_id = $1 AND p.game_id = $2`,
@@ -868,7 +1070,9 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (prize.winner_housie_name !== playerHousieName) {
+    const isWinner = (prize.winner_housie_name?.toLowerCase() === playerHousieName.toLowerCase()) ||
+      (prize.winner_housie_name && prize.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes(playerHousieName.toLowerCase()));
+    if (!isWinner) {
       res.status(403).json({ message: 'You are not the winner of this prize' });
       return;
     }
@@ -905,14 +1109,61 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
       [prize_id]
     );
 
+    // Notify financial admins via sockets
+    io.emit('prize_claim_received', { game_id, prize_id, player_housie_name: playerHousieName });
+    io.emit('ticket_status_change');
+
     // Get Financial Officer's WhatsApp
     const foWhatsApp = await getFinancialOfficerWhatsApp();
     
+    // Fetch bookie details
+    let bookieInfo = '';
+    if (prize.winner_ticket_id) {
+      const bookieRes = await pool.query(
+        `SELECT u.full_name 
+         FROM Bookings b
+         JOIN Users u ON u.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+         WHERE $1 = ANY(b.ticket_ids) AND b.booking_status = 'Sold'
+         LIMIT 1`,
+        [prize.winner_ticket_id]
+      );
+      if (bookieRes.rows.length > 0) {
+        bookieInfo = bookieRes.rows[0].full_name;
+      }
+    }
+
+    // Format game date/time
+    const gameDateFormatted = gameDetailRes.rows[0]?.scheduled_at
+      ? new Date(gameDetailRes.rows[0].scheduled_at).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : '';
+
     // Generate WhatsApp message
-    const gameTitle = game.title || 'Housie Ghar Game';
-    const gameDate = game.scheduled_at ? new Date(game.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
-    const amount = prize.amount_per_winner ?? prize.prize_amount;
-    const whatsappMessage = `Hi, I am ${playerHousieName} and I have won the "${prize.pattern_name}" prize for ticket #${prize.winner_ticket_number} respectively for Housie Ghar's ${gameTitle} dated ${gameDate}. My total claim is ₹${amount.toFixed(2)}. Here is my UPI ID/QR code for disbursement.`;
+    const amount = parseFloat(prize.amount_per_winner ?? prize.prize_amount);
+    let ticketDisplay = prize.winner_ticket_number ? `#${prize.winner_ticket_number}` : '';
+    if (prize.winner_housie_name) {
+      const match = prize.winner_housie_name.match(/\(([^)]+)\)/);
+      if (match && match[1]) {
+        ticketDisplay = `#${match[1]}`;
+      }
+    }
+
+    const whatsappMessage = `Hi, I am *${playerHousieName}* and I am claiming my prize on Housie Ghar!
+
+*Claim Details:*
+- *Game:* ${gameDetailRes.rows[0]?.title || 'Housie Ghar Game'} (${gameDateFormatted})
+- *Prize:* ${prize.pattern_name}
+- *Ticket:* ${ticketDisplay}
+${bookieInfo ? `- *Bookie:* ${bookieInfo}\n` : ''}- *Prize Amount:* ₹${amount.toFixed(2)}
+
+Here is my UPI ID/QR Code for disbursement:`;
+
     const whatsappUrl = foWhatsApp 
       ? `https://wa.me/${foWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
       : null;
@@ -963,12 +1214,16 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         p.winner_ticket_id,
         t.ticket_number AS winner_ticket_number,
         sg.title AS game_title,
-        sg.scheduled_at AS game_date
+        sg.scheduled_at AS game_date,
+        bu.full_name AS bookie_name,
+        bu.phone AS bookie_phone
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE p.player_claimed = TRUE AND p.disbursed = FALSE
-       ORDER BY p.player_claimed_at DESC`
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = FALSE
+       ORDER BY COALESCE(p.player_claimed_at, sg.completed_at, NOW()) DESC`
     );
 
     const claims = result.rows.map((row) => ({
@@ -983,11 +1238,127 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
       player_claimed_at: row.player_claimed_at,
       disbursed: row.disbursed,
       disbursed_at: row.disbursed_at,
+      bookie_name: row.bookie_name || 'System/Operator',
+      bookie_phone: row.bookie_phone || '',
     }));
 
     res.json(claims);
   } catch (error) {
     console.error('Error fetching prize claims:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Get prize claims dashboard statistics and past 10 history records
+ */
+export async function getPrizeClaimsDashboard(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    if (req.user!.roleName !== 'Financial Admin' && req.user!.roleName !== 'Superadmin') {
+      res.status(403).json({ message: 'Forbidden: Financial Admin access required' });
+      return;
+    }
+
+    const overallClaimsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)`
+    );
+    const overallDisbursalsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE`
+    );
+    const dailyClaimsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) 
+         AND COALESCE(p.player_claimed_at, sg.completed_at, NOW()) >= date_trunc('day', NOW())`
+    );
+    const dailyDisbursalsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE AND p.disbursed_at >= date_trunc('day', NOW())`
+    );
+    const weeklyClaimsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) 
+         AND COALESCE(p.player_claimed_at, sg.completed_at, NOW()) >= NOW() - INTERVAL '7 days'`
+    );
+    const weeklyDisbursalsRes = await pool.query(
+      `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
+       FROM Prize_Pool p
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '7 days'`
+    );
+
+    const historyRes = await pool.query(
+      `SELECT 
+        p.prize_id,
+        p.game_id,
+        p.pattern_name,
+        p.amount_per_winner,
+        p.prize_amount,
+        p.player_claimed,
+        p.player_claimed_at,
+        p.disbursed,
+        p.disbursed_at,
+        p.winner_housie_name,
+        p.winner_ticket_id,
+        t.ticket_number AS winner_ticket_number,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date,
+        bu.full_name AS bookie_name
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)
+       ORDER BY COALESCE(p.player_claimed_at, sg.completed_at, p.disbursed_at) DESC
+       LIMIT 10`
+    );
+
+    const history = historyRes.rows.map((row) => ({
+      game_id: row.game_id,
+      prize_id: row.prize_id,
+      game_title: row.game_title,
+      game_date: row.game_date,
+      pattern_name: row.pattern_name,
+      amount: parseFloat(row.amount_per_winner ?? row.prize_amount),
+      winner_housie_name: row.winner_housie_name,
+      winner_ticket_number: row.winner_ticket_number,
+      player_claimed_at: row.player_claimed_at,
+      disbursed: row.disbursed,
+      disbursed_at: row.disbursed_at,
+      bookie_name: row.bookie_name || 'System/Operator',
+    }));
+
+    res.json({
+      stats: {
+        overall_claims_count: overallClaimsRes.rows[0].count,
+        overall_claims_amount: overallClaimsRes.rows[0].amount,
+        overall_disbursals_count: overallDisbursalsRes.rows[0].count,
+        overall_disbursals_amount: overallDisbursalsRes.rows[0].amount,
+        daily_claims_count: dailyClaimsRes.rows[0].count,
+        daily_claims_amount: dailyClaimsRes.rows[0].amount,
+        daily_disbursals_count: dailyDisbursalsRes.rows[0].count,
+        daily_disbursals_amount: dailyDisbursalsRes.rows[0].amount,
+        weekly_claims_count: weeklyClaimsRes.rows[0].count,
+        weekly_claims_amount: weeklyClaimsRes.rows[0].amount,
+        weekly_disbursals_count: weeklyDisbursalsRes.rows[0].count,
+        weekly_disbursals_amount: weeklyDisbursalsRes.rows[0].amount,
+      },
+      history
+    });
+  } catch (error) {
+    console.error('Error fetching prize claims dashboard stats:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -1028,8 +1399,9 @@ export async function disbursePrize(req: AuthenticatedRequest, res: Response): P
 
     const prize = prizeRes.rows[0];
 
-    if (!prize.player_claimed) {
-      res.status(400).json({ message: 'Prize has not been claimed by player yet' });
+    // Allow manual disbursement if either manually claimed by player OR won during game
+    if (!prize.player_claimed && !prize.claimed) {
+      res.status(400).json({ message: 'Prize has neither been won during the game nor claimed by the player' });
       return;
     }
 
@@ -1048,31 +1420,37 @@ export async function disbursePrize(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    // Mark as disbursed
+    // Mark as disbursed (and auto-set player_claimed to true so reporting aligns)
     await pool.query(
       `UPDATE Prize_Pool 
-       SET disbursed = TRUE, disbursed_at = NOW(), disbursed_by = $1
+       SET disbursed = TRUE, 
+           disbursed_at = NOW(), 
+           disbursed_by = $1,
+           player_claimed = TRUE,
+           player_claimed_at = COALESCE(player_claimed_at, NOW())
        WHERE prize_id = $2`,
       [admin.userId, prize_id]
     );
 
-    // Check if all prizes for this game are now disbursed
+    // Check if all won prizes for this game are now disbursed
     const allPrizesRes = await pool.query(
-      `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE disbursed = TRUE) as disbursed_count
-       FROM Prize_Pool WHERE game_id = $1`,
+      `SELECT COUNT(*)::integer as total_won, COUNT(*) FILTER (WHERE disbursed = TRUE)::integer as disbursed_count
+       FROM Prize_Pool 
+       WHERE game_id = $1 AND claimed = TRUE`,
       [game_id]
     );
 
-    const { total, disbursed_count } = allPrizesRes.rows[0];
+    const { total_won, disbursed_count } = allPrizesRes.rows[0];
 
-    // If all prizes disbursed, mark game as Completed
-    if (parseInt(total) === parseInt(disbursed_count) && total > 0) {
+    // If all won prizes (claims) are disbursed, mark game as Completed
+    if (parseInt(total_won) === parseInt(disbursed_count)) {
       await pool.query(
         `UPDATE Scheduled_Games 
          SET game_status = 'Completed', completed_at = NOW()
          WHERE game_id = $1 AND game_status != 'Completed'`,
         [game_id]
       );
+      io.emit('game_list_update');
     }
 
     res.json({

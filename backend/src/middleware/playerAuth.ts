@@ -22,7 +22,13 @@ export async function authenticatePlayer(req: AuthenticatedPlayerRequest, res: R
   }
 
   if (!token) {
-    token = req.cookies['hg_player_token'];
+    const gameId = req.params?.game_id || req.params?.gameId || req.query?.game_id || req.query?.gameId || req.body?.game_id || req.body?.gameId;
+    if (gameId) {
+      token = req.cookies?.[`hg_player_token_${gameId}`];
+    }
+    if (!token) {
+      token = req.cookies?.['hg_player_token'] || req.cookies?.hg_player_token;
+    }
   }
 
   if (!token) {

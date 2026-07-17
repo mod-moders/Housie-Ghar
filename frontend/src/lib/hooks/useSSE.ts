@@ -35,13 +35,15 @@ export function useSSE(gameId: string | null, onEvent?: (data: SSEEventData) => 
         return;
       }
       if (data.event === "initial_state") {
-        setStatus(data.game_status as "Scheduled" | "Live" | "Paused" | "Completed");
+        setStatus(data.game_status as any);
         ((data.drawn_numbers as number[]) ?? []).forEach((n) => addDrawn(n));
         // Let LiveBoard handle draw to sync with audio!
       } else if (data.event === "paused") {
         setStatus("Paused");
       } else if (data.event === "resumed") {
         setStatus("Live");
+      } else if (data.event === "draw_ended") {
+        setStatus("Draw_Ended");
       } else if (data.event === "completed") {
         setStatus("Completed");
       }

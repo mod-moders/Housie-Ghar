@@ -32,7 +32,9 @@ router.post('/agent/:booking_id/reject', authenticateToken, requireRole(['Bookie
 
 // Operator overflow failsafe endpoints (Authenticated)
 router.get('/operator/overflow-queue', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getOperatorOverflowQueue);
+router.get('/operator/overflow-history', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getAgentHistory);
 router.post('/operator/:booking_id/force-confirm', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), forceConfirmBooking);
+router.post('/operator/:booking_id/force-reject', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), rejectBooking);
 router.post('/staff/manual-book', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), staffManualBooking);
 
 export default router;

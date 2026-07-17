@@ -12,6 +12,8 @@ export interface PublicConfig {
   announcements_list?: string;
   announcement_speed?: string;
   announcements_muted?: string;
+  cage_sound_enabled?: string;
+  celebration_sound_enabled?: string;
 }
 
 interface ConfigState {

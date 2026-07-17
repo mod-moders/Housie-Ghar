@@ -105,89 +105,117 @@ export default function Leaderboard() {
     <PublicShell>
       <div className="hg-screen" style={{ overflow: "auto" }}>
 
+        {/* ── Page Header ── */}
+        <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
+          <div>
+            <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame</h1>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Check the top-ranked players, win records, and biggest payouts.</p>
+          </div>
+        </div>
+
         {/* ── Insight KPI Strip ── */}
         {insights && (
-          <div style={{ ...containerStyle, display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 18, paddingBottom: 14 }}>
+          <div style={{ ...containerStyle, display: "flex", gap: 12, flexWrap: "wrap", paddingTop: 12, paddingBottom: 16 }}>
             {[
               { label: "Total Payouts", value: money(insights.totalEarnings), accent: true },
               { label: "Highest Payout", value: money(insights.maxWin), accent: false },
               { label: "Avg Payout/Win", value: money(insights.avgWinValue), accent: false },
             ].map((k) => (
-              <div key={k.label} style={{
-                flex: "1 1 160px",
+              <div key={k.label} className="hg-kpi-card-hover" style={{
+                flex: "1 1 200px",
                 background: "var(--surface)", border: "1.5px solid var(--card-line)",
-                borderRadius: "var(--radius-sm)", padding: "10px 14px",
+                borderRadius: "var(--radius)", padding: "14px 18px",
                 boxShadow: "var(--card-shadow-sm)",
+                transition: "transform 0.2s, box-shadow 0.2s",
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".05em", display: "block" }}>{k.label}</span>
-                <strong style={{ fontSize: 18, color: k.accent ? "var(--accent)" : "var(--text)", fontFamily: "var(--font-head)" }}>{k.value}</strong>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", display: "block" }}>{k.label}</span>
+                <strong style={{ fontSize: 20, color: k.accent ? "var(--accent)" : "var(--text)", fontFamily: "var(--font-head)", marginTop: 4, display: "block" }}>{k.value}</strong>
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Controls Row: Search + Timeframe + Sort Tabs ── */}
-        <div style={{ ...containerStyle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 12 }}>
-          {/* Search Input */}
-          <div style={{
-            flex: 1, minWidth: 180,
-            display: "flex", background: "var(--surface)",
-            border: "1.5px solid var(--card-line)", borderRadius: "var(--radius-sm)",
-            padding: "5px 12px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
-          }}>
-            <Icon name="search" size={14} style={{ color: "var(--text-dim)", marginRight: 8 }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search player name..."
-              style={{ border: "none", background: "transparent", color: "var(--text)", outline: "none", width: "100%", fontSize: 13 }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-dim)" }}>
-                <Icon name="x" size={14} />
-              </button>
-            )}
-          </div>
+        {/* ── Filters & Controls Section ── */}
+        <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 12, paddingBottom: 20 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", width: "100%" }}>
+            {/* Search Input Box */}
+            <div style={{
+              flex: "3 1 280px",
+              display: "flex", background: "var(--surface)",
+              border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)",
+              padding: "8px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
+            }}>
+              <Icon name="search" size={14} style={{ color: "var(--text-dim)", marginRight: 10 }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search player name..."
+                style={{ border: "none", background: "transparent", color: "var(--text)", outline: "none", width: "100%", fontSize: 13.5 }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-dim)", display: "flex", alignItems: "center" }}>
+                  <Icon name="x" size={14} />
+                </button>
+              )}
+            </div>
 
-          {/* Timeframe Dropdown */}
-          <div style={{
-            display: "flex", background: "var(--surface)",
-            border: "1.5px solid var(--card-line)", borderRadius: "var(--radius-sm)",
-            padding: "2px 8px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
-          }}>
-            <Icon name="clock" size={13} style={{ color: "var(--text-dim)", marginRight: 6 }} />
-            <select
-              value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value as Timeframe)}
-              style={{ border: "none", background: "transparent", color: "var(--text)", outline: "none", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 0" }}
-            >
-              <option value="all-time" style={{ background: "var(--surface)", color: "var(--text)" }}>All-Time Records</option>
-              <option value="monthly" style={{ background: "var(--surface)", color: "var(--text)" }}>This Month</option>
-              <option value="weekly" style={{ background: "var(--surface)", color: "var(--text)" }}>This Week</option>
-              <option value="daily" style={{ background: "var(--surface)", color: "var(--text)" }}>Today (24h)</option>
-            </select>
-          </div>
-
-          {/* Sort Tabs */}
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["wins", "earnings", "biggestWin"] as SortTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "5px 12px", borderRadius: 999,
-                  border: activeTab === tab ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
-                  background: activeTab === tab ? "var(--accent-soft)" : "var(--surface)",
-                  color: activeTab === tab ? "var(--accent)" : "var(--text-dim)",
-                  fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em",
-                  cursor: "pointer", boxShadow: activeTab === tab ? "var(--card-shadow-sm)" : "none",
-                  transition: "all 0.15s ease", whiteSpace: "nowrap",
-                }}
+            {/* Timeframe Dropdown */}
+            <div style={{
+              flex: "1 1 180px",
+              display: "flex", background: "var(--surface)",
+              border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)",
+              padding: "8px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
+            }}>
+              <Icon name="clock" size={14} style={{ color: "var(--text-dim)", marginRight: 8 }} />
+              <select
+                value={timeframe}
+                onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+                style={{ border: "none", background: "transparent", color: "var(--text)", outline: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" }}
               >
-                {tab === "wins" ? "Most Wins" : tab === "earnings" ? "Total Earnings" : "Biggest Win"}
-              </button>
-            ))}
+                <option value="all-time" style={{ background: "var(--surface)", color: "var(--text)" }}>All-Time Records</option>
+                <option value="monthly" style={{ background: "var(--surface)", color: "var(--text)" }}>This Month</option>
+                <option value="weekly" style={{ background: "var(--surface)", color: "var(--text)" }}>This Week</option>
+                <option value="daily" style={{ background: "var(--surface)", color: "var(--text)" }}>Today (24h)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sort Segmented tabs bar */}
+          <div style={{
+            display: "flex", background: "var(--surface-2)",
+            padding: 4, borderRadius: "var(--radius)",
+            border: "1.5px solid var(--border-2)",
+            boxShadow: "var(--card-shadow-sm)",
+            width: "100%", gap: 4
+          }}>
+            {(["wins", "earnings", "biggestWin"] as SortTab[]).map((tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px", borderRadius: "calc(var(--radius) - 2px)",
+                    border: "none",
+                    background: isActive ? "var(--surface)" : "transparent",
+                    color: isActive ? "var(--accent)" : "var(--text-dim)",
+                    fontSize: 11.5, fontWeight: isActive ? 700 : 600, textTransform: "uppercase", letterSpacing: ".04em",
+                    cursor: "pointer", 
+                    boxShadow: isActive ? "var(--card-shadow-sm)" : "none",
+                    transition: "all 0.2s ease", whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6
+                  }}
+                >
+                  <Icon name={tab === "wins" ? "trophy" : tab === "earnings" ? "wallet" : "flame"} size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
+                  {tab === "wins" ? "Most Wins" : tab === "earnings" ? "Total Earnings" : "Biggest Win"}
+                </button>
+              );
+            })}
           </div>
         </div>
 

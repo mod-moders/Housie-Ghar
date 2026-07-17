@@ -43,7 +43,7 @@ export interface GameSummary {
   available_count: number;
   player_count?: number; // Optional since it might be missing in older API versions
   fill_percentage: number;
-  game_status: "Scheduled" | "Live" | "Paused" | "Completed";
+  game_status: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
   prize_pool: Prize[];
 }
 

@@ -231,7 +231,7 @@ async function processNextDraw(gameId: string): Promise<void> {
   if (!game) return;
 
   if (game.currentIndex >= 90) {
-    await completeGame(gameId);
+    await endGameDraw(gameId);
     return;
   }
 
@@ -284,7 +284,7 @@ async function processNextDraw(gameId: string): Promise<void> {
     console.log(`🏆 Winners announced! Pausing conductor for 4 seconds...`);
     game.timer = setTimeout(() => {
       if (allPrizesClaimed) {
-        completeGame(gameId).catch(err => console.error("Error completing game:", err));
+        endGameDraw(gameId).catch(err => console.error("Error ending draw:", err));
       } else {
         runConductorTick(gameId);
       }
@@ -387,6 +387,22 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
       // reset on rollback, so a DB failure announced a phantom, unpersisted win.)
       const client = await pool.connect();
       let committed = false;
+
+      const grouped = new Map<string, number[]>();
+      patternWinners.forEach((w) => {
+        const list = grouped.get(w.housieName) || [];
+        list.push(w.ticketNumber);
+        grouped.set(w.housieName, list);
+      });
+
+      const formattedWinnerName = Array.from(grouped.entries()).map(([name, ticketNums]) => {
+        if (ticketNums.length === 1) {
+          return `${name} (${ticketNums[0]})`;
+        } else {
+          return `${name} (${ticketNums.join(' & ')})`;
+        }
+      }).join(' & ');
+
       try {
         await client.query('BEGIN');
         // Update Prize_Pool
@@ -400,8 +416,8 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
                amount_per_winner = $4
            WHERE prize_id = $5`,
           [
-            patternWinners[0].ticketId, // Stores first winner's ID or comma separated
-            patternWinners.map((w) => w.housieName).join(', '),
+            patternWinners[0].ticketId,
+            formattedWinnerName,
             splitCount,
             amountPerWinner,
             prize.prizeId,
@@ -419,8 +435,14 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
       if (committed) {
         prize.claimed = true;
         patternWinners.forEach((win) => {
+          const ticketNums = grouped.get(win.housieName) || [win.ticketNumber];
+          const formattedName = ticketNums.length === 1 
+            ? `${win.housieName} (${ticketNums[0]})`
+            : `${win.housieName} (${ticketNums.join(' & ')})`;
+
           detectedWinners.push({
             ...win,
+            housieName: formattedName,
             amountPerWinner,
             splitCount,
           });
@@ -548,6 +570,69 @@ export async function completeGame(gameId: string): Promise<void> {
   activeGames.delete(gameId);
 
   console.log(`🏁 Game ${gameId} Completed! leaderboard:`, leaderboard);
+}
+
+/**
+ * End draw loop when all prizes are won
+ */
+export async function endGameDraw(gameId: string): Promise<void> {
+  const game = activeGames.get(gameId);
+  if (!game) return;
+
+  if (game.timer) {
+    clearTimeout(game.timer);
+    game.timer = null;
+  }
+
+  // Check if any prizes were actually won/claimed during the game
+  const wonPrizesRes = await pool.query(
+    `SELECT COUNT(*)::integer as won_count FROM Prize_Pool WHERE game_id = $1 AND claimed = TRUE`,
+    [gameId]
+  );
+  const wonCount = parseInt(wonPrizesRes.rows[0].won_count || '0');
+
+  if (wonCount === 0) {
+    // If no claims are to be made for the game, treat it as completed immediately!
+    await pool.query(
+      `UPDATE Scheduled_Games
+       SET game_status = 'Completed', completed_at = NOW()
+       WHERE game_id = $1`,
+      [gameId]
+    );
+    // Broadcast list update so it shifts to past games
+    io.emit('game_list_update');
+  } else {
+    await pool.query(
+      `UPDATE Scheduled_Games
+       SET game_status = 'Draw_Ended'
+       WHERE game_id = $1`,
+      [gameId]
+    );
+  }
+
+  // Fetch final leaderboard (all claimed/won prizes)
+  const prizesRes = await pool.query(
+    `SELECT pattern_name, winner_housie_name, amount_per_winner
+     FROM Prize_Pool
+     WHERE game_id = $1 AND claimed = TRUE`,
+    [gameId]
+  );
+
+  const leaderboard = prizesRes.rows.map((row) => ({
+    prize: row.pattern_name,
+    housie_name: row.winner_housie_name || 'No Winner',
+    amount: parseFloat(row.amount_per_winner || '0'),
+  }));
+
+  const drawEndedEvent = {
+    event: 'draw_ended' as const,
+    final_leaderboard: leaderboard,
+  };
+
+  await publishGameEvent(gameId, drawEndedEvent);
+  activeGames.delete(gameId);
+
+  console.log(`🏁 Game ${gameId} Draw Ended! leaderboard:`, leaderboard);
 }
 
 /**

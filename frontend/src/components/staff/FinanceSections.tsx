@@ -10,6 +10,7 @@ import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
 import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
 import type { AuthUser } from "@/lib/stores/authStore";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 interface QueueItem {
   request_id: string;
@@ -43,13 +44,17 @@ interface FinancialAnalysis {
 
 export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
   const showRequestsTab = me.role_name === "Financial Admin";
-  const [activeTab, setActiveTab] = useState<"requests" | "ledgers" | "analysis">("analysis");
+  const showClaimsTab = me.role_name === "Financial Admin";
+  const [activeTab, setActiveTab] = useState<"requests" | "ledgers" | "analysis" | "claims">("analysis");
 
   useEffect(() => {
     if (!showRequestsTab && activeTab === "requests") {
       setActiveTab("analysis");
     }
-  }, [showRequestsTab, activeTab]);
+    if (!showClaimsTab && activeTab === "claims") {
+      setActiveTab("analysis");
+    }
+  }, [showRequestsTab, showClaimsTab, activeTab]);
 
   const [agents, setAgents] = useState<LedgerAgent[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
@@ -60,6 +65,74 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
   const [overview, setOverview] = useState<any>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+
+  const isEmpty = !analysis || analysis.overall_collection === 0;
+
+  // Claims states
+  const [claims, setClaims] = useState<any[]>([]);
+  const [loadingClaims, setLoadingClaims] = useState(false);
+  const [selClaimId, setSelClaimId] = useState<string | null>(null);
+  const [claimDashboard, setClaimDashboard] = useState<any>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+
+  const loadClaims = useCallback(() => {
+    setLoadingClaims(true);
+    apiFetch<any[]>("/api/games/prize-claims")
+      .then((data) => {
+        setClaims(data || []);
+        setLoadingClaims(false);
+      })
+      .catch(() => {
+        setLoadingClaims(false);
+      });
+
+    setLoadingDashboard(true);
+    apiFetch<any>("/api/games/prize-claims/dashboard")
+      .then((data) => {
+        setClaimDashboard(data || null);
+        setLoadingDashboard(false);
+      })
+      .catch(() => {
+        setLoadingDashboard(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadClaims();
+  }, [loadClaims]);
+
+  useEffect(() => {
+    if (activeTab === "claims") {
+      loadClaims();
+    }
+  }, [activeTab, loadClaims]);
+
+  const activeClaim = claims.find((c) => `${c.game_id}-${c.prize_id}` === selClaimId) ?? claims[0];
+
+  const handleDisburse = async () => {
+    if (!activeClaim || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/games/${activeClaim.game_id}/prizes/${activeClaim.prize_id}/disburse`, {
+        method: "POST",
+      });
+      setSelClaimId(null);
+      loadClaims();
+      onResolved?.();
+    } catch (e: any) {
+      setError(e.message || "Disbursal failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useSocket((event) => {
+    if (event === "ticket_status_change" || event === "prize_claim_received" || event === "game_list_update") {
+      loadClaims();
+      load();
+    }
+  });
 
   const load = useCallback(() => {
     apiFetch<LedgerAgent[]>("/api/wallet/master-ledger").then(setAgents).catch(() => {});
@@ -185,9 +258,31 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
             Pending Requests ({queue.length})
           </button>
         )}
+        {showClaimsTab && (
+          <button
+            onClick={() => setActiveTab("claims")}
+            style={{
+              background: activeTab === "claims" ? "var(--surface)" : "none",
+              color: activeTab === "claims" ? "var(--cyan)" : "var(--text-dim)",
+              border: "none",
+              outline: "none",
+              boxShadow: "none",
+              borderRadius: "6px",
+              padding: "6px 16px",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              margin: 0,
+              whiteSpace: "nowrap"
+            }}
+          >
+            Claims & Disbursals ({claims.length})
+          </button>
+        )}
       </div>
 
-      ({activeTab === "requests" ? (
+      {activeTab === "requests" ? (
         <div className="hg-split" style={{ height: "calc(100% - 60px)" }}>
           <div className="hg-split-l">
             <div className="hg-split-head">Pending requests <span className="hg-q-count">{queue.length}</span></div>
@@ -270,6 +365,156 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
             </div>
           )}
         </div>
+      ) : activeTab === "claims" ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "20px", height: "calc(100% - 60px)", overflow: "hidden" }}>
+          
+          {/* KPI Dashboard Row at the top */}
+          {claimDashboard && claimDashboard.stats && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", flexShrink: 0 }}>
+              <div style={{ background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "14px 18px", boxShadow: "var(--card-shadow)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Overall Claims</span>
+                <strong style={{ fontSize: "20px", color: "var(--text)", display: "block", marginTop: "4px" }}>{money(claimDashboard.stats.overall_claims_amount)}</strong>
+                <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "2px" }}>{claimDashboard.stats.overall_claims_count} total claims submitted</span>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "14px 18px", boxShadow: "var(--card-shadow)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Overall Disbursed</span>
+                <strong style={{ fontSize: "20px", color: "var(--brand)", display: "block", marginTop: "4px" }}>{money(claimDashboard.stats.overall_disbursals_amount)}</strong>
+                <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "2px" }}>{claimDashboard.stats.overall_disbursals_count} total claims disbursed</span>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "14px 18px", boxShadow: "var(--card-shadow)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Weekly Claims / Disbursals</span>
+                <strong style={{ fontSize: "20px", color: "var(--cyan)", display: "block", marginTop: "4px" }}>{money(claimDashboard.stats.weekly_claims_amount)}</strong>
+                <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "2px" }}>
+                  {claimDashboard.stats.weekly_claims_count} claims · {money(claimDashboard.stats.weekly_disbursals_amount)} paid ({claimDashboard.stats.weekly_disbursals_count})
+                </span>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "14px 18px", boxShadow: "var(--card-shadow)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Daily Claims / Disbursals</span>
+                <strong style={{ fontSize: "20px", color: "var(--text)", display: "block", marginTop: "4px" }}>{money(claimDashboard.stats.daily_claims_amount)}</strong>
+                <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "2px" }}>
+                  {claimDashboard.stats.daily_claims_count} claims · {money(claimDashboard.stats.daily_disbursals_amount)} paid ({claimDashboard.stats.daily_disbursals_count})
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Split view: Pending Claims queue + Right Detail Pane OR History list */}
+          <div className="hg-split" style={{ flex: 1, minHeight: 0 }}>
+            <div className="hg-split-l" style={{ overflowY: "auto" }}>
+              <div className="hg-split-head">Pending Claims Queue <span className="hg-q-count">{claims.length}</span></div>
+              {loadingClaims && claims.length === 0 && (
+                <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--text-dim)" }}>
+                  Loading claims...
+                </div>
+              )}
+              {!loadingClaims && claims.length === 0 && (
+                <EmptyHint icon="check" title="All claims cleared" sub="No pending prize claims awaiting disbursal." />
+              )}
+              {claims.map((c) => {
+                const uniqueKey = `${c.game_id}-${c.prize_id}`;
+                const isSelected = activeClaim && `${activeClaim.game_id}-${activeClaim.prize_id}` === uniqueKey;
+                return (
+                  <button
+                    key={uniqueKey}
+                    className={`hg-q-card${isSelected ? " is-active" : ""}`}
+                    onClick={() => setSelClaimId(isSelected ? null : uniqueKey)}
+                  >
+                    <div className="hg-q-top">
+                      <b>{c.winner_housie_name}</b>
+                      <span className="hg-q-amt">{money(c.amount)}</span>
+                    </div>
+                    <div className="hg-q-meta">
+                      {c.pattern_name} · {c.game_title}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="hg-split-r" style={{ overflowY: "auto" }}>
+              {activeClaim ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                    <h3 style={{ margin: 0, fontSize: "16px" }}>Disbursal Review</h3>
+                    <button 
+                      onClick={() => setSelClaimId(null)}
+                      style={{ background: "transparent", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <Icon name="x" size={14} /> Clear Selection
+                    </button>
+                  </div>
+                  <div className="hg-detail-head">
+                    <Avatar src={BOOKIE_AVATAR} name={activeClaim.winner_housie_name} className="hg-avatar-lg" />
+                    <div>
+                      <b>{activeClaim.winner_housie_name}</b>
+                      <span>Winning Ticket #{activeClaim.winner_ticket_number}</span>
+                    </div>
+                  </div>
+                  <div className="hg-detail-grid">
+                    <div><span>Game</span><b>{activeClaim.game_title}</b></div>
+                    <div><span>Game Date/Time</span><b>{activeClaim.game_date ? new Date(activeClaim.game_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—"}</b></div>
+                    <div><span>Ticket Number</span><b>#{activeClaim.winner_ticket_number}</b></div>
+                    <div><span>Prize Type</span><b>{activeClaim.pattern_name}</b></div>
+                    <div><span>Bookie (Agent)</span><b>{activeClaim.bookie_name || "System/Operator"}</b></div>
+                    <div><span>Amount</span><b style={{ color: "var(--brand)" }}>{money(activeClaim.amount)}</b></div>
+                    <div><span>Claim Date</span><b>{new Date(activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</b></div>
+                  </div>
+                  <div className="hg-detail-note" style={{ marginTop: "16px" }}>
+                    Verify the prize claim details, then credit or transfer the reward. Action is logged for audit reporting.
+                  </div>
+                  {error && <p className="hg-sec-err">{error}</p>}
+                  <div className="hg-detail-actions" style={{ marginTop: "16px" }}>
+                    <button className="hg-fin-approve" disabled={busy} onClick={handleDisburse}>
+                      <Icon name="check" size={17} strokeWidth={2.6} /> Disburse Reward {money(activeClaim.amount)}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: "16px" }}>
+                  <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h3 style={{ fontSize: "14px", margin: 0 }}>Past 10 Claims / Disbursals History</h3>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>Auto-refreshes on actions</span>
+                  </div>
+                  
+                  {claimDashboard && claimDashboard.history && claimDashboard.history.length > 0 ? (
+                    <div className="hg-table" style={{ fontSize: "12px" }}>
+                      <div className="hg-tr hg-tr-head" style={{ padding: "8px 12px" }}>
+                        <span>Winner</span>
+                        <span>Game</span>
+                        <span>Prize</span>
+                        <span>Ticket</span>
+                        <span>Amount</span>
+                        <span>Status</span>
+                      </div>
+                      {claimDashboard.history.map((h: any) => {
+                        const uniqueKey = `hist-${h.game_id}-${h.prize_id}`;
+                        return (
+                          <div key={uniqueKey} className="hg-tr" style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-light)" }}>
+                            <span className="hg-td-name" style={{ fontWeight: 600 }}>{h.winner_housie_name}</span>
+                            <span className="hg-dim">{h.game_title}</span>
+                            <span>{h.pattern_name}</span>
+                            <span>#{h.winner_ticket_number}</span>
+                            <strong style={{ color: h.disbursed ? "var(--brand)" : "var(--cyan)" }}>{money(h.amount)}</strong>
+                            <span>
+                              {h.disbursed ? (
+                                <span style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Disbursed</span>
+                              ) : (
+                                <span style={{ background: "rgba(217, 119, 6, 0.1)", color: "#d97706", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Pending</span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", color: "var(--text-dim)", padding: "40px" }}>
+                      No past claim history records found.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         /* ── Housie Ghar Analysis Tab Content (Incorporates Dashboard Contents) ── */
         <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "24px", paddingBottom: "32px" }}>
@@ -291,39 +536,39 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                 <EnhancedKpiCard 
                   label="Gross revenue today" 
                   value={money(overview.gross_revenue_today ?? 0)} 
-                  delta={{ value: "14.8%", isPositive: true }}
-                  trendData={[12000, 15000, 14000, 18000, 22000, 19000, overview.gross_revenue_today || 24500]}
+                  delta={{ value: isEmpty ? "0.0%" : "14.8%", isPositive: true }}
+                  trendData={isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [12000, 15000, 14000, 18000, 22000, 19000, overview.gross_revenue_today || 24500]}
                   trendColor="var(--cyan)"
                   tone="good"
                 />
                 <EnhancedKpiCard 
                   label="Tickets sold today" 
-                  value={(overview.tickets_sold_today ?? 0).toLocaleString("en-IN")} 
-                  delta={{ value: "8.2%", isPositive: true }}
-                  trendData={[240, 310, 290, 360, 420, 380, overview.tickets_sold_today || 450]}
+                  value={isEmpty ? "0" : (overview.tickets_sold_today ?? 0).toLocaleString("en-IN")} 
+                  delta={{ value: isEmpty ? "0.0%" : "8.2%", isPositive: true }}
+                  trendData={isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [240, 310, 290, 360, 420, 380, overview.tickets_sold_today || 450]}
                   trendColor="var(--accent)"
                 />
                 <EnhancedKpiCard 
                   label="Active games" 
-                  value={overview.active_games ?? 0} 
-                  sub={`${overview.scheduled_games ?? 0} scheduled`}
-                  delta={{ value: "20.0%", isPositive: true }}
-                  trendData={[3, 4, 3, 5, 4, 6, overview.active_games || 5]}
+                  value={isEmpty ? 0 : (overview.active_games ?? 0)} 
+                  sub={isEmpty ? "0 scheduled" : `${overview.scheduled_games ?? 0} scheduled`}
+                  delta={{ value: isEmpty ? "0.0%" : "20.0%", isPositive: true }}
+                  trendData={isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [3, 4, 3, 5, 4, 6, overview.active_games || 5]}
                   trendColor="var(--success)"
                 />
                 <EnhancedKpiCard 
                   label="Pending topups" 
-                  value={overview.pending_topups ?? 0} 
+                  value={isEmpty ? 0 : (overview.pending_topups ?? 0)} 
                   sub="Awaiting approval"
-                  delta={{ value: "15.4%", isPositive: false }}
-                  trendData={[8, 12, 6, 14, 9, 7, overview.pending_topups || 0]}
+                  delta={{ value: isEmpty ? "0.0%" : "15.4%", isPositive: false }}
+                  trendData={isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [8, 12, 6, 14, 9, 7, overview.pending_topups || 0]}
                   trendColor="var(--danger)"
                   tone={overview.pending_topups > 0 ? "alert" : undefined}
                 />
               </div>
 
               {/* Main Analytics Chart */}
-              <AnalyticsChart />
+              <AnalyticsChart isEmpty={isEmpty} />
 
               {/* Today's Operational KPIs */}
               <div 
@@ -335,18 +580,18 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               >
                 <EnhancedKpiCard
                   label="Realized Net Revenue"
-                  value={money(overview.net_revenue ?? 18450)}
-                  sub="18% average net profit margin"
+                  value={money(isEmpty ? 0 : (overview.net_revenue ?? 0))}
+                  sub={isEmpty ? "0% average net profit margin" : "18% average net profit margin"}
                   tone="good"
                 />
                 <EnhancedKpiCard
                   label="Withdrawal Queue"
-                  value={money(overview.pending_withdrawals ?? 24500)}
-                  sub="6 pending requests awaiting CFO review"
+                  value={money(isEmpty ? 0 : (overview.pending_withdrawals ?? 0))}
+                  sub={isEmpty ? "0 pending requests" : `${overview.pending_withdrawals === 24500 ? 6 : 0} pending requests awaiting CFO review`}
                 />
                 <EnhancedKpiCard
                   label="Total Wallet Balances"
-                  value={money(overview.wallet_balances ?? 142000)}
+                  value={money(isEmpty ? 0 : (overview.wallet_balances ?? 0))}
                   sub="Aggregate active agent deposits"
                 />
               </div>
@@ -365,7 +610,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Overall Collection</span>
                     <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
                       <strong style={{ fontSize: "24px", color: "var(--text)" }}>{money(analysis.overall_collection)}</strong>
-                      <span style={{ fontSize: "12px", color: "#10b981", fontWeight: 600 }}>▲ 14.8%</span>
+                      <span style={{ fontSize: "12px", color: "#10b981", fontWeight: 600 }}>▲ {isEmpty ? "0.0%" : "14.8%"}</span>
                     </div>
                     <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "4px" }}>Aggregate tickets sales value</span>
                   </div>
@@ -374,7 +619,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Overall Profit</span>
                     <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
                       <strong style={{ fontSize: "24px", color: "var(--accent)" }}>{money(analysis.overall_profit)}</strong>
-                      <span style={{ fontSize: "12px", color: "#10b981", fontWeight: 600 }}>▲ 18.2%</span>
+                      <span style={{ fontSize: "12px", color: "#10b981", fontWeight: 600 }}>▲ {isEmpty ? "0.0%" : "18.2%"}</span>
                     </div>
                     <span style={{ fontSize: "11px", color: "var(--text-mute)", display: "block", marginTop: "4px" }}>Net platform margin earned</span>
                   </div>
@@ -423,8 +668,8 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
 
               {/* Visualizations row: Heatmap & Retention */}
               <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", width: "100%" }}>
-                <HeatmapWidget />
-                <RetentionWidget />
+                <HeatmapWidget isEmpty={isEmpty} />
+                <RetentionWidget isEmpty={isEmpty} />
               </div>
 
               {/* Granular Game Performance Ledger */}

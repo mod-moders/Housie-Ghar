@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Sphere, Torus, Cylinder, Text } from "@react-three/drei";
 import * as THREE from "three";
+import { soundSynthesizer } from "@/lib/soundSynthesizer";
+import { useConfigStore } from "@/lib/stores/configStore";
 
 /* ─── Constants ──────────────────────────────────────── */
 const CAGE_R = 1.4;
@@ -154,9 +156,20 @@ function InnerBalls({ isSpinning, drawn }: { isSpinning: boolean; drawn: Set<num
       if (isSpinning) {
         // High-energy tumbling
         const tt = t * 3.4 + b.seed;
-        const tx = Math.sin(tt * b.freq.x) * R * 0.8;
-        const ty = Math.cos(tt * b.freq.y) * R * 0.8;
-        const tz = Math.sin(tt * b.freq.z + b.seed) * R * 0.8;
+        // Limit X-axis swing along the axle to keep them centered, while tumbling fully in Y-Z plane
+        let tx = Math.sin(tt * b.freq.x) * R * 0.45;
+        let ty = Math.cos(tt * b.freq.y) * R * 0.9;
+        let tz = Math.sin(tt * b.freq.z + b.seed) * R * 0.9;
+        
+        // Enforce strict spherical boundary constraint (convex sphere constraint)
+        const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        const maxDist = R * 0.88; // Keep center of ball within 88% of cage radius to avoid wire clipping
+        if (dist > maxDist) {
+          tx = (tx / dist) * maxDist;
+          ty = (ty / dist) * maxDist;
+          tz = (tz / dist) * maxDist;
+        }
+
         child.position.x = THREE.MathUtils.lerp(child.position.x, tx, 0.12);
         child.position.y = THREE.MathUtils.lerp(child.position.y, ty, 0.12);
         child.position.z = THREE.MathUtils.lerp(child.position.z, tz, 0.12);
@@ -208,6 +221,21 @@ export function RealisticBingoCage({
   drawn?: Set<number>;
   compact?: boolean;
 }) {
+  useEffect(() => {
+    const config = useConfigStore.getState().config;
+    const isSoundEnabled = config?.cage_sound_enabled !== "false";
+
+    if (isTeasing && isSoundEnabled) {
+      soundSynthesizer.startCageSpin();
+    } else {
+      soundSynthesizer.stopCageSpin();
+    }
+
+    return () => {
+      soundSynthesizer.stopCageSpin();
+    };
+  }, [isTeasing]);
+
   const ballHue = lastDrawn !== null ? (lastDrawn * 37) % 360 : 0;
   const ballColor = lastDrawn !== null ? `hsl(${ballHue}, 75%, 50%)` : "transparent";
   const showBadge = !isTeasing && lastDrawn !== null;

@@ -14,6 +14,8 @@ import type { GameSummary, QueueBooking, Prize } from "@/lib/types";
 import { type AuthUser } from "@/lib/stores/authStore";
 import { getPresetClass } from "@/lib/presetHelper";
 import { HousieTicket, gridToMatrix, type TicketMatrix } from "@/components/HousieTicket";
+import { useConfigStore } from "@/lib/stores/configStore";
+import { useGameAudio } from "@/hooks/useGameAudio";
 import dynamic from "next/dynamic";
 
 const RealisticBingoCage = dynamic(
@@ -51,6 +53,35 @@ export function OperatorHudSection() {
   const [isSearching, setIsSearching] = useState(false);
   const [showAllCalled, setShowAllCalled] = useState(false);
 
+  const [muted, setMuted] = useState(false);
+  const audioCtx = useRef<AudioContext | null>(null);
+
+  const { config } = useConfigStore();
+  const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
+    config?.english_caller_enabled === "true" && !muted
+  );
+
+  const beep = useCallback(() => {
+    if (muted) return;
+    try {
+      if (!audioCtx.current) audioCtx.current = new AudioContext();
+      const ctx = audioCtx.current;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 660;
+      o.type = "sine";
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.38, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + 0.2);
+    } catch {
+      /* audio unavailable */
+    }
+  }, [muted]);
+
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
       .then((g) => {
@@ -65,8 +96,10 @@ export function OperatorHudSection() {
       const num = data.draw_number as number;
       setRevealed(false);
       setTimeout(() => {
+        beep();
         addDrawn(num);
         setRevealed(true);
+        playNumberCall(num);
       }, 2000);
     } else if (data.event === "winner") {
       const w = data as any;
@@ -77,8 +110,9 @@ export function OperatorHudSection() {
             : p
         )
       );
+      playCelebration();
     }
-  }, [addDrawn]);
+  }, [beep, playNumberCall, playCelebration, addDrawn]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -99,6 +133,15 @@ export function OperatorHudSection() {
   }, [selectedId]);
 
   const game = games.find((g) => g.game_id === selectedId) ?? null;
+  const activeGameStatus = game?.game_status || gameStatus;
+
+  const gameStartedAnnouncedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (activeGameStatus === "Live" && !gameStartedAnnouncedRef.current) {
+      gameStartedAnnouncedRef.current = true;
+      playGreeting();
+    }
+  }, [activeGameStatus, playGreeting]);
 
   const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;
@@ -173,7 +216,7 @@ export function OperatorHudSection() {
                 >
                   <div className="hg-fill-top">
                     <strong className="hg-card-title" style={{ fontSize: "16px" }}>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta" style={{ marginTop: "6px" }}>
                     <span className="hg-card-when">{dateStr}</span>
@@ -208,6 +251,28 @@ export function OperatorHudSection() {
           <button className="hg-ic-btn" title="Back to game list" onClick={() => setSelectedId(null)}>
             <Icon name="arrowL" size={16} />
           </button>
+          
+          <button 
+            className="hover:scale-105 active:scale-95" 
+            style={{
+              borderRadius: "50%",
+              border: "1.5px solid var(--accent)",
+              width: "32px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "none",
+              color: "var(--accent)",
+              cursor: "pointer",
+              transition: "transform 0.15s"
+            }}
+            onClick={() => setMuted(!muted)}
+            title={muted ? "Unmute" : "Mute"}
+          >
+            <Icon name={muted ? "volumeX" : "volume"} size={14} />
+          </button>
+
           <div>
             <h3 style={{ margin: 0, fontSize: "16px" }}>{game.title} LIVE Deck</h3>
             <span className="hg-dim" style={{ fontSize: "12px" }}>Operator Console</span>
@@ -346,7 +411,7 @@ export function OperatorHudSection() {
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                         <span className="hg-prize-winner">
                           {p.winner_housie_name}
-                          {p.winner_ticket_number && (
+                          {p.winner_ticket_number && !p.winner_housie_name.includes('(') && (
                             <span style={{ opacity: 0.8, fontSize: '0.85em', marginLeft: '4px' }}>
                               (Tk #{p.winner_ticket_number})
                             </span>
@@ -414,12 +479,21 @@ export function OperatorHudSection() {
 
 export function OverflowSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<{ user_id: string; full_name: string; role_name: string; receive_overflow: boolean }[]>([]);
   const [updatingSettings, setUpdatingSettings] = useState(false);
 
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/operator/overflow-queue").then(setQueue).catch(() => {});
+    apiFetch<any[]>("/api/bookings/operator/overflow-history").then(setHistory).catch(() => {});
   }, []);
 
   const loadSettings = useCallback(() => {
@@ -441,7 +515,7 @@ export function OverflowSection({ me }: { me: AuthUser }) {
 
   useSocket(
     (event) => {
-      if (event === "overflow_booking") {
+      if (event === "overflow_booking" || event === "ticket_status_change") {
         load();
         try {
           const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav");
@@ -453,14 +527,22 @@ export function OverflowSection({ me }: { me: AuthUser }) {
     { event: "join_operator_room", arg: me.user_id }
   );
 
-  const forceConfirm = async (id: string) => {
+  const act = async (id: string, action: "confirm" | "reject") => {
     setError(null);
     try {
-      await apiFetch(`/api/bookings/operator/${id}/force-confirm`, { method: "POST" });
+      const endpoint = action === "confirm" ? "force-confirm" : "force-reject";
+      await apiFetch(`/api/bookings/operator/${id}/${endpoint}`, { method: "POST" });
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Force-confirm failed");
+      setError(e instanceof Error ? e.message : "Action failed");
     }
+  };
+
+  const copyReply = (r: QueueBooking) => {
+    const text = `✅ Payment received, ${r.housie_name}! Your ticket(s) ${r.ticket_numbers.map((t) => "#" + t).join(", ")} for "${r.game_title}" are confirmed. Good luck! 🍀`;
+    navigator.clipboard?.writeText(text).catch(() => {});
+    setCopied(r.booking_id);
+    setTimeout(() => setCopied(null), 1500);
   };
 
   const toggleSetting = async (userId: string, currentVal: boolean) => {
@@ -531,11 +613,88 @@ export function OverflowSection({ me }: { me: AuthUser }) {
         />
       ) : (
         <div className="hg-bq-list">
-          {queue.map((r) => (
-            <OverflowCard key={r.booking_id} booking={r} onConfirm={() => forceConfirm(r.booking_id)} />
-          ))}
+          {queue.map((r) => {
+            const left = Math.max(0, Math.floor((new Date(r.locked_until).getTime() - now) / 1000));
+            const timer = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+            return (
+              <div key={r.booking_id} className="hg-bq-card">
+                <div className="hg-bq-top">
+                  <div><b>{r.housie_name}</b><span className="hg-bq-game">{r.game_title}</span></div>
+                  <div className="hg-bq-timer"><Icon name="clock" size={13} /> {timer}</div>
+                </div>
+                <div className="hg-bq-tickets">
+                  Tickets {r.ticket_numbers.map((t) => "#" + t).join(", ")} · <b>{money(r.total_amount)}</b>
+                </div>
+                <div className="hg-bq-actions">
+                  <button className="hg-bq-copy" onClick={() => copyReply(r)}>
+                    <Icon name="chat" size={15} /> {copied === r.booking_id ? "Copied!" : "Copy WhatsApp reply"}
+                  </button>
+                  <button className="hg-bq-confirm" onClick={() => act(r.booking_id, "confirm")}>
+                    <Icon name="check" size={15} strokeWidth={2.6} /> Confirm
+                  </button>
+                  <button className="hg-bq-cancel" onClick={() => act(r.booking_id, "reject")}>
+                    <Icon name="x" size={15} strokeWidth={2.6} /> Cancel
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* Booking History Panel */}
+      <div className="hg-panel" style={{ marginTop: "32px" }}>
+        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Icon name="clock" size={16} /> Booking History (Last 10)
+          </h3>
+        </div>
+        {history.length === 0 ? (
+          <EmptyHint icon="clock" title="No history yet" sub="Processed booking requests will show up here." />
+        ) : (
+          <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
+            <div className="hg-table" style={{ minWidth: "700px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr" }}>
+                <span>Player Name</span>
+                <span>Game Title</span>
+                <span>Ticket Numbers</span>
+                <span>Amount</span>
+                <span style={{ textAlign: "right" }}>Status</span>
+              </div>
+              {history.map((h) => {
+                const formattedDate = h.processed_at 
+                  ? new Date(h.processed_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+                  : "Unknown";
+                return (
+                  <div key={h.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr" }}>
+                    <div>
+                      <b style={{ color: "var(--text)" }}>{h.housie_name}</b>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedDate}</div>
+                    </div>
+                    <span className="hg-dim">{h.game_title}</span>
+                    <span style={{ color: "var(--text)" }}>
+                      {h.ticket_numbers.map((num: number) => `#${num}`).join(", ")}
+                    </span>
+                    <strong style={{ color: "var(--accent)" }}>{money(h.total_amount)}</strong>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <span 
+                        className={`hg-pill hg-pill-${h.booking_status.toLowerCase()}`}
+                        style={{
+                          background: h.booking_status === "Sold" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: h.booking_status === "Sold" ? "#10B981" : "#EF4444",
+                          border: h.booking_status === "Sold" ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)"
+                        }}
+                      >
+                        {h.booking_status === "Sold" ? "Sold" : "Rejected"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -721,7 +880,7 @@ export function ShareGamesSection() {
                 <div>
                   <div className="hg-fill-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                     <strong style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)", fontFamily: "var(--font-head)" }}>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`} style={{ flexShrink: 0 }}>{g.game_status}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`} style={{ flexShrink: 0 }}>{g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta" style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "6px" }}>
                     {fmtDateTime(g.scheduled_at)}
@@ -803,29 +962,4 @@ export function ShareGamesSection() {
   );
 }
 
-function OverflowCard({ booking, onConfirm }: { booking: QueueBooking; onConfirm: () => void }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const left = Math.max(0, Math.floor((new Date(booking.locked_until).getTime() - now) / 1000));
-  const timer = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
 
-  return (
-    <div className="hg-bq-card">
-      <div className="hg-bq-top">
-        <div><b>{booking.housie_name}</b><span className="hg-bq-game">{booking.game_title}</span></div>
-        <div className="hg-bq-timer"><Icon name="clock" size={13} /> {timer}</div>
-      </div>
-      <div className="hg-bq-tickets">
-        Tickets {booking.ticket_numbers.map((t) => "#" + t).join(", ")} · <b>{money(booking.total_amount)}</b>
-      </div>
-      <div className="hg-bq-actions">
-        <button className="hg-bq-confirm" onClick={onConfirm}>
-          <Icon name="check" size={15} strokeWidth={2.6} /> Force Confirm
-        </button>
-      </div>
-    </div>
-  );
-}

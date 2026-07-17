@@ -11,13 +11,17 @@ export async function apiFetch<T>(
 
   if (typeof window !== "undefined") {
     const staffToken = sessionStorage.getItem("hg_staff_token");
-    const playerToken = localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token");
+    const playerToken = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
 
     // Player self-service endpoints (identity comes from the token, not a URL param)
     // must always use the player token — a staff member can be signed into both
     // dashboards in the same browser, and a stray staff token here would silently
     // 401/404 these calls (the JWT has no playerId), bouncing the player out.
-    const isPlayerSelfPath = /^\/api\/player\/(me|stats)(\?|$)/.test(path) || /\/my-tickets(\?|$)/.test(path);
+    const isPlayerSelfPath =
+      /^\/api\/player\/(me|stats)(\?|$)/.test(path) ||
+      /\/my-tickets(\?|$)/.test(path) ||
+      /\/claim(\?|$)/.test(path) ||
+      /\/reactions(\?|$)/.test(path);
 
     if (isPlayerSelfPath && playerToken) {
       headers["Authorization"] = `Bearer ${playerToken}`;

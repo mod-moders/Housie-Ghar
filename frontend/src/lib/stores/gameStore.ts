@@ -11,7 +11,7 @@ interface PrizeEntry {
 interface GameStore {
   drawnNumbers: number[];
   lastDrawn: number | null;
-  gameStatus: "Scheduled" | "Live" | "Paused" | "Completed";
+  gameStatus: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
   prizes: PrizeEntry[];
   addDrawn: (n: number) => void;
   setStatus: (s: GameStore["gameStatus"]) => void;

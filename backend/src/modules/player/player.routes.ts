@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer } from './player.controller';
+import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings } from './player.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -12,6 +12,7 @@ router.post('/logout', logout);
 router.get('/me', authenticatePlayer, getProfile);
 router.patch('/me', authenticatePlayer, updateProfile);
 router.get('/stats', authenticatePlayer, getPlayerStats);
+router.get('/winnings', authenticatePlayer, getPlayerWinnings);
 
 // Administrative Player Management endpoints
 router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getAllPlayers);

@@ -140,7 +140,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets
               {money(expMargin)}
             </span>
             <span className="hg-dim">{playerCount}</span>
-            <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span></span>
+            <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span></span>
             {controls && (
               <span className="hg-row-ctrls" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap" }}>
                 {g.game_status === "Scheduled" && (
@@ -297,17 +297,24 @@ export function EnhancedKpiCard({
 
 type ChartSource = "margin" | "volume" | "engagement";
 
-export function AnalyticsChart() {
+export function AnalyticsChart({ isEmpty }: { isEmpty?: boolean }) {
   const [source, setSource] = useState<ChartSource>("margin");
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const marginData = {
+  const marginData = isEmpty ? {
+    revenue: [0, 0, 0, 0, 0, 0, 0],
+    payouts: [0, 0, 0, 0, 0, 0, 0],
+    net: [0, 0, 0, 0, 0, 0, 0],
+  } : {
     revenue: [12000, 15000, 14000, 18000, 22000, 19000, 24500],
     payouts: [9000, 11000, 10000, 13000, 16000, 14000, 18000],
     net: [3000, 4000, 4000, 5000, 6000, 5000, 6500],
   };
-  const volumeData = [240, 310, 290, 360, 420, 380, 450];
-  const engagementData = {
+  const volumeData = isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [240, 310, 290, 360, 420, 380, 450];
+  const engagementData = isEmpty ? {
+    dau: [0, 0, 0, 0, 0, 0, 0],
+    mau: [0, 0, 0, 0, 0, 0, 0],
+  } : {
     dau: [450, 520, 480, 610, 720, 680, 810],
     mau: [2400, 2450, 2510, 2580, 2690, 2750, 2820],
   };
@@ -435,12 +442,12 @@ export function AnalyticsChart() {
   );
 }
 
-export function HeatmapWidget() {
+export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
   const hours = [
-    { label: "12 AM", val: 12 }, { label: "2 AM", val: 8 }, { label: "4 AM", val: 4 },
-    { label: "6 AM", val: 15 }, { label: "8 AM", val: 48 }, { label: "10 AM", val: 84 },
-    { label: "12 PM", val: 145 }, { label: "2 PM", val: 110 }, { label: "4 PM", val: 180 },
-    { label: "6 PM", val: 240 }, { label: "8 PM", val: 320 }, { label: "10 PM", val: 290 }
+    { label: "12 AM", val: isEmpty ? 0 : 12 }, { label: "2 AM", val: isEmpty ? 0 : 8 }, { label: "4 AM", val: isEmpty ? 0 : 4 },
+    { label: "6 AM", val: isEmpty ? 0 : 15 }, { label: "8 AM", val: isEmpty ? 0 : 48 }, { label: "10 AM", val: isEmpty ? 0 : 84 },
+    { label: "12 PM", val: isEmpty ? 0 : 145 }, { label: "2 PM", val: isEmpty ? 0 : 110 }, { label: "4 PM", val: isEmpty ? 0 : 180 },
+    { label: "6 PM", val: isEmpty ? 0 : 240 }, { label: "8 PM", val: isEmpty ? 0 : 320 }, { label: "10 PM", val: isEmpty ? 0 : 290 }
   ];
 
   const getOpacity = (val: number) => {
@@ -479,9 +486,9 @@ export function HeatmapWidget() {
   );
 }
 
-export function RetentionWidget() {
-  const total = 209;
-  const returningPct = 68;
+export function RetentionWidget({ isEmpty }: { isEmpty?: boolean }) {
+  const total = isEmpty ? 0 : 209;
+  const returningPct = isEmpty ? 0 : 68;
   const radius = 32;
   const stroke = 8;
   const circ = 2 * Math.PI * radius;
@@ -728,7 +735,9 @@ export function GamesSection({ me }: { me: AuthUser }) {
       <div className="hg-sec-head">
         <div>
           <h2 className="hg-sec-title">Games &amp; Draw Management</h2>
-          {(me.role_name === "Superadmin" || me.role_name === "Financial Admin" || me.role_name === "Operator") ? (
+          {me.role_name === "Operator" ? (
+            <p className="hg-sec-sub">Start, pause, edit and delete games</p>
+          ) : (me.role_name === "Superadmin" || me.role_name === "Financial Admin") ? (
             <p className="hg-sec-sub">Schedule, start, pause or resume any game.</p>
           ) : (
             <p className="hg-sec-sub">Monitor live ticket sales, booking fill rates, and past game draws.</p>
@@ -965,7 +974,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
                 <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ margin: 0 }}>
                   <div className="hg-fill-top">
                     <strong>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta">
                     {gameTime(g)} · {g.sold_count + g.locked_count}/{g.total_tickets} tickets
@@ -1005,7 +1014,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         {games.length === 0 ? (
           <EmptyHint icon="grid" title="No games yet" sub="Create the first game to open bookings." />
         ) : (
-          <GamesTable games={games} controls={true} onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} canManage={me.role_name === "Superadmin" || me.role_name === "Financial Admin"} />
+          <GamesTable games={games} controls={true} onAction={act} onViewTickets={setSalesGameId} onManualBook={setBookingGameId} canManage={me.role_name === "Superadmin" || me.role_name === "Financial Admin" || me.role_name === "Operator"} />
         )}
       </div>
 
@@ -1183,10 +1192,12 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
       owner_housie_name: string;
       bookie_username: string;
       bookie_name: string;
+      bookie_role?: string;
     }>;
     agents: Array<{
       bookie_username: string;
       bookie_name: string;
+      bookie_role?: string;
       total_sold: number;
     }>;
   } | null>(null);
@@ -1196,7 +1207,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
 
   useEffect(() => {
     setLoading(true);
-    apiFetch<any>(`/api/games/${gameId}/sales-details`)
+    apiFetch<any>(`/api/games/${gameId}/sales-details?_=${Date.now()}`)
       .then((res) => setData(res))
       .catch((err) => console.error("Failed to load sales details:", err))
       .finally(() => setLoading(false));
@@ -1222,7 +1233,8 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
       t.ticket_number.toString().includes(query) ||
       t.owner_housie_name.toLowerCase().includes(query) ||
       t.bookie_username.toLowerCase().includes(query) ||
-      t.bookie_name.toLowerCase().includes(query)
+      t.bookie_name.toLowerCase().includes(query) ||
+      (t.bookie_role || '').toLowerCase().includes(query)
     );
   });
 
@@ -1286,7 +1298,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                 transition: "all 0.2s"
               }}
             >
-              AGENT LIST
+              BOOKIE LIST
             </button>
           </div>
 
@@ -1338,7 +1350,9 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                         {t.ticket_number}
                       </td>
                       <td style={{ padding: "10px 14px", fontWeight: 600 }}>{t.owner_housie_name}</td>
-                      <td style={{ padding: "10px 14px", color: "var(--text-dim)" }}>{t.bookie_name} ({t.bookie_username})</td>
+                      <td style={{ padding: "10px 14px", color: "var(--text-dim)" }}>
+                        {t.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)" }}>({t.bookie_role || 'System'})</span>
+                      </td>
                       <td style={{ padding: "10px 14px", textAlign: "right" }}>
                         <span className={`hg-pill hg-pill-${t.status.toLowerCase()}`} style={{ fontSize: 11 }}>
                           {t.status}
@@ -1368,7 +1382,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                     <tr key={a.bookie_username} style={{ borderBottom: "1px solid var(--border-light)", fontSize: 13 }}>
                       <td style={{ padding: "10px 14px", fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>{idx + 1}</td>
                       <td style={{ padding: "10px 14px", fontWeight: 600 }}>
-                        {a.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)", fontWeight: 400 }}>({a.bookie_username})</span>
+                        {a.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)", fontWeight: 400 }}>({a.bookie_role || 'System'})</span>
                       </td>
                       <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>{a.total_sold}</td>
                     </tr>
@@ -1689,7 +1703,7 @@ export function FillingSection() {
             <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`}>
               <div className="hg-fill-top">
                 <strong>{g.title}</strong>
-                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status}</span>
+                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
               </div>
               <div className="hg-fill-meta">
                 {gameTime(g)} · {g.sold_count + g.locked_count}/{g.total_tickets} tickets

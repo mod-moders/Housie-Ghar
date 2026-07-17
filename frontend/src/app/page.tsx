@@ -66,7 +66,7 @@ const PRESET_BG: Record<string, string> = {
 import { getPresetClass } from "@/lib/presetHelper";
 
 function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void; compact?: boolean }) {
-  const isLive = game.game_status === "Live" || game.game_status === "Paused";
+  const isLive = game.game_status === "Live" || game.game_status === "Paused" || game.game_status === "Draw_Ended";
   const status = cardStatus(game);
   const sold = status === "sold";
   const top = game.prize_pool[game.prize_pool.length - 1] ?? game.prize_pool[0];
@@ -82,14 +82,16 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
           <h3 className="hg-card-title">{game.title}</h3>
           <div className="hg-card-when">
             <Icon name={isLive ? "play" : "clock"} size={13} strokeWidth={2} />
-            {isLive ? (game.game_status === "Paused" ? "Paused mid-draw" : "Drawing now") : `${when.date} · ${when.time}`}
+            {isLive ? (
+              game.game_status === "Paused" 
+                ? "Paused mid-draw" 
+                : game.game_status === "Draw_Ended" 
+                  ? "Claims & disbursal in process" 
+                  : "Ongoing"
+            ) : `${when.date} · ${when.time}`}
           </div>
         </div>
-        {isLive ? (
-          <Badge tone="hot" icon="play">{game.game_status === "Paused" ? "Paused" : "Live"}</Badge>
-        ) : (
-          <GameStatusBadge status={status} />
-        )}
+        {!isLive && <GameStatusBadge status={status} />}
       </div>
 
       {!compact && game.prize_pool && game.prize_pool.length > 0 && (
@@ -155,7 +157,9 @@ function PastGameCard({ game }: { game: GameSummary }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0 }}>
                   <span style={{ fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", fontSize: "9px", whiteSpace: "nowrap" }}>{p.pattern_name}:</span>
                   <span style={{ color: "var(--text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                    {p.winner_housie_name} <span style={{ color: "var(--text-mute)", fontSize: "9.5px" }}>(Tk #{p.winner_ticket_number})</span>
+                    {p.winner_housie_name} {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
+                      <span style={{ color: "var(--text-mute)", fontSize: "9.5px" }}>(Tk #{p.winner_ticket_number})</span>
+                    )}
                   </span>
                 </div>
                 <strong style={{ fontFamily: "var(--font-mono)", color: "var(--brand)", whiteSpace: "nowrap", marginLeft: "8px" }}>{money(p.amount_per_winner ?? p.prize_amount)}</strong>
@@ -267,7 +271,7 @@ export default function Lobby() {
       localStorage.setItem("hg_ref_promoter_id", ref);
     }
 
-    const token = localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token");
+    const token = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
     if (!token) {
       router.push("/login");
     } else {
@@ -311,7 +315,7 @@ export default function Lobby() {
   const scrollToGames = () => lobbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const all = games ?? [];
-  const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused");
+  const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
   const scheduled = all
     .filter((g) => g.game_status === "Scheduled")
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
@@ -325,6 +329,18 @@ export default function Lobby() {
     .filter((g) => g.game_status === "Completed")
     .sort((a, b) => new Date(b.completed_at || b.scheduled_at).getTime() - new Date(a.completed_at || a.scheduled_at).getTime())
     .slice(0, 4);
+
+  const marqueeStyle = useMemo(() => {
+    if (!marqueeVars) return { visibility: "hidden" as const };
+    return {
+      animationName: "hgMarqueeScroll",
+      animationDuration: `${marqueeVars.duration}s`,
+      animationTimingFunction: "linear",
+      animationIterationCount: "infinite",
+      ["--marquee-start" as any]: `${marqueeVars.startPx}px`,
+      ["--marquee-end" as any]: `${marqueeVars.endPx}px`,
+    };
+  }, [marqueeVars]);
 
   if (isCheckingAuth) {
     return (
@@ -397,14 +413,7 @@ export default function Lobby() {
                   key={marqueeVars ? "animated" : "measuring"}
                   className="hg-marquee"
                   ref={marqueeRef}
-                  style={marqueeVars ? {
-                    animationName: "hgMarqueeScroll",
-                    animationDuration: `${marqueeVars.duration}s`,
-                    animationTimingFunction: "linear",
-                    animationIterationCount: "infinite",
-                    ["--marquee-start" as any]: `${marqueeVars.startPx}px`,
-                    ["--marquee-end" as any]: `${marqueeVars.endPx}px`,
-                  } : { visibility: "hidden" }}
+                  style={marqueeStyle}
                 >
                   {textToScroll}
                 </div>

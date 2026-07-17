@@ -74,7 +74,7 @@ export async function getOverview(req: AuthenticatedRequest, res: Response): Pro
       pending_topups: parseInt(topups.rows[0].pending_topups, 10),
       wallet_balances: parseFloat(walletBalances.rows[0].wallet_balances),
       net_revenue: netRev,
-      pending_withdrawals: 24500, // Mocked pending withdrawal requests
+      pending_withdrawals: 0, // Mocked pending withdrawal requests
     });
   } catch (error) {
     console.error('Error fetching overview stats:', error);

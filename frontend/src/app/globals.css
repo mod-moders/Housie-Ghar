@@ -947,6 +947,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-badge-hot{background:var(--locked-soft);color:var(--locked)}
 .hg-badge-dead{background:var(--danger-soft);color:var(--danger)}
 .hg-badge-neutral{background:var(--surface-2);color:var(--text-dim)}
+.hg-badge-glow{background:linear-gradient(135deg,rgba(230,180,34,0.18),rgba(230,140,34,0.22));color:#f7c948;box-shadow:0 0 8px rgba(230,180,34,0.2);border:1px solid rgba(230,180,34,0.3)}
 
 /* ============ PROGRESS ============ */
 .hg-prog{display:flex;flex-direction:column;gap:6px}
@@ -1918,38 +1919,56 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-emoji-btn:hover{transform:scale(1.15)}
 .hg-emoji-btn:active{transform:scale(.9)}
 .hg-reactions{position:fixed;inset:0;pointer-events:none;z-index:90;max-width:452px;margin:0 auto}
-.hg-react-float{position:absolute;bottom:70px;animation:hg-rise 2.6s ease-out forwards}
-@keyframes hg-rise{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-10px) scale(1)}
-  100%{transform:translateY(-78vh) scale(1.1) rotate(12deg);opacity:0}}
+.hg-react-float{position:absolute;bottom:70px;animation:hg-rise 2.8s ease-out forwards}
+@keyframes hg-rise {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.5);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+    transform: translateY(-20px) translateX(-5px) scale(1);
+  }
+  30% {
+    transform: translateY(-160px) translateX(12px) scale(1.05);
+  }
+  60% {
+    transform: translateY(-360px) translateX(-12px) scale(1);
+  }
+  100% {
+    transform: translateY(-720px) translateX(8px) scale(0.85) rotate(8deg);
+    opacity: 0;
+  }
+}
 
 .hg-react-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  padding: 4px 10px 4px 6px;
+  gap: 6px;
+  background: rgba(18, 18, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 3px 8px 3px 5px;
   color: #fff;
   font-family: var(--font-sans), sans-serif;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  max-width: 180px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  max-width: 155px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .hg-react-avatar {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand, #d4af37), #f3e5ab);
-  color: #000;
+  background: linear-gradient(135deg, #e0a96d, #201a15);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 7.5px;
   font-weight: 700;
   flex-shrink: 0;
   text-shadow: none;
@@ -1959,12 +1978,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100px;
+  max-width: 80px;
   color: #f3e5ab;
 }
 
 .hg-react-emoji {
-  font-size: 16px;
+  font-size: 14.5px;
   flex-shrink: 0;
 }
 
@@ -2180,6 +2199,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-pill-live{background:var(--danger-soft);color:var(--danger)}
 .hg-pill-paused{background:var(--locked-soft);color:var(--locked)}
 .hg-pill-completed{background:var(--surface-2);color:var(--text-mute)}
+.hg-pill-draw-ended{background:rgba(230,180,34,0.15);color:#f7c948;border-color:rgba(230,180,34,0.3)}
 .hg-pill-active{background:var(--success-soft);color:var(--success)}
 .hg-pill-suspended{background:var(--danger-soft);color:var(--danger)}
 .hg-pill-veteran{background:var(--success-soft);color:var(--success)}
@@ -3621,6 +3641,23 @@ input::-ms-clear {
   color: var(--accent) !important;
 }
 
+/* Hide native Edge/Chrome/Safari password reveal and caps lock buttons */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
 
-
-
+.hg-kpi-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hg-kpi-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+}

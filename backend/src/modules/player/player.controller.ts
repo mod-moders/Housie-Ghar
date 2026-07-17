@@ -418,3 +418,57 @@ export async function adminDeletePlayer(req: any, res: Response): Promise<void> 
   }
 }
 
+/**
+ * Get all won prizes (winnings) of the authenticated player
+ */
+export async function getPlayerWinnings(req: any, res: Response): Promise<void> {
+  const playerHousieName = req.player.housieName;
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        p.prize_id,
+        p.game_id,
+        p.pattern_name,
+        p.amount_per_winner,
+        p.prize_amount,
+        p.player_claimed,
+        p.player_claimed_at,
+        p.disbursed,
+        p.disbursed_at,
+        p.winner_housie_name,
+        p.winner_ticket_id,
+        t.ticket_number AS winner_ticket_number,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       WHERE p.claimed = TRUE 
+         AND sg.game_status IN ('Draw_Ended', 'Completed')
+         AND (p.winner_housie_name = $1 OR p.winner_housie_name LIKE '%' || $1 || '%')
+       ORDER BY sg.scheduled_at DESC`,
+      [playerHousieName]
+    );
+
+    const winnings = result.rows.map((row) => ({
+      prize_id: row.prize_id,
+      game_id: row.game_id,
+      game_title: row.game_title,
+      game_date: row.game_date,
+      pattern_name: row.pattern_name,
+      amount: parseFloat(row.amount_per_winner ?? row.prize_amount),
+      winner_ticket_number: row.winner_ticket_number,
+      player_claimed: row.player_claimed,
+      player_claimed_at: row.player_claimed_at,
+      disbursed: row.disbursed,
+      disbursed_at: row.disbursed_at,
+    }));
+
+    res.json(winnings);
+  } catch (error) {
+    console.error('Error fetching player winnings:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+

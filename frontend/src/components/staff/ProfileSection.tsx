@@ -206,10 +206,11 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           <div>
             <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showCurPw ? "text" : "password"} value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
+              <input type={showCurPw ? "text" : "password"} value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="Enter current password" />
               <button
                 type="button"
                 className="hg-password-toggle"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowCurPw(!showCurPw)}
                 title={showCurPw ? "Hide Password" : "Show Password"}
               >
@@ -221,10 +222,11 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           <div>
             <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showNewPw ? "text" : "password"} value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
+              <input type={showNewPw ? "text" : "password"} value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="At least 6 characters" />
               <button
                 type="button"
                 className="hg-password-toggle"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowNewPw(!showNewPw)}
                 title={showNewPw ? "Hide Password" : "Show Password"}
               >
@@ -236,10 +238,11 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           <div>
             <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showConfirmPw ? "text" : "password"} value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
+              <input type={showConfirmPw ? "text" : "password"} value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="Re-enter new password" />
               <button
                 type="button"
                 className="hg-password-toggle"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowConfirmPw(!showConfirmPw)}
                 title={showConfirmPw ? "Hide Password" : "Show Password"}
               >
