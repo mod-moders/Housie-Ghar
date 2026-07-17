@@ -37,15 +37,24 @@ export const useConfigStore = create<ConfigState>((set) => ({
   loadConfig: async () => {
     try {
       const config = await apiFetch<PublicConfig>("/api/config/public");
-      
-      // Try fetching player theme preference to override site default
-      try {
-        const res = await apiFetch<{ player: { theme_preference: string | null } }>("/api/player/me");
-        if (res.player?.theme_preference) {
-          config.active_theme = res.player.theme_preference;
+
+      // Only look up the player's saved theme when a player is actually signed in.
+      // ConfigProvider calls loadConfig() on a 30s interval; probing /api/player/me
+      // while logged out just 401s on a loop, spamming the browser console and the
+      // server logs on every public page. The player token is mirrored into web
+      // storage on login/signup, so its absence is a reliable "anonymous" signal.
+      const hasPlayerToken =
+        typeof window !== "undefined" &&
+        !!(localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token"));
+      if (hasPlayerToken) {
+        try {
+          const res = await apiFetch<{ player: { theme_preference: string | null } }>("/api/player/me");
+          if (res.player?.theme_preference) {
+            config.active_theme = res.player.theme_preference;
+          }
+        } catch {
+          // Ignore if the session expired or the endpoint fails
         }
-      } catch (err) {
-        // Ignore if not logged in or endpoint fails
       }
 
       // Apply theme globally
