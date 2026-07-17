@@ -103,6 +103,13 @@ export async function ensureSuperadminAccess(): Promise<void> {
 
 export async function ensurePlatformConfig(): Promise<void> {
   const configs = [
+    // Master switch checked by every audio call site (useGameAudio.ts /
+    // LiveBoardContent.tsx gate playGreeting/playNumberCall/playCelebration on
+    // this being exactly "true"). It was never seeded anywhere, so it always
+    // read back undefined -> all game audio was silently disabled everywhere.
+    { key: 'english_caller_enabled', val: 'true', desc: 'Master switch for live English number-caller audio (MP3/TTS) in games' },
+    { key: 'cage_sound_enabled', val: 'true', desc: 'Enable/disable the ball-draw cage sound effect' },
+    { key: 'celebration_sound_enabled', val: 'true', desc: 'Enable/disable the prize-win celebration sound' },
     { key: 'welcome_voice_url', val: '', desc: 'Welcome voice note audio URL or Base64 data' },
     { key: 'instruction_voice_url', val: '', desc: 'Instruction voice note audio URL or Base64 data' },
     { key: 'welcome_voice_text', val: 'Welcome to Housie Ghar. The game is starting now! Best of luck.', desc: 'Welcome voice note TTS fallback text' },
