@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 const THEMES = [
   { id: "luxury_gold", label: "Luxury Gold", icon: "star" },
@@ -19,11 +20,16 @@ interface WhatsAppShareGroup {
 
 export function SettingsSection() {
   const { config, updateConfigLocally } = useConfigStore();
+  const { user } = useAuthStore();
+  const isSuperadmin = user?.role_name === "Superadmin";
   const [saving, setSaving] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [siteTitle, setSiteTitle] = useState("");
   const [activeTheme, setActiveTheme] = useState("");
   const [message, setMessage] = useState("");
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Announcements manager states
   const [announcements, setAnnouncements] = useState<Array<{ id: number; text: string; muted: boolean }>>([]);
@@ -34,17 +40,11 @@ export function SettingsSection() {
   const [groupName, setGroupName] = useState("");
   const [groupUrl, setGroupUrl] = useState("");
 
-  // Sound effects configuration states
-  const [cageSound, setCageSound] = useState(true);
-  const [celebrationSound, setCelebrationSound] = useState(true);
-
   useEffect(() => {
     if (config) {
       setAnnouncement(config.announcement_text || "");
       setSiteTitle(config.site_title || "");
       setActiveTheme(config.active_theme || "");
-      setCageSound(config.cage_sound_enabled !== "false");
-      setCelebrationSound(config.celebration_sound_enabled !== "false");
       
       // Parse announcements list
       try {
@@ -277,47 +277,6 @@ export function SettingsSection() {
             </div>
           </div>
 
-          {/* Sound Effects Card */}
-          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="volume" size={18} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: 16 }}>Sound Effects</h3>
-            </div>
-            <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
-              Enable or disable live game audio effects.
-            </p>
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", userSelect: "none" }}>
-                <input 
-                  type="checkbox" 
-                  checked={cageSound} 
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setCageSound(val);
-                    handleSave({ cage_sound_enabled: String(val) });
-                  }}
-                  style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
-                />
-                Cage Spinning Sound
-              </label>
-
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", userSelect: "none" }}>
-                <input 
-                  type="checkbox" 
-                  checked={celebrationSound} 
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setCelebrationSound(val);
-                    handleSave({ celebration_sound_enabled: String(val) });
-                  }}
-                  style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
-                />
-                Celebratory Winner Sound
-              </label>
-            </div>
-          </div>
-
           {/* Official Info Groups Card */}
           <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -466,6 +425,78 @@ export function SettingsSection() {
               </div>
             )}
           </div>
+
+          {/* Danger Zone / Database reset for Superadmin only */}
+          {isSuperadmin && (
+            <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12, border: "1.5px solid var(--danger)", boxShadow: "0 0 15px rgba(239, 68, 68, 0.08)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon name="trash" size={18} style={{ color: "var(--danger)" }} />
+                <h3 style={{ margin: 0, fontSize: 16, color: "var(--danger)" }}>Danger Zone</h3>
+              </div>
+              <p className="hg-dim" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.4 }}>
+                Permanently purge all game stats, ticket logs, bookings, financial history, and reset agent balances to zero.
+              </p>
+              
+              {!showResetConfirm ? (
+                <Button 
+                  onClick={() => setShowResetConfirm(true)}
+                  style={{ background: "var(--danger)", color: "#fff", border: "none", marginTop: 4, width: "100%" }}
+                >
+                  Reset Platform Database
+                </Button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4, padding: "12px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--danger)" }}>
+                    ⚠️ WARNING: This action is irreversible. Type &quot;RESET&quot; below to confirm:
+                  </span>
+                  <input
+                    type="text"
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder="Type RESET here..."
+                    style={{
+                      padding: "8px 12px", borderRadius: 8,
+                      border: "1.5px solid var(--danger)", background: "var(--bg)",
+                      color: "var(--text)", fontSize: 13, outline: "none", width: "100%"
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <Button
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        setResetConfirmText("");
+                      }}
+                      variant="ghost"
+                      style={{ flex: 1, fontSize: 12 }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={isResetting || resetConfirmText !== "RESET"}
+                      onClick={async () => {
+                        setIsResetting(true);
+                        try {
+                          const res = await apiFetch<{ message: string }>("/api/config/reset-database", { method: "POST" });
+                          setMessage(res.message);
+                          setShowResetConfirm(false);
+                          setResetConfirmText("");
+                          // Reload the page after 2 seconds to refresh all statistics
+                          setTimeout(() => window.location.reload(), 2000);
+                        } catch (e: any) {
+                          setMessage(e.message || "Reset failed.");
+                        } finally {
+                          setIsResetting(false);
+                        }
+                      }}
+                      style={{ flex: 1, background: "var(--danger)", color: "#fff", border: "none", fontSize: 12 }}
+                    >
+                      {isResetting ? "Resetting..." : "Confirm Purge"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1432,6 +1432,9 @@ export async function disbursePrize(req: AuthenticatedRequest, res: Response): P
       [admin.userId, prize_id]
     );
 
+    io.emit('prize_disbursed', { game_id, prize_id });
+    io.emit('ticket_status_change');
+
     // Check if all won prizes for this game are now disbursed
     const allPrizesRes = await pool.query(
       `SELECT COUNT(*)::integer as total_won, COUNT(*) FILTER (WHERE disbursed = TRUE)::integer as disbursed_count

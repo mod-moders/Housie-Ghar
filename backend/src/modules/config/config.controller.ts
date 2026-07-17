@@ -34,7 +34,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -120,7 +120,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {
@@ -149,6 +149,59 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error updating platform config:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Reset entire game stats and financial data (Superadmin)
+ */
+export async function resetDatabase(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const actor = req.user!;
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    await client.query(`
+      TRUNCATE 
+        Scheduled_Games, 
+        Prize_Pool, 
+        Tickets, 
+        Bookings, 
+        Wallet_Ledger, 
+        TopUp_Requests, 
+        Game_Logs, 
+        Audit_Log, 
+        Promoter_Referrals, 
+        Promoter_Commissions, 
+        Bookie_Applications 
+      RESTART IDENTITY CASCADE;
+    `);
+    
+    await client.query(`
+      UPDATE Users SET current_balance = 0.00;
+    `);
+    
+    await client.query('COMMIT');
+    
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'RESET_DATABASE',
+      targetType: 'Database',
+      targetDescription: 'Truncated stats, transactions, games, bookings, ledgers, and reset user balances to 0.00',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Database reset completed successfully!' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error resetting database:', error);
     res.status(500).json({ message: 'Internal server error' });
   } finally {
     client.release();

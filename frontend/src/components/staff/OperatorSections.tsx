@@ -58,7 +58,8 @@ export function OperatorHudSection() {
 
   const { config } = useConfigStore();
   const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
-    config?.english_caller_enabled === "true" && !muted
+    config?.english_caller_enabled === "true" && !muted,
+    ((games.find((g) => g.game_id === selectedId)?.game_status === "Live") || gameStatus === "Live")
   );
 
   const beep = useCallback(() => {

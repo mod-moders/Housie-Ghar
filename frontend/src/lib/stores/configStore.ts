@@ -14,6 +14,13 @@ export interface PublicConfig {
   announcements_muted?: string;
   cage_sound_enabled?: string;
   celebration_sound_enabled?: string;
+  welcome_voice_url?: string;
+  instruction_voice_url?: string;
+  welcome_voice_text?: string;
+  instruction_voice_text?: string;
+  background_music_url?: string;
+  background_music_enabled?: string;
+  background_music_volume?: string;
 }
 
 interface ConfigState {

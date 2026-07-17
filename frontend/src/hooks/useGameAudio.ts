@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { englishPhrases } from "@/lib/englishPhrases";
 import { apiFetch } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
+import { useConfigStore } from "@/lib/stores/configStore";
 
 interface NumberCallConfig {
   number: number;
@@ -12,12 +13,17 @@ interface NumberCallConfig {
   volume?: number;
 }
 
-export function useGameAudio(englishCallerEnabled: boolean) {
+export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
+  const { config } = useConfigStore();
   
   const activeAudiosRef = useRef<HTMLAudioElement[]>([]);
   const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
   const isMountedRef = useRef<boolean>(true);
+  
+  const isIntroPlayingRef = useRef<boolean>(false);
+  const pendingNumbersQueueRef = useRef<number[]>([]);
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -34,6 +40,14 @@ export function useGameAudio(englishCallerEnabled: boolean) {
 
       activeTimersRef.current.forEach((t) => clearTimeout(t));
       activeTimersRef.current = [];
+
+      if (bgMusicRef.current) {
+        try {
+          bgMusicRef.current.pause();
+          bgMusicRef.current.src = "";
+        } catch {}
+        bgMusicRef.current = null;
+      }
 
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         try {
@@ -57,6 +71,48 @@ export function useGameAudio(englishCallerEnabled: boolean) {
       .catch(() => {});
   }, [englishCallerEnabled]);
 
+  // Handle Gameplay Background Music Playback
+  useEffect(() => {
+    const bgEnabled = config?.background_music_enabled === "true";
+    const bgUrl = config?.background_music_url;
+    const bgVol = parseFloat(config?.background_music_volume || "0.15");
+
+    if (isGameLive && bgEnabled && bgUrl) {
+      if (!bgMusicRef.current || bgMusicRef.current.src !== bgUrl) {
+        if (bgMusicRef.current) {
+          try { bgMusicRef.current.pause(); } catch {}
+        }
+        const audio = new Audio(bgUrl);
+        audio.loop = true;
+        audio.volume = bgVol;
+        bgMusicRef.current = audio;
+        audio.play().catch(() => {
+          // auto-play blocked
+        });
+      } else {
+        bgMusicRef.current.volume = bgVol;
+      }
+    } else {
+      if (bgMusicRef.current) {
+        try {
+          bgMusicRef.current.pause();
+          bgMusicRef.current.src = "";
+        } catch {}
+        bgMusicRef.current = null;
+      }
+    }
+
+    return () => {
+      if (bgMusicRef.current) {
+        try {
+          bgMusicRef.current.pause();
+          bgMusicRef.current.src = "";
+        } catch {}
+        bgMusicRef.current = null;
+      }
+    };
+  }, [isGameLive, config?.background_music_enabled, config?.background_music_url, config?.background_music_volume]);
+
   const stopAllActiveAudios = () => {
     activeAudiosRef.current.forEach((audio) => {
       try {
@@ -79,14 +135,54 @@ export function useGameAudio(englishCallerEnabled: boolean) {
   const playGreeting = async () => {
     if (!englishCallerEnabled) return;
     stopAllActiveAudios();
-    await playAudioOrFallback(
-      "/audio/calls/greeting.mp3",
-      "Welcome to Housie Ghar. The game is starting now! Best of luck."
-    );
+    
+    isIntroPlayingRef.current = true;
+    
+    try {
+      // 1. Play Welcome Voice Note (url or fallback text)
+      const welcomeUrl = config?.welcome_voice_url;
+      const welcomeText = config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
+      const welcomeVoiceName = typeof window !== "undefined" ? localStorage.getItem("welcome_voice_name") : null;
+      await playAudioOrFallback(
+        welcomeUrl || "",
+        welcomeText,
+        1.0,
+        welcomeVoiceName
+      );
+      
+      if (!isMountedRef.current) return;
+
+      // 2. Play Instruction Voice Note (url or fallback text)
+      const instructionUrl = config?.instruction_voice_url;
+      const instructionText = config?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
+      const instructionVoiceName = typeof window !== "undefined" ? localStorage.getItem("instruction_voice_name") : null;
+      await playAudioOrFallback(
+        instructionUrl || "",
+        instructionText,
+        1.0,
+        instructionVoiceName
+      );
+    } finally {
+      isIntroPlayingRef.current = false;
+      // Play any pending number call that arrived during the intro
+      if (isMountedRef.current && pendingNumbersQueueRef.current.length > 0) {
+        const nextNum = pendingNumbersQueueRef.current.shift();
+        if (nextNum !== undefined) {
+          playNumberCall(nextNum);
+        }
+      }
+    }
   };
 
   const playNumberCall = async (num: number) => {
     if (!englishCallerEnabled) return;
+    
+    if (isIntroPlayingRef.current) {
+      // Buffer latest number call to play once intro ends
+      pendingNumbersQueueRef.current = [num];
+      return;
+    }
+
     stopAllActiveAudios();
     const config = callsConfig[num];
     const phrase = config?.call_text || englishPhrases[num] || `Number ${num}`;
@@ -119,9 +215,14 @@ export function useGameAudio(englishCallerEnabled: boolean) {
       });
   };
 
-  const playAudioOrFallback = (mp3Path: string, fallbackText: string, customVolume: number = 1.0): Promise<void> => {
+  const playAudioOrFallback = (mp3Path: string, fallbackText: string, customVolume: number = 1.0, forcedVoiceName: string | null = null): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current) return resolve();
+
+      if (!mp3Path) {
+        fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
+        return;
+      }
 
       const audio = new Audio(mp3Path);
       activeAudiosRef.current.push(audio);
@@ -135,7 +236,7 @@ export function useGameAudio(englishCallerEnabled: boolean) {
       audio.onerror = () => {
         activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
         if (isMountedRef.current) {
-          fallbackToTTS(fallbackText).then(resolve);
+          fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
         } else {
           resolve();
         }
@@ -151,7 +252,7 @@ export function useGameAudio(englishCallerEnabled: boolean) {
         .catch(() => {
           activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
           if (isMountedRef.current) {
-            fallbackToTTS(fallbackText).then(resolve);
+            fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
           } else {
             resolve();
           }
@@ -159,7 +260,7 @@ export function useGameAudio(englishCallerEnabled: boolean) {
     });
   };
 
-  const fallbackToTTS = (text: string): Promise<void> => {
+  const fallbackToTTS = (text: string, forcedVoiceName: string | null = null): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current || !("speechSynthesis" in window)) {
         return resolve();
@@ -172,7 +273,7 @@ export function useGameAudio(englishCallerEnabled: boolean) {
         const utterance = new SpeechSynthesisUtterance(text);
         
         const voices = window.speechSynthesis.getVoices();
-        const preferredName = typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null;
+        const preferredName = forcedVoiceName || (typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null);
         let voice = voices.find(v => v.name === preferredName);
         if (!voice) {
           voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));

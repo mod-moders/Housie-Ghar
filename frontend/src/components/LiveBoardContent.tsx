@@ -123,7 +123,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const { config } = useConfigStore();
   
   const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
-    config?.english_caller_enabled === "true" && !muted
+    config?.english_caller_enabled === "true" && !muted,
+    gameStatus === "Live"
   );
 
   const gameStartedAnnouncedRef = useRef<boolean>(false);
@@ -252,7 +253,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   }, [loadMyTickets]);
 
   useSocket((event) => {
-    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received") {
+    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received" || event === "prize_disbursed") {
       loadMyTickets();
       loadGameData();
     }
@@ -354,8 +355,21 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
-  const claimPrize = (prizeId: number) => {
-    router.push(`/profile?claim_prize_id=${prizeId}&game_id=${game_id}`);
+  const claimPrize = async (prizeId: number) => {
+    setClaimingPrize(String(prizeId));
+    try {
+      const response = await apiFetch<{ whatsapp_url?: string }>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
+        method: "POST",
+      });
+      loadGameData();
+      if (response.whatsapp_url) {
+        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to initiate claim");
+    } finally {
+      setClaimingPrize(null);
+    }
   };
 
   const drawn = new Set(drawnNumbers);
@@ -529,7 +543,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px',
                               }}>
-                                {p.disbursed ? 'Disbursed' : isWinner ? 'Claimed (Pending)' : 'Claimed'}
+                                {p.disbursed ? 'Disbursed' : 'Claimed'}
                               </span>
                             )}
                             {showClaimBtn && (
@@ -721,7 +735,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 <h3 style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12, marginBottom: 16, textAlign: "left" }}>Final Winners List</h3>
                 <div style={{ maxHeight: "40vh", overflowY: "auto", textAlign: "left" }}>
                   {prizes.filter(p => p.claimed).map((p) => {
-                    const isWinner = p.winner_housie_name === displayName;
+                    const isWinner = p.winner_housie_name === displayName || 
+                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
                     const isClaimed = p.player_claimed;
                     const showRowClaimBtn = !isStaff && gameStatus === "Draw_Ended" && isWinner && !isClaimed;
                     return (
@@ -772,7 +787,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
                             }}>
-                              {p.disbursed ? 'Disbursed' : isWinner ? 'Claimed (Pending)' : 'Claimed'}
+                              {p.disbursed ? 'Disbursed' : 'Claimed'}
                             </span>
                           )}
 

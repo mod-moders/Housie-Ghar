@@ -100,3 +100,29 @@ export async function ensureSuperadminAccess(): Promise<void> {
     console.error('ensureSuperadminAccess failed:', error);
   }
 }
+
+export async function ensurePlatformConfig(): Promise<void> {
+  const configs = [
+    { key: 'welcome_voice_url', val: '', desc: 'Welcome voice note audio URL or Base64 data' },
+    { key: 'instruction_voice_url', val: '', desc: 'Instruction voice note audio URL or Base64 data' },
+    { key: 'welcome_voice_text', val: 'Welcome to Housie Ghar. The game is starting now! Best of luck.', desc: 'Welcome voice note TTS fallback text' },
+    { key: 'instruction_voice_text', val: 'Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.', desc: 'Instruction voice note TTS fallback text' },
+    { key: 'background_music_url', val: '', desc: 'Background music audio URL or Base64 data' },
+    { key: 'background_music_enabled', val: 'false', desc: 'Enable background music during game' },
+    { key: 'background_music_volume', val: '0.15', desc: 'Background music volume (0.0 to 1.0)' },
+  ];
+
+  try {
+    for (const c of configs) {
+      await pool.query(
+        `INSERT INTO Platform_Config (config_key, config_value, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (config_key) DO NOTHING`,
+        [c.key, c.val, c.desc]
+      );
+    }
+    console.log('✅ Checked/initialized sound configuration keys in Platform_Config');
+  } catch (error) {
+    console.error('Failed to initialize platform config keys:', error);
+  }
+}

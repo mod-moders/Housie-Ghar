@@ -11,7 +11,7 @@ import { connectRedis } from './db/redis';
 import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
 import { socketAuth, authorizeRoomJoin } from './middleware/socketAuth';
-import { ensureSuperadminAccess } from './services/superadminHeal';
+import { ensureSuperadminAccess, ensurePlatformConfig } from './services/superadminHeal';
 
 const server = http.createServer(app);
 
@@ -78,6 +78,7 @@ async function boot() {
     //     SUPERADMIN_TEMP_PASSWORD). No-op unless that env var is set and the
     //     stored password is missing/not-a-real-bcrypt-hash.
     await ensureSuperadminAccess();
+    await ensurePlatformConfig();
 
     // 2c. JWT keypair self-check. A private/public mismatch is invisible at
     //     login (signing succeeds) but kills every session (verify fails), so
