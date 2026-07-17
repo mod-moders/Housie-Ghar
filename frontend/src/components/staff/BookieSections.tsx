@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { money } from "@/lib/money";
+import { money, moneyStr } from "@/lib/money";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
@@ -398,7 +398,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
                 <span className="hg-kpi-label">Total Recharged</span>
                 <b className="hg-kpi-value" style={{ fontSize: "20px" }}>{money(stats?.total_recharged ?? 0)}</b>
                 <span className="hg-kpi-sub">
-                  {stats?.recent_recharge_amount ? `Last: ${money(stats.recent_recharge_amount)}` : "No recharges yet"}
+                  {stats?.recent_recharge_amount ? `Last: ${moneyStr(stats.recent_recharge_amount)}` : "No recharges yet"}
                 </span>
               </div>
 

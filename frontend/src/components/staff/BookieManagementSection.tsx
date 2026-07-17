@@ -190,10 +190,6 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
     window.print();
   };
 
-  // KPIs
-  const totalBookies = bookies.length;
-  const activeBookies = bookies.filter((b) => b.status === "Active").length;
-  const totalWalletSum = bookies.reduce((sum, b) => sum + b.current_balance, 0);
 
   const pendingAppsCount = apps.filter((a) => a.status === "Pending").length;
 
@@ -366,7 +362,7 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
                 {money(
                   bookies
                     .filter((b) => activeTab === "registered" ? !b.temp_password_required : b.temp_password_required)
-                    .reduce((sum, b) => sum + b.current_balance, 0)
+                    .reduce((sum, b) => sum + (Number(b.current_balance) || 0), 0)
                 )}
               </b>
               <span className="hg-kpi-sub">Total capital held by Bookies</span>
