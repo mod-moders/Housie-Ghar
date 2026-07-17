@@ -57,10 +57,15 @@ export function OperatorHudSection() {
   const audioCtx = useRef<AudioContext | null>(null);
 
   const { config } = useConfigStore();
-  const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
+  const { playGreeting, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true" && !muted,
     ((games.find((g) => g.game_id === selectedId)?.game_status === "Live") || gameStatus === "Live")
   );
+
+  // Draws that arrive while the welcome/instruction intro is still playing get
+  // queued here instead of revealed immediately, so the operator HUD never
+  // shows/calls a number over the intro (mirrors LiveBoardContent.tsx).
+  const pendingDrawsRef = useRef<number[]>([]);
 
   const beep = useCallback(() => {
     if (muted) return;
@@ -92,15 +97,37 @@ export function OperatorHudSection() {
       .catch(() => {});
   }, []);
 
+  const revealDraw = useCallback((num: number) => {
+    beep();
+    addDrawn(num);     // set new number FIRST
+    setRevealed(true); // THEN reveal badge — no stale flash
+    playNumberCall(num);
+  }, [beep, addDrawn, playNumberCall]);
+
+  const flushPendingDraws = useCallback(() => {
+    const queued = pendingDrawsRef.current.splice(0);
+    queued.forEach((num, i) => {
+      const offset = i * 2500;
+      setTimeout(() => setRevealed(false), offset);
+      setTimeout(() => revealDraw(num), offset + 2000);
+    });
+  }, [revealDraw]);
+
   const onEvent = useCallback((data: SSEEventData) => {
     if (data.event === "draw") {
       const num = data.draw_number as number;
+
+      // Intro (welcome + instruction voice notes) still playing — queue the
+      // draw instead of revealing/calling it now, so the HUD never shows or
+      // calls a number over the intro.
+      if (introPlayingRef.current) {
+        pendingDrawsRef.current.push(num);
+        return;
+      }
+
       setRevealed(false);
       setTimeout(() => {
-        beep();
-        addDrawn(num);
-        setRevealed(true);
-        playNumberCall(num);
+        revealDraw(num);
       }, 2000);
     } else if (data.event === "winner") {
       const w = data as any;
@@ -113,7 +140,7 @@ export function OperatorHudSection() {
       );
       playCelebration();
     }
-  }, [beep, playNumberCall, playCelebration, addDrawn]);
+  }, [revealDraw, playCelebration, introPlayingRef]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -140,9 +167,9 @@ export function OperatorHudSection() {
   useEffect(() => {
     if (activeGameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      playGreeting();
+      playGreeting().then(flushPendingDraws);
     }
-  }, [activeGameStatus, playGreeting]);
+  }, [activeGameStatus, playGreeting, flushPendingDraws]);
 
   const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;
