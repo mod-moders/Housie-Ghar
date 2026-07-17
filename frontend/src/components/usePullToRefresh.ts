@@ -1,21 +1,26 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const THRESHOLD = 70;
 const MAX_PULL = 120;
 const RESISTANCE = 0.5;
 
 /**
- * `.hg-frame` (not html/body) is the real scroll container in this app's phone-frame layout, so
- * neither Chrome's nor (nonexistent on) Safari's native pull-to-refresh can ever fire on it — this
- * reimplements the gesture by hand, scoped to the frame, so it works the same on iOS and Android.
+ * `.hg-frame` / `.hg-dash-content` (not html/body) are the real scroll containers in this app's
+ * frame-scrolled layouts, so neither Chrome's nor (nonexistent on) Safari's native pull-to-refresh
+ * can ever fire on them — this reimplements the gesture by hand. Takes a callback ref rather than
+ * a plain useRef: some callers (e.g. the staff dashboard) render a loading placeholder before the
+ * real scroll container mounts, and a useRef+useEffect([ref]) pairing only ever sees that first
+ * (null) commit — a callback ref re-fires exactly when the DOM node actually appears.
  */
-export function usePullToRefresh(frameRef: RefObject<HTMLDivElement | null>) {
+export function usePullToRefresh() {
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [distance, setDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  const ref = useCallback((node: HTMLDivElement | null) => setEl(node), []);
+
   useEffect(() => {
-    const el = frameRef.current;
     if (!el) return;
 
     let startY = 0;
@@ -69,11 +74,12 @@ export function usePullToRefresh(frameRef: RefObject<HTMLDivElement | null>) {
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [frameRef, refreshing]);
+  }, [el, refreshing]);
 
   const pulledEnough = distance >= THRESHOLD;
 
   return {
+    ref,
     indicatorStyle: {
       opacity: distance > 4 ? Math.min(distance / THRESHOLD, 1) : 0,
       transform: `translate(-50%, ${Math.max(distance - 32, -32)}px) rotate(${refreshing ? 0 : pulledEnough ? 180 : 0}deg)`,

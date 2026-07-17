@@ -1,7 +1,7 @@
 "use client";
 /** Unified staff dashboard — role-driven sidebar sections, single shell. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
@@ -145,8 +145,7 @@ export default function StaffDashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [hud, setHud] = useState<FinancialHud | null>(null);
   const [checked, setChecked] = useState(false);
-  const dashContentRef = useRef<HTMLDivElement>(null);
-  const { indicatorStyle, contentStyle } = usePullToRefresh(dashContentRef);
+  const { ref: dashContentRef, indicatorStyle, contentStyle } = usePullToRefresh();
 
   const setSectionAndPersist = (newSec: string | null) => {
     setSection(newSec);
