@@ -135,7 +135,7 @@ export default function ProfilePage() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--profile" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 16px" }}>
-        <div style={{ width: "100%", maxWidth: 1000, margin: "0 auto" }}>
+        <div className="hg-content-col">
           <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 24, background: "var(--surface)", padding: "24px 28px", borderRadius: 12, border: "1px solid var(--border-light)" }}>
             
             {/* Header */}

@@ -875,6 +875,10 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
 
 .hg-root{font-family:var(--font-body);color:var(--text)}
 
+/* Shared page content column — keeps stats/profile in step with the
+   leaderboard/how-to-play 940px desktop column (see @media(min-width:900px) below). */
+.hg-content-col{width:100%;margin:0 auto}
+
 /* ---- Stage & frame ---- */
 .hg-stage{min-height:100vh;min-height:100dvh;display:flex;justify-content:center;
   background:radial-gradient(120% 80% at 50% -10%, var(--bg2), var(--bg));}
@@ -2137,6 +2141,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-tr-6{grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr}
 .hg-tr-games{grid-template-columns:2fr 1fr 1.2fr 1fr 1.2fr 1fr 180px}
 .hg-tr-history{grid-template-columns:2fr 1fr 1.2fr 1fr 200px}
+.hg-tr-players{grid-template-columns:1.8fr 1fr .7fr .7fr 1fr 1fr .9fr 90px}
+.hg-tr-fin-games{grid-template-columns:1.8fr 1fr .8fr 1fr 1fr 1fr .8fr}
 
 /* premium table styles */
 .hg-table-premium .hg-tr {
@@ -2619,6 +2625,8 @@ select option {
   .hg-patterns-grid{grid-template-columns:repeat(4,1fr)}
   .hg-cta-block{max-width:440px;margin:0 auto;width:100%}
 
+  .hg-content-col{max-width:940px}
+
   .hg-footer{padding-top:36px;padding-bottom:40px}
 }
 
@@ -3078,7 +3086,8 @@ select option {
    Premium Winners / Hall of Fame Page Design Overrides
    ==================================================================== */
 .hg-leaderboard {
-  max-width: 640px !important;
+  width: 100% !important;
+  max-width: 940px !important;
   margin: 24px auto 48px !important;
   padding: 16px !important;
   display: flex !important;
@@ -3194,7 +3203,8 @@ select option {
 
 @media(min-width:900px) {
   .hg-leaderboard {
-    max-width: 640px !important;
+    width: 100% !important;
+    max-width: 940px !important;
     margin: 24px auto 48px !important;
     display: flex !important;
     flex-direction: column !important;

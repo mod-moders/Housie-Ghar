@@ -127,7 +127,7 @@ export default function StatsPage() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--lobby" style={{ paddingBottom: 0, overflow: "hidden" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto", width: "100%", padding: "10px 20px 10px" }}>
+        <div className="hg-content-col" style={{ padding: "10px 20px 10px" }}>
 
           {/* ━━━ HERO BANNER ━━━ */}
           <div style={{

@@ -155,7 +155,7 @@ export function PlayersSection() {
               <EmptyHint icon="users" title="No players found" sub="No registered players match your search criteria." />
             ) : (
               <div className="hg-table" style={{ height: "100%", overflowY: "auto" }}>
-                <div className="hg-tr hg-tr-head">
+                <div className="hg-tr hg-tr-players hg-tr-head">
                   <span>Player</span>
                   <span>Registered</span>
                   <span>Games</span>
@@ -168,7 +168,7 @@ export function PlayersSection() {
                 {filteredPlayers.map((p) => {
                   const isBusy = actionBusy === p.player_id;
                   return (
-                    <div key={p.player_id} className="hg-tr">
+                    <div key={p.player_id} className="hg-tr hg-tr-players">
                       <span 
                         className="hg-td-name" 
                         style={{ cursor: "pointer" }}
