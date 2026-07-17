@@ -857,6 +857,9 @@
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+/* iOS Safari ignores the viewport meta's zoom restrictions (since iOS 10, for accessibility) but
+   does honor touch-action, so pan-x/pan-y (no pinch-zoom) is what actually blocks pinch there. */
+html,body{touch-action:pan-x pan-y}
 body{background:var(--bg);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
 
 /* Lock page height and body scrolling on mobile viewports where frame has internal scroll */

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, DM_Sans, JetBrains_Mono, DM_Serif_Display, VT323 } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +13,13 @@ import { ConfigProvider } from "@/components/ConfigProvider";
 export const metadata: Metadata = {
   title: "Housie Ghar — Book on WhatsApp, Play Live",
   description: "Housie (Tambola) the easy way — book tickets through your local agent and play live.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
