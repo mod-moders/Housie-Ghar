@@ -122,18 +122,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const booking = useBookingStore();
   const { config } = useConfigStore();
   
-  const { playGreeting, playNumberCall, playCelebration } = useGameAudio(
+  const { playGreeting, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true" && !muted,
     gameStatus === "Live"
   );
-
-  const gameStartedAnnouncedRef = useRef<boolean>(false);
-  useEffect(() => {
-    if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
-      gameStartedAnnouncedRef.current = true;
-      playGreeting();
-    }
-  }, [gameStatus, playGreeting]);
 
   // Track winners for audio celebration
   const [recentWinners, setRecentWinners] = useState<WinOverlay[]>([]);
@@ -162,6 +154,35 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   }, [muted]);
 
   const { addDrawn } = useGameStore();
+
+  // Draws that arrive (e.g. for a client joining mid-game) while the welcome/
+  // instruction intro is still playing get queued here instead of revealed
+  // immediately, so the board never shows/calls a number over the intro.
+  const pendingDrawsRef = useRef<number[]>([]);
+
+  const revealDraw = useCallback((num: number) => {
+    beep();
+    addDrawn(num);       // set new number FIRST
+    setRevealed(true);   // THEN reveal badge — no stale flash
+    playNumberCall(num);
+  }, [beep, addDrawn, playNumberCall]);
+
+  const flushPendingDraws = useCallback(() => {
+    const queued = pendingDrawsRef.current.splice(0);
+    queued.forEach((num, i) => {
+      const offset = i * 2500;
+      delay(() => setRevealed(false), offset);
+      delay(() => revealDraw(num), offset + 2000);
+    });
+  }, [delay, revealDraw]);
+
+  const gameStartedAnnouncedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
+      gameStartedAnnouncedRef.current = true;
+      playGreeting().then(flushPendingDraws);
+    }
+  }, [gameStatus, playGreeting, flushPendingDraws]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);
@@ -290,16 +311,19 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     if (data.event === "draw") {
       const num = data.draw_number as number;
 
+      // Intro (welcome + instruction voice notes) still playing for this
+      // client — queue the draw instead of revealing/calling it now, so the
+      // board never shows or calls a number over the intro.
+      if (introPlayingRef.current) {
+        pendingDrawsRef.current.push(num);
+        return;
+      }
+
       // Step 1 — Cage spins, badge hidden
       setRevealed(false);
 
       // Step 2 — After spin (2s), show badge + play audio together (number set in same tick)
-      delay(() => {
-        beep();
-        addDrawn(num);       // set new number FIRST
-        setRevealed(true);   // THEN reveal badge — no stale flash
-        playNumberCall(num);
-      }, 2000);
+      delay(() => revealDraw(num), 2000);
     } else if (data.event === "winner") {
       const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number };
       setPrizes((prev) =>
@@ -328,7 +352,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       setReactions((r) => [...r, next]);
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     }
-  }, [beep, playNumberCall, playCelebration, addDrawn, delay]);
+  }, [revealDraw, playCelebration, introPlayingRef, delay]);
 
   useSSE(game_id, onEvent);
 
