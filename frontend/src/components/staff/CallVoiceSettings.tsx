@@ -39,7 +39,12 @@ export function CallVoiceSettings() {
   const [bgMusicVolume, setBgMusicVolume] = useState(parseFloat(config?.background_music_volume || "0.15"));
   const [masterCallsVolume, setMasterCallsVolume] = useState(parseFloat(config?.master_calls_volume || "1.0"));
   const [uploadingVoiceKey, setUploadingVoiceKey] = useState<string | null>(null);
-  const [previewingUrl, setPreviewingUrl] = useState<string | null>(null);
+  // Which preview button is currently playing. Previously this was keyed off the
+  // audio content itself (a shared "tts" sentinel for any text-to-speech preview),
+  // so the Welcome and Instruction Listen buttons — both defaulting to TTS with no
+  // uploaded file — collided: starting either one flipped BOTH buttons to "Stop".
+  // Keying off which button was clicked instead makes each one track only itself.
+  const [previewingKey, setPreviewingKey] = useState<"welcome" | "instruction" | "bgMusic" | null>(null);
 
   // Voice note fallbacks & voice choices states
   const [welcomeText, setWelcomeText] = useState(config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
@@ -113,17 +118,22 @@ export function CallVoiceSettings() {
     reader.readAsDataURL(file);
   };
 
-  const handlePreviewAudio = (audioData: string, fallbackText: string, forcedVoiceName: string | null = null) => {
-    if (previewingUrl) {
-      window.speechSynthesis.cancel();
-      const existing = document.getElementById("preview-audio-element") as HTMLAudioElement;
-      if (existing) {
-        existing.pause();
-        existing.src = "";
-      }
-      setPreviewingUrl(null);
-      return;
+  const stopPreview = () => {
+    window.speechSynthesis.cancel();
+    const existing = document.getElementById("preview-audio-element") as HTMLAudioElement;
+    if (existing) {
+      existing.pause();
+      existing.src = "";
     }
+    setPreviewingKey(null);
+  };
+
+  const handlePreviewAudio = (key: "welcome" | "instruction" | "bgMusic", audioData: string, fallbackText: string, forcedVoiceName: string | null = null) => {
+    const wasPlayingThis = previewingKey === key;
+    // Stop whatever is currently playing (a different button's preview, or this
+    // same one being toggled off) before deciding whether to start a new one.
+    stopPreview();
+    if (wasPlayingThis) return;
 
     if (!audioData) {
       if ("speechSynthesis" in window) {
@@ -137,8 +147,8 @@ export function CallVoiceSettings() {
           utterance.voice = voice;
         }
         window.speechSynthesis.speak(utterance);
-        setPreviewingUrl("tts");
-        utterance.onend = () => setPreviewingUrl(null);
+        setPreviewingKey(key);
+        utterance.onend = () => setPreviewingKey((cur) => (cur === key ? null : cur));
       } else {
         alert("Audio not uploaded, and TTS not supported in this browser.");
       }
@@ -149,12 +159,12 @@ export function CallVoiceSettings() {
     audio.id = "preview-audio-element";
     audio.volume = 0.8;
     audio.play().then(() => {
-      setPreviewingUrl(audioData);
+      setPreviewingKey(key);
     }).catch(() => {
       alert("Failed to play audio preview.");
     });
     audio.onended = () => {
-      setPreviewingUrl(null);
+      setPreviewingKey((cur) => (cur === key ? null : cur));
     };
   };
 
@@ -648,9 +658,9 @@ export function CallVoiceSettings() {
                   variant="ghost"
                   size="sm"
                   style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio(welcomeVoice, welcomeText, selectedWelcomeVoice)}
+                  onClick={() => handlePreviewAudio("welcome", welcomeVoice, welcomeText, selectedWelcomeVoice)}
                 >
-                  {previewingUrl === welcomeVoice || previewingUrl === "tts" ? "⏹ Stop" : "🔊 Listen"}
+                  {previewingKey === "welcome" ? "⏹ Stop" : "🔊 Listen"}
                 </Button>
                 {welcomeVoice && (
                   <Button
@@ -744,9 +754,9 @@ export function CallVoiceSettings() {
                   variant="ghost"
                   size="sm"
                   style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio(instructionVoice, instructionText, selectedInstructionVoice)}
+                  onClick={() => handlePreviewAudio("instruction", instructionVoice, instructionText, selectedInstructionVoice)}
                 >
-                  {previewingUrl === instructionVoice || previewingUrl === "tts" ? "⏹ Stop" : "🔊 Listen"}
+                  {previewingKey === "instruction" ? "⏹ Stop" : "🔊 Listen"}
                 </Button>
                 {instructionVoice && (
                   <Button
@@ -841,9 +851,9 @@ export function CallVoiceSettings() {
                   variant="ghost"
                   size="sm"
                   style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio(bgMusicUrl, "")}
+                  onClick={() => handlePreviewAudio("bgMusic", bgMusicUrl, "")}
                 >
-                  {previewingUrl === bgMusicUrl ? "⏹ Stop Preview" : "🔊 Preview"}
+                  {previewingKey === "bgMusic" ? "⏹ Stop Preview" : "🔊 Preview"}
                 </Button>
               )}
             </div>
