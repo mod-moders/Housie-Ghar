@@ -1,7 +1,7 @@
 "use client";
 /** Unified staff dashboard — role-driven sidebar sections, single shell. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
@@ -10,6 +10,7 @@ import { Icon } from "@/components/Icon";
 import { Logo, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
 import { useSocket } from "@/lib/hooks/useSocket";
+import { usePullToRefresh } from "@/components/usePullToRefresh";
 import {
   OverviewSection, GamesSection, HistorySection, FillingSection, WorkforceSection, AuditSection,
 } from "@/components/staff/AdminSections";
@@ -144,6 +145,8 @@ export default function StaffDashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [hud, setHud] = useState<FinancialHud | null>(null);
   const [checked, setChecked] = useState(false);
+  const dashContentRef = useRef<HTMLDivElement>(null);
+  const { indicatorStyle, contentStyle } = usePullToRefresh(dashContentRef);
 
   const setSectionAndPersist = (newSec: string | null) => {
     setSection(newSec);
@@ -274,6 +277,7 @@ export default function StaffDashboard() {
     <div className="hg-stage hg-stage-wide">
       <div className="hg-frame hg-frame-wide">
         <div className="hg-dash">
+          {collapsed && <div className="hg-side-backdrop" onClick={() => setCollapsed(false)} />}
           <aside className={`hg-side${collapsed ? " is-collapsed" : ""}`}>
             <div className="hg-side-brand"><Logo size={18} onClick={() => window.location.reload()} /></div>
              <nav className="hg-side-nav" style={{ gap: "4px" }}>
@@ -389,7 +393,10 @@ export default function StaffDashboard() {
               </div>
             </header>
 
-            <main className="hg-dash-content">{renderSection()}</main>
+            <main className="hg-dash-content" ref={dashContentRef} style={{ position: "relative" }}>
+              <div className="hg-ptr-indicator" style={indicatorStyle}>↓</div>
+              <div style={contentStyle}>{renderSection()}</div>
+            </main>
           </div>
         </div>
       </div>

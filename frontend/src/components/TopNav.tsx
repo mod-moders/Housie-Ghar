@@ -81,22 +81,25 @@ export function TopNav() {
         </button>
       </div>
       {open && (
-        <div className="hg-nav-sheet">
-          {navItems.map(([href, lbl, icon]) => (
-            <button key={lbl} className="hg-sheet-link" onClick={() => go(href)}>
-              <Icon name={icon} size={18} /> {lbl}
-            </button>
-          ))}
-          {user?.role === "staff" ? (
-            <button className="hg-sheet-link" onClick={() => go("/staff")}>
-              <Icon name="shield" size={18} /> Staff Panel ({user.name})
-            </button>
-          ) : (
-            <button className="hg-sheet-link" onClick={() => go("/staff/login")}>
-              <Icon name="lock" size={18} /> Staff Login
-            </button>
-          )}
-        </div>
+        <>
+          <div className="hg-nav-backdrop" onClick={() => setOpen(false)} />
+          <div className="hg-nav-sheet">
+            {navItems.map(([href, lbl, icon]) => (
+              <button key={lbl} className="hg-sheet-link" onClick={() => go(href)}>
+                <Icon name={icon} size={18} /> {lbl}
+              </button>
+            ))}
+            {user?.role === "staff" ? (
+              <button className="hg-sheet-link" onClick={() => go("/staff")}>
+                <Icon name="shield" size={18} /> Staff Panel ({user.name})
+              </button>
+            ) : (
+              <button className="hg-sheet-link" onClick={() => go("/staff/login")}>
+                <Icon name="lock" size={18} /> Staff Login
+              </button>
+            )}
+          </div>
+        </>
       )}
     </header>
   );

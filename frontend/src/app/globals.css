@@ -926,7 +926,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-player-chip:hover{border-color:var(--ink);color:var(--text);box-shadow:0 3px 0 -1px var(--ink)}
 .hg-staff-btn:hover,.hg-theme-btn:hover{color:var(--text)}
 .hg-burger{display:grid;place-items:center;width:36px;height:36px;color:var(--text);cursor:pointer}
-.hg-nav-sheet{position:absolute;top:100%;left:0;right:0;display:flex;flex-direction:column;
+.hg-nav-backdrop{position:fixed;inset:0;z-index:38;background:transparent}
+.hg-nav-sheet{position:absolute;top:100%;left:0;right:0;z-index:41;display:flex;flex-direction:column;
   padding:8px;gap:2px;background:var(--surface)}
 .hg-sheet-link{display:flex;align-items:center;gap:11px;padding:12px;border:0;background:none;
   color:var(--text);font:600 14px var(--font-head);text-align:left;border-radius:10px;cursor:pointer}
@@ -2096,6 +2097,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 
 /* ============ STAFF DASHBOARD ============ */
 .hg-dash{display:flex;height:100vh;height:100dvh;background:var(--bg);overflow:hidden}
+.hg-side-backdrop{display:none}
 .hg-side{display:flex;flex-direction:column;width:224px;flex-shrink:0;padding:16px 12px;gap:18px;
   background:var(--bg);border-right:1.5px solid var(--card-line);height:100%;overflow-y:auto;scrollbar-width:none}
 .hg-side::-webkit-scrollbar{display:none}
@@ -2378,6 +2380,7 @@ select option {
 /* ============ STAFF DASHBOARD — narrow-screen handling ============ */
 @media(max-width:720px){
   .hg-dash{position:relative}
+  .hg-side-backdrop{display:block;position:fixed;inset:0;z-index:49}
   .hg-side{width:60px;padding:14px 8px}
   .hg-side .hg-side-link span,.hg-side .hg-side-mod,.hg-side .hg-logo-word{display:none}
   .hg-side .hg-side-link{justify-content:center;padding:11px 0}
