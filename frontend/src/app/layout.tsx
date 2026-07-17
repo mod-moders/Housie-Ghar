@@ -28,6 +28,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       {/* suppressHydrationWarning lets the inline script update data-theme before React hydrates */}
       <body className="hg-root" data-theme="dark" suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('hg-theme');if(t)document.body.dataset.theme=t;}catch(e){}` }} />
+        {/* iOS Safari ignores the viewport meta's zoom lock and touch-action for its native
+            pinch gesture; gesturestart/gesturechange are the only reliable hook to block it there.
+            The touchend timer blocks the separate double-tap-to-zoom gesture. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+var lastTouchEnd = 0;
+document.addEventListener('touchend', function(e){
+  var now = Date.now();
+  if (now - lastTouchEnd <= 300) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+})();` }} />
         <ConfigProvider>
           <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1 }}>
