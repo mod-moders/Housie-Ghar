@@ -217,7 +217,7 @@
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), inset 0 0 15px rgba(0, 255, 255, 0.2) !important;
   padding: 20px !important;
 }
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .hg-root[data-theme='retro_arcade'] .hg-card { padding: 18px 20px !important; }
   .hg-root[data-theme='retro_arcade'] .hg-hero-card { padding: 24px 28px !important; }
   .hg-root[data-theme='retro_arcade'] .hg-hero-title { font-size: 32px !important; }
@@ -2540,7 +2540,7 @@ select option {
 .hg-live-body,.hg-live-left,.hg-live-right{display:contents}
 .hg-room-aside-hint{display:none}  /* desktop-rail placeholder only */
 
-@media(min-width:900px){
+@media(min-width:768px){
   /* ---- de-phone the chrome: the page fills the viewport, the frame
      stops being a bordered floating device and becomes a centered
      content column scrolling with the document ---- */
@@ -3166,7 +3166,7 @@ select option {
   border-color: var(--brand) !important;
 }
 
-@media(min-width:560px) and (max-width:899px) {
+@media(min-width:560px) and (max-width:767px) {
   .hg-feed-list {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -3304,7 +3304,7 @@ select option {
   border-color: #d35400 !important;
 }
 
-@media(min-width:900px) {
+@media(min-width:768px) {
   .hg-leaderboard {
     width: 100% !important;
     max-width: 940px !important;

@@ -23,6 +23,7 @@ import { ProfileSection } from "@/components/staff/ProfileSection";
 import { FirstTimeSetup } from "@/components/staff/FirstTimeSetup";
 import { BookieManagementSection } from "@/components/staff/BookieManagementSection";
 import { BookieLiveHudSection } from "@/components/staff/BookieLiveHudSection";
+import { CallVoiceSettings } from "@/components/staff/CallVoiceSettings";
 import type { FinancialHud } from "@/lib/types";
 
 type NavItem = [key: string, label: string, icon: string];
@@ -38,6 +39,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["bookies", "Bookie Management", "users"],
       ["players", "Player Management", "users"],
       ["settings", "Website Settings", "edit"],
+      ["audio", "Audio Settings", "volume"],
       ["audit", "Website Audits", "shield"],
       ["profile", "My Profile", "user"],
     ];
@@ -51,7 +53,6 @@ function navFor(user: AuthUser): NavItem[] {
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
-      ["players", "Player Management", "users"],
       ["audit", "Website Audits", "shield"],
       ["profile", "My Profile", "user"],
     ];
@@ -260,6 +261,7 @@ export default function StaffDashboard() {
       case "audit": return <AuditSection />;
       case "bookies": return <BookieManagementSection me={user} goSection={setSectionAndPersist} />;
       case "settings": return <SettingsSection />;
+      case "audio": return <CallVoiceSettings />;
       case "hud": return <LiveHudAndGamesSection me={user} />;
       case "overflow": return <OverflowSection me={user} />;
       case "broadcast": return <ShareGamesSection />;

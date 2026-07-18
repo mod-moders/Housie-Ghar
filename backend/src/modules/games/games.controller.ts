@@ -1222,8 +1222,8 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
        LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
        LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = FALSE
-       ORDER BY COALESCE(p.player_claimed_at, sg.completed_at, NOW()) DESC`
+       WHERE p.player_claimed = TRUE AND p.disbursed = FALSE
+       ORDER BY p.player_claimed_at DESC`
     );
 
     const claims = result.rows.map((row) => ({
@@ -1263,39 +1263,37 @@ export async function getPrizeClaimsDashboard(req: AuthenticatedRequest, res: Re
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)`
+       WHERE p.player_claimed = TRUE`
     );
     const overallDisbursalsRes = await pool.query(
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE`
+       WHERE p.player_claimed = TRUE AND p.disbursed = TRUE`
     );
     const dailyClaimsRes = await pool.query(
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) 
-         AND COALESCE(p.player_claimed_at, sg.completed_at, NOW()) >= date_trunc('day', NOW())`
+       WHERE p.player_claimed = TRUE AND p.player_claimed_at >= date_trunc('day', NOW())`
     );
     const dailyDisbursalsRes = await pool.query(
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE AND p.disbursed_at >= date_trunc('day', NOW())`
+       WHERE p.player_claimed = TRUE AND p.disbursed = TRUE AND p.disbursed_at >= date_trunc('day', NOW())`
     );
     const weeklyClaimsRes = await pool.query(
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) 
-         AND COALESCE(p.player_claimed_at, sg.completed_at, NOW()) >= NOW() - INTERVAL '7 days'`
+       WHERE p.player_claimed = TRUE AND p.player_claimed_at >= NOW() - INTERVAL '7 days'`
     );
     const weeklyDisbursalsRes = await pool.query(
       `SELECT COUNT(*)::integer AS count, COALESCE(SUM(p.amount_per_winner), 0)::float AS amount 
        FROM Prize_Pool p
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       WHERE (p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)) AND p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '7 days'`
+       WHERE p.player_claimed = TRUE AND p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '7 days'`
     );
 
     const historyRes = await pool.query(
@@ -1320,8 +1318,8 @@ export async function getPrizeClaimsDashboard(req: AuthenticatedRequest, res: Re
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
        LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
        LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-       WHERE p.player_claimed = TRUE OR (sg.game_status IN ('Draw_Ended', 'Completed') AND p.claimed = TRUE)
-       ORDER BY COALESCE(p.player_claimed_at, sg.completed_at, p.disbursed_at) DESC
+       WHERE p.player_claimed = TRUE
+       ORDER BY COALESCE(p.player_claimed_at, p.disbursed_at) DESC
        LIMIT 10`
     );
 
@@ -1384,7 +1382,7 @@ export async function disbursePrize(req: AuthenticatedRequest, res: Response): P
 
     // Get prize details
     const prizeRes = await pool.query(
-      `SELECT p.prize_id, p.pattern_name, p.amount_per_winner, p.prize_amount, p.player_claimed, p.disbursed, p.winner_housie_name, p.winner_ticket_id,
+      `SELECT p.prize_id, p.pattern_name, p.amount_per_winner, p.prize_amount, p.player_claimed, p.claimed, p.disbursed, p.winner_housie_name, p.winner_ticket_id,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id

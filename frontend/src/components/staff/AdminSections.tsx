@@ -10,7 +10,6 @@ import { Button, EmptyHint, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuditEntry, GameSummary, StaffUser } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
-import { CallVoiceSettings } from "./CallVoiceSettings";
 import { getPresetClass } from "@/lib/presetHelper";
 import { useSocket } from "@/lib/hooks/useSocket";
 
@@ -566,7 +565,6 @@ export function GamesSection({ me }: { me: AuthUser }) {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [pastGames, setPastGames] = useState<GameSummary[]>([]);
   const [creating, setCreating] = useState(false);
-  const [managingVoice, setManagingVoice] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prizes, setPrizes] = useState(PATTERN_DEFAULTS);
@@ -742,17 +740,8 @@ export function GamesSection({ me }: { me: AuthUser }) {
           )}
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          {me.role_name === "Superadmin" && (
-            <Button variant="ghost" size="sm" icon="volume" onClick={() => {
-              setCreating(false);
-              setManagingVoice(!managingVoice);
-            }}>
-              {managingVoice ? "Back to Games" : "Voice & TTS Settings"}
-            </Button>
-          )}
           {(me.role_name === "Superadmin" || me.role_name === "Financial Admin") && (
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
-              setManagingVoice(false);
               if (creating) {
                 setEditingGameId(null);
                 setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120" });
@@ -766,10 +755,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         </div>
       </div>
 
-      {managingVoice ? (
-        <CallVoiceSettings />
-      ) : (
-        <>
+      <>
           {creating && (
             <div className="hg-form">
           <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
@@ -1050,7 +1036,6 @@ export function GamesSection({ me }: { me: AuthUser }) {
         )}
       </div>
     </>
-  )}
 
       {ruleModal && (
         <div className="hg-modal-scrim" onClick={() => setRuleModal(null)}>
