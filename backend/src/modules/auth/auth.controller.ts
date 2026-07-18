@@ -318,9 +318,9 @@ export async function changeOwnPassword(req: AuthenticatedRequest, res: Response
     const newHash = await bcrypt.hash(new_password, 12);
     await pool.query(
       `UPDATE Users
-       SET password_hash = $1, password_plain = $2, temp_password_required = FALSE
-       WHERE user_id = $3`,
-      [newHash, new_password, actor.userId]
+       SET password_hash = $1, temp_password_required = FALSE
+       WHERE user_id = $2`,
+      [newHash, actor.userId]
     );
 
     await logAuditEvent({

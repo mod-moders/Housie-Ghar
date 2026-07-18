@@ -69,14 +69,11 @@ export async function ensureSuperadminAccess(): Promise<void> {
     const passwordHash = await bcrypt.hash(resetPassword, 12);
 
     if (existing.rowCount) {
-      // Keep password_plain in sync — the Workforce UI shows it to the
-      // Superadmin as the source of truth, and a heal that updates only the
-      // hash silently desynchronizes the two.
       await pool.query(
         `UPDATE Users
-            SET password_hash = $1, password_plain = $2, temp_password_required = TRUE, status = 'Active'
-          WHERE user_id = $3`,
-        [passwordHash, resetPassword, existing.rows[0].user_id]
+            SET password_hash = $1, temp_password_required = TRUE, status = 'Active'
+          WHERE user_id = $2`,
+        [passwordHash, existing.rows[0].user_id]
       );
       console.warn(
         `⚠️  Superadmin (${existing.rows[0].email}) password ${forceReset ? 'FORCE-' : ''}reset from ` +
@@ -85,10 +82,10 @@ export async function ensureSuperadminAccess(): Promise<void> {
       );
     } else {
       await pool.query(
-        `INSERT INTO Users (role_id, full_name, username, email, phone, password_hash, password_plain, temp_password_required, status)
-         VALUES ($1, 'Super Admin', 'superadmin', $2, '+919999999999', $3, $4, TRUE, 'Active')
+        `INSERT INTO Users (role_id, full_name, username, email, phone, password_hash, temp_password_required, status)
+         VALUES ($1, 'Super Admin', 'superadmin', $2, '+919999999999', $3, TRUE, 'Active')
          ON CONFLICT (email) DO NOTHING`,
-        [SUPERADMIN_ROLE_ID, email, passwordHash, resetPassword]
+        [SUPERADMIN_ROLE_ID, email, passwordHash]
       );
       console.warn(
         `⚠️  Superadmin (${email}) did not exist — created from SUPERADMIN_TEMP_PASSWORD. ` +

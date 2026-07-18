@@ -1,0 +1,13 @@
+-- Drop the cleartext staff-password column added in 031.
+--
+-- Whoever sets a password already knows it at set-time: an admin types it when
+-- creating an account or resetting one (window.prompt / create form), and a
+-- user types their own when changing it. Storing the plaintext therefore backed
+-- no real workflow — it existed only so a Superadmin could read every staff
+-- member's password in the Workforce table, which is a straight liability on a
+-- real-money platform with a public repo. Login still works off password_hash;
+-- temp_password_required still forces a first-login change.
+--
+-- Idempotent: safe to re-run (IF EXISTS), and harmless on a fresh DB where 031
+-- adds the column moments earlier in the same migrate pass.
+ALTER TABLE Users DROP COLUMN IF EXISTS password_plain;

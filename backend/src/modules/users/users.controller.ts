@@ -16,11 +16,10 @@ const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
  * List all staff users with assigned game counts (Admin+)
  */
 export async function listUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const actor = req.user!;
   try {
     const result = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.username, u.phone, u.upi_id, u.town, u.status,
-              u.current_balance, u.last_login, u.role_id, u.is_cfo, u.password_plain, r.role_name,
+              u.current_balance, u.last_login, u.role_id, u.is_cfo, r.role_name,
               (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count,
               (SELECT COUNT(*) FROM Bookings b
                WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold')::INTEGER AS sold_count
@@ -47,7 +46,6 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
         assigned_games_count: parseInt(row.assigned_games_count, 10),
         trust: row.role_id === 4 ? deriveTrust(row.sold_count) : null,
         last_login: row.last_login,
-        password_plain: actor.roleName === 'Superadmin' ? row.password_plain : null,
       }))
     );
   } catch (error) {
@@ -92,8 +90,8 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
     const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await pool.query(
-      `INSERT INTO Users (role_id, full_name, username, email, phone, upi_id, town, password_hash, password_plain, temp_password_required, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, 'Active', $10)
+      `INSERT INTO Users (role_id, full_name, username, email, phone, upi_id, town, password_hash, temp_password_required, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, 'Active', $9)
        RETURNING user_id, full_name, username, email, role_id, status`,
       [
         Number(role_id),
@@ -104,7 +102,6 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
         upi_id || null,
         town || null,
         passwordHash,
-        password,
         actor.userId,
       ]
     );
@@ -195,9 +192,9 @@ export async function resetUserPassword(req: AuthenticatedRequest, res: Response
     const newHash = await bcrypt.hash(new_password, 12);
     await pool.query(
       `UPDATE Users
-       SET password_hash = $1, password_plain = $2, temp_password_required = TRUE
-       WHERE user_id = $3`,
-      [newHash, new_password, id]
+       SET password_hash = $1, temp_password_required = TRUE
+       WHERE user_id = $2`,
+      [newHash, id]
     );
 
     await logAuditEvent({
