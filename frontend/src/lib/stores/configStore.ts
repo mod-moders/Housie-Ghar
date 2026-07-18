@@ -18,6 +18,11 @@ export interface PublicConfig {
   instruction_voice_url?: string;
   welcome_voice_text?: string;
   instruction_voice_text?: string;
+  welcome_voice_mode?: string;
+  instruction_voice_mode?: string;
+  welcome_voice_volume?: string;
+  instruction_voice_volume?: string;
+  tts_voice_name?: string;
   background_music_url?: string;
   background_music_enabled?: string;
   background_music_volume?: string;

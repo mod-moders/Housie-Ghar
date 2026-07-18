@@ -50,7 +50,9 @@ export function useSSE(gameId: string | null, onEvent?: (data: SSEEventData) => 
       handlerRef.current?.(data);
     };
 
-    src.onerror = () => src.close();
+    src.onerror = (e) => {
+      console.warn("SSE connection encountered an error, browser will auto-reconnect.", e);
+    };
     return () => src.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);

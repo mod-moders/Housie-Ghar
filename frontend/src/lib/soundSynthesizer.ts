@@ -834,8 +834,11 @@ class SoundSynthesizer {
   applyLiveAnnouncementEcho(audio: HTMLAudioElement, customVolume: number = 1.0) {
     try {
       this.initCtx();
+      const boostFactor = 1.75;
+      const boostedVolume = customVolume * boostFactor;
+
       if (!this.ctx) {
-        audio.volume = Math.min(1.0, customVolume);
+        audio.volume = Math.min(1.0, boostedVolume);
         return null;
       }
       const ctx = this.ctx;
@@ -843,7 +846,7 @@ class SoundSynthesizer {
       const source = ctx.createMediaElementSource(audio);
       
       const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.95 * customVolume; // direct dry sound (clear, direct announcement)
+      dryGain.gain.value = 0.95 * boostedVolume; // direct dry sound (clear, direct announcement)
       
       const delayNode = ctx.createDelay(1.0);
       delayNode.delayTime.value = 0.18; // tight 180ms room reflection delay
@@ -852,7 +855,7 @@ class SoundSynthesizer {
       feedbackGain.gain.value = 0.22; // very fast echo decay (ends after 1 or 2 quick taps)
       
       const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.18 * customVolume; // subtle mix volume of the echo
+      wetGain.gain.value = 0.18 * boostedVolume; // subtle mix volume of the echo
       
       // Feedback loop
       delayNode.connect(feedbackGain);
@@ -874,12 +877,14 @@ class SoundSynthesizer {
 
       return {
         updateVolume: (newVolume: number) => {
-          dryGain.gain.value = 0.95 * newVolume;
-          wetGain.gain.value = 0.18 * newVolume;
+          const boostedNew = newVolume * boostFactor;
+          dryGain.gain.value = 0.95 * boostedNew;
+          wetGain.gain.value = 0.18 * boostedNew;
         }
       };
-    } catch {
-      audio.volume = Math.min(1.0, customVolume);
+} catch (e) {
+      const boostFactor = 1.75;
+      audio.volume = Math.min(1.0, customVolume * boostFactor);
       return null;
     }
   }

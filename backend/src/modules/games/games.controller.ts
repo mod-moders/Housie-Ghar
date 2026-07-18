@@ -208,13 +208,25 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         [game.game_id]
       );
 
-      const ticketsRes = await pool.query(
-        `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
-        [game.game_id]
-      );
+      const splitWinnerNames = new Set<string>();
+      prizesRes.rows.forEach((p) => {
+        if (p.claimed && p.winner_housie_name && p.winner_housie_name.includes(',') && !p.winner_housie_name.includes('(')) {
+          p.winner_housie_name.split(',').forEach((n: string) => splitWinnerNames.add(n.trim()));
+        }
+      });
+
+      let ticketsRows = [];
+      if (splitWinnerNames.size > 0) {
+        const ticketsRes = await pool.query(
+          `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND owner_housie_name = ANY($2) AND status = 'Sold'`,
+          [game.game_id, Array.from(splitWinnerNames)]
+        );
+        ticketsRows = ticketsRes.rows;
+      }
+
       const logRes = await pool.query(`SELECT drawn_numbers FROM game_logs WHERE game_id = $1`, [game.game_id]);
       const drawnNumbers = logRes.rows[0]?.drawn_numbers || [];
-      const formattedPrizes = formatPrizes(prizesRes.rows, game.game_id, drawnNumbers, ticketsRes.rows);
+      const formattedPrizes = formatPrizes(prizesRes.rows, game.game_id, drawnNumbers, ticketsRows);
 
       games.push({
         game_id: game.game_id,
@@ -289,13 +301,25 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       [game_id]
     );
 
-    const ticketsRes = await pool.query(
-      `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
-      [game_id]
-    );
+    const splitWinnerNames = new Set<string>();
+    prizesRes.rows.forEach((p) => {
+      if (p.claimed && p.winner_housie_name && p.winner_housie_name.includes(',') && !p.winner_housie_name.includes('(')) {
+        p.winner_housie_name.split(',').forEach((n: string) => splitWinnerNames.add(n.trim()));
+      }
+    });
+
+    let ticketsRows = [];
+    if (splitWinnerNames.size > 0) {
+      const ticketsRes = await pool.query(
+        `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND owner_housie_name = ANY($2) AND status = 'Sold'`,
+        [game_id, Array.from(splitWinnerNames)]
+      );
+      ticketsRows = ticketsRes.rows;
+    }
+
     const logRes = await pool.query(`SELECT drawn_numbers FROM game_logs WHERE game_id = $1`, [game_id]);
     const drawnNumbers = logRes.rows[0]?.drawn_numbers || [];
-    const formattedPrizes = formatPrizes(prizesRes.rows, game_id as string, drawnNumbers, ticketsRes.rows);
+    const formattedPrizes = formatPrizes(prizesRes.rows, game_id as string, drawnNumbers, ticketsRows);
 
     res.json({
       game_id: game.game_id,
@@ -603,11 +627,23 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       [game_id]
     );
 
-    const ticketsRes = await pool.query(
-      `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND status = 'Sold'`,
-      [game_id]
-    );
-    const formattedPrizes = formatPrizes(prizesRes.rows, game_id, gameLogRes.rows[0]?.drawn_numbers || [], ticketsRes.rows);
+    const splitWinnerNames = new Set<string>();
+    prizesRes.rows.forEach((p) => {
+      if (p.claimed && p.winner_housie_name && p.winner_housie_name.includes(',') && !p.winner_housie_name.includes('(')) {
+        p.winner_housie_name.split(',').forEach((n: string) => splitWinnerNames.add(n.trim()));
+      }
+    });
+
+    let ticketsRows = [];
+    if (splitWinnerNames.size > 0) {
+      const ticketsRes = await pool.query(
+        `SELECT ticket_id, ticket_number, owner_housie_name, grid_data FROM Tickets WHERE game_id = $1 AND owner_housie_name = ANY($2) AND status = 'Sold'`,
+        [game_id, Array.from(splitWinnerNames)]
+      );
+      ticketsRows = ticketsRes.rows;
+    }
+
+    const formattedPrizes = formatPrizes(prizesRes.rows, game_id, gameLogRes.rows[0]?.drawn_numbers || [], ticketsRows);
 
     const initialPayload = {
       event: 'initial_state',
