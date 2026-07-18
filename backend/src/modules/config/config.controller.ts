@@ -36,7 +36,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -102,7 +102,34 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
   try {
     await client.query('BEGIN');
 
+    let rootDir = process.cwd();
+    if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+      rootDir = path.resolve(rootDir, '..');
+    }
+    const destDir = path.resolve(rootDir, 'frontend/public/audio/config');
+
     for (const [key, value] of Object.entries(updates)) {
+      if (value === '') {
+        const audioKeys = [
+          'welcome_voice_url',
+          'instruction_voice_url',
+          'background_music_url',
+          'lobby_music_url_1',
+          'lobby_music_url_2',
+          'lobby_music_url_3',
+          'lobby_music_url_4',
+          'lobby_music_url_5'
+        ];
+        if (audioKeys.includes(key) && fs.existsSync(destDir)) {
+          const files = fs.readdirSync(destDir);
+          files.forEach((file) => {
+            if (file.startsWith(`${key}-`) || file.startsWith(`${key}.`)) {
+              try { fs.unlinkSync(path.join(destDir, file)); } catch {}
+            }
+          });
+        }
+      }
+      
       // Only update keys that already exist — config keys are not free-form
       const result = await client.query(
         `UPDATE Platform_Config
@@ -122,7 +149,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {
@@ -261,22 +288,29 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Resolve destination: frontend/public/audio/config/
-    const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/config');
+    let rootDir = process.cwd();
+    if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+      rootDir = path.resolve(rootDir, '..');
+    }
+    const destDir = path.resolve(rootDir, 'frontend/public/audio/config');
     fs.mkdirSync(destDir, { recursive: true });
 
-    // Clean up any existing files for this key
-    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
-    possibleExts.forEach((e) => {
-      const oldPath = path.join(destDir, `${key}.${e}`);
-      if (fs.existsSync(oldPath)) {
-        try { fs.unlinkSync(oldPath); } catch {}
-      }
-    });
+    // Clean up any existing files for this key (wildcard to delete old versions)
+    if (fs.existsSync(destDir)) {
+      const files = fs.readdirSync(destDir);
+      files.forEach((file) => {
+        if (file.startsWith(`${key}-`) || file.startsWith(`${key}.`)) {
+          try { fs.unlinkSync(path.join(destDir, file)); } catch {}
+        }
+      });
+    }
 
-    const destPath = path.join(destDir, `${key}.${ext}`);
+    const timestamp = Date.now();
+    const filename = `${key}-${timestamp}.${ext}`;
+    const destPath = path.join(destDir, filename);
     fs.writeFileSync(destPath, buffer);
 
-    const audioUrl = `/audio/config/${key}.${ext}`;
+    const audioUrl = `/audio/config/${filename}`;
 
     const result = await pool.query(
       `UPDATE Platform_Config 

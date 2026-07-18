@@ -66,6 +66,30 @@ class SoundSynthesizer {
         noiseQ = 1.5;
         noiseVol = 0.16;
         mainGainVal = 0.62;
+      } else if (type === 'golden_brass') {
+        humFreq = 95;
+        humType = 'sine';
+        filterFreq = 250;
+        noiseFreq = 600;
+        noiseQ = 2.5;
+        noiseVol = 0.15;
+        mainGainVal = 0.50;
+      } else if (type === 'electric_blower') {
+        humFreq = 50;
+        humType = 'sawtooth';
+        filterFreq = 90;
+        noiseFreq = 180;
+        noiseQ = 0.5;
+        noiseVol = 0.30;
+        mainGainVal = 0.40;
+      } else if (type === 'bamboo_basket') {
+        humFreq = 80;
+        humType = 'triangle';
+        filterFreq = 110;
+        noiseFreq = 150;
+        noiseQ = 3.0;
+        noiseVol = 0.18;
+        mainGainVal = 0.55;
       }
 
       lfoGain.gain.value = type === 'classic_wooden' ? 8 : 12;
@@ -130,6 +154,9 @@ class SoundSynthesizer {
         let isCeramicClick = false;
         let isWoodClick = false;
         let isPlasticClick = false;
+        let isGlassClick = false;
+        let isBlowerPop = false;
+        let isBambooClick = false;
 
         if (type === 'steel_wooden') {
           triggerProb = 0.26;
@@ -151,6 +178,19 @@ class SoundSynthesizer {
         } else if (type === 'classic_wooden') {
           triggerProb = 0.24;
           isWoodClick = true;
+        } else if (type === 'golden_brass') {
+          triggerProb = 0.28;
+          if (Math.random() > 0.35) {
+            isGlassClick = true;
+          } else {
+            isMetalClick = true;
+          }
+        } else if (type === 'electric_blower') {
+          triggerProb = 0.35;
+          isBlowerPop = true;
+        } else if (type === 'bamboo_basket') {
+          triggerProb = 0.25;
+          isBambooClick = true;
         }
 
         if (Math.random() > triggerProb) return;
@@ -194,6 +234,30 @@ class SoundSynthesizer {
           decays = [65, 85, 115, 140];
           amps = [1.0, 0.5, 0.3, 0.15];
           noiseMix = 0.25;
+        } else if (isGlassClick) {
+          duration = 0.08;
+          gainVal = 0.15 + Math.random() * 0.10;
+          const base = 3500 + Math.random() * 1500;
+          freqs = [base, base * 1.5, base * 2.2];
+          decays = [8, 15, 30];
+          amps = [1.0, 0.4, 0.2];
+          noiseMix = 0.02;
+        } else if (isBlowerPop) {
+          duration = 0.05;
+          gainVal = 0.30 + Math.random() * 0.20;
+          const base = 250 + Math.random() * 120;
+          freqs = [base, base * 1.4, base * 1.9];
+          decays = [150, 180, 220];
+          amps = [1.0, 0.3, 0.1];
+          noiseMix = 0.35;
+        } else if (isBambooClick) {
+          duration = 0.07;
+          gainVal = 0.40 + Math.random() * 0.20;
+          const base = 300 + Math.random() * 150;
+          freqs = [base, base * 1.5, base * 2.2, base * 3.1];
+          decays = [120, 150, 180, 240];
+          amps = [1.0, 0.5, 0.3, 0.15];
+          noiseMix = 0.40;
         }
 
         const sampleRate = this.ctx.sampleRate;
@@ -519,6 +583,207 @@ class SoundSynthesizer {
         });
       };
 
+      const playSymphonyOrchestra = () => {
+        if (!this.ctx) return;
+        const notes = [130.81, 196.00, 261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
+        notes.forEach((freq, idx) => {
+          if (!this.ctx) return;
+          const time = now + idx * 0.08;
+          const duration = 2.5;
+          const osc1 = this.ctx.createOscillator();
+          osc1.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(freq, time);
+          const osc2 = this.ctx.createOscillator();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(freq * 1.005, time);
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(400, time);
+          filter.frequency.exponentialRampToValueAtTime(3000, time + 0.8);
+          filter.frequency.exponentialRampToValueAtTime(800, time + duration);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.001, time);
+          gain.gain.linearRampToValueAtTime(0.04, time + 0.3);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+          osc1.connect(filter);
+          osc2.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc1.start(time);
+          osc2.start(time);
+          osc1.stop(time + duration + 0.1);
+          osc2.stop(time + duration + 0.1);
+        });
+        const cymDuration = 2.0;
+        const cymBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * cymDuration, this.ctx.sampleRate);
+        const cymData = cymBuffer.getChannelData(0);
+        for (let i = 0; i < cymBuffer.length; i++) {
+          cymData[i] = Math.random() * 2 - 1;
+        }
+        const cymSource = this.ctx.createBufferSource();
+        cymSource.buffer = cymBuffer;
+        const cymFilter = this.ctx.createBiquadFilter();
+        cymFilter.type = 'highpass';
+        cymFilter.frequency.value = 7000;
+        const cymGain = this.ctx.createGain();
+        cymGain.gain.setValueAtTime(0.12, now);
+        cymGain.gain.exponentialRampToValueAtTime(0.001, now + cymDuration);
+        cymSource.connect(cymFilter);
+        cymFilter.connect(cymGain);
+        cymGain.connect(this.ctx.destination);
+        cymSource.start(now);
+      };
+
+      const playSynthParty = () => {
+        if (!this.ctx) return;
+        const root = 130.81;
+        const scale = [1.0, 1.2, 1.25, 1.5, 1.67, 1.875, 2.0, 2.4];
+        const noteDuration = 0.12;
+        for (let i = 0; i < 24; i++) {
+          const mult = scale[i % scale.length];
+          const freq = root * mult * (i >= 8 ? 2 : 1) * (i >= 16 ? 2 : 1);
+          const time = now + i * noteDuration;
+          const osc = this.ctx.createOscillator();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, time);
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'peaking';
+          filter.frequency.setValueAtTime(1500 + Math.sin(i) * 800, time);
+          filter.Q.value = 5.0;
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.025, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + noteDuration - 0.01);
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(time);
+          osc.stop(time + noteDuration);
+        }
+        const bassOsc = this.ctx.createOscillator();
+        bassOsc.type = 'sawtooth';
+        bassOsc.frequency.setValueAtTime(110, now);
+        bassOsc.frequency.exponentialRampToValueAtTime(40, now + 2.0);
+        const bassFilter = this.ctx.createBiquadFilter();
+        bassFilter.type = 'lowpass';
+        bassFilter.frequency.value = 180;
+        const bassGain = this.ctx.createGain();
+        bassGain.gain.setValueAtTime(0.18, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+        bassOsc.connect(bassFilter);
+        bassFilter.connect(bassGain);
+        bassGain.connect(this.ctx.destination);
+        bassOsc.start(now);
+        bassOsc.stop(now + 2.5);
+      };
+
+      const playFireworks = () => {
+        if (!this.ctx) return;
+        for (let f = 0; f < 5; f++) {
+          const launchTime = now + f * 0.6 + Math.random() * 0.2;
+          const explodeTime = launchTime + 0.8;
+          const whistle = this.ctx.createOscillator();
+          whistle.type = 'sine';
+          whistle.frequency.setValueAtTime(400, launchTime);
+          whistle.frequency.exponentialRampToValueAtTime(2200 + Math.random() * 500, explodeTime - 0.05);
+          const whistleGain = this.ctx.createGain();
+          whistleGain.gain.setValueAtTime(0.001, launchTime);
+          whistleGain.gain.linearRampToValueAtTime(0.02, launchTime + 0.1);
+          whistleGain.gain.exponentialRampToValueAtTime(0.001, explodeTime);
+          whistle.connect(whistleGain);
+          whistleGain.connect(this.ctx.destination);
+          whistle.start(launchTime);
+          whistle.stop(explodeTime);
+
+          const boomDuration = 1.2;
+          const boomBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * boomDuration, this.ctx.sampleRate);
+          const boomData = boomBuffer.getChannelData(0);
+          let lastVal = 0.0;
+          for (let i = 0; i < boomBuffer.length; i++) {
+            const white = Math.random() * 2 - 1;
+            boomData[i] = (lastVal + (0.05 * white)) / 1.05;
+            lastVal = boomData[i];
+            boomData[i] *= Math.exp(-4 * (i / this.ctx.sampleRate));
+          }
+          const boomSource = this.ctx.createBufferSource();
+          boomSource.buffer = boomBuffer;
+          const boomGain = this.ctx.createGain();
+          boomGain.gain.setValueAtTime(0.40, explodeTime);
+          boomGain.gain.exponentialRampToValueAtTime(0.001, explodeTime + boomDuration - 0.05);
+          boomSource.connect(boomGain);
+          boomGain.connect(this.ctx.destination);
+          boomSource.start(explodeTime);
+
+          const sparksCount = 15;
+          for (let s = 0; s < sparksCount; s++) {
+            const sparkTime = explodeTime + 0.1 + Math.random() * 0.5;
+            const sparkDuration = 0.05 + Math.random() * 0.05;
+            const sparkBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * sparkDuration, this.ctx.sampleRate);
+            const sparkData = sparkBuf.getChannelData(0);
+            for (let i = 0; i < sparkBuf.length; i++) {
+              sparkData[i] = (Math.random() * 2 - 1) * Math.exp(-120 * (i / this.ctx.sampleRate));
+            }
+            const sparkSource = this.ctx.createBufferSource();
+            sparkSource.buffer = sparkBuf;
+            const sparkFilter = this.ctx.createBiquadFilter();
+            sparkFilter.type = 'highpass';
+            sparkFilter.frequency.value = 5000 + Math.random() * 4000;
+            const sparkGain = this.ctx.createGain();
+            sparkGain.gain.setValueAtTime(0.08, sparkTime);
+            sparkGain.gain.exponentialRampToValueAtTime(0.001, sparkTime + sparkDuration - 0.002);
+            sparkSource.connect(sparkFilter);
+            sparkFilter.connect(sparkGain);
+            sparkGain.connect(this.ctx.destination);
+            sparkSource.start(sparkTime);
+          }
+        }
+      };
+
+      const playRetroArcade = () => {
+        if (!this.ctx) return;
+        const playCoin = (timeOffset: number) => {
+          if (!this.ctx) return;
+          const t = now + timeOffset;
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          osc1.type = 'sine';
+          osc2.type = 'sine';
+          osc1.frequency.setValueAtTime(987.77, t);
+          osc1.frequency.setValueAtTime(1318.51, t + 0.08);
+          osc2.frequency.setValueAtTime(1046.50, t);
+          osc2.frequency.setValueAtTime(1396.91, t + 0.08);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.03, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc1.start(t);
+          osc2.start(t);
+          osc1.stop(t + 0.4);
+          osc2.stop(t + 0.4);
+        };
+        playCoin(0);
+        playCoin(0.15);
+        playCoin(0.30);
+
+        const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98];
+        notes.forEach((freq, idx) => {
+          if (!this.ctx) return;
+          const time = now + 0.45 + idx * 0.07;
+          const duration = 0.12;
+          const osc = this.ctx.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, time);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.04, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + duration - 0.01);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(time);
+          osc.stop(time + duration);
+        });
+      };
+
       // Selection Router
       if (type === 'trumpet_cheering') {
         playTrumpet();
@@ -531,6 +796,14 @@ class SoundSynthesizer {
         playVocalYes();
       } else if (type === 'default_chime') {
         playChime();
+      } else if (type === 'symphony_orchestra') {
+        playSymphonyOrchestra();
+      } else if (type === 'synth_party') {
+        playSynthParty();
+      } else if (type === 'fireworks') {
+        playFireworks();
+      } else if (type === 'retro_arcade_celebration') {
+        playRetroArcade();
       } else {
         playTrumpet();
       }

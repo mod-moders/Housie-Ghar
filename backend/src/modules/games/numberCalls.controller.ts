@@ -212,3 +212,30 @@ export async function updateBulkVolume(req: Request, res: Response): Promise<voi
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * Update call mode for all number calls in bulk (Superadmin only)
+ */
+export async function updateBulkMode(req: Request, res: Response): Promise<void> {
+  const { call_mode } = req.body;
+
+  if (call_mode !== 'Text' && call_mode !== 'Audio') {
+    res.status(400).json({ message: 'Valid call_mode is required (Text or Audio)' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE Number_Calls 
+       SET call_mode = $1
+       RETURNING *`,
+      [call_mode]
+    );
+
+    res.json({ message: `Updated call mode to ${call_mode} for ${result.rowCount} numbers`, call_mode });
+  } catch (error) {
+    console.error('Error bulk updating call modes:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+

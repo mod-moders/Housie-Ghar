@@ -9,10 +9,10 @@ export function useLobbyAudio(active: boolean) {
   // Handle dynamically updating the volume without restarting/skipping tracks
   useEffect(() => {
     if (audioRef.current) {
-      const bgVol = parseFloat(config?.background_music_volume || "0.15");
+      const bgVol = parseFloat(config?.lobby_music_volume || "0.15");
       audioRef.current.volume = bgVol;
     }
-  }, [config?.background_music_volume]);
+  }, [config?.lobby_music_volume]);
 
   useEffect(() => {
     if (!active) {
@@ -57,7 +57,7 @@ export function useLobbyAudio(active: boolean) {
       }
 
       const audio = new Audio(url);
-      const bgVol = parseFloat(config?.background_music_volume || "0.15");
+      const bgVol = parseFloat(config?.lobby_music_volume || "0.15");
       audio.volume = bgVol;
       audioRef.current = audio;
 
