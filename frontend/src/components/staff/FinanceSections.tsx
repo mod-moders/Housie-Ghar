@@ -10,6 +10,7 @@ import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
 import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
 import type { AuthUser } from "@/lib/stores/authStore";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 interface QueueItem {
   request_id: string;
@@ -84,12 +85,9 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
     load();
   }, [load]);
 
-  // Load financial analysis & overview stats when tab is switched
-  useEffect(() => {
+  // Load financial analysis & overview stats when tab is switched or via socket
+  const loadStats = useCallback(() => {
     if (activeTab === "analysis") {
-      // Data fetch when the analysis tab opens: flips the loading flag then
-      // resolves async — the effect fetch the set-state-in-effect rule over-flags.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingAnalysis(true);
       Promise.all([
         apiFetch<FinancialAnalysis>("/api/stats/financial-analysis"),
@@ -105,6 +103,26 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
         });
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // Sync real-time updates instantly via socket
+  useSocket((event) => {
+    if (
+      event === "ticket_status_change" || 
+      event === "game_list_update" || 
+      event === "topup_request_received" || 
+      event === "wallet_credited" || 
+      event === "wallet_debited" ||
+      event === "ledger_update" ||
+      event === "wallet_update"
+    ) {
+      load();
+      loadStats();
+    }
+  });
 
   const queue: QueueItem[] = useMemo(
     () =>
@@ -428,8 +446,8 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
 
               {/* Visualizations row: Heatmap & Retention */}
               <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", width: "100%" }}>
-                <HeatmapWidget />
-                <RetentionWidget />
+                <HeatmapWidget isEmpty={true} />
+                <RetentionWidget isEmpty={true} />
               </div>
 
               {/* Granular Game Performance Ledger */}

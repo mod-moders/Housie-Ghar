@@ -1903,71 +1903,214 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       )}
 
       {error && <p className="hg-sec-err">{error}</p>}
-      <div className="hg-panel">
-        <div className="hg-table">
-          <div
-            className={me.role_name === "Superadmin" ? "hg-tr hg-tr-head" : "hg-tr hg-tr-6 hg-tr-head"}
-            style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
-          >
-            {me.role_name === "Superadmin" ? (
-              <>
-                <span>Staff</span><span>Role</span><span>Username</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
-              </>
-            ) : (
-              <>
-                <span>Staff</span><span>Role</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
-              </>
-            )}
-          </div>
-          {users.map((u) => (
-            <div
+      <div 
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: "20px",
+          marginTop: "16px"
+        }}
+      >
+        {users.map((u) => {
+          const isSuper = me.role_name === "Superadmin";
+          const isActive = u.status === "Active";
+          
+          // Role pill colors matching the website's professional design
+          let roleColor = "var(--text-dim)";
+          let roleBg = "rgba(255, 255, 255, 0.05)";
+          let roleBorder = "rgba(255, 255, 255, 0.1)";
+          if (u.role_name === "Financial Admin") {
+            roleColor = "var(--cyan)";
+            roleBg = "rgba(0, 242, 254, 0.05)";
+            roleBorder = "rgba(0, 242, 254, 0.2)";
+          } else if (u.role_name === "Operator") {
+            roleColor = "var(--accent)";
+            roleBg = "rgba(212, 175, 55, 0.05)";
+            roleBorder = "rgba(212, 175, 55, 0.2)";
+          } else if (u.role_name === "Bookie") {
+            roleColor = "#10B981";
+            roleBg = "rgba(16, 185, 129, 0.05)";
+            roleBorder = "rgba(16, 185, 129, 0.2)";
+          }
+
+          return (
+            <div 
               key={u.user_id}
-              className={me.role_name === "Superadmin" ? "hg-tr" : "hg-tr hg-tr-6"}
-              style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
+              className="hg-card"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                padding: "20px",
+                borderRadius: "12px",
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                boxShadow: "var(--card-shadow)",
+                transition: "transform 0.2s, box-shadow 0.2s",
+                position: "relative",
+                gap: "14px"
+              }}
             >
-              <span className="hg-td-name">
-                <Avatar src={roleAvatar(u)} name={u.full_name} />{u.full_name}
-              </span>
-              <span className="hg-dim">{roleLabel(u)}</span>
-              {me.role_name === "Superadmin" && (
-                <>
-                  <span className="hg-dim" style={{ wordBreak: "break-all" }}>{u.username}</span>
-                </>
+              {/* Header: Avatar, Name, and Status */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <Avatar src={roleAvatar(u)} name={u.full_name} className="hg-avatar-lg" />
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                  <b style={{ color: "var(--text)", fontSize: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {u.full_name}
+                  </b>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                    <span 
+                      style={{ 
+                        fontSize: "10px", 
+                        padding: "2px 8px", 
+                        borderRadius: "10px", 
+                        fontWeight: 600, 
+                        color: roleColor, 
+                        background: roleBg, 
+                        border: `1px solid ${roleBorder}`
+                      }}
+                    >
+                      {roleLabel(u)}
+                    </span>
+                    <span 
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "4px", 
+                        fontSize: "11px", 
+                        color: isActive ? "var(--success)" : "var(--danger)",
+                        fontWeight: 600
+                      }}
+                    >
+                      <span 
+                        style={{ 
+                          width: "6px", 
+                          height: "6px", 
+                          borderRadius: "50%", 
+                          background: isActive ? "var(--success)" : "var(--danger)" 
+                        }} 
+                      />
+                      {u.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Username (Superadmin only) */}
+              {isSuper && (
+                <div 
+                  style={{ 
+                    fontSize: "12.5px", 
+                    color: "var(--text-dim)", 
+                    background: "var(--surface-2)", 
+                    padding: "8px 12px", 
+                    borderRadius: "6px", 
+                    border: "1px solid var(--border-2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between"
+                  }}
+                >
+                  <span className="hg-dim" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Icon name="users" size={13} /> Username:
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, wordBreak: "break-all" }}>
+                    {u.username}
+                  </span>
+                </div>
               )}
-              <span className="hg-dim">{u.town ?? "—"}</span>
-              <span>{u.role_id === 4 ? money(u.current_balance) : "—"}</span>
-              <span><span className={`hg-pill hg-pill-${u.status.toLowerCase()}`}>{u.status}</span></span>
-              <span className="hg-row-ctrls">
-                {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
-                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
-                  u.status === "Active" ? (
-                    <button className="hg-ic-btn" title="Suspend" onClick={() => setStatus(u, "Suspended")}>
-                      <Icon name="x" size={14} />
-                    </button>
-                  ) : (
-                    <button className="hg-ic-btn" title="Reactivate" onClick={() => setStatus(u, "Active")}>
-                      <Icon name="check" size={14} />
-                    </button>
-                  )
-                )}
 
+              {/* Action buttons at the bottom */}
+              <div 
+                style={{ 
+                  display: "flex", 
+                  gap: "8px", 
+                  marginTop: "auto", 
+                  paddingTop: "12px", 
+                  borderTop: "1px solid var(--border-2)",
+                  justifyContent: "flex-end"
+                }}
+              >
                 {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
-                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
-                  <button className="hg-ic-btn" title="Reset password" onClick={() => resetPassword(u)}>
-                    <Icon name="key" size={14} />
-                  </button>
-                )}
+                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) ? (
+                  <>
+                    {/* Suspend/Reactivate Button */}
+                    <button 
+                      onClick={() => setStatus(u, isActive ? "Suspended" : "Active")}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        border: "1px solid var(--border)",
+                        background: "var(--surface-2)",
+                        color: isActive ? "var(--danger)" : "var(--success)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease"
+                      }}
+                      title={isActive ? "Suspend User" : "Activate User"}
+                    >
+                      <Icon name={isActive ? "x" : "check"} size={12} />
+                      {isActive ? "Suspend" : "Activate"}
+                    </button>
 
-                {((me.role_name === "Superadmin" && u.user_id !== me.user_id) ||
-                  (me.role_name === "Financial Admin" && u.user_id !== me.user_id && u.role_id > 2)) && (
-                  <button className="hg-ic-btn" title="Delete" style={{ color: "var(--danger)" }} onClick={() => deleteUser(u)}>
-                    <Icon name="trash" size={14} />
-                  </button>
+                    {/* Reset Password Button */}
+                    <button 
+                      onClick={() => resetPassword(u)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        border: "1px solid var(--border)",
+                        background: "var(--surface-2)",
+                        color: "var(--cyan)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease"
+                      }}
+                      title="Reset Password"
+                    >
+                      <Icon name="key" size={12} />
+                      Password
+                    </button>
+
+                    {/* Delete Button */}
+                    <button 
+                      onClick={() => deleteUser(u)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        border: "1px solid var(--border)",
+                        background: "var(--surface-2)",
+                        color: "var(--danger)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease"
+                      }}
+                      title="Delete User"
+                    >
+                      <Icon name="trash" size={12} />
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <span className="hg-dim" style={{ fontSize: "11px", fontStyle: "italic", alignSelf: "center" }}>
+                    Self / System account
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
