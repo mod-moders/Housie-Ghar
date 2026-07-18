@@ -209,6 +209,114 @@ export async function getLuckyNumber(req: Request, res: Response): Promise<void>
   }
 }
 
+/**
+ * Combined "Housie Ghar Analysis" visualizations for the Finance Hub:
+ * a real trailing-7-day revenue/payout/volume/DAU-MAU series, today's
+ * peak-hour ticket-sales heatmap, and today's new-vs-returning player split.
+ * Replaces the panel's previous hardcoded demo numbers with actual rows from
+ * Bookings/Tickets/Prize_Pool/Players.
+ */
+export async function getFinanceInsights(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [seriesResult, heatmapResult, retentionResult] = await Promise.all([
+      pool.query(
+        `WITH days AS (
+           SELECT generate_series(
+             date_trunc('day', NOW()) - INTERVAL '6 days',
+             date_trunc('day', NOW()),
+             INTERVAL '1 day'
+           )::date AS day
+         ),
+         revenue AS (
+           SELECT confirmed_at::date AS day, SUM(total_amount) AS revenue
+           FROM Bookings
+           WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         ),
+         payouts AS (
+           SELECT claimed_at::date AS day, SUM(prize_amount) AS payouts
+           FROM Prize_Pool
+           WHERE claimed = TRUE AND claimed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         ),
+         volume AS (
+           SELECT confirmed_at::date AS day, COUNT(*) AS volume
+           FROM Tickets
+           WHERE status = 'Sold' AND confirmed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         ),
+         dau AS (
+           SELECT confirmed_at::date AS day, COUNT(DISTINCT housie_name) AS dau
+           FROM Bookings
+           WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
+           GROUP BY 1
+         )
+         SELECT
+           to_char(d.day, 'Dy') AS day_label,
+           COALESCE(r.revenue, 0) AS revenue,
+           COALESCE(p.payouts, 0) AS payouts,
+           COALESCE(v.volume, 0) AS volume,
+           COALESCE(a.dau, 0) AS dau,
+           (SELECT COUNT(DISTINCT housie_name) FROM Bookings b2
+              WHERE b2.booking_status = 'Sold'
+                AND b2.confirmed_at::date BETWEEN d.day - INTERVAL '29 days' AND d.day) AS mau
+         FROM days d
+         LEFT JOIN revenue r ON r.day = d.day
+         LEFT JOIN payouts p ON p.day = d.day
+         LEFT JOIN volume v ON v.day = d.day
+         LEFT JOIN dau a ON a.day = d.day
+         ORDER BY d.day`
+      ),
+      pool.query(
+        `SELECT EXTRACT(HOUR FROM confirmed_at)::INT AS hr, COUNT(*)::INT AS cnt
+         FROM Tickets
+         WHERE status = 'Sold' AND confirmed_at >= date_trunc('day', NOW())
+         GROUP BY 1`
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE p.registered_at < date_trunc('day', NOW())) AS returning_users,
+           COUNT(*) FILTER (WHERE p.registered_at >= date_trunc('day', NOW())) AS new_signups
+         FROM (
+           SELECT DISTINCT housie_name
+           FROM Bookings
+           WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW())
+         ) active
+         JOIN Players p ON p.housie_name = active.housie_name`
+      ),
+    ]);
+
+    const series = {
+      days: seriesResult.rows.map((r) => r.day_label),
+      revenue: seriesResult.rows.map((r) => parseFloat(r.revenue)),
+      payouts: seriesResult.rows.map((r) => parseFloat(r.payouts)),
+      net: seriesResult.rows.map((r) => Math.max(0, parseFloat(r.revenue) - parseFloat(r.payouts))),
+      volume: seriesResult.rows.map((r) => parseInt(r.volume, 10)),
+      dau: seriesResult.rows.map((r) => parseInt(r.dau, 10)),
+      mau: seriesResult.rows.map((r) => parseInt(r.mau, 10)),
+    };
+
+    const HEATMAP_LABELS = ['12 AM', '2 AM', '4 AM', '6 AM', '8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM', '10 PM'];
+    const bucketCounts = new Array(12).fill(0);
+    for (const row of heatmapResult.rows) {
+      bucketCounts[Math.floor(row.hr / 2)] += row.cnt;
+    }
+    const heatmap = HEATMAP_LABELS.map((label, i) => ({ label, value: bucketCounts[i] }));
+
+    const returning = parseInt(retentionResult.rows[0].returning_users, 10);
+    const newSignups = parseInt(retentionResult.rows[0].new_signups, 10);
+
+    res.json({
+      series,
+      heatmap,
+      retention: { returning, new_signups: newSignups, total: returning + newSignups },
+    });
+  } catch (error) {
+    console.error('Error fetching finance insights:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 export async function getFinancialAnalysis(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const [grossRev, totalPayouts, ticketSales, walletBalances, recentGames] = await Promise.all([

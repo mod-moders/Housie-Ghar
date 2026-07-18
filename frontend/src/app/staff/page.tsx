@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
 import { Icon } from "@/components/Icon";
@@ -159,32 +159,51 @@ export default function StaffDashboard() {
     }
   };
 
-  // Authoritative profile (also restores the session after a reload)
+  // Authoritative profile (also restores the session after a reload). Only a
+  // genuine 401/403 from the server means the session is actually invalid —
+  // a network blip, cold start, or mid-deploy connection gap throws with no
+  // status and must NOT be treated as "logged out", or every staff member
+  // gets bounced to the login screen (and their token wiped) on every such
+  // hiccup, which is exactly the "signed out repeatedly" bug this fixes.
   useEffect(() => {
-    apiFetch<{ user: AuthUser }>("/api/auth/me")
-      .then((res) => { setUser(res.user); setChecked(true); })
-      .catch((e) => {
-        if (typeof window !== "undefined") {
-          // If we HELD a token and the server still rejected it, the bounce is
-          // anomalous (expired session, or a server-side JWT key problem where
-          // login signs tokens that verification then refuses). Carry the reason
-          // to the login page instead of bouncing back silently — a silent loop
-          // here is indistinguishable from "the login button did nothing".
-          const hadToken = !!sessionStorage.getItem("hg_staff_token");
-          sessionStorage.removeItem("hg_staff_token");
-          // Clear the first-party middleware cookie too, so a rejected session
-          // can't keep /staff "unlocked" (cookie present) while the real bearer
-          // check keeps failing — that would be a silent bounce loop.
-          document.cookie = "hg_auth_token=; path=/; max-age=0; SameSite=Lax; Secure";
-          if (hadToken) {
-            sessionStorage.setItem(
-              "hg_staff_login_notice",
-              e instanceof Error && e.message ? e.message : "Your session could not be verified."
-            );
+    let cancelled = false;
+    const checkAuth = () => {
+      apiFetch<{ user: AuthUser }>("/api/auth/me")
+        .then((res) => {
+          if (cancelled) return;
+          setUser(res.user);
+          setChecked(true);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (!isAuthError(e)) {
+            setTimeout(() => { if (!cancelled) checkAuth(); }, 3000);
+            return;
           }
-        }
-        router.replace("/staff/login");
-      });
+          if (typeof window !== "undefined") {
+            // If we HELD a token and the server still rejected it, the bounce is
+            // anomalous (expired session, or a server-side JWT key problem where
+            // login signs tokens that verification then refuses). Carry the reason
+            // to the login page instead of bouncing back silently — a silent loop
+            // here is indistinguishable from "the login button did nothing".
+            const hadToken = !!sessionStorage.getItem("hg_staff_token");
+            sessionStorage.removeItem("hg_staff_token");
+            // Clear the first-party middleware cookie too, so a rejected session
+            // can't keep /staff "unlocked" (cookie present) while the real bearer
+            // check keeps failing — that would be a silent bounce loop.
+            document.cookie = "hg_auth_token=; path=/; max-age=0; SameSite=Lax; Secure";
+            if (hadToken) {
+              sessionStorage.setItem(
+                "hg_staff_login_notice",
+                e instanceof Error && e.message ? e.message : "Your session could not be verified."
+              );
+            }
+          }
+          router.replace("/staff/login");
+        });
+    };
+    checkAuth();
+    return () => { cancelled = true; };
   }, [setUser, router]);
 
   // Set page tab title dynamically according to staff role

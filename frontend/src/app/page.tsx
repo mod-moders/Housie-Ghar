@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
@@ -241,15 +241,28 @@ export default function Lobby() {
     const token = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
     if (!token) {
       router.push("/login");
-    } else {
+      return;
+    }
+    // A stored token exists — only a real 401/403 means it's actually invalid.
+    // A network blip or mid-deploy connection gap must not bounce a signed-in
+    // player back to /login; retry quietly instead.
+    let cancelled = false;
+    const checkAuth = () => {
       apiFetch("/api/player/me")
         .then(() => {
-          setIsCheckingAuth(false);
+          if (!cancelled) setIsCheckingAuth(false);
         })
-        .catch(() => {
+        .catch((e) => {
+          if (cancelled) return;
+          if (!isAuthError(e)) {
+            setTimeout(() => { if (!cancelled) checkAuth(); }, 3000);
+            return;
+          }
           router.push("/login");
         });
-    }
+    };
+    checkAuth();
+    return () => { cancelled = true; };
   }, [router]);
 
   useEffect(() => {

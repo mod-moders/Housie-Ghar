@@ -264,7 +264,7 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
 
       {/* Premium Pill Tabs Segmented Control */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: "28px" }}>
-        <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "30px", padding: "4px", gap: "4px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+        <div className="hg-pill-tabs" style={{ display: "flex", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "30px", padding: "4px", gap: "4px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
           <button
             onClick={() => setActiveTab("registered")}
             style={{
