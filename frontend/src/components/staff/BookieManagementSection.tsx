@@ -635,82 +635,81 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
               style={{
                 background: "#ffffff",
                 color: "#111827",
-                padding: "60px 50px",
+                padding: "30px 40px",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
                 border: "4px double #b59410",
                 fontFamily: "Georgia, serif",
-                fontSize: "14px",
-                lineHeight: "1.6",
-                minHeight: "1000px",
+                fontSize: "13.5px",
+                lineHeight: "1.5",
                 position: "relative"
               }}
             >
               {/* Top Watermark or Header Lines */}
-              <div style={{ borderBottom: "2px solid #b59410", paddingBottom: "20px", marginBottom: "30px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ borderBottom: "2px solid #b59410", paddingBottom: "10px", marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                   <Image 
                     src="/HG Primary.png" 
                     alt="Housie Ghar Primary Logo" 
-                    width={72} 
-                    height={72} 
+                    width={60} 
+                    height={60} 
                     style={{ objectFit: "contain" }}
                   />
                   <div>
-                    <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "bold", letterSpacing: "1px", color: "#1f2937", textTransform: "uppercase" }}>
+                    <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "bold", letterSpacing: "1px", color: "#1f2937", textTransform: "uppercase" }}>
                       Housie Ghar
                     </h1>
-                    <span style={{ fontSize: "11px", letterSpacing: "2px", textTransform: "uppercase", color: "#6b7280", display: "block", marginTop: "2px" }}>
+                    <span style={{ fontSize: "10px", letterSpacing: "2px", textTransform: "uppercase", color: "#6b7280", display: "block", marginTop: "1px" }}>
                       Official Bookie Franchise Network
                     </span>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ border: "2px solid #10B981", color: "#10B981", padding: "4px 10px", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", borderRadius: "4px", display: "inline-block", marginBottom: "8px" }}>
+                  <span style={{ border: "2px solid #10B981", color: "#10B981", padding: "3px 8px", fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", borderRadius: "4px", display: "inline-block", marginBottom: "4px" }}>
                     {selectedApp.status}
                   </span>
-                  <div style={{ fontSize: "11px", color: "#4b5563" }}>
+                  <div style={{ fontSize: "10px", color: "#4b5563" }}>
                     No: <b>#{selectedApp.application_id.substring(0, 8).toUpperCase()}</b>
                   </div>
                 </div>
               </div>
 
               {/* Title Section */}
-              <div style={{ textAlign: "center", marginBottom: "40px" }}>
-                <h2 style={{ fontSize: "18px", fontWeight: "bold", borderBottom: "1px solid #e5e7eb", display: "inline-block", paddingBottom: "6px", textTransform: "uppercase", color: "#1f2937" }}>
+              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                <h2 style={{ fontSize: "16px", fontWeight: "bold", borderBottom: "1px solid #e5e7eb", display: "inline-block", paddingBottom: "4px", textTransform: "uppercase", color: "#1f2937" }}>
                   Franchise Bookie Application Profile
                 </h2>
-                <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "6px" }}>
-                  Submitted on: {new Date(selectedApp.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "numeric" })}
+                <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "4px" }}>
+                  Submitted: {new Date(selectedApp.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "numeric" })}
                 </div>
               </div>
 
               {/* Grid Fields Block */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 
                 {/* Block 1: Personal Profile */}
                 <div>
-                  <h3 style={{ fontSize: "13px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "4px", marginBottom: "14px", textTransform: "uppercase", color: "#b59410" }}>
+                  <h3 style={{ fontSize: "12px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "3px", marginBottom: "10px", textTransform: "uppercase", color: "#b59410" }}>
                     I. Personal Profile Details
                   </h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <tbody>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ width: "30%", padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Full Name:</td>
-                        <td style={{ padding: "8px 0", color: "#111827", fontSize: "15px" }}>{selectedApp.full_name}</td>
+                        <td style={{ width: "30%", padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Full Name:</td>
+                        <td style={{ padding: "6px 0", color: "#111827", fontSize: "14px" }}>{selectedApp.full_name}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Nationality:</td>
-                        <td style={{ padding: "8px 0", color: "#111827" }}>{selectedApp.nationality}</td>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Nationality:</td>
+                        <td style={{ padding: "6px 0", color: "#111827" }}>{selectedApp.nationality}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Date of Birth:</td>
-                        <td style={{ padding: "8px 0", color: "#111827" }}>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Date of Birth:</td>
+                        <td style={{ padding: "6px 0", color: "#111827" }}>
                           {new Date(selectedApp.date_of_birth).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
                         </td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Gender:</td>
-                        <td style={{ padding: "8px 0", color: "#111827" }}>{selectedApp.gender}</td>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Gender:</td>
+                        <td style={{ padding: "6px 0", color: "#111827" }}>{selectedApp.gender}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -718,33 +717,33 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
 
                 {/* Block 2: Professional & Contact Details */}
                 <div>
-                  <h3 style={{ fontSize: "13px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "4px", marginBottom: "14px", textTransform: "uppercase", color: "#b59410" }}>
+                  <h3 style={{ fontSize: "12px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "3px", marginBottom: "10px", textTransform: "uppercase", color: "#b59410" }}>
                     II. Professional & Contact Specifications
                   </h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <tbody>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ width: "30%", padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>WhatsApp Number:</td>
-                        <td style={{ padding: "8px 0", color: "#111827", fontWeight: "bold" }}>{selectedApp.phone}</td>
+                        <td style={{ width: "30%", padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>WhatsApp Number:</td>
+                        <td style={{ padding: "6px 0", color: "#111827", fontWeight: "bold" }}>{selectedApp.phone}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Email Address:</td>
-                        <td style={{ padding: "8px 0", color: "#111827" }}>{selectedApp.email}</td>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Email Address:</td>
+                        <td style={{ padding: "6px 0", color: "#111827" }}>{selectedApp.email}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "8px 0", fontWeight: "bold", color: "#4b5563" }}>Current Occupation:</td>
-                        <td style={{ padding: "8px 0", color: "#111827" }}>{selectedApp.occupation}</td>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Current Occupation:</td>
+                        <td style={{ padding: "6px 0", color: "#111827" }}>{selectedApp.occupation}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
                 {/* Block 3: Declaration */}
-                <div style={{ marginTop: "20px" }}>
-                  <h3 style={{ fontSize: "13px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "4px", marginBottom: "14px", textTransform: "uppercase", color: "#b59410" }}>
+                <div>
+                  <h3 style={{ fontSize: "12px", fontWeight: "bold", borderBottom: "1.5px solid #b59410", paddingBottom: "3px", marginBottom: "10px", textTransform: "uppercase", color: "#b59410" }}>
                     III. Declarations & Agreements
                   </h3>
-                  <p style={{ fontSize: "12px", color: "#374151", textAlign: "justify", textIndent: "24px", margin: 0 }}>
+                  <p style={{ fontSize: "11px", color: "#374151", textAlign: "justify", textIndent: "16px", margin: 0 }}>
                     I hereby declare that all details provided in this registration application form are true, accurate, and complete to the best of my knowledge and belief. I agree to operate within the guidelines specified by the Housie Ghar administration, to maintain the required wholesale inventory liquidity, and to systematically execute player booking verifications. I understand that any fraudulent transaction confirmation or delay of sales will result in immediate franchise suspension and permanent deletion of my account.
                   </p>
                 </div>
@@ -752,23 +751,23 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
               </div>
 
               {/* Signature Blocks */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "100px", padding: "0 20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "40px", padding: "0 20px" }}>
                 <div style={{ textAlign: "center", width: "40%" }}>
-                  <div style={{ borderBottom: "1px solid #9ca3af", marginBottom: "8px" }} />
-                  <span style={{ fontSize: "12px", fontWeight: "bold", color: "#4b5563", textTransform: "uppercase" }}>
+                  <div style={{ borderBottom: "1px solid #9ca3af", marginBottom: "6px" }} />
+                  <span style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", textTransform: "uppercase" }}>
                     Signature of Applicant
                   </span>
                 </div>
                 <div style={{ textAlign: "center", width: "40%" }}>
-                  <div style={{ borderBottom: "1px solid #9ca3af", marginBottom: "8px" }} />
-                  <span style={{ fontSize: "12px", fontWeight: "bold", color: "#4b5563", textTransform: "uppercase" }}>
+                  <div style={{ borderBottom: "1px solid #9ca3af", marginBottom: "6px" }} />
+                  <span style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", textTransform: "uppercase" }}>
                     Authorized Official / Stamp
                   </span>
                 </div>
               </div>
 
               {/* Official Seal Watermark */}
-              <div style={{ position: "absolute", bottom: "40px", left: "50%", transform: "translateX(-50%)", fontSize: "11px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "1px" }}>
+              <div style={{ position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", fontSize: "11px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "1px" }}>
                 Housie Ghar Official Franchise Document
               </div>
 
