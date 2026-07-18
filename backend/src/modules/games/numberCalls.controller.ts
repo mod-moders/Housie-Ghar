@@ -41,6 +41,7 @@ export async function updateNumberCall(req: Request, res: Response): Promise<voi
       return;
     }
 
+    req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating number call:', error);
@@ -99,6 +100,8 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
       ext = 'wav';
     } else if (mimeType.includes('m4a')) {
       ext = 'm4a';
+    } else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) {
+      ext = 'mpeg';
     }
 
     const base64Data = audio_data.split(';base64,').pop();
@@ -141,6 +144,7 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
       return;
     }
 
+    req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error uploading number audio:', error);
@@ -180,6 +184,7 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
       return;
     }
 
+    req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error deleting number audio:', error);
@@ -206,6 +211,7 @@ export async function updateBulkVolume(req: Request, res: Response): Promise<voi
       [parseFloat(volume)]
     );
 
+    req.app.get('io')?.emit('number_calls_update');
     res.json({ message: `Updated volume for ${result.rowCount} numbers`, volume: parseFloat(volume) });
   } catch (error) {
     console.error('Error bulk updating volumes:', error);
@@ -232,6 +238,7 @@ export async function updateBulkMode(req: Request, res: Response): Promise<void>
       [call_mode]
     );
 
+    req.app.get('io')?.emit('number_calls_update');
     res.json({ message: `Updated call mode to ${call_mode} for ${result.rowCount} numbers`, call_mode });
   } catch (error) {
     console.error('Error bulk updating call modes:', error);

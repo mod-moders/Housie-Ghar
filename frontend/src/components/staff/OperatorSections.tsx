@@ -61,7 +61,7 @@ export function OperatorHudSection() {
   const activeGameStatus = game?.game_status || gameStatus;
   const isGameRunning = activeGameStatus === "Live" || activeGameStatus === "Paused" || activeGameStatus === "Draw_Ended";
 
-  const { playGreeting, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
+  const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true" && !muted,
     ((games.find((g) => g.game_id === selectedId)?.game_status === "Live") || gameStatus === "Live")
   );
@@ -163,12 +163,23 @@ export function OperatorHudSection() {
   }, [selectedId]);
 
   const gameStartedAnnouncedRef = useRef<boolean>(false);
+  const outroPlayedRef = useRef<boolean>(false);
   useEffect(() => {
     if (activeGameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
       playGreeting().then(flushPendingDraws);
     }
-  }, [activeGameStatus, playGreeting, flushPendingDraws]);
+    if ((activeGameStatus === "Completed" || activeGameStatus === "Draw_Ended") && !outroPlayedRef.current) {
+      outroPlayedRef.current = true;
+      playOutro();
+    }
+    if (activeGameStatus !== "Live") {
+      gameStartedAnnouncedRef.current = false;
+    }
+    if (activeGameStatus !== "Completed" && activeGameStatus !== "Draw_Ended") {
+      outroPlayedRef.current = false;
+    }
+  }, [activeGameStatus, playGreeting, playOutro, flushPendingDraws]);
 
   const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;
@@ -352,8 +363,8 @@ export function OperatorHudSection() {
             <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} />
             
             <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
-              {status === "Completed"
-                ? "Game over — thanks for playing!"
+              {status === "Completed" || status === "Draw_Ended"
+                ? "Game has ended"
                 : status === "Paused"
                   ? "Draw paused…"
                   : !revealed

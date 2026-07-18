@@ -26,6 +26,8 @@ export const io = new Server(server, {
   pingInterval: 15000,
 });
 
+app.set('io', io);
+
 // Authenticate every socket best-effort (attaches socket.data.user for a valid
 // staff cookie). The connection stays open for anonymous clients so the public
 // config_update / game-draw broadcasts keep working; sensitive room joins are

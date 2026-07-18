@@ -82,3 +82,19 @@ export const sseManager = {
     return gameClients.get(gameId)?.length || 0;
   },
 };
+
+// Start a unified heartbeat interval (every 15 seconds) to prevent firewalls / routers from dropping inactive SSE connections
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const keepAliveMsg = ': keep-alive\n\n';
+    for (const clients of gameClients.values()) {
+      clients.forEach((client) => {
+        try {
+          client.write(keepAliveMsg);
+        } catch {
+          // ignore - client will be unregistered on close
+        }
+      });
+    }
+  }, 15000).unref();
+}

@@ -49,8 +49,11 @@ export function CallVoiceSettings() {
   // Voice note fallbacks & voice choices states
   const [welcomeText, setWelcomeText] = useState(config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
   const [instructionText, setInstructionText] = useState(config?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.");
-  const [selectedWelcomeVoice, setSelectedWelcomeVoice] = useState("");
-  const [selectedInstructionVoice, setSelectedInstructionVoice] = useState("");
+  const [welcomeVoiceMode, setWelcomeVoiceMode] = useState(config?.welcome_voice_mode || "Text");
+  const [instructionVoiceMode, setInstructionVoiceMode] = useState(config?.instruction_voice_mode || "Text");
+  const [welcomeVoiceVolume, setWelcomeVoiceVolume] = useState(parseFloat(config?.welcome_voice_volume || "1.0"));
+  const [instructionVoiceVolume, setInstructionVoiceVolume] = useState(parseFloat(config?.instruction_voice_volume || "1.0"));
+  const [ttsVoiceName, setTtsVoiceName] = useState(config?.tts_voice_name || "");
 
   useEffect(() => {
     if (config) {
@@ -70,6 +73,11 @@ export function CallVoiceSettings() {
       setMasterCallsVolume(parseFloat(config.master_calls_volume || "1.0"));
       setWelcomeText(config.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
       setInstructionText(config.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.");
+      setWelcomeVoiceMode(config.welcome_voice_mode || "Text");
+      setInstructionVoiceMode(config.instruction_voice_mode || "Text");
+      setWelcomeVoiceVolume(parseFloat(config.welcome_voice_volume || "1.0"));
+      setInstructionVoiceVolume(parseFloat(config.instruction_voice_volume || "1.0"));
+      setTtsVoiceName(config.tts_voice_name || "");
     }
   }, [config]);
 
@@ -107,8 +115,11 @@ export function CallVoiceSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("audio/") && !file.name.endsWith(".mp3") && !file.name.endsWith(".wav") && !file.name.endsWith(".m4a")) {
-      alert("Please upload a valid audio file (MP3, WAV, or M4A).");
+    const fileName = file.name.toLowerCase();
+    const isMimeValid = file.type.startsWith("audio/") || file.type.startsWith("video/mp4") || file.type.includes("mp4") || file.type.includes("mpeg");
+    const isExtValid = fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".m4a") || fileName.endsWith(".mp4") || fileName.endsWith(".mpeg") || fileName.endsWith(".mpg");
+    if (!isMimeValid && !isExtValid) {
+      alert("Please upload a valid audio or video file (MP3, MPEG, WAV, M4A, or MP4).");
       return;
     }
 
@@ -131,18 +142,34 @@ export function CallVoiceSettings() {
     reader.readAsDataURL(file);
   };
 
-  const playPreview = (key: string, audioUrl: string, fallbackText: string, voiceName: string | null = null) => {
-    // Stop cage spin if playing
+  const stopAllPreviews = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (audioPlayerRef.current) {
+      try {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+      } catch {}
+    }
+    setActivePreviewKey(null);
+    setPreviewStatus("stopped");
+
+    if (activePreviewRef.current) {
+      try {
+        activePreviewRef.current.audio.pause();
+        activePreviewRef.current.audio.src = "";
+      } catch {}
+      activePreviewRef.current = null;
+    }
+
     if (previewingCage) {
       soundSynthesizer.stopCageSpin();
       setPreviewingCage(false);
     }
+  };
 
-    // If another preview is active, stop it first
-    if (activePreviewKey && activePreviewKey !== key) {
-      stopPreview(activePreviewKey);
-    }
-
+  const playPreview = (key: string, audioUrl: string, fallbackText: string, voiceName: string | null = null) => {
     // If same key is playing, do nothing
     if (activePreviewKey === key && previewStatus === "playing") {
       return;
@@ -150,7 +177,11 @@ export function CallVoiceSettings() {
 
     // If same key is paused, resume
     if (activePreviewKey === key && previewStatus === "paused") {
-      const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+      const isCustomFile = key === "welcome" 
+        ? (welcomeVoiceMode === "Audio" && welcomeVoice) 
+        : key === "instruction" 
+          ? (instructionVoiceMode === "Audio" && instructionVoice) 
+          : bgMusicUrl;
       if (!isCustomFile) {
         if (window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
@@ -166,9 +197,16 @@ export function CallVoiceSettings() {
       return;
     }
 
+    // Stop all other playbacks/previews first
+    stopAllPreviews();
+
     // Start a brand new playback
     setActivePreviewKey(key);
-    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    const isCustomFile = key === "welcome" 
+      ? (welcomeVoiceMode === "Audio" && welcomeVoice) 
+      : key === "instruction" 
+        ? (instructionVoiceMode === "Audio" && instructionVoice) 
+        : bgMusicUrl;
     if (!isCustomFile) {
       startNewTTS(fallbackText, voiceName, key);
     } else {
@@ -221,6 +259,11 @@ export function CallVoiceSettings() {
     const isBg = url === bgMusicUrl;
     audio.volume = isLobby ? lobbyMusicVolume : isBg ? bgMusicVolume : 0.8;
 
+    if (key === "welcome" || key === "instruction") {
+      const volMultiplier = key === "welcome" ? welcomeVoiceVolume : instructionVoiceVolume;
+      soundSynthesizer.applyLiveAnnouncementEcho(audio, volMultiplier * masterCallsVolume);
+    }
+
     audio.onended = () => {
       setActivePreviewKey(null);
       setPreviewStatus("stopped");
@@ -239,7 +282,11 @@ export function CallVoiceSettings() {
   const pausePreview = (key: string) => {
     if (activePreviewKey !== key) return;
 
-    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    const isCustomFile = key === "welcome" 
+      ? (welcomeVoiceMode === "Audio" && welcomeVoice) 
+      : key === "instruction" 
+        ? (instructionVoiceMode === "Audio" && instructionVoice) 
+        : bgMusicUrl;
     if (!isCustomFile) {
       window.speechSynthesis.pause();
     } else {
@@ -253,7 +300,11 @@ export function CallVoiceSettings() {
   const stopPreview = (key: string) => {
     if (activePreviewKey !== key) return;
 
-    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    const isCustomFile = key === "welcome" 
+      ? (welcomeVoiceMode === "Audio" && welcomeVoice) 
+      : key === "instruction" 
+        ? (instructionVoiceMode === "Audio" && instructionVoice) 
+        : bgMusicUrl;
     if (!isCustomFile) {
       window.speechSynthesis.cancel();
     } else {
@@ -326,20 +377,8 @@ export function CallVoiceSettings() {
         localStorage.setItem("preferred_caller_voice", defaultVoice.name);
       }
 
-      const storedWelcome = localStorage.getItem("welcome_voice_name");
-      if (storedWelcome) {
-        setSelectedWelcomeVoice(storedWelcome);
-      } else if (defaultVoice) {
-        setSelectedWelcomeVoice(defaultVoice.name);
-        localStorage.setItem("welcome_voice_name", defaultVoice.name);
-      }
-
-      const storedInstruction = localStorage.getItem("instruction_voice_name");
-      if (storedInstruction) {
-        setSelectedInstructionVoice(storedInstruction);
-      } else if (defaultVoice) {
-        setSelectedInstructionVoice(defaultVoice.name);
-        localStorage.setItem("instruction_voice_name", defaultVoice.name);
+      if (!config?.tts_voice_name && defaultVoice) {
+        setTtsVoiceName(defaultVoice.name);
       }
     };
 
@@ -498,13 +537,7 @@ export function CallVoiceSettings() {
   };
 
   const playCallPreview = (item: NumberCallConfig) => {
-    if (activePreviewRef.current) {
-      try {
-        activePreviewRef.current.audio.pause();
-        activePreviewRef.current.audio.src = "";
-      } catch {}
-      activePreviewRef.current = null;
-    }
+    stopAllPreviews();
 
     if (item.call_mode === "Audio" && item.audio_url) {
       const audio = new Audio(item.audio_url);
@@ -554,7 +587,7 @@ export function CallVoiceSettings() {
   return (
     <div className="hg-sec" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* Page Header */}
-      <div className="hg-sec-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "16px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+      <div className="hg-sec-head" style={{ borderBottom: "1.5px solid var(--card-line)", paddingBottom: "16px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
           <h2 className="hg-sec-title">Audio &amp; Voice Settings</h2>
           <p className="hg-sec-sub">Configure announcement vocals, loopable game music, ambient sound effects, and voice notes.</p>
@@ -565,14 +598,14 @@ export function CallVoiceSettings() {
           const changedList = settings.filter((s) => (editingTexts[s.number] ?? s.call_text) !== s.call_text);
           if (changedList.length === 0) return null;
           return (
-            <div style={{ display: "flex", gap: "8px" }} className="no-print">
+            <div style={{ display: "flex", gap: "10px" }} className="no-print">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => {
                   const initialEdits: Record<number, string> = {};
                   settings.forEach((s) => {
-                    initialEdits[s.number] = s.call_text;
+                     initialEdits[s.number] = s.call_text;
                   });
                   setEditingTexts(initialEdits);
                 }}
@@ -595,13 +628,15 @@ export function CallVoiceSettings() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "24px" }}>
         
         {/* CARD 1: Mixing Console & Master Audio Controls */}
-        <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "20px", border: "1px solid rgba(212, 175, 55, 0.25)", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Icon name="volume" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Live Mixing Board</h3>
+        <div className="hg-panel">
+          <div className="hg-panel-head">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon name="volume" size={20} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Live Mixing Board</h3>
+            </div>
           </div>
           
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Master Voice Fader */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700 }}>
@@ -636,7 +671,7 @@ export function CallVoiceSettings() {
                     } catch {}
                   }, 250);
                 }}
-                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.1)" }}
+                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "var(--border-2)" }}
               />
             </div>
 
@@ -660,180 +695,162 @@ export function CallVoiceSettings() {
                     audioPlayerRef.current.volume = val;
                   }
                 }}
-                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.1)" }}
+                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "var(--border-2)" }}
               />
             </div>
 
-            {/* Lobby Waiting Music Fader */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700 }}>
-                <span style={{ color: "var(--text)" }}>🛋️ Lobby &amp; Waiting Music</span>
-                <span style={{ color: "var(--accent)" }}>{Math.round(lobbyMusicVolume * 100)}%</span>
+            {/* AI Voice Caller Selector Card */}
+            <div style={{ borderTop: "1.5px solid var(--border)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-dim)" }}>AI Voice</span>
+                <label 
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "6px", 
+                    cursor: "pointer", 
+                    fontSize: "11px", 
+                    fontWeight: 600,
+                    color: callerEnabled ? "var(--accent)" : "var(--text-dim)",
+                    userSelect: "none"
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={callerEnabled}
+                    onChange={handleToggleGlobalCaller}
+                    style={{ accentColor: "var(--accent)", width: "13px", height: "13px" }}
+                  />
+                  <span>Enable live AI Call Audio</span>
+                </label>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="1.0"
-                step="0.01"
-                value={lobbyMusicVolume}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setLobbyMusicVolume(val);
-                  handleSaveConfig({ lobby_music_volume: String(val) });
-                  if (audioPlayerRef.current && activePreviewKey?.startsWith("lobby_")) {
-                    audioPlayerRef.current.volume = val;
-                  }
-                }}
-                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.1)" }}
-              />
+              {voices.length > 0 && (
+                <select
+                  value={ttsVoiceName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTtsVoiceName(val);
+                    setSelectedVoiceName(val);
+                    localStorage.setItem("preferred_caller_voice", val);
+                    handleSaveConfig({ tts_voice_name: val });
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "999px",
+                    border: "1.5px solid var(--border-2)",
+                    background: "var(--surface-2)",
+                    color: "var(--text)",
+                    fontFamily: "var(--font-head)",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  {voices.map((v) => {
+                    const isPremium = v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Neural");
+                    return (
+                      <option key={v.name} value={v.name} style={{ backgroundColor: "var(--surface)", color: "var(--text)" }}>
+                        {v.name} ({v.lang}){isPremium ? " ✨ Premium" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
             </div>
-          </div>
 
-          {/* AI Voice Caller Selector Card */}
-          <div style={{ borderTop: "1px solid var(--border-2)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-dim)" }}>AI Caller Voice Preference</span>
-              <label 
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: "6px", 
-                  cursor: "pointer", 
-                  fontSize: "11px", 
-                  fontWeight: 600,
-                  color: callerEnabled ? "var(--accent)" : "var(--text-dim)",
-                  userSelect: "none"
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={callerEnabled}
-                  onChange={handleToggleGlobalCaller}
-                  style={{ accentColor: "var(--accent)", width: "13px", height: "13px" }}
-                />
-                <span>Enable live AI Call Audio</span>
-              </label>
-            </div>
-            {voices.length > 0 && (
-              <select
-                value={selectedVoiceName}
-                onChange={(e) => {
-                  setSelectedVoiceName(e.target.value);
-                  localStorage.setItem("preferred_caller_voice", e.target.value);
-                }}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--border-2)",
-                  background: "var(--surface-2)",
-                  color: "var(--text)",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  outline: "none",
-                  cursor: "pointer"
-                }}
-              >
-                {voices.map((v) => {
-                  const isPremium = v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Neural");
-                  return (
-                    <option key={v.name} value={v.name} style={{ backgroundColor: "#1b1c22", color: "#ffffff" }}>
-                      {v.name} ({v.lang}){isPremium ? " ✨ Premium" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-          </div>
-
-          {/* Global Number Call Mode Switcher */}
-          <div style={{ borderTop: "1px solid var(--border-2)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-dim)" }}>Global Playback Mode (All 1-90 Numbers)</span>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={async () => {
-                  try {
-                    setSettings(prev => prev.map(s => ({ ...s, call_mode: "Text" })));
-                    await apiFetch("/api/games/number-calls-bulk-mode", {
-                      method: "PATCH",
-                      body: JSON.stringify({ call_mode: "Text" }),
-                    });
-                    alert("Successfully set all numbers to Text (TTS) mode!");
-                  } catch (e: any) {
-                    alert(e.message || "Failed to update bulk call mode");
-                  }
-                }}
-                className="hg-btn"
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: settings.every(s => s.call_mode === "Text") ? "var(--accent)" : "rgba(255,255,255,0.05)",
-                  color: settings.every(s => s.call_mode === "Text") ? "#000" : "var(--text)",
-                  border: settings.every(s => s.call_mode === "Text") ? "1px solid var(--accent)" : "1px solid var(--border-2)",
-                  transition: "all 0.2s"
-                }}
-              >
-                <span>🗣️ Use TTS (All)</span>
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    // Update locally: set to Audio if they have audio_url, else stay Text
-                    setSettings(prev => prev.map(s => ({ ...s, call_mode: s.audio_url ? "Audio" : "Text" })));
-                    await apiFetch("/api/games/number-calls-bulk-mode", {
-                      method: "PATCH",
-                      body: JSON.stringify({ call_mode: "Audio" }),
-                    });
-                    alert("Successfully set all uploaded numbers to Audio (MP3) mode!");
-                  } catch (e: any) {
-                    alert(e.message || "Failed to update bulk call mode");
-                  }
-                }}
-                className="hg-btn"
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "var(--accent)" : "rgba(255,255,255,0.05)",
-                  color: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "#000" : "var(--text)",
-                  border: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "1px solid var(--accent)" : "1px solid var(--border-2)",
-                  transition: "all 0.2s"
-                }}
-              >
-                <span>🎵 Use MP3 (All Uploaded)</span>
-              </button>
+            {/* Global Number Call Mode Switcher */}
+            <div style={{ borderTop: "1.5px solid var(--border)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-dim)" }}>Global Playback Mode (All 1-90 Numbers)</span>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  onClick={async () => {
+                    try {
+                      setSettings(prev => prev.map(s => ({ ...s, call_mode: "Text" })));
+                      await apiFetch("/api/games/number-calls-bulk-mode", {
+                        method: "PATCH",
+                        body: JSON.stringify({ call_mode: "Text" }),
+                      });
+                      alert("Successfully set all numbers to Text (TTS) mode!");
+                    } catch (e: any) {
+                      alert(e.message || "Failed to update bulk call mode");
+                    }
+                  }}
+                  className="hg-btn"
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "10px 14px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: settings.every(s => s.call_mode === "Text") ? "var(--accent)" : "var(--surface-2)",
+                    color: settings.every(s => s.call_mode === "Text") ? "var(--accent-ink)" : "var(--text)",
+                    border: settings.every(s => s.call_mode === "Text") ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  <span>🗣️ Use TTS (All)</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Update locally: set to Audio if they have audio_url, else stay Text
+                      setSettings(prev => prev.map(s => ({ ...s, call_mode: s.audio_url ? "Audio" : "Text" })));
+                      await apiFetch("/api/games/number-calls-bulk-mode", {
+                        method: "PATCH",
+                        body: JSON.stringify({ call_mode: "Audio" }),
+                      });
+                      alert("Successfully set all uploaded numbers to Audio (MP3) mode!");
+                    } catch (e: any) {
+                      alert(e.message || "Failed to update bulk call mode");
+                    }
+                  }}
+                  className="hg-btn"
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "10px 14px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "var(--accent)" : "var(--surface-2)",
+                    color: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "var(--accent-ink)" : "var(--text)",
+                    border: settings.filter(s => s.audio_url).every(s => s.call_mode === "Audio") ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  <span>🎵 Use MP3 (All Uploaded)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* CARD 2: Physical Sound Effects Synthesizers (Cage & Celebration) */}
-        <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "20px", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Icon name="zap" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Aesthetic Sound FX Synthesizers</h3>
+        <div className="hg-panel">
+          <div className="hg-panel-head">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon name="zap" size={20} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Aesthetic Sound FX Synthesizers</h3>
+            </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
             
             {/* Cage sound effects */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>⚙️ Realistic Tambola Cage Draw</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>⚙️ Realistic Tambola Cage Draw</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: cageSound ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -847,7 +864,7 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
                 <select
                   value={config?.cage_sound_type || "steel_wooden"}
                   onChange={(e) => {
@@ -858,7 +875,20 @@ export function CallVoiceSettings() {
                       setTimeout(() => { soundSynthesizer.startCageSpin(); }, 50);
                     }
                   }}
-                  style={{ flex: 1, padding: "6px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--bg)", color: "var(--text)", fontSize: "11.5px", fontWeight: 600, outline: "none", cursor: "pointer" }}
+                  style={{
+                    flex: 1,
+                    minWidth: "180px",
+                    padding: "8px 12px",
+                    borderRadius: "999px",
+                    border: "1.5px solid var(--border-2)",
+                    background: "var(--surface)",
+                    color: "var(--text)",
+                    fontFamily: "var(--font-head)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
                 >
                   <option value="steel_wooden">Steel Cage with Wooden Balls</option>
                   <option value="steel_ceramic">Steel Cage with Ceramic Balls</option>
@@ -871,13 +901,13 @@ export function CallVoiceSettings() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  style={{ padding: "6px 12px", fontSize: "11px", fontWeight: 600 }}
+                  style={{ padding: "8px 16px", borderRadius: "999px", fontSize: "12px", fontWeight: 700 }}
                   onClick={() => {
                     if (previewingCage) {
                       soundSynthesizer.stopCageSpin();
                       setPreviewingCage(false);
                     } else {
-                      if (activePreviewKey) stopPreview(activePreviewKey);
+                      stopAllPreviews();
                       soundSynthesizer.startCageSpin();
                       setPreviewingCage(true);
                     }
@@ -889,9 +919,9 @@ export function CallVoiceSettings() {
             </div>
 
             {/* Victory Sound Synthesizer */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>🏆 Celebratory Winner Fanfare</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>🏆 Celebratory Winner Fanfare</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: celebrationSound ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -905,11 +935,24 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
                 <select
                   value={config?.winner_sound_type || "trumpet_cheering"}
                   onChange={(e) => handleSaveConfig({ winner_sound_type: e.target.value })}
-                  style={{ flex: 1, padding: "6px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--bg)", color: "var(--text)", fontSize: "11.5px", fontWeight: 600, outline: "none", cursor: "pointer" }}
+                  style={{
+                    flex: 1,
+                    minWidth: "180px",
+                    padding: "8px 12px",
+                    borderRadius: "999px",
+                    border: "1.5px solid var(--border-2)",
+                    background: "var(--surface)",
+                    color: "var(--text)",
+                    fontFamily: "var(--font-head)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
                 >
                   <option value="trumpet_cheering">Trumpet Fanfare with Cheering</option>
                   <option value="cheering">Crowd Cheering</option>
@@ -924,13 +967,9 @@ export function CallVoiceSettings() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  style={{ padding: "6px 12px", fontSize: "11px", fontWeight: 600 }}
+                  style={{ padding: "8px 16px", borderRadius: "999px", fontSize: "12px", fontWeight: 700 }}
                   onClick={() => {
-                    if (activePreviewKey) stopPreview(activePreviewKey);
-                    if (previewingCage) {
-                      soundSynthesizer.stopCageSpin();
-                      setPreviewingCage(false);
-                    }
+                    stopAllPreviews();
                     soundSynthesizer.playCelebration();
                   }}
                 >
@@ -947,253 +986,375 @@ export function CallVoiceSettings() {
       {/* Grid of Voice Notes & Game BG Music */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "24px" }}>
         
-        {/* CARD 3: Intro Voice Notes */}
-        <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Icon name="chat" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Intro Voice Notes</h3>
+        {/* CARD 3: Voice Announcements */}
+        <div className="hg-panel">
+          <div className="hg-panel-head">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon name="chat" size={20} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Voice Announcements</h3>
+            </div>
           </div>
-          <p className="hg-dim" style={{ fontSize: "11.5px", margin: 0, lineHeight: 1.3 }}>
-            These voice notes are played in sequence immediately upon starting a game, prior to the live draw.
-          </p>
+          
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+            <p className="hg-dim" style={{ fontSize: "12px", margin: 0, lineHeight: 1.4 }}>
+              Configure the intro welcome message and outro game conclusion announcement.
+            </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            
-            {/* Welcome Voice Note */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface-2)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>1. Welcome Announcement</span>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: welcomeVoice ? "var(--success)" : "var(--text-dim)" }}>
-                  {welcomeVoice ? "✓ Custom Upload" : "Text-to-Speech"}
-                </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              
+              {/* Intro Note */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", flexWrap: "wrap", gap: "10px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>1. Intro Note</span>
+                  {/* Mode toggle */}
+                  <div style={{ display: "flex", gap: "2px", background: "var(--surface)", padding: "2px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+                    <button
+                      onClick={() => handleSaveConfig({ welcome_voice_mode: "Text" })}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "none",
+                        background: welcomeVoiceMode === "Text" ? "var(--accent)" : "transparent",
+                        color: welcomeVoiceMode === "Text" ? "#000" : "var(--text-dim)",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      TTS
+                    </button>
+                    <button
+                      onClick={() => handleSaveConfig({ welcome_voice_mode: "Audio" })}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "none",
+                        background: welcomeVoiceMode === "Audio" ? "var(--accent)" : "transparent",
+                        color: welcomeVoiceMode === "Audio" ? "#000" : "var(--text-dim)",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      Audio
+                    </button>
+                  </div>
+                </div>
+
+                {welcomeVoiceMode === "Text" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <input
+                      type="text"
+                      value={welcomeText}
+                      onChange={(e) => setWelcomeText(e.target.value)}
+                      placeholder="Intro TTS announcement text..."
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "999px",
+                        border: "1.5px solid var(--border-2)",
+                        background: "var(--surface)",
+                        color: "var(--text)",
+                        fontSize: "12.5px",
+                        outline: "none"
+                      }}
+                    />
+                    {welcomeText !== (config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.") && (
+                      <Button variant="cta" size="sm" onClick={() => handleSaveConfig({ welcome_voice_text: welcomeText })} style={{ alignSelf: "flex-end", fontSize: "11px", padding: "6px 12px", borderRadius: "999px" }}>Save Text</Button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                        <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("welcome_voice_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                        <span>📁 {uploadingVoiceKey === "welcome_voice_url" ? "..." : welcomeVoice ? "Replace Audio" : "Upload Audio"}</span>
+                      </label>
+                      {welcomeVoice && (
+                        <>
+                          <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {welcomeVoice.split("/").pop()}
+                          </span>
+                          <button onClick={() => handleSaveConfig({ welcome_voice_url: "" })} title="Delete file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "28px", height: "28px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={14} /></button>
+                        </>
+                      )}
+                    </div>
+                    {welcomeVoice && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px", borderTop: "1px dashed var(--border-2)", paddingTop: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600 }}>
+                          <span style={{ color: "var(--text-dim)" }}>Volume Boost: {Math.round(welcomeVoiceVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2.0"
+                          step="0.05"
+                          value={welcomeVoiceVolume}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setWelcomeVoiceVolume(val);
+                            handleSaveConfig({ welcome_voice_volume: String(val) });
+                          }}
+                          style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "4px", borderRadius: "2px", background: "var(--border-2)" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "4px" }}>
+                  <div style={{ display: "flex", gap: "4px", background: "var(--surface)", padding: "4px 8px", borderRadius: "20px", border: "1.5px solid var(--border-2)" }}>
+                    <button onClick={() => playPreview("welcome", welcomeVoice, welcomeText, ttsVoiceName)} disabled={activePreviewKey === "welcome" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "welcome" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "welcome" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
+                    <button onClick={() => stopPreview("welcome")} disabled={activePreviewKey !== "welcome" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "welcome" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
-              {!welcomeVoice && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "6px" }}>
-                  <input
-                    type="text"
-                    value={welcomeText}
-                    onChange={(e) => setWelcomeText(e.target.value)}
-                    placeholder="Welcome fallback text..."
-                    style={{ padding: "6px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--bg)", color: "var(--text)", fontSize: "11.5px", outline: "none" }}
-                  />
-                  {welcomeText !== (config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.") && (
-                    <Button variant="cta" size="sm" onClick={() => handleSaveConfig({ welcome_voice_text: welcomeText })} style={{ alignSelf: "flex-end", fontSize: "10px", padding: "4px 8px" }}>Save Text</Button>
-                  )}
+
+              {/* Outro Note */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", flexWrap: "wrap", gap: "10px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>2. Outro Note</span>
+                  {/* Mode toggle */}
+                  <div style={{ display: "flex", gap: "2px", background: "var(--surface)", padding: "2px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+                    <button
+                      onClick={() => handleSaveConfig({ instruction_voice_mode: "Text" })}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "none",
+                        background: instructionVoiceMode === "Text" ? "var(--accent)" : "transparent",
+                        color: instructionVoiceMode === "Text" ? "#000" : "var(--text-dim)",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      TTS
+                    </button>
+                    <button
+                      onClick={() => handleSaveConfig({ instruction_voice_mode: "Audio" })}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "none",
+                        background: instructionVoiceMode === "Audio" ? "var(--accent)" : "transparent",
+                        color: instructionVoiceMode === "Audio" ? "#000" : "var(--text-dim)",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      Audio
+                    </button>
+                  </div>
                 </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <label className="hg-btn" style={{ background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.2)", padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
-                    <input type="file" accept="audio/*" onChange={(e) => handleConfigAudioUpload("welcome_voice_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
-                    <span>📁 {uploadingVoiceKey === "welcome_voice_url" ? "..." : welcomeVoice ? "Replace" : "Upload"}</span>
-                  </label>
-                  {welcomeVoice && (
-                    <button onClick={() => handleSaveConfig({ welcome_voice_url: "" })} title="Delete file" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "26px", height: "26px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: "4px", background: "var(--bg)", padding: "3px 6px", borderRadius: "20px", border: "1px solid var(--border-2)" }}>
-                  <button onClick={() => playPreview("welcome", welcomeVoice, welcomeText, selectedWelcomeVoice)} disabled={activePreviewKey === "welcome" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "welcome" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "welcome" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
-                  <button onClick={() => stopPreview("welcome")} disabled={activePreviewKey !== "welcome" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "welcome" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                  </button>
+
+                {instructionVoiceMode === "Text" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <input
+                      type="text"
+                      value={instructionText}
+                      onChange={(e) => setInstructionText(e.target.value)}
+                      placeholder="Outro TTS announcement text..."
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "999px",
+                        border: "1.5px solid var(--border-2)",
+                        background: "var(--surface)",
+                        color: "var(--text)",
+                        fontSize: "12.5px",
+                        outline: "none"
+                      }}
+                    />
+                    {instructionText !== (config?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.") && (
+                      <Button variant="cta" size="sm" onClick={() => handleSaveConfig({ instruction_voice_text: instructionText })} style={{ alignSelf: "flex-end", fontSize: "11px", padding: "6px 12px", borderRadius: "999px" }}>Save Text</Button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                        <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("instruction_voice_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                        <span>📁 {uploadingVoiceKey === "instruction_voice_url" ? "..." : instructionVoice ? "Replace Audio" : "Upload Audio"}</span>
+                      </label>
+                      {instructionVoice && (
+                        <>
+                          <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {instructionVoice.split("/").pop()}
+                          </span>
+                          <button onClick={() => handleSaveConfig({ instruction_voice_url: "" })} title="Delete file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "28px", height: "28px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={14} /></button>
+                        </>
+                      )}
+                    </div>
+                    {instructionVoice && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px", borderTop: "1px dashed var(--border-2)", paddingTop: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600 }}>
+                          <span style={{ color: "var(--text-dim)" }}>Volume Boost: {Math.round(instructionVoiceVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2.0"
+                          step="0.05"
+                          value={instructionVoiceVolume}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setInstructionVoiceVolume(val);
+                            handleSaveConfig({ instruction_voice_volume: String(val) });
+                          }}
+                          style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "4px", borderRadius: "2px", background: "var(--border-2)" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "4px" }}>
+                  <div style={{ display: "flex", gap: "4px", background: "var(--surface)", padding: "4px 8px", borderRadius: "20px", border: "1.5px solid var(--border-2)" }}>
+                    <button onClick={() => playPreview("instruction", instructionVoice, instructionText, ttsVoiceName)} disabled={activePreviewKey === "instruction" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "instruction" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "instruction" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
+                    <button onClick={() => stopPreview("instruction")} disabled={activePreviewKey !== "instruction" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "instruction" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
+
             </div>
-
-            {/* Instruction Voice Note */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface-2)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>2. Instruction Rules note</span>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: instructionVoice ? "var(--success)" : "var(--text-dim)" }}>
-                  {instructionVoice ? "✓ Custom Upload" : "Text-to-Speech"}
-                </span>
-              </div>
-              {!instructionVoice && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "6px" }}>
-                  <input
-                    type="text"
-                    value={instructionText}
-                    onChange={(e) => setInstructionText(e.target.value)}
-                    placeholder="Instruction fallback text..."
-                    style={{ padding: "6px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--bg)", color: "var(--text)", fontSize: "11.5px", outline: "none" }}
-                  />
-                  {instructionText !== (config?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.") && (
-                    <Button variant="cta" size="sm" onClick={() => handleSaveConfig({ instruction_voice_text: instructionText })} style={{ alignSelf: "flex-end", fontSize: "10px", padding: "4px 8px" }}>Save Text</Button>
-                  )}
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <label className="hg-btn" style={{ background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.2)", padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
-                    <input type="file" accept="audio/*" onChange={(e) => handleConfigAudioUpload("instruction_voice_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
-                    <span>📁 {uploadingVoiceKey === "instruction_voice_url" ? "..." : instructionVoice ? "Replace" : "Upload"}</span>
-                  </label>
-                  {instructionVoice && (
-                    <button onClick={() => handleSaveConfig({ instruction_voice_url: "" })} title="Delete file" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "26px", height: "26px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: "4px", background: "var(--bg)", padding: "3px 6px", borderRadius: "20px", border: "1px solid var(--border-2)" }}>
-                  <button onClick={() => playPreview("instruction", instructionVoice, instructionText, selectedInstructionVoice)} disabled={activePreviewKey === "instruction" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "instruction" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "instruction" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
-                  <button onClick={() => stopPreview("instruction")} disabled={activePreviewKey !== "instruction" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "instruction" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
 
         {/* CARD 4: Live gameplay background music */}
-        <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Icon name="music" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Gameplay Background Music</h3>
+        <div className="hg-panel">
+          <div className="hg-panel-head">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon name="music" size={20} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Gameplay Background Music</h3>
+            </div>
           </div>
-          <p className="hg-dim" style={{ fontSize: "11.5px", margin: 0, lineHeight: 1.3 }}>
-            Ambient soundtrack loops that play continuously during active game boards.
-          </p>
+          
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <p className="hg-dim" style={{ fontSize: "12px", margin: 0, lineHeight: 1.4 }}>
+              Ambient soundtrack loops that play continuously during active game boards.
+            </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
-              <input
-                type="checkbox"
-                checked={bgMusicEnabled}
-                onChange={(e) => {
-                  const val = e.target.checked;
-                  setBgMusicEnabled(val);
-                  handleSaveConfig({ background_music_enabled: String(val) });
-                }}
-                style={{ accentColor: "var(--accent)", width: "13px", height: "13px" }}
-              />
-              <span>Enable gameplay background music loops</span>
-            </label>
-
-            {bgMusicUrl && !["", "/audio/music/soft_lounge.wav", "/audio/music/retro_arcade.wav", "/audio/music/traditional_flute.wav", "/audio/music/upbeat_dhol.wav", "/audio/music/synthwave_glow.wav", "/audio/music/acoustic_guitar.wav", "/audio/music/sleek_jazz.wav"].includes(bgMusicUrl) ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid rgba(212, 175, 55, 0.3)", background: "rgba(212, 175, 55, 0.05)" }}>
-                <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase" }}>Active Custom Loop</span>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    🎵 {bgMusicUrl.startsWith("data:") ? "custom_music_loop.mp3" : decodeURIComponent(bgMusicUrl.split("/").pop() || "custom_music_loop.mp3")}
-                  </span>
-                  <button onClick={() => { setBgMusicUrl(""); handleSaveConfig({ background_music_url: "" }); }} style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "11px", fontWeight: 700, textDecoration: "underline", padding: 0 }}>Reset to Presets</button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase" }}>Select Preset Soundtrack</span>
-                <select
-                  value={bgMusicUrl}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>
+                <input
+                  type="checkbox"
+                  checked={bgMusicEnabled}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setBgMusicUrl(val);
-                    handleSaveConfig({ background_music_url: val });
+                    const val = e.target.checked;
+                    setBgMusicEnabled(val);
+                    handleSaveConfig({ background_music_enabled: String(val) });
                   }}
-                  style={{ padding: "7px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: "12px", fontWeight: 600, outline: "none", cursor: "pointer" }}
-                >
-                  <option value="">None / Silent</option>
-                  <option value="/audio/music/soft_lounge.wav">Preset 1: Soft Lounge Loop</option>
-                  <option value="/audio/music/retro_arcade.wav">Preset 2: Retro Arcade Loop</option>
-                  <option value="/audio/music/traditional_flute.wav">Preset 3: Calm Indian Flute</option>
-                  <option value="/audio/music/upbeat_dhol.wav">Preset 4: Upbeat Indian Dhol Beat 🥁</option>
-                  <option value="/audio/music/synthwave_glow.wav">Preset 5: Ambient Synthwave Glow 🌃</option>
-                  <option value="/audio/music/acoustic_guitar.wav">Preset 6: Chill Acoustic Guitar 🎸</option>
-                  <option value="/audio/music/sleek_jazz.wav">Preset 7: Sleek Jazz Lounge 🎷</option>
-                </select>
-              </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-              <label className="hg-btn" style={{ background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.2)", padding: "5px 12px", borderRadius: "var(--radius-sm)", fontSize: "11px", fontWeight: 600, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
-                <input type="file" accept="audio/*" onChange={(e) => handleConfigAudioUpload("background_music_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
-                <span>📁 Upload Custom Loop</span>
+                  style={{ accentColor: "var(--accent)", width: "14px", height: "14px" }}
+                />
+                <span>Enable gameplay background music loops</span>
               </label>
 
-              {bgMusicUrl && (
-                <div style={{ display: "flex", gap: "4px", background: "var(--bg)", padding: "3px 6px", borderRadius: "20px", border: "1px solid var(--border-2)" }}>
-                  <button onClick={() => playPreview("bg", bgMusicUrl, "")} disabled={activePreviewKey === "bg" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "bg" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "bg" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
-                  <button onClick={() => stopPreview("bg")} disabled={activePreviewKey !== "bg" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "bg" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                  </button>
+              {bgMusicUrl && !["", "/audio/music/soft_lounge.wav", "/audio/music/retro_arcade.wav", "/audio/music/traditional_flute.wav", "/audio/music/upbeat_dhol.wav", "/audio/music/synthwave_glow.wav", "/audio/music/acoustic_guitar.wav", "/audio/music/sleek_jazz.wav"].includes(bgMusicUrl) ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--card-line)", background: "var(--accent-soft)" }}>
+                  <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".04em" }}>Active Custom Loop</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      🎵 {bgMusicUrl.startsWith("data:") ? "custom_music_loop.mp3" : decodeURIComponent(bgMusicUrl.split("/").pop() || "custom_music_loop.mp3")}
+                    </span>
+                    <button onClick={() => { setBgMusicUrl(""); handleSaveConfig({ background_music_url: "" }); }} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: "11px", fontWeight: 700, textDecoration: "underline", padding: 0 }}>Reset to Presets</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>Select Preset Soundtrack</span>
+                  <select
+                    value={bgMusicUrl}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBgMusicUrl(val);
+                      handleSaveConfig({ background_music_url: val });
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: "999px",
+                      border: "1.5px solid var(--border-2)",
+                      background: "var(--surface-2)",
+                      color: "var(--text)",
+                      fontFamily: "var(--font-head)",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="">None / Silent</option>
+                    <option value="/audio/music/soft_lounge.wav">Preset 1: Soft Lounge Loop</option>
+                    <option value="/audio/music/retro_arcade.wav">Preset 2: Retro Arcade Loop</option>
+                    <option value="/audio/music/traditional_flute.wav">Preset 3: Calm Indian Flute</option>
+                    <option value="/audio/music/upbeat_dhol.wav">Preset 4: Upbeat Indian Dhol Beat 🥁</option>
+                    <option value="/audio/music/synthwave_glow.wav">Preset 5: Ambient Synthwave Glow 🌃</option>
+                    <option value="/audio/music/acoustic_guitar.wav">Preset 6: Chill Acoustic Guitar 🎸</option>
+                    <option value="/audio/music/sleek_jazz.wav">Preset 7: Sleek Jazz Lounge 🎷</option>
+                  </select>
                 </div>
               )}
-            </div>
 
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", flexWrap: "wrap", gap: "8px" }}>
+                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 14px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                  <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("background_music_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                  <span>📁 Upload Custom Loop</span>
+                </label>
+
+                {bgMusicUrl && (
+                  <div style={{ display: "flex", gap: "4px", background: "var(--surface)", padding: "4px 8px", borderRadius: "20px", border: "1.5px solid var(--border-2)" }}>
+                    <button onClick={() => playPreview("bg", bgMusicUrl, "")} disabled={activePreviewKey === "bg" && previewStatus === "playing"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: activePreviewKey === "bg" && previewStatus === "playing" ? "var(--accent)" : "transparent", color: activePreviewKey === "bg" && previewStatus === "playing" ? "#000" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={11} /></button>
+                    <button onClick={() => stopPreview("bg")} disabled={activePreviewKey !== "bg" || previewStatus === "stopped"} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: activePreviewKey === "bg" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
           </div>
         </div>
 
-      </div>
-
-      {/* CARD 5: Lobby & Waiting Music Slots */}
-      <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Icon name="music" size={20} style={{ color: "var(--accent)" }} />
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Lobby Waiting Channels (Sequential Slots)</h3>
-        </div>
-        <p className="hg-dim" style={{ fontSize: "11.5px", margin: 0, lineHeight: 1.3 }}>
-          Upload up to five tracks to play sequentially in the player lobby &amp; staff Live HUD when the game is in waiting status.
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginTop: "4px" }}>
-          {[1, 2, 3, 4, 5].map((index) => {
-            const key = `lobby_music_url_${index}` as const;
-            const url = (config as any)?.[key] || "";
-
-            return (
-              <div key={index} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--surface-2)", transition: "all 0.15s ease" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--text)" }}>Channel {index}</span>
-                  <span style={{ fontSize: "9px", fontWeight: 700, color: url ? "var(--success)" : "var(--text-dim)", textTransform: "uppercase" }}>
-                    {url ? "✓ Active" : "Empty"}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", gap: "6px" }}>
-                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                    <label className="hg-btn" style={{ background: "rgba(255, 255, 255, 0.05)", color: "var(--text)", border: "1px solid var(--border-2)", padding: "4px 8px", borderRadius: "var(--radius-sm)", fontSize: "10px", fontWeight: 600, cursor: "pointer", display: "inline-flex", margin: 0 }}>
-                      <input type="file" accept="audio/*" onChange={(e) => handleConfigAudioUpload(key, e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
-                      <span>{uploadingVoiceKey === key ? "..." : url ? "Replace" : "Upload"}</span>
-                    </label>
-                    {url && (
-                      <button onClick={() => { if (window.confirm(`Delete Lobby Track ${index}?`)) handleSaveConfig({ [key]: "" }); }} title="Delete track" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "24px", height: "24px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={11} /></button>
-                    )}
-                  </div>
-
-                  {url && (
-                    <div style={{ display: "flex", gap: "3px", background: "var(--bg)", padding: "2px 4px", borderRadius: "15px", border: "1px solid var(--border-2)" }}>
-                      <button onClick={() => playPreview(`lobby_${index}`, url, "")} disabled={activePreviewKey === `lobby_${index}` && previewStatus === "playing"} style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none", background: "transparent", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="play" size={10} /></button>
-                      <button onClick={() => stopPreview(`lobby_${index}`)} disabled={activePreviewKey !== `lobby_${index}` || previewStatus === "stopped"} style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none", background: "transparent", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                        <svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* CARD 6: 1 to 90 Number Calls Directory */}
-      <div className="hg-panel" style={{ background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+      <div className="hg-panel">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid var(--card-line)", padding: "14px 16px", flexWrap: "wrap", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Icon name="grid" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--accent)" }}>Number Call Phrases Directory (1-90)</h3>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Number Call Phrases Directory (1-90)</h3>
           </div>
           <input
             type="text"
             placeholder="Search number or call phrase..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-3 py-1.5 text-xs rounded border outline-none bg-surface"
-            style={{ borderColor: "var(--border-2)", borderRadius: "var(--radius-sm)", minWidth: "250px", color: "var(--text)" }}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "999px",
+              border: "1.5px solid var(--border-2)",
+              background: "var(--surface-2)",
+              color: "var(--text)",
+              fontSize: "12.5px",
+              outline: "none",
+              minWidth: "250px"
+            }}
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "550px", overflowY: "auto", paddingRight: "4px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "600px", overflowY: "auto", padding: "16px 20px" }}>
           {filtered.length === 0 ? (
-            <div className="text-center p-8 text-mute">No caller phrases match your search query.</div>
+            <div className="text-center p-8 text-mute" style={{ fontStyle: "italic", fontSize: "13px" }}>No caller phrases match your search query.</div>
           ) : (
             filtered.map((item) => {
               const isModified = item.call_text !== item.default_text;
@@ -1202,32 +1363,32 @@ export function CallVoiceSettings() {
               return (
                 <div 
                   key={item.number} 
-                  className="hg-card-interactive" 
                   style={{ 
                     display: "flex", 
                     alignItems: "center", 
                     justifyContent: "space-between", 
                     gap: "16px", 
-                    padding: "10px 14px", 
+                    padding: "12px 16px", 
                     borderRadius: "var(--radius-sm)", 
                     background: "var(--surface-2)",
-                    border: "1px solid var(--border-2)",
+                    border: "1.5px solid var(--border-2)",
                     flexWrap: "wrap"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: "1 1 320px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "1 1 320px" }}>
                     <div 
                       style={{ 
-                        width: "36px", 
-                        height: "36px", 
+                        width: "38px", 
+                        height: "38px", 
                         borderRadius: "50%", 
-                        background: "rgba(212,175,55,0.08)", 
+                        background: "var(--accent-soft)", 
                         color: "var(--accent)", 
                         display: "flex", 
                         alignItems: "center", 
                         justifyContent: "center", 
                         fontWeight: "bold",
-                        fontSize: "14px",
+                        fontFamily: "var(--font-head)",
+                        fontSize: "15px",
                         border: "2px solid var(--accent)",
                         flexShrink: 0
                       }}
@@ -1235,22 +1396,31 @@ export function CallVoiceSettings() {
                       {item.number}
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px", width: "100%" }}>
-                      <div style={{ display: "flex", gap: "6px", width: "100%" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
+                      <div style={{ display: "flex", gap: "8px", width: "100%" }}>
                         <input 
                           type="text" 
                           value={currentEdit} 
                           onChange={(e) => setEditingTexts({ ...editingTexts, [item.number]: e.target.value })}
-                          style={{ borderColor: "var(--border-2)", borderRadius: "var(--radius-sm)", color: "var(--text)", background: "var(--surface)", border: "1px solid var(--border-2)", padding: "4px 8px", fontSize: "11.5px", outline: "none", flexGrow: 1 }}
+                          style={{
+                            borderRadius: "999px",
+                            color: "var(--text)",
+                            background: "var(--surface)",
+                            border: "1.5px solid var(--border-2)",
+                            padding: "6px 14px",
+                            fontSize: "12.5px",
+                            outline: "none",
+                            flexGrow: 1
+                          }}
                         />
                         {currentEdit !== item.call_text && (
-                          <Button variant="cta" size="sm" onClick={() => handleSaveText(item.number)} style={{ fontSize: "10.5px", padding: "4px 8px" }}>Save</Button>
+                          <Button variant="cta" size="sm" onClick={() => handleSaveText(item.number)} style={{ fontSize: "11px", padding: "6px 12px", borderRadius: "999px" }}>Save</Button>
                         )}
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "9.5px", color: "var(--text-dim)" }}>Default: <em>{item.default_text}</em></span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: "4px" }}>
+                        <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>Default: <em>{item.default_text}</em></span>
                         {isModified && (
-                          <button onClick={() => handleRestore(item.number)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "9.5px", color: "var(--accent)", fontWeight: 600 }}>Restore Default</button>
+                          <button onClick={() => handleRestore(item.number)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "11px", color: "var(--accent)", fontWeight: 700 }}>Restore Default</button>
                         )}
                       </div>
                     </div>
@@ -1258,39 +1428,39 @@ export function CallVoiceSettings() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", flexShrink: 0 }}>
                     
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <label className={`flex items-center gap-1 px-2.5 py-1.5 rounded border text-[10.5px] cursor-pointer select-none font-semibold ${item.audio_url ? "bg-surface text-text hover:bg-surface-2" : "bg-brand text-bg border-brand hover:opacity-90"}`} style={{ borderRadius: "var(--radius-sm)", transition: "all 0.15s ease", opacity: uploadingNum === item.number ? 0.6 : 1, pointerEvents: uploadingNum === item.number ? "none" : "auto", margin: 0 }}>
-                        <input type="file" accept="audio/*,video/mp4,.mp3,.wav,.m4a" onChange={(e) => handleFileUpload(item.number, e)} style={{ display: "none" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <label className={`flex items-center gap-1 px-3 py-1.5 rounded border text-[11px] cursor-pointer select-none font-bold ${item.audio_url ? "bg-surface text-text hover:bg-surface-2" : "bg-brand text-bg border-brand hover:opacity-90"}`} style={{ borderRadius: "999px", transition: "all 0.15s ease", opacity: uploadingNum === item.number ? 0.6 : 1, pointerEvents: uploadingNum === item.number ? "none" : "auto", margin: 0, border: "1.5px solid var(--ink)" }}>
+                        <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleFileUpload(item.number, e)} style={{ display: "none" }} />
                         <span>{uploadingNum === item.number ? "..." : item.audio_url ? "Replace" : "Upload File"}</span>
                       </label>
                       
-                      <Button variant="ghost" size="sm" style={{ padding: "5px 8px", fontSize: "10.5px" }} onClick={() => playCallPreview(item)}>Listen</Button>
+                      <Button variant="ghost" size="sm" style={{ padding: "6px 12px", fontSize: "11px", borderRadius: "999px" }} onClick={() => playCallPreview(item)}>Listen</Button>
 
                       {item.audio_url && (
-                        <button onClick={() => handleDeleteAudio(item.number)} title="Delete custom sound file" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "24px", height: "24px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={11} /></button>
+                        <button onClick={() => handleDeleteAudio(item.number)} title="Delete custom sound file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={13} /></button>
                       )}
                     </div>
 
                     {item.audio_url && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", minWidth: "115px" }}>
-                        <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--text-dim)", whiteSpace: "nowrap" }}>Vol: {Math.round((item.volume !== undefined ? item.volume : 1.0) * 100)}%</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "6px 10px", borderRadius: "999px", border: "1.5px solid var(--border-2)", minWidth: "115px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-dim)", whiteSpace: "nowrap" }}>Vol: {Math.round((item.volume !== undefined ? item.volume : 1.0) * 100)}%</span>
                         <input type="range" min="0" max="100" step="1" value={Math.round((item.volume !== undefined ? item.volume : 1.0) * 100)} onChange={(e) => { const sliderVal = parseInt(e.target.value, 10); handleVolumeChange(item.number, sliderVal / 100); }} style={{ width: "60px", accentColor: "var(--accent)", cursor: "pointer", height: "3px" }} />
                       </div>
                     )}
 
                     {item.audio_url ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)" }}>
-                        <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", cursor: "pointer", fontWeight: 600, color: item.call_mode === "Text" ? "var(--accent)" : "var(--text-dim)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "6px 12px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10.5px", cursor: "pointer", fontWeight: 700, color: item.call_mode === "Text" ? "var(--accent)" : "var(--text-dim)" }}>
                           <input type="checkbox" checked={item.call_mode === "Text"} onChange={() => handleToggleMode(item.number, "Text")} style={{ accentColor: "var(--accent)", width: "12px", height: "12px" }} />
                           <span>TTS</span>
                         </label>
-                        <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", cursor: "pointer", fontWeight: 600, color: item.call_mode === "Audio" ? "var(--accent)" : "var(--text-dim)" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10.5px", cursor: "pointer", fontWeight: 700, color: item.call_mode === "Audio" ? "var(--accent)" : "var(--text-dim)" }}>
                           <input type="checkbox" checked={item.call_mode === "Audio"} onChange={() => handleToggleMode(item.number, "Audio")} style={{ accentColor: "var(--accent)", width: "12px", height: "12px" }} />
                           <span>MP3</span>
                         </label>
                       </div>
                     ) : (
-                      <div className="text-[10px] text-mute" style={{ width: "115px", textAlign: "center" }}>Text-only (TTS)</div>
+                      <div className="text-[11px] text-mute" style={{ width: "115px", textAlign: "center", fontStyle: "italic" }}>Text-only (TTS)</div>
                     )}
 
                   </div>

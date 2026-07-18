@@ -28,15 +28,25 @@ export async function getConfig(req: AuthenticatedRequest, res: Response): Promi
   }
 }
 
+let publicConfigCache: Record<string, string> | null = null;
+
+export function clearPublicConfigCache(): void {
+  publicConfigCache = null;
+}
+
 /**
  * Read public platform configuration (Unauthenticated)
  */
 export async function getPublicConfig(req: any, res: Response): Promise<void> {
+  if (publicConfigCache) {
+    res.json(publicConfigCache);
+    return;
+  }
   try {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'welcome_voice_mode', 'instruction_voice_mode', 'welcome_voice_volume', 'instruction_voice_volume', 'tts_voice_name', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -44,6 +54,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
       return acc;
     }, {} as Record<string, string>);
     
+    publicConfigCache = configObj;
     res.json(configObj);
   } catch (error) {
     console.error('Error reading public platform config:', error);
@@ -98,6 +109,8 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     return;
   }
 
+  clearPublicConfigCache();
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -149,7 +162,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'welcome_voice_mode', 'instruction_voice_mode', 'welcome_voice_volume', 'instruction_voice_volume', 'tts_voice_name', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {
@@ -250,6 +263,8 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
     return;
   }
 
+  clearPublicConfigCache();
+
   const allowedKeys = [
     'welcome_voice_url',
     'instruction_voice_url',
@@ -277,6 +292,8 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
       ext = 'wav';
     } else if (mimeType.includes('m4a')) {
       ext = 'm4a';
+    } else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) {
+      ext = 'mpeg';
     }
 
     const base64Data = audio_data.split(';base64,').pop();

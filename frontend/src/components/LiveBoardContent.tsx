@@ -90,21 +90,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [showAllCalled, setShowAllCalled] = useState(false);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
 
-  const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
+const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
-
-  useEffect(() => {
-    // Auto-open the winners overlay when the draw ends (and close it if the game
-    // leaves that state). Users can also toggle it manually (see the controls
-    // below), so this can't be a pure render-time derivation — syncing via
-    // effect is intended here.
-    if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShowWinnersOverlay(true);
-    } else {
-      setShowWinnersOverlay(false);
-    }
-  }, [gameStatus]);
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -127,10 +114,24 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const booking = useBookingStore();
   const { config } = useConfigStore();
   
-  const { playGreeting, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
+  const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true" && !muted,
     gameStatus === "Live"
   );
+
+  const outroPlayedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
+      setShowWinnersOverlay(true);
+      if (!outroPlayedRef.current) {
+        outroPlayedRef.current = true;
+        playOutro();
+      }
+    } else {
+      setShowWinnersOverlay(false);
+      outroPlayedRef.current = false;
+    }
+  }, [gameStatus, playOutro]);
 
   // Track winners for audio celebration
 
@@ -438,8 +439,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} />
                 
                 <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
-                  {gameStatus === "Completed"
-                    ? "Game over — thanks for playing!"
+                  {gameStatus === "Completed" || gameStatus === "Draw_Ended"
+                    ? "Game has ended"
                     : gameStatus === "Paused"
                       ? "Draw paused…"
                       : !revealed

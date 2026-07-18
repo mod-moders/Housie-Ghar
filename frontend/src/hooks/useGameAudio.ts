@@ -3,6 +3,7 @@ import { englishPhrases } from "@/lib/englishPhrases";
 import { apiFetch } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useConfigStore } from "@/lib/stores/configStore";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 interface NumberCallConfig {
   number: number;
@@ -57,7 +58,7 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     };
   }, []);
 
-  useEffect(() => {
+  const loadCallsConfig = () => {
     if (!englishCallerEnabled) return;
     apiFetch<NumberCallConfig[]>("/api/games/number-calls")
       .then((data) => {
@@ -69,7 +70,17 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
         setCallsConfig(configMap);
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadCallsConfig();
   }, [englishCallerEnabled]);
+
+  useSocket((event) => {
+    if (event === "number_calls_update") {
+      loadCallsConfig();
+    }
+  });
 
   // Handle Gameplay Background Music Playback
   useEffect(() => {
@@ -139,29 +150,25 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     isIntroPlayingRef.current = true;
     
     try {
-      // 1. Play Welcome Voice Note (url or fallback text)
-      const welcomeUrl = platformConfig?.welcome_voice_url;
-      const welcomeText = platformConfig?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
-      const welcomeVoiceName = typeof window !== "undefined" ? localStorage.getItem("welcome_voice_name") : null;
-      await playAudioOrFallback(
-        welcomeUrl || "",
-        welcomeText,
-        1.0,
-        welcomeVoiceName
-      );
-      
+      // 2-3 seconds delay after start/bg music starts before playing Intro Note
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2500);
+        activeTimersRef.current.push(timer);
+      });
       if (!isMountedRef.current) return;
 
-      // 2. Play Instruction Voice Note (url or fallback text)
-      const instructionUrl = platformConfig?.instruction_voice_url;
-      const instructionText = platformConfig?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
-      const instructionVoiceName = typeof window !== "undefined" ? localStorage.getItem("instruction_voice_name") : null;
-      await playAudioOrFallback(
-        instructionUrl || "",
-        instructionText,
-        1.0,
-        instructionVoiceName
-      );
+      const mode = platformConfig?.welcome_voice_mode || "Text";
+      const welcomeUrl = platformConfig?.welcome_voice_url;
+      const welcomeText = platformConfig?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
+      const universalVoice = platformConfig?.tts_voice_name || null;
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = platformConfig?.welcome_voice_volume !== undefined ? parseFloat(platformConfig.welcome_voice_volume) : 1.0;
+
+      if (mode === "Audio" && welcomeUrl) {
+        await playAudioOrFallback(welcomeUrl, welcomeText, masterVol * volMultiplier, universalVoice);
+      } else {
+        await fallbackToTTS(welcomeText, universalVoice);
+      }
     } finally {
       isIntroPlayingRef.current = false;
       // Play any pending number call that arrived during the intro
@@ -172,6 +179,26 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
         }
       }
     }
+  };
+
+  const playOutro = async () => {
+    if (!englishCallerEnabled) return;
+    stopAllActiveAudios();
+    
+    try {
+      const mode = platformConfig?.instruction_voice_mode || "Text";
+      const instructionUrl = platformConfig?.instruction_voice_url;
+      const instructionText = platformConfig?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
+      const universalVoice = platformConfig?.tts_voice_name || null;
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = platformConfig?.instruction_voice_volume !== undefined ? parseFloat(platformConfig.instruction_voice_volume) : 1.0;
+
+      if (mode === "Audio" && instructionUrl) {
+        await playAudioOrFallback(instructionUrl, instructionText, masterVol * volMultiplier, universalVoice);
+      } else {
+        await fallbackToTTS(instructionText, universalVoice);
+      }
+    } catch {}
   };
 
   const playNumberCall = async (num: number) => {
@@ -276,7 +303,7 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
         const utterance = new SpeechSynthesisUtterance(text);
         
         const voices = window.speechSynthesis.getVoices();
-        const preferredName = forcedVoiceName || (typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null);
+        const preferredName = forcedVoiceName || platformConfig?.tts_voice_name || (typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null);
         let voice = voices.find(v => v.name === preferredName);
         if (!voice) {
           voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));
@@ -298,5 +325,5 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
     });
   };
 
-  return { playGreeting, playNumberCall, playCelebration, introPlayingRef: isIntroPlayingRef };
+  return { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef: isIntroPlayingRef };
 }
