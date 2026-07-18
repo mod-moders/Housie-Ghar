@@ -115,8 +115,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const { config } = useConfigStore();
   
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
-    config?.english_caller_enabled === "true" && !muted,
-    gameStatus === "Live"
+    config?.english_caller_enabled === "true",
+    gameStatus === "Live" || gameStatus === "Paused" || gameStatus === "Draw_Ended",
+    muted
   );
 
   const outroPlayedRef = useRef<boolean>(false);
@@ -126,12 +127,17 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       if (!outroPlayedRef.current) {
         outroPlayedRef.current = true;
         playOutro();
+        playCelebration();
+        const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+        if (isSoundEnabled) {
+          soundSynthesizer.playCelebration();
+        }
       }
     } else {
       setShowWinnersOverlay(false);
       outroPlayedRef.current = false;
     }
-  }, [gameStatus, playOutro]);
+  }, [gameStatus, playOutro, playCelebration]);
 
   // Track winners for audio celebration
 
@@ -353,8 +359,8 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
             : p
         )
       );
-      playCelebration();
       delay(() => {
+        playCelebration();
         const config = useConfigStore.getState().config;
         const isSoundEnabled = config?.celebration_sound_enabled !== "false";
         if (isSoundEnabled) {

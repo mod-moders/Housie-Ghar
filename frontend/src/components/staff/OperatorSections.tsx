@@ -62,8 +62,9 @@ export function OperatorHudSection() {
   const isGameRunning = activeGameStatus === "Live" || activeGameStatus === "Paused" || activeGameStatus === "Draw_Ended";
 
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
-    config?.english_caller_enabled === "true" && !muted,
-    ((games.find((g) => g.game_id === selectedId)?.game_status === "Live") || gameStatus === "Live")
+    config?.english_caller_enabled === "true",
+    isGameRunning,
+    muted
   );
 
   const pendingDrawsRef = useRef<number[]>([]);

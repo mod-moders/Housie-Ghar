@@ -14,6 +14,8 @@ export interface PublicConfig {
   announcements_muted?: string;
   cage_sound_enabled?: string;
   celebration_sound_enabled?: string;
+  welcome_voice_enabled?: string;
+  instruction_voice_enabled?: string;
   welcome_voice_url?: string;
   instruction_voice_url?: string;
   welcome_voice_text?: string;
