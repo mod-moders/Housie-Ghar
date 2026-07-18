@@ -3,7 +3,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useBookingStore } from "@/lib/stores/bookingStore";
 import { PublicShell } from "@/components/PublicShell";
@@ -42,15 +42,24 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
 
   const booking = useBookingStore();
 
-  // Prefill player's registered Housie Name from session
+  // Prefill player's registered Housie Name from session. Only a real 401/403
+  // means the player isn't actually logged in — a network blip or mid-deploy
+  // connection gap must not bounce them to /login; retry instead.
   useEffect(() => {
-    apiFetch<{ player: { housie_name: string } }>("/api/player/me")
-      .then((res) => {
-        setName(res.player.housie_name || "");
-      })
-      .catch(() => {
-        router.push("/login");
-      });
+    let cancelled = false;
+    const checkAuth = () => {
+      apiFetch<{ player: { housie_name: string } }>("/api/player/me")
+        .then((res) => {
+          if (!cancelled) setName(res.player.housie_name || "");
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (!isAuthError(e)) { setTimeout(() => { if (!cancelled) checkAuth(); }, 3000); return; }
+          router.push("/login");
+        });
+    };
+    checkAuth();
+    return () => { cancelled = true; };
   }, [router]);
 
   // Load game meta once; refresh the ticket grid every 5s so locks/sales appear live.

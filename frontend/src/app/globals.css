@@ -2442,6 +2442,18 @@ select option {
   .hg-status-role{max-width:112px;overflow:hidden;text-overflow:ellipsis}
 }
 
+/* ============ Finance Hub statusbar — stats row wraps below, mobile + tablet ============
+   .hg-statusbar.is-finance packs the hamburger, the 4-pill .hg-fin-hud, the role
+   text, and the avatar into one flex row (hg-fin-hud has flex:1 so it's meant to
+   fill the gap between them) — on desktop that's a wide single row, but below
+   900px there isn't room and the pills got squeezed against the hamburger
+   ("beside the hamburger" bug). Force the statusbar to wrap and let hg-fin-hud
+   claim the full second line instead of fighting for space on the first. */
+@media(max-width:899px){
+  .hg-statusbar.is-finance{flex-wrap:wrap}
+  .hg-statusbar.is-finance .hg-fin-hud{flex:1 1 100%;order:3;overflow-x:auto}
+}
+
 /* ============ Bookie Management — segmented pill tabs, mobile + tablet ============
    The pill tab row (Registered/Created/Applications) has no CSS class (inline
    styles only) and no flex-wrap/overflow handling, so on a narrow viewport it
@@ -2462,6 +2474,24 @@ select option {
    overflow-x:hidden. Stack to a single column below 900px instead. */
 @media(max-width:899px){
   .hg-settings-grid{grid-template-columns:1fr !important}
+}
+
+/* ============ Audio Settings — Number Call Phrases row, mobile + tablet ============
+   Each row's right-hand controls group (upload/Listen/delete, volume slider,
+   TTS/MP3 toggle) is flex-wrap:wrap but also flex-shrink:0 with no width cap —
+   as a lone item on its own wrapped line it sizes to its own max-content
+   (fits every child on one line) instead of respecting the row's actual
+   width, so the volume slider pill runs past the card edge and is clipped by
+   the ancestor's overflow-x:hidden. Capping it to 100% width lets its own
+   flex-wrap actually engage. */
+@media(max-width:899px){
+  .hg-numcall-row{flex-direction:column !important;align-items:stretch !important}
+  /* flex-basis:320px on the row's first child was written for the row's
+     original horizontal main axis (a preferred width) — once flex-direction
+     flips to column above, the same flex-basis is read as a preferred
+     height instead, stretching the number+text block to 320px tall. */
+  .hg-numcall-row > *:first-child{flex-basis:auto !important}
+  .hg-numcall-controls{width:100% !important;flex-shrink:1 !important;justify-content:flex-start !important}
 }
 
 /* ====================================================================
@@ -2607,6 +2637,16 @@ select option {
   .hg-banner-logo img{width:200px;height:200px}
   .hg-banner-quote{font-size:30px}
   .hg-lobby-v2{max-width:1180px;width:100%;margin:0 auto;gap:34px;padding:44px 40px 0;scroll-margin-top:82px}
+  /* Info ticker breaks out of the 1180px content column to span the full
+     viewport — left screen edge to right. width:100vw with symmetric negative
+     margins keeps its flex margin-box exactly the content-column width (so the
+     lobby flex layout stays sane) while the border-box bleeds both ways; the
+     lobby screen's own overflow:hidden clips the bleed, so no horizontal scroll. */
+  .hg-announcement-banner{
+    width:100vw;
+    margin-left:calc(50% - 50vw);
+    margin-right:calc(50% - 50vw);
+  }
   .hg-lucky{padding:22px 26px;gap:22px}
   .hg-lucky-ball{width:92px;height:92px;font-size:38px}
   .hg-lucky-ball.is-wide{font-size:27px}

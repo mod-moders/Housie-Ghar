@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
@@ -78,25 +78,35 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    apiFetch<{ player: PlayerProfile }>("/api/player/me")
-      .then((res) => {
-        setProfile(res.player);
-        setFullName(res.player.full_name || "");
-        setPhone(res.player.phone || "");
-        setEmail(res.player.email || "");
-        setSoundEnabled(res.player.sound_enabled !== false);
-        setHasPassword(!!res.player.has_password);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load profile", err);
-        router.push("/login"); // redirect to login/signup
-      });
+    let cancelled = false;
+    const loadProfile = () => {
+      apiFetch<{ player: PlayerProfile }>("/api/player/me")
+        .then((res) => {
+          if (cancelled) return;
+          setProfile(res.player);
+          setFullName(res.player.full_name || "");
+          setPhone(res.player.phone || "");
+          setEmail(res.player.email || "");
+          setSoundEnabled(res.player.sound_enabled !== false);
+          setHasPassword(!!res.player.has_password);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error("Failed to load profile", err);
+          // Only a real 401/403 means the player isn't actually logged in —
+          // a network blip must not bounce them to /login; retry instead.
+          if (!isAuthError(err)) { setTimeout(() => { if (!cancelled) loadProfile(); }, 3000); return; }
+          router.push("/login"); // redirect to login/signup
+        });
+    };
+    loadProfile();
 
     // Kick off the winnings fetch on mount (flips a loading flag then resolves
     // async — the effect fetch the set-state-in-effect rule over-flags).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWinnings();
+    return () => { cancelled = true; };
   }, [router]);
 
   useEffect(() => {

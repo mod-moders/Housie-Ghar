@@ -46,3 +46,14 @@ export async function apiFetch<T>(
   }
   return res.json() as Promise<T>;
 }
+
+// A network failure (offline, DNS, a mid-deploy connection-refused window) never
+// reaches the `!res.ok` branch above and so carries no `.status` — only a real
+// 401/403 response from the server means the session is actually invalid. Callers
+// that redirect-to-login or clear stored tokens on any fetch failure will bounce
+// a user with a perfectly valid session during any transient blip; gate on this
+// instead of reacting to every thrown error.
+export function isAuthError(err: unknown): boolean {
+  const status = (err as { status?: number } | null | undefined)?.status;
+  return status === 401 || status === 403;
+}

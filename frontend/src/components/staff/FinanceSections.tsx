@@ -9,6 +9,7 @@ import { EmptyHint, Avatar } from "@/components/ui";
 import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
 import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
+import type { PerformanceSeries, HeatmapHour, RetentionData } from "./AdminSections";
 import type { AuthUser } from "@/lib/stores/authStore";
 
 interface QueueItem {
@@ -52,6 +53,12 @@ interface FinanceOverview {
   wallet_balances: number;
 }
 
+interface FinanceInsights {
+  series: PerformanceSeries;
+  heatmap: HeatmapHour[];
+  retention: RetentionData;
+}
+
 export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
   const showRequestsTab = me.role_name === "Financial Admin";
   const [activeTab, setActiveTab] = useState<"requests" | "ledgers" | "analysis">("analysis");
@@ -74,6 +81,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   // Analysis & Overview states
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const [insights, setInsights] = useState<FinanceInsights | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const load = useCallback(() => {
@@ -93,11 +101,13 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
       setLoadingAnalysis(true);
       Promise.all([
         apiFetch<FinancialAnalysis>("/api/stats/financial-analysis"),
-        apiFetch<FinanceOverview>("/api/stats/overview")
+        apiFetch<FinanceOverview>("/api/stats/overview"),
+        apiFetch<FinanceInsights>("/api/stats/finance-insights")
       ])
-        .then(([finRes, ovRes]) => {
+        .then(([finRes, ovRes, insightsRes]) => {
           setAnalysis(finRes);
           setOverview(ovRes);
+          setInsights(insightsRes);
           setLoadingAnalysis(false);
         })
         .catch(() => {
@@ -328,9 +338,9 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                 />
               </div>
 
-              {/* Main Analytics Chart — honest empty state when there's no real
-                  activity today (there is no backend 7-day series yet). */}
-              <AnalyticsChart isEmpty={!overview.gross_revenue_today && !overview.tickets_sold_today && !overview.active_games} />
+              {/* Main Analytics Chart — real trailing-7-day series from
+                  /api/stats/finance-insights, zero-filled while it loads. */}
+              <AnalyticsChart series={insights?.series} />
 
               {/* Today's Operational KPIs */}
               <div 
@@ -428,8 +438,8 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
 
               {/* Visualizations row: Heatmap & Retention */}
               <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", width: "100%" }}>
-                <HeatmapWidget />
-                <RetentionWidget />
+                <HeatmapWidget hours={insights?.heatmap} />
+                <RetentionWidget retention={insights?.retention} />
               </div>
 
               {/* Granular Game Performance Ledger */}

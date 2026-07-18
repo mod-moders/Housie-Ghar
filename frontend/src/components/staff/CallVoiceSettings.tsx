@@ -829,7 +829,7 @@ export function CallVoiceSettings() {
                     transition: "all 0.2s"
                   }}
                 >
-                  <span>🎵 Use MP3 (All Uploaded)</span>
+                  <span>🎵 Use MP3</span>
                 </button>
               </div>
             </div>
@@ -1259,7 +1259,7 @@ export function CallVoiceSettings() {
                 <span>Enable gameplay background music loops</span>
               </label>
 
-              {bgMusicUrl && !["", "/audio/music/soft_lounge.wav", "/audio/music/retro_arcade.wav", "/audio/music/traditional_flute.wav", "/audio/music/upbeat_dhol.wav", "/audio/music/synthwave_glow.wav", "/audio/music/acoustic_guitar.wav", "/audio/music/sleek_jazz.wav"].includes(bgMusicUrl) ? (
+              {bgMusicUrl && !["", "/audio/music/soft_lounge.wav", "/audio/music/retro_arcade.wav", "/audio/music/traditional_flute.wav"].includes(bgMusicUrl) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--card-line)", background: "var(--accent-soft)" }}>
                   <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".04em" }}>Active Custom Loop</span>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
@@ -1297,10 +1297,6 @@ export function CallVoiceSettings() {
                     <option value="/audio/music/soft_lounge.wav">Preset 1: Soft Lounge Loop</option>
                     <option value="/audio/music/retro_arcade.wav">Preset 2: Retro Arcade Loop</option>
                     <option value="/audio/music/traditional_flute.wav">Preset 3: Calm Indian Flute</option>
-                    <option value="/audio/music/upbeat_dhol.wav">Preset 4: Upbeat Indian Dhol Beat 🥁</option>
-                    <option value="/audio/music/synthwave_glow.wav">Preset 5: Ambient Synthwave Glow 🌃</option>
-                    <option value="/audio/music/acoustic_guitar.wav">Preset 6: Chill Acoustic Guitar 🎸</option>
-                    <option value="/audio/music/sleek_jazz.wav">Preset 7: Sleek Jazz Lounge 🎷</option>
                   </select>
                 </div>
               )}
@@ -1361,15 +1357,16 @@ export function CallVoiceSettings() {
               const currentEdit = editingTexts[item.number] ?? item.call_text;
 
               return (
-                <div 
-                  key={item.number} 
-                  style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "space-between", 
-                    gap: "16px", 
-                    padding: "12px 16px", 
-                    borderRadius: "var(--radius-sm)", 
+                <div
+                  key={item.number}
+                  className="hg-numcall-row"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "16px",
+                    padding: "12px 16px",
+                    borderRadius: "var(--radius-sm)",
                     background: "var(--surface-2)",
                     border: "1.5px solid var(--border-2)",
                     flexWrap: "wrap"
@@ -1426,8 +1423,8 @@ export function CallVoiceSettings() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", flexShrink: 0 }}>
-                    
+                  <div className="hg-numcall-controls" style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", flexShrink: 0 }}>
+
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <label className={`flex items-center gap-1 px-3 py-1.5 rounded border text-[11px] cursor-pointer select-none font-bold ${item.audio_url ? "bg-surface text-text hover:bg-surface-2" : "bg-brand text-bg border-brand hover:opacity-90"}`} style={{ borderRadius: "999px", transition: "all 0.15s ease", opacity: uploadingNum === item.number ? 0.6 : 1, pointerEvents: uploadingNum === item.number ? "none" : "auto", margin: 0, border: "1.5px solid var(--ink)" }}>
                         <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleFileUpload(item.number, e)} style={{ display: "none" }} />

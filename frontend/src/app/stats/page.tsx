@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import type { PlayerStats, HallOfFameEntry } from "@/lib/types";
@@ -49,9 +49,21 @@ export default function StatsPage() {
   const [rankInfo, setRankInfo] = useState<{ rank: number; totalPlayers: number } | null>(null);
 
   useEffect(() => {
-    apiFetch<PlayerStats>("/api/player/stats")
-      .then((res) => { setStats(res); setLoading(false); })
-      .catch((err) => { console.error("Failed to load stats", err); router.push("/login"); });
+    let cancelled = false;
+    const load = () => {
+      apiFetch<PlayerStats>("/api/player/stats")
+        .then((res) => { if (!cancelled) { setStats(res); setLoading(false); } })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error("Failed to load stats", err);
+          // Only a real 401/403 means the player isn't actually logged in —
+          // a network blip must not bounce them to /login; retry instead.
+          if (!isAuthError(err)) { setTimeout(() => { if (!cancelled) load(); }, 3000); return; }
+          router.push("/login");
+        });
+    };
+    load();
+    return () => { cancelled = true; };
   }, [router]);
 
   // Percentile rank: cross-reference this player against the public leaderboard by earnings

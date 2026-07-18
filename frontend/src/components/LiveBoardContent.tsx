@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useSSE, SSEEventData } from "@/lib/hooks/useSSE";
 import { useGameStore } from "@/lib/stores/gameStore";
@@ -192,21 +192,36 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);
 
-  // Player or Staff session check
+  // Player or Staff session check. Redirect to /login only if BOTH checks come
+  // back with a genuine 401/403 — i.e. neither identity is actually valid. A
+  // network blip or mid-deploy connection gap makes both checks fail with no
+  // status, and must not bounce an already-signed-in viewer off the live board;
+  // retry quietly instead.
   useEffect(() => {
-    apiFetch<{ player: { housie_name: string } }>("/api/player/me")
-      .then((res) => {
-        setDisplayName(res.player?.housie_name || "Player");
-      })
-      .catch(() => {
-        return apiFetch<{ user: { full_name: string } }>("/api/auth/me")
-          .then((res) => {
-            setDisplayName(res.user?.full_name || "Staff");
-          })
-          .catch(() => {
-            router.push("/login");
-          });
-      });
+    let cancelled = false;
+    const checkAuth = () => {
+      apiFetch<{ player: { housie_name: string } }>("/api/player/me")
+        .then((res) => {
+          if (!cancelled) setDisplayName(res.player?.housie_name || "Player");
+        })
+        .catch((playerErr) => {
+          if (cancelled) return;
+          apiFetch<{ user: { full_name: string } }>("/api/auth/me")
+            .then((res) => {
+              if (!cancelled) setDisplayName(res.user?.full_name || "Staff");
+            })
+            .catch((staffErr) => {
+              if (cancelled) return;
+              if (!isAuthError(playerErr) || !isAuthError(staffErr)) {
+                setTimeout(() => { if (!cancelled) checkAuth(); }, 3000);
+                return;
+              }
+              router.push("/login");
+            });
+        });
+    };
+    checkAuth();
+    return () => { cancelled = true; };
   }, [router]);
 
   const loadGameData = useCallback(() => {

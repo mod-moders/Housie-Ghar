@@ -295,27 +295,34 @@ export function EnhancedKpiCard({
 
 type ChartSource = "margin" | "volume" | "engagement";
 
-export function AnalyticsChart({ isEmpty }: { isEmpty?: boolean }) {
+export interface PerformanceSeries {
+  days: string[];
+  revenue: number[];
+  payouts: number[];
+  net: number[];
+  volume: number[];
+  dau: number[];
+  mau: number[];
+}
+
+const EMPTY_SERIES: PerformanceSeries = {
+  days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  revenue: [0, 0, 0, 0, 0, 0, 0],
+  payouts: [0, 0, 0, 0, 0, 0, 0],
+  net: [0, 0, 0, 0, 0, 0, 0],
+  volume: [0, 0, 0, 0, 0, 0, 0],
+  dau: [0, 0, 0, 0, 0, 0, 0],
+  mau: [0, 0, 0, 0, 0, 0, 0],
+};
+
+export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }) {
   const [source, setSource] = useState<ChartSource>("margin");
 
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const marginData = isEmpty ? {
-    revenue: [0, 0, 0, 0, 0, 0, 0],
-    payouts: [0, 0, 0, 0, 0, 0, 0],
-    net: [0, 0, 0, 0, 0, 0, 0],
-  } : {
-    revenue: [12000, 15000, 14000, 18000, 22000, 19000, 24500],
-    payouts: [9000, 11000, 10000, 13000, 16000, 14000, 18000],
-    net: [3000, 4000, 4000, 5000, 6000, 5000, 6500],
-  };
-  const volumeData = isEmpty ? [0, 0, 0, 0, 0, 0, 0] : [240, 310, 290, 360, 420, 380, 450];
-  const engagementData = isEmpty ? {
-    dau: [0, 0, 0, 0, 0, 0, 0],
-    mau: [0, 0, 0, 0, 0, 0, 0],
-  } : {
-    dau: [450, 520, 480, 610, 720, 680, 810],
-    mau: [2400, 2450, 2510, 2580, 2690, 2750, 2820],
-  };
+  const data = series ?? EMPTY_SERIES;
+  const days = data.days;
+  const marginData = { revenue: data.revenue, payouts: data.payouts, net: data.net };
+  const volumeData = data.volume;
+  const engagementData = { dau: data.dau, mau: data.mau };
 
   const getPathPoints = (data: number[], w: number, h: number, maxVal: number) => {
     return data.map((val, idx) => {
@@ -331,19 +338,19 @@ export function AnalyticsChart({ isEmpty }: { isEmpty?: boolean }) {
   let paths: { points: { x: number; y: number }[]; color: string; label: string }[] = [];
 
   if (source === "margin") {
-    maxVal = Math.max(...marginData.revenue) * 1.15;
+    maxVal = Math.max(1, Math.max(...marginData.revenue) * 1.15);
     paths = [
       { points: getPathPoints(marginData.revenue, width, height, maxVal), color: "var(--cyan)", label: "Gross Revenue" },
       { points: getPathPoints(marginData.payouts, width, height, maxVal), color: "var(--danger)", label: "Total Payouts" },
       { points: getPathPoints(marginData.net, width, height, maxVal), color: "var(--success)", label: "Net Profit" },
     ];
   } else if (source === "volume") {
-    maxVal = Math.max(...volumeData) * 1.15;
+    maxVal = Math.max(1, Math.max(...volumeData) * 1.15);
     paths = [
       { points: getPathPoints(volumeData, width, height, maxVal), color: "var(--accent)", label: "Ticket Sales Volume" },
     ];
   } else {
-    maxVal = Math.max(...engagementData.mau) * 1.15;
+    maxVal = Math.max(1, Math.max(...engagementData.mau) * 1.15);
     paths = [
       { points: getPathPoints(engagementData.dau, width, height, maxVal), color: "var(--accent)", label: "Daily Active (DAU)" },
       { points: getPathPoints(engagementData.mau, width, height, maxVal), color: "var(--cyan)", label: "Monthly Active (MAU)" },
@@ -440,16 +447,22 @@ export function AnalyticsChart({ isEmpty }: { isEmpty?: boolean }) {
   );
 }
 
-export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
-  const hours = [
-    { label: "12 AM", val: isEmpty ? 0 : 12 }, { label: "2 AM", val: isEmpty ? 0 : 8 }, { label: "4 AM", val: isEmpty ? 0 : 4 },
-    { label: "6 AM", val: isEmpty ? 0 : 15 }, { label: "8 AM", val: isEmpty ? 0 : 48 }, { label: "10 AM", val: isEmpty ? 0 : 84 },
-    { label: "12 PM", val: isEmpty ? 0 : 145 }, { label: "2 PM", val: isEmpty ? 0 : 110 }, { label: "4 PM", val: isEmpty ? 0 : 180 },
-    { label: "6 PM", val: isEmpty ? 0 : 240 }, { label: "8 PM", val: isEmpty ? 0 : 320 }, { label: "10 PM", val: isEmpty ? 0 : 290 }
-  ];
+export interface HeatmapHour {
+  label: string;
+  value: number;
+}
+
+const EMPTY_HEATMAP: HeatmapHour[] = [
+  "12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM",
+  "12 PM", "2 PM", "4 PM", "6 PM", "8 PM", "10 PM",
+].map((label) => ({ label, value: 0 }));
+
+export function HeatmapWidget({ hours }: { hours?: HeatmapHour[] | null }) {
+  const data = hours ?? EMPTY_HEATMAP;
+  const peak = Math.max(1, ...data.map((h) => h.value));
 
   const getOpacity = (val: number) => {
-    return Math.max(0.12, Math.min(1.0, val / 320));
+    return val === 0 ? 0.12 : Math.max(0.12, Math.min(1.0, val / peak));
   };
 
   return (
@@ -458,8 +471,8 @@ export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
       <p className="text-xs text-mute mb-4">Optimized game scheduling hours based on today&apos;s traffic.</p>
       
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginTop: "12px" }}>
-        {hours.map((h, i) => {
-          const op = getOpacity(h.val);
+        {data.map((h, i) => {
+          const op = getOpacity(h.value);
           return (
             <div 
               key={i} 
@@ -475,7 +488,7 @@ export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
               }}
             >
               <span className="text-[9px] text-mute font-bold">{h.label}</span>
-              <strong style={{ fontSize: "12px", color: op > 0.6 ? "#fff" : "var(--text)" }}>{h.val} tix</strong>
+              <strong style={{ fontSize: "12px", color: op > 0.6 ? "#fff" : "var(--text)" }}>{h.value} tix</strong>
             </div>
           );
         })}
@@ -484,9 +497,17 @@ export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
   );
 }
 
-export function RetentionWidget({ isEmpty }: { isEmpty?: boolean }) {
-  const total = isEmpty ? 0 : 209;
-  const returningPct = isEmpty ? 0 : 68;
+export interface RetentionData {
+  returning: number;
+  new_signups: number;
+  total: number;
+}
+
+export function RetentionWidget({ retention }: { retention?: RetentionData | null }) {
+  const returning = retention?.returning ?? 0;
+  const newSignups = retention?.new_signups ?? 0;
+  const total = retention?.total ?? 0;
+  const returningPct = total > 0 ? Math.round((returning / total) * 100) : 0;
   const radius = 32;
   const stroke = 8;
   const circ = 2 * Math.PI * radius;
@@ -524,13 +545,13 @@ export function RetentionWidget({ isEmpty }: { isEmpty?: boolean }) {
             <span style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
               <i style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)" }} /> Returning Users
             </span>
-            <span className="font-mono text-xs font-semibold">142 ({returningPct}%)</span>
+            <span className="font-mono text-xs font-semibold">{returning} ({returningPct}%)</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1.5px solid var(--border)", paddingBottom: "4px" }}>
             <span style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
               <i style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--surface-2)" }} /> New Signups
             </span>
-            <span className="font-mono text-xs font-semibold">67 ({100 - returningPct}%)</span>
+            <span className="font-mono text-xs font-semibold">{newSignups} ({total > 0 ? 100 - returningPct : 0}%)</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "2px" }}>
             <span className="text-[10px] text-mute">Total Active Today:</span>
