@@ -1,7 +1,7 @@
 "use client";
 /** Public lobby — full-screen banner with a rotating hook, then Live Now + Upcoming. */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
@@ -11,14 +11,6 @@ import { Icon } from "@/components/Icon";
 import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
 import type { GameSummary, LuckyNumberResponse } from "@/lib/types";
-import { RetroBingoHUD } from "@/components/RetroBingoHUD";
-
-// Rotated on the banner every 5s, starting from a random hook each page load.
-const HOOKS = [
-  "The whole town's playing — don't miss your number.",
-  "Mark your numbers. Match the call. Win the house.",
-  "Tambola night, every night — straight from the hills.",
-];
 
 // Decorative 3×9 ticket grid behind the hero. null = empty cell.
 type BannerCell = { n: number; tone: "yellow" | "ocean" | "pink" | "plain"; daub?: "pink" | "ocean" } | null;
@@ -30,8 +22,6 @@ const GRID_CELLS: BannerCell[] = [
 
 // Scattered sticker coins (size/colour/position come from .hg-banner-coin--N in CSS).
 const COINS = [33, 7, 62, 88];
-
-const emptySubscribe = () => () => {};
 
 function formatWhen(iso: string): { date: string; time: string } {
   const d = new Date(iso);
@@ -56,20 +46,12 @@ function cardStatus(g: GameSummary): "sold" | "fast" | "filling" | "open" {
   return "open";
 }
 
-const PRESET_BG: Record<string, string> = {
-  "High Noon Fortune": "/presets/High Noon Fortune.jpg",
-  "Prime Time": "/presets/Prime Time.jpg",
-  "Snack & Stack": "/presets/Snack & Stack.jpg",
-  "Sundown Showdown": "/presets/Sundown Showdown.jpg"
-};
-
 import { getPresetClass } from "@/lib/presetHelper";
 
 function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: string) => void; goLive: (id: string) => void; compact?: boolean }) {
   const isLive = game.game_status === "Live" || game.game_status === "Paused" || game.game_status === "Draw_Ended";
   const status = cardStatus(game);
   const sold = status === "sold";
-  const top = game.prize_pool[game.prize_pool.length - 1] ?? game.prize_pool[0];
   const totalPool = game.prize_pool.reduce((s, p) => s + p.prize_amount, 0);
   const when = formatWhen(game.scheduled_at);
   const presetClass = getPresetClass(game.title);
@@ -193,32 +175,14 @@ export default function Lobby() {
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // The quote rotates through HOOKS every 5s. A client-only random start (via
-  // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
-  // first quote fresh each visit; `step` advances on a timer; `key={step}` on the
-  // <p> replays the fade-in. React Compiler safe: setState lives in the interval
-  // callback, never synchronously in the effect body.
-  const startRef = useRef<number | null>(null);
-  const start = useSyncExternalStore(
-    emptySubscribe,
-    () => (startRef.current ??= Math.floor(Math.random() * HOOKS.length)),
-    (): number | null => null,
-  );
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setStep((s) => s + 1), 5000);
-    return () => clearInterval(id);
-  }, []);
-  const quote = start === null ? "" : HOOKS[(start + step) % HOOKS.length];
-
   // Announcement ticker text, derived from config (muted/list/legacy single text).
   const textToScroll = useMemo(() => {
     if (!config || config.announcements_muted === "true") return null;
     let activeAnnouncements: string[] = [];
     try {
       if (config.announcements_list) {
-        const list = JSON.parse(config.announcements_list);
-        activeAnnouncements = list.filter((a: any) => !a.muted).map((a: any) => a.text);
+        const list: { muted?: boolean; text: string }[] = JSON.parse(config.announcements_list);
+        activeAnnouncements = list.filter((a) => !a.muted).map((a) => a.text);
       }
     } catch (e) {
       console.error("Failed to parse announcements_list", e);
@@ -236,6 +200,9 @@ export default function Lobby() {
 
   useLayoutEffect(() => {
     if (!textToScroll) {
+      // Clearing measured marquee vars when there's nothing to scroll — a DOM
+      // measurement layout effect, which is the legitimate setState-in-effect case.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMarqueeVars(null);
       return;
     }
@@ -312,7 +279,6 @@ export default function Lobby() {
   const goLive = (id: string) => router.push(`/game/${id}/live`);
 
   const lobbyRef = useRef<HTMLDivElement>(null);
-  const scrollToGames = () => lobbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const all = games ?? [];
   const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
@@ -320,8 +286,10 @@ export default function Lobby() {
     .filter((g) => g.game_status === "Scheduled")
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
-  // Disable the featured next card; all scheduled games show in the upcoming grid below.
-  const featuredNext: any = undefined;
+  // Featured "next draw" card is disabled — all scheduled games show in the grid
+  // below. Derived via find(() => false) so it stays undefined at runtime while
+  // keeping the card's JSX type-checked (GameSummary | undefined) for easy re-enable.
+  const featuredNext: GameSummary | undefined = scheduled.find(() => false);
   const gridGames = scheduled;
   const nothingToShow = games !== null && inProgress.length === 0 && scheduled.length === 0;
 
@@ -337,9 +305,9 @@ export default function Lobby() {
       animationDuration: `${marqueeVars.duration}s`,
       animationTimingFunction: "linear",
       animationIterationCount: "infinite",
-      ["--marquee-start" as any]: `${marqueeVars.startPx}px`,
-      ["--marquee-end" as any]: `${marqueeVars.endPx}px`,
-    };
+      "--marquee-start": `${marqueeVars.startPx}px`,
+      "--marquee-end": `${marqueeVars.endPx}px`,
+    } as CSSProperties;
   }, [marqueeVars]);
 
   if (isCheckingAuth) {
@@ -391,6 +359,7 @@ export default function Lobby() {
                   aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
                 >
                   <div className="hg-lucky-wizard-scene">
+                     {/* eslint-disable-next-line @next/next/no-img-element -- decorative CSS-positioned PNG; next/image fill would fight the wizard-scene layout */}
                      <img src="/assets/wizard_globe.png" className="hg-wizard-img" alt="Wizard predicting lucky number" />
                      <div className="hg-globe-glow"></div>
                      <div className="hg-lucky-number-overlay">

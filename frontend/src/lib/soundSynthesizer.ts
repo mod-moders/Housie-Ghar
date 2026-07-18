@@ -2,13 +2,16 @@ class SoundSynthesizer {
   private ctx: AudioContext | null = null;
   
   // Cage spinning state
-  private spinInterval: any = null;
+  private spinInterval: ReturnType<typeof setInterval> | null = null;
   private spinOscNode: OscillatorNode | null = null;
   private spinGainNode: GainNode | null = null;
+  private spinLfo: OscillatorNode | null = null;
+  private spinNoiseSource: AudioBufferSourceNode | null = null;
 
   private initCtx() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.ctx = new (window.AudioContext ||
+        (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
@@ -75,8 +78,8 @@ class SoundSynthesizer {
       noiseSource.start();
 
       this.spinOscNode = osc;
-      (this as any).spinNoiseSource = noiseSource;
-      (this as any).spinLfo = lfo;
+      this.spinNoiseSource = noiseSource;
+      this.spinLfo = lfo;
       this.spinGainNode = mainGain;
 
       // 2. High-density ball collisions (ball-to-ball plastic thuds & ball-to-wire steel clinks)
@@ -141,13 +144,13 @@ class SoundSynthesizer {
         try { this.spinOscNode.stop(); } catch {}
         this.spinOscNode = null;
       }
-      if ((this as any).spinLfo) {
-        try { (this as any).spinLfo.stop(); } catch {}
-        (this as any).spinLfo = null;
+      if (this.spinLfo) {
+        try { this.spinLfo.stop(); } catch {}
+        this.spinLfo = null;
       }
-      if ((this as any).spinNoiseSource) {
-        try { (this as any).spinNoiseSource.stop(); } catch {}
-        (this as any).spinNoiseSource = null;
+      if (this.spinNoiseSource) {
+        try { this.spinNoiseSource.stop(); } catch {}
+        this.spinNoiseSource = null;
       }
       if (this.spinGainNode) {
         this.spinGainNode.disconnect();
@@ -265,7 +268,7 @@ class SoundSynthesizer {
           wetGain.gain.value = 0.18 * newVolume;
         }
       };
-    } catch (e) {
+    } catch {
       audio.volume = Math.min(1.0, customVolume);
       return null;
     }

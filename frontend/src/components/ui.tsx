@@ -82,6 +82,7 @@ export function Avatar({
   const [failed, setFailed] = React.useState(false);
   if (src && !failed) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- avatar needs an onError fallback and an arbitrary/remote src, which next/image doesn't fit
       <img
         src={src}
         alt={name ?? "Profile picture"}

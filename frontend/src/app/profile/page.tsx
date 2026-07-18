@@ -70,8 +70,8 @@ export default function ProfilePage() {
       if (response.whatsapp_url) {
         window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
-      alert(err.message || "Failed to initiate claim");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to initiate claim");
     } finally {
       setClaimingId(null);
     }
@@ -93,6 +93,9 @@ export default function ProfilePage() {
         router.push("/login"); // redirect to login/signup
       });
 
+    // Kick off the winnings fetch on mount (flips a loading flag then resolves
+    // async — the effect fetch the set-state-in-effect rule over-flags).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWinnings();
   }, [router]);
 
@@ -102,11 +105,16 @@ export default function ProfilePage() {
       const claimPrizeId = params.get("claim_prize_id");
       const gameId = params.get("game_id");
       if (claimPrizeId && gameId) {
+        // Auto-fire a deep-linked prize claim once, after the page has loaded.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         initiateClaim(gameId, parseInt(claimPrizeId, 10));
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
     }
+    // initiateClaim is intentionally excluded: this must run once when loading
+    // settles, not each time the (non-memoised) callback identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, winningsLoading]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -114,7 +122,13 @@ export default function ProfilePage() {
     setSaving(true);
     setError(null);
     try {
-      const updates: any = {
+      const updates: {
+        full_name: string;
+        phone: string | null;
+        email: string | null;
+        sound_enabled: boolean;
+        password?: string;
+      } = {
         full_name: fullName,
         phone: phone || null,
         email: email || null,
@@ -142,8 +156,8 @@ export default function ProfilePage() {
       setRemovePassword(false); // Reset checkbox
       
       alert("Profile updated successfully!");
-    } catch (err: any) {
-      setError(err.message || "Failed to save profile");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save profile");
     } finally {
       setSaving(false);
     }

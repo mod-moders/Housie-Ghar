@@ -23,8 +23,6 @@ export function SettingsSection() {
   const { user } = useAuthStore();
   const isSuperadmin = user?.role_name === "Superadmin";
   const [saving, setSaving] = useState(false);
-  const [announcement, setAnnouncement] = useState("");
-  const [siteTitle, setSiteTitle] = useState("");
   const [activeTheme, setActiveTheme] = useState("");
   const [message, setMessage] = useState("");
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -42,15 +40,17 @@ export function SettingsSection() {
 
   useEffect(() => {
     if (config) {
-      setAnnouncement(config.announcement_text || "");
-      setSiteTitle(config.site_title || "");
+      // Seed editable form fields from the live config store when it loads or
+      // changes. config starts null and populates async, so a lazy initial value
+      // can't capture it — mirroring via effect is the correct pattern here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTheme(config.active_theme || "");
-      
+
       // Parse announcements list
       try {
         const parsed = JSON.parse(config.announcements_list || "[]");
         setAnnouncements(parsed);
-      } catch (e) {
+      } catch {
         setAnnouncements([]);
       }
       setSpeed(config.announcement_speed || "10");
@@ -88,8 +88,8 @@ export function SettingsSection() {
       });
       updateConfigLocally(updates);
       setMessage("Settings saved successfully.");
-    } catch (e: any) {
-      setMessage(e.message || "Failed to save settings.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to save settings.");
     }
     setSaving(false);
     setTimeout(() => setMessage(""), 3000);
@@ -482,8 +482,8 @@ export function SettingsSection() {
                           setResetConfirmText("");
                           // Reload the page after 2 seconds to refresh all statistics
                           setTimeout(() => window.location.reload(), 2000);
-                        } catch (e: any) {
-                          setMessage(e.message || "Reset failed.");
+                        } catch (e) {
+                          setMessage(e instanceof Error ? e.message : "Reset failed.");
                         } finally {
                           setIsResetting(false);
                         }

@@ -60,12 +60,13 @@ export default function Login() {
 
       // Redirect to lobby
       router.push("/");
-    } catch (err: any) {
-      if (err.password_required) {
+    } catch (err) {
+      const e = err as { password_required?: boolean; message?: string };
+      if (e.password_required) {
         setPasswordRequired(true);
         setError("This account is secured. Please enter your password.");
       } else {
-        setError(err.message || "Housie Name not found. Check spelling or sign up.");
+        setError(e.message || "Housie Name not found. Check spelling or sign up.");
       }
     } finally {
       setLoading(false);

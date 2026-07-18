@@ -27,6 +27,9 @@ export default function StaffLogin() {
     const n = sessionStorage.getItem("hg_staff_login_notice");
     if (n) {
       sessionStorage.removeItem("hg_staff_login_notice");
+      // sessionStorage is client-only, so this notice can't be a lazy initial
+      // value (which would also run during SSR) — seeding via effect is correct.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotice(n);
     }
   }, []);

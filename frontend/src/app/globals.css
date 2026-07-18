@@ -537,13 +537,17 @@
   overflow: hidden;
   height: 44px;
   
-  /* Break out of container constraints to span full screen width */
-  width: 100vw;
+  /* Full-bleed on real phones, but never wider than the 452px phone frame,
+     so the bar spans the frame edge-to-edge instead of overhanging it on
+     tablet-band widths (560-899px). margin-left self-corrects to the frame's
+     left edge at any width: it equals frameCenter - halfBox, and the frame is
+     always centered in the viewport below 900px. */
+  width: min(100vw, 452px);
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+  left: auto;
+  right: auto;
+  margin-left: calc(50% - min(50vw, 226px));
+  margin-right: 0;
   margin-top: 16px;
   margin-bottom: 16px;
 
@@ -932,7 +936,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-sheet-link{display:flex;align-items:center;gap:11px;padding:12px;border:0;background:none;
   color:var(--text);font:600 14px var(--font-head);text-align:left;border-radius:10px;cursor:pointer}
 .hg-sheet-link:hover{background:var(--surface-2)}
-@media(min-width:560px){.hg-nav-links{display:flex}.hg-burger{display:none}}
+/* Inline nav links only once the frame de-phones to full width (>=900px).
+   Below that the frame is a fixed 452px column, so the links would overflow
+   it on tablet-band widths (560-899px) — the hamburger stays until then. */
+@media(min-width:900px){.hg-nav-links{display:flex}.hg-burger{display:none}}
 
 /* ============ BUTTONS ============ */
 .hg-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
@@ -2375,7 +2382,26 @@ select option {
   border-radius:999px;border:1.5px solid var(--ink);box-shadow:0 4px 0 -1px var(--ink)}
 .hg-empty-cta:active{transform:translateY(3px);box-shadow:0 1px 0 -1px var(--ink)}
 
-@media(prefers-reduced-motion:reduce){*{animation-duration:.001s!important}}
+/* ====================================================================
+   Motion polish — subtle ease-in-out on interactive state changes that
+   previously snapped (hover / focus / :active). Durations kept short
+   (.14-.18s) so the UI stays crisp, not laggy. All neutralised under
+   prefers-reduced-motion by the block below.
+   ==================================================================== */
+.hg-player-chip{transition:border-color .18s ease-in-out,color .18s ease-in-out,box-shadow .18s ease-in-out}
+.hg-sheet-link{transition:background-color .16s ease-in-out,color .16s ease-in-out}
+.hg-staff-btn,.hg-theme-btn,.hg-burger,.hg-back,.hg-mute{
+  transition:transform .14s ease-in-out,box-shadow .14s ease-in-out,
+    background-color .16s ease-in-out,color .16s ease-in-out,border-color .16s ease-in-out}
+.hg-nav-link{transition:color .18s ease-in-out,background-color .18s ease-in-out}
+.hg-name-input,.hg-login-field input,.hg-form-field input,.hg-form-field select,
+.hg-search-input{transition:border-color .18s ease-in-out,box-shadow .18s ease-in-out}
+/* Mobile/tablet nav menu eases in on open instead of popping */
+.hg-nav-sheet{animation:hg-sheet-drop .17s ease-out}
+@keyframes hg-sheet-drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* Reduced-motion: collapse both animations AND transitions to ~instant. */
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.001s!important}}
 
 /* ============ STAFF DASHBOARD — narrow-screen handling ============ */
 @media(max-width:720px){
@@ -2679,6 +2705,38 @@ select option {
 @media(min-width:1340px){
   .hg-lobby-body,.hg-room-body,.hg-live-body{padding-left:56px;padding-right:56px}
   .hg-room-main .hg-numgrid{grid-template-columns:repeat(auto-fill,minmax(58px,1fr))}
+}
+
+/* ====================================================================
+   SAFE-AREA INSETS (viewport-fit:cover) — reclaim the space under the
+   notch and home indicator on modern phones. env(..., 0px) resolves to
+   0px on every non-notched screen, so all of these are inert (no visual
+   change) everywhere except an actual notched device. Placed after the
+   nav padding rules above so the padding-top override lands; scoped to
+   <=899px so it never shrinks the desktop nav's 16px top padding. */
+@supports (padding: env(safe-area-inset-top)) {
+  @media (max-width: 899px) {
+    .hg-nav { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  }
+  .hg-frame:not(.hg-frame-wide) {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+/* Tablet band (560-899px): the frame is still the 452px phone column, which
+   otherwise floats in up to ~220px of undifferentiated dead space each side.
+   Give it hairline side edges + a soft ambient shadow so the centered column
+   reads as an intentional phone-device presentation rather than a stray narrow
+   column. Scoped to this band only — phones and the >=900px desktop layer are
+   untouched (the frame stays flat there, per the existing design). */
+@media (min-width: 560px) and (max-width: 899px) {
+  .hg-frame:not(.hg-frame-wide) {
+    border-left: 1px solid var(--border-2);
+    border-right: 1px solid var(--border-2);
+    box-shadow: 0 0 44px -10px rgba(0, 0, 0, 0.55);
+  }
 }
 
 /* Ticket Search Box and Styling */

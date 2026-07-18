@@ -162,7 +162,7 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
                 Franchise Portal <br /> Onboarding Setup
               </h2>
               <p style={{ color: "var(--text-mute)", fontSize: "13px", lineHeight: "1.6", marginBottom: "32px" }}>
-                As a newly provisioned staff member, you must complete your profile configuration and replace the temporary password before gain access to the dashboard.
+                As a newly provisioned staff member, you must complete your profile configuration and replace the temporary password before gaining access to the dashboard.
               </p>
 
               {/* Progress Bullet Steps */}

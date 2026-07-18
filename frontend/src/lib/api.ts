@@ -6,7 +6,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(init.headers as any ?? {}),
+    ...((init.headers as Record<string, string>) ?? {}),
   };
 
   if (typeof window !== "undefined") {
@@ -40,7 +40,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     const error = new Error(err.message ?? "Request failed");
-    (error as any).status = res.status;
+    (error as Error & { status?: number }).status = res.status;
     Object.assign(error, err);
     throw error;
   }

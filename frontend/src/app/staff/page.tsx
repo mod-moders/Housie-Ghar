@@ -335,8 +335,8 @@ export default function StaffDashboard() {
               {showFinanceBar ? (
                 <div className="hg-fin-hud">
                   <div className="hg-fin-stat"><span>Overall Profit</span><b>{money(hud.overall_profit)}</b></div>
-                  <div className="hg-fin-stat"><span>Today's Collection</span><b>{money(hud.today_collection)}</b></div>
-                  <div className="hg-fin-stat"><span>Today's Profit</span><b>{money(hud.today_profit)}</b></div>
+                  <div className="hg-fin-stat"><span>Today&apos;s Collection</span><b>{money(hud.today_collection)}</b></div>
+                  <div className="hg-fin-stat"><span>Today&apos;s Profit</span><b>{money(hud.today_profit)}</b></div>
                   <div className="hg-fin-stat"><span>Monthly Profit</span><b>{money(hud.monthly_profit)}</b></div>
                 </div>
               ) : (

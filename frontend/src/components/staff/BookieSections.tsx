@@ -21,16 +21,26 @@ function useTicker(): number {
   return now;
 }
 
+interface BookieHistoryItem {
+  booking_id: string;
+  housie_name: string;
+  game_title: string;
+  ticket_numbers: number[];
+  total_amount: number;
+  booking_status: string;
+  processed_at: string | null;
+}
+
 export function BookieQueueSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<BookieHistoryItem[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const now = useTicker();
 
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/agent/queue").then(setQueue).catch(() => {});
-    apiFetch<any[]>("/api/bookings/agent/history").then(setHistory).catch(() => {});
+    apiFetch<BookieHistoryItem[]>("/api/bookings/agent/history").then(setHistory).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -418,7 +428,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="hg-dim">Today's Profit</span>
+                <span className="hg-dim">Today&apos;s Profit</span>
                 <strong style={{ color: "#10B981" }}>{money(stats?.profit_today ?? 0)}</strong>
               </div>
 

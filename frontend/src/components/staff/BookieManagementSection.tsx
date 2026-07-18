@@ -62,6 +62,9 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
   }, [me.role_name]);
 
   useEffect(() => {
+    // Mount fetch: loadCommission() may setState after resolving async — the
+    // effect fetch the set-state-in-effect rule over-flags (memoised, runs once).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCommission();
   }, [loadCommission]);
 
@@ -75,8 +78,8 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
       });
       setCommMessage("Commission updated successfully!");
       setTimeout(() => setCommMessage(""), 3000);
-    } catch (e: any) {
-      setCommMessage(e.message || "Failed to update commission.");
+    } catch (e) {
+      setCommMessage(e instanceof Error ? e.message : "Failed to update commission.");
     }
     setSavingComm(false);
   };
@@ -88,8 +91,8 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
     try {
       const data = await apiFetch<BookieStats[]>("/api/users/bookies-stats");
       setBookies(data);
-    } catch (e: any) {
-      setError(e.message || "Failed to load bookies stats");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load bookies stats");
     }
   }, []);
 
@@ -98,12 +101,15 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
     try {
       const data = await apiFetch<BookieApplication[]>("/api/users/bookie-applications");
       setApps(data);
-    } catch (e: any) {
-      setError(e.message || "Failed to load applications");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load applications");
     }
   }, []);
 
   useEffect(() => {
+    // Refetch on tab change: the loaders setState after resolving async — the
+    // effect fetch the set-state-in-effect rule over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (activeTab === "registered" || activeTab === "created") loadBookies();
     else loadApps();
   }, [activeTab, loadBookies, loadApps]);
@@ -129,8 +135,8 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
         body: JSON.stringify({ status: newStatus }),
       });
       loadBookies();
-    } catch (e: any) {
-      setError(e.message || "Failed to update status");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update status");
     } finally {
       setBusy(false);
     }
@@ -142,8 +148,8 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
     try {
       await apiFetch(`/api/users/${b.user_id}`, { method: "DELETE" });
       loadBookies();
-    } catch (e: any) {
-      setError(e.message || "Failed to delete bookie");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete bookie");
     } finally {
       setBusy(false);
     }

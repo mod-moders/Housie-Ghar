@@ -35,7 +35,7 @@ export function useSSE(gameId: string | null, onEvent?: (data: SSEEventData) => 
         return;
       }
       if (data.event === "initial_state") {
-        setStatus(data.game_status as any);
+        setStatus(data.game_status as Parameters<typeof setStatus>[0]);
         ((data.drawn_numbers as number[]) ?? []).forEach((n) => addDrawn(n));
         // Let LiveBoard handle draw to sync with audio!
       } else if (data.event === "paused") {

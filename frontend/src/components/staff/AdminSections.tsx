@@ -6,13 +6,12 @@ import { apiFetch } from "@/lib/api";
 import Link from "next/link";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
-import { Button, EmptyHint, KpiCard, Avatar } from "@/components/ui";
+import { Button, EmptyHint, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
-import type { AuditEntry, GameSummary, OverviewStats, StaffUser } from "@/lib/types";
+import type { AuditEntry, GameSummary, StaffUser } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { CallVoiceSettings } from "./CallVoiceSettings";
 import { getPresetClass } from "@/lib/presetHelper";
-import { BookieQueueSection } from "./BookieSections";
 import { useSocket } from "@/lib/hooks/useSocket";
 
 const DIVIDEND_METADATA = [
@@ -89,7 +88,7 @@ function gameTime(g: GameSummary): string {
 }
 
 // ── Games table with start/pause/resume controls ─────────────────────────────
-function GamesTable({ games, controls, onAction, onCompletedClick, onViewTickets, onManualBook, canManage }: {
+function GamesTable({ games, controls, onAction, onCompletedClick, canManage }: {
   games: GameSummary[];
   controls?: boolean;
   onAction?: (id: string, action: "start" | "pause" | "resume" | "edit" | "delete" | "speed", speedValue?: number) => void;
@@ -457,7 +456,7 @@ export function HeatmapWidget({ isEmpty }: { isEmpty?: boolean }) {
   return (
     <div className="hg-panel" style={{ flex: 1, minWidth: "260px", padding: "16px 20px" }}>
       <h3 className="text-sm font-semibold mb-1">Peak Ticket Sales Heatmap</h3>
-      <p className="text-xs text-mute mb-4">Optimized game scheduling hours based on today's traffic.</p>
+      <p className="text-xs text-mute mb-4">Optimized game scheduling hours based on today&apos;s traffic.</p>
       
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginTop: "12px" }}>
         {hours.map((h, i) => {
@@ -672,7 +671,6 @@ export function GamesSection({ me }: { me: AuthUser }) {
 
   const create = async () => {
     setError(null);
-    const isFirstSelected = prizes.find((p) => p.pattern_name === "1st Full House")?.enabled;
     const isSecondSelected = prizes.find((p) => p.pattern_name === "2nd Full House")?.enabled;
     const isThirdSelected = prizes.find((p) => p.pattern_name === "3rd Full House")?.enabled;
 
@@ -1206,8 +1204,11 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    // Mount/param fetch: sets the loading flag then resolves async — the effect
+    // fetch the set-state-in-effect rule over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    apiFetch<any>(`/api/games/${gameId}/sales-details?_=${Date.now()}`)
+    apiFetch<NonNullable<typeof data>>(`/api/games/${gameId}/sales-details?_=${Date.now()}`)
       .then((res) => setData(res))
       .catch((err) => console.error("Failed to load sales details:", err))
       .finally(() => setLoading(false));
@@ -1413,8 +1414,11 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Mount/param fetch: sets the loading flag then resolves async — the effect
+    // fetch the set-state-in-effect rule over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    apiFetch<any>(`/api/games/${gameId}/tickets`)
+    apiFetch<{ tickets?: typeof tickets }>(`/api/games/${gameId}/tickets`)
       .then((res) => {
         setTickets(res.tickets || []);
       })
@@ -1472,8 +1476,8 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
       alert("Manual booking confirmed!");
       onSuccess?.();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to confirm manual booking.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to confirm manual booking.");
     } finally {
       setSaving(false);
     }
@@ -1768,6 +1772,8 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       if (prefill) {
         try {
           const data = JSON.parse(prefill);
+          // Seed the form once from a prefill payload in storage (client-only).
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setForm({
             full_name: data.full_name || "",
             username: data.username || "",
@@ -1916,11 +1922,11 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
         <div className="hg-table">
           <div
             className={me.role_name === "Superadmin" ? "hg-tr hg-tr-head" : "hg-tr hg-tr-6 hg-tr-head"}
-            style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 1.3fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
+            style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
           >
             {me.role_name === "Superadmin" ? (
               <>
-                <span>Staff</span><span>Role</span><span>Username</span><span>Password</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
+                <span>Staff</span><span>Role</span><span>Username</span><span>Town</span><span>Wallet</span><span>Status</span><span>Actions</span>
               </>
             ) : (
               <>
@@ -1932,7 +1938,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
             <div
               key={u.user_id}
               className={me.role_name === "Superadmin" ? "hg-tr" : "hg-tr hg-tr-6"}
-              style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 1.3fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
+              style={me.role_name === "Superadmin" ? { gridTemplateColumns: "1.8fr 1.1fr 1.2fr 0.9fr 0.9fr 0.8fr 1fr" } : undefined}
             >
               <span className="hg-td-name">
                 <Avatar src={roleAvatar(u)} name={u.full_name} />{u.full_name}
@@ -1941,7 +1947,6 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
               {me.role_name === "Superadmin" && (
                 <>
                   <span className="hg-dim" style={{ wordBreak: "break-all" }}>{u.username}</span>
-                  <span style={{ fontFamily: "monospace", color: "var(--accent)", fontSize: "12px", wordBreak: "break-all" }}>{u.password_plain || "—"}</span>
                 </>
               )}
               <span className="hg-dim">{u.town ?? "—"}</span>
@@ -2030,6 +2035,9 @@ export function HistorySection() {
   const [salesGameId, setSalesGameId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Mount fetch: sets the loading flag then resolves async — the effect fetch
+    // the set-state-in-effect rule over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     apiFetch<GameSummary[]>("/api/games")
       .then((g) => {

@@ -96,26 +96,30 @@ function Stand() {
 /* ─── Balls inside cage ──────────────────────────────── */
 const BALL_COLORS = ["#e53935", "#1e88e5", "#43a047", "#fdd835", "#8e24aa", "#fb8c00", "#00acc1", "#ec407a", "#7cb342", "#ff7043"];
 
+// Per-ball motion params — random but computed once at module load, so they stay
+// fixed for the app's lifetime. Doing this here (not in render/useMemo) keeps the
+// impure Math.random out of the render path, which the react-hooks purity rule
+// requires, and none of these values depend on component props.
+const INNER_BALLS = [...Array(90)].map((_, i) => {
+  const num = i + 1;
+  return {
+    num,
+    color: BALL_COLORS[num % BALL_COLORS.length],
+    seed: Math.random() * Math.PI * 2,
+    freq: {
+      x: 0.5 + Math.random() * 1.5,
+      y: 0.5 + Math.random() * 1.5,
+      z: 0.5 + Math.random() * 1.5,
+    },
+    spinX: (Math.random() - 0.5) * 5,
+    spinY: (Math.random() - 0.5) * 5,
+  };
+});
+
 function InnerBalls({ isSpinning, drawn }: { isSpinning: boolean; drawn: Set<number> }) {
   const groupRef = useRef<THREE.Group>(null);
 
-  const balls = useMemo(() => {
-    return [...Array(90)].map((_, i) => {
-      const num = i + 1;
-      return {
-        num,
-        color: BALL_COLORS[num % BALL_COLORS.length],
-        seed: Math.random() * Math.PI * 2,
-        freq: {
-          x: 0.5 + Math.random() * 1.5,
-          y: 0.5 + Math.random() * 1.5,
-          z: 0.5 + Math.random() * 1.5,
-        },
-        spinX: (Math.random() - 0.5) * 5,
-        spinY: (Math.random() - 0.5) * 5,
-      };
-    });
-  }, []);
+  const balls = INNER_BALLS;
 
   // Pre-calculate dense hemispherical pack layout
   const settlePositions = useMemo(() => {

@@ -60,7 +60,6 @@ export function TopNav() {
             className={`hg-nav-link${pathname === href ? " is-active" : ""}`}
             onClick={() => go(href)}
           >
-            {/* @ts-ignore */}
             <Icon name={icon} size={16} /> <span style={{ marginLeft: "6px" }}>{lbl}</span>
           </button>
         ))}

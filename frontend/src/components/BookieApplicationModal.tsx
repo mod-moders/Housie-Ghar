@@ -69,8 +69,8 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
         })
       });
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to submit application. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit application. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -233,7 +233,7 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
                 
                 <div>
                   <b style={{ color: "var(--text)", display: "block", fontSize: "13px", marginBottom: "4px" }}>2. Confirming Player Bookings</b>
-                  When a player pays you for their tickets via UPI, you must first check your personal bank account or UPI app to ensure the money has successfully arrived. Once you see the payment is safely in your account, open your booking dashboard and click the <b>"Confirm"</b> button.
+                  When a player pays you for their tickets via UPI, you must first check your personal bank account or UPI app to ensure the money has successfully arrived. Once you see the payment is safely in your account, open your booking dashboard and click the <b>&quot;Confirm&quot;</b> button.
                   <p style={{ marginTop: "6px", color: "var(--accent)", fontStyle: "italic" }}>
                     * <b>Important Time Limit:</b> You must verify the payment and click confirm within a 10-minute window. Once you click confirm, the system will officially issue the active tickets to the player.
                   </p>

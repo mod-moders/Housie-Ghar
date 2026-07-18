@@ -54,6 +54,10 @@ export function CallVoiceSettings() {
 
   useEffect(() => {
     if (config) {
+      // Seed local toggle/URL state from the live config store when it arrives
+      // or changes (config is async and starts null, so a lazy initial value
+      // can't capture it) — mirroring via effect is correct here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCallerEnabled(config.english_caller_enabled === "true");
       setCageSound(config.cage_sound_enabled !== "false");
       setCelebrationSound(config.celebration_sound_enabled !== "false");
@@ -200,6 +204,9 @@ export function CallVoiceSettings() {
   };
 
   useEffect(() => {
+    // Mount data-fetch: load() flips the loading flag then resolves async — the
+    // canonical effect fetch the set-state-in-effect heuristic over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
 
     const updateVoices = () => {

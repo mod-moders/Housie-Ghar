@@ -8,9 +8,9 @@ import { useSSE, type SSEEventData } from "@/lib/hooks/useSSE";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { useGameStore } from "@/lib/stores/gameStore";
 import { Icon } from "@/components/Icon";
-import { Button, EmptyHint, KpiCard } from "@/components/ui";
+import { Button, EmptyHint } from "@/components/ui";
 import { downloadPoster, type PosterKind } from "@/lib/sharePoster";
-import type { GameSummary, QueueBooking, Prize } from "@/lib/types";
+import type { GameSummary, QueueBooking, Prize, TicketDetail } from "@/lib/types";
 import { type AuthUser } from "@/lib/stores/authStore";
 import { getPresetClass } from "@/lib/presetHelper";
 import { HousieTicket, gridToMatrix, type TicketMatrix } from "@/components/HousieTicket";
@@ -130,7 +130,7 @@ export function OperatorHudSection() {
         revealDraw(num);
       }, 2000);
     } else if (data.event === "winner") {
-      const w = data as any;
+      const w = data as unknown as { prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number };
       setPrizes((prev) =>
         prev.map((p) =>
           p.pattern_name === w.prize
@@ -145,6 +145,8 @@ export function OperatorHudSection() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     reset();
+    // Reset the ticket-search UI whenever the selected game changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchedTickets([]);
     setSearchQuery("");
   }, [selectedId, reset]);
@@ -201,7 +203,7 @@ export function OperatorHudSection() {
   const handleSearch = () => {
     if (!selectedId || !searchQuery.trim()) return;
     setIsSearching(true);
-    apiFetch<any[]>(`/api/games/${selectedId}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
+    apiFetch<TicketDetail[]>(`/api/games/${selectedId}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
       .then((tickets) => {
         const mapped = tickets.map((t) => ({
           number: t.ticket_number,
@@ -505,9 +507,19 @@ export function OperatorHudSection() {
   );
 }
 
+interface OverflowHistoryItem {
+  booking_id: string;
+  housie_name: string;
+  game_title: string;
+  ticket_numbers: number[];
+  total_amount: number;
+  booking_status: string;
+  processed_at: string | null;
+}
+
 export function OverflowSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<OverflowHistoryItem[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<{ user_id: string; full_name: string; role_name: string; receive_overflow: boolean }[]>([]);
@@ -521,12 +533,12 @@ export function OverflowSection({ me }: { me: AuthUser }) {
 
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/operator/overflow-queue").then(setQueue).catch(() => {});
-    apiFetch<any[]>("/api/bookings/operator/overflow-history").then(setHistory).catch(() => {});
+    apiFetch<OverflowHistoryItem[]>("/api/bookings/operator/overflow-history").then(setHistory).catch(() => {});
   }, []);
 
   const loadSettings = useCallback(() => {
     if (me.role_name !== "Superadmin") return;
-    apiFetch<any[]>("/api/users/overflow-settings")
+    apiFetch<{ user_id: string; full_name: string; role_name: string; receive_overflow: boolean }[]>("/api/users/overflow-settings")
       .then(setSettings)
       .catch(() => {});
   }, [me]);
@@ -794,7 +806,7 @@ export function ShareGamesSection() {
 
   return (
     <div className="hg-sec">
-      <p className="hg-sec-sub">Share a game's schedule card, or its final winners, as an image straight to a Housie Ghar WhatsApp group.</p>
+      <p className="hg-sec-sub">Share a game&apos;s schedule card, or its final winners, as an image straight to a Housie Ghar WhatsApp group.</p>
       {error && <p className="hg-sec-err">{error}</p>}
 
       {/* Redesigned Modal Popout Card when download is clicked */}
@@ -822,7 +834,7 @@ export function ShareGamesSection() {
             </div>
             
             <p className="hg-sec-sub" style={{ margin: 0, fontSize: 12, color: "var(--text-dim)" }}>
-              The share poster for <b>"{result.gameTitle}"</b> has been downloaded. Copy the caption below and share:
+              The share poster for <b>&quot;{result.gameTitle}&quot;</b> has been downloaded. Copy the caption below and share:
             </p>
 
             <div style={{ position: "relative" }}>

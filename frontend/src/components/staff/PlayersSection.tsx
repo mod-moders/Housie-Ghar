@@ -34,14 +34,18 @@ export function PlayersSection() {
     try {
       const data = await apiFetch<PlayerData[]>("/api/player");
       setPlayers(data);
-    } catch (e: any) {
-      setError(e.message || "Failed to load players list.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load players list.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // Mount data-fetch: loadPlayers() flips the loading flag then resolves
+    // async. This is the canonical effect fetch (memoised, runs once) that the
+    // set-state-in-effect heuristic intentionally over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPlayers();
   }, [loadPlayers]);
 
@@ -62,8 +66,8 @@ export function PlayersSection() {
       if (selectedPlayer && selectedPlayer.player_id === player.player_id) {
         setSelectedPlayer((prev) => prev ? { ...prev, status: nextStatus } : null);
       }
-    } catch (e: any) {
-      alert(e.message || "Failed to update status.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to update status.");
     } finally {
       setActionBusy(null);
     }
@@ -80,8 +84,8 @@ export function PlayersSection() {
       });
       setPlayers((prev) => prev.filter((p) => p.player_id !== player.player_id));
       setSelectedPlayer(null);
-    } catch (e: any) {
-      alert(e.message || "Failed to delete player profile.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete player profile.");
     } finally {
       setActionBusy(null);
     }

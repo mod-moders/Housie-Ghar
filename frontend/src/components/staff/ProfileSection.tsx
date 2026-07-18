@@ -53,7 +53,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     setSaving(true);
     setMessage(null);
     try {
-      const res = await apiFetch<{ user: any }>("/api/auth/me", {
+      const res = await apiFetch<{ user: { full_name: string; phone: string; upi_id: string | null; email: string | null; nationality: string | null } }>("/api/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
           full_name: fullName.trim(),
@@ -72,8 +72,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         nationality: res.user.nationality
       });
       setMessage({ text: "Profile updated successfully." });
-    } catch (e: any) {
-      setMessage({ text: e.message || "Failed to update profile.", error: true });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Failed to update profile.", error: true });
     }
     setSaving(false);
   };
@@ -105,8 +105,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
       setNewPw("");
       setConfirmPw("");
       setPwMessage({ text: "Password updated successfully." });
-    } catch (e: any) {
-      setPwMessage({ text: e.message || "Failed to update password.", error: true });
+    } catch (e) {
+      setPwMessage({ text: e instanceof Error ? e.message : "Failed to update password.", error: true });
     }
     setPwSaving(false);
   };

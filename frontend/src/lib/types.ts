@@ -130,7 +130,6 @@ export interface StaffUser {
   assigned_games_count: number;
   trust: TrustTier | null;
   last_login: string | null;
-  password_plain?: string | null;
 }
 
 export interface AuditEntry {

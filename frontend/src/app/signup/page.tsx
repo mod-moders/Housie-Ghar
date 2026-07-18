@@ -30,6 +30,10 @@ export default function SignUp() {
     // Check for promoter referral ID
     const storedRef = localStorage.getItem("hg_ref_promoter_id");
     if (storedRef) {
+      // localStorage is client-only, so this referral id can't be a lazy
+      // useState initializer (which would also run during SSR) — seeding it
+      // from an effect on mount is the correct pattern.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRefId(storedRef);
     }
   }, [router]);
@@ -60,8 +64,8 @@ export default function SignUp() {
 
       // Redirect to lobby
       router.push("/");
-    } catch (err: any) {
-      setError(err.message || "Sign up failed. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed. Please try again.");
     } finally {
       setLoading(false);
     }

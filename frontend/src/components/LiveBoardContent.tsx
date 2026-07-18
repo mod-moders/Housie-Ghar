@@ -15,7 +15,7 @@ import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
-import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
+import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -94,7 +94,12 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
 
   useEffect(() => {
+    // Auto-open the winners overlay when the draw ends (and close it if the game
+    // leaves that state). Users can also toggle it manually (see the controls
+    // below), so this can't be a pure render-time derivation — syncing via
+    // effect is intended here.
     if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowWinnersOverlay(true);
     } else {
       setShowWinnersOverlay(false);
@@ -128,7 +133,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   );
 
   // Track winners for audio celebration
-  const [recentWinners, setRecentWinners] = useState<WinOverlay[]>([]);
 
   const audioCtx = useRef<AudioContext | null>(null);
 
@@ -222,7 +226,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     let alive = true;
 
     // First try fetching directly from API (handles page refreshes)
-    apiFetch<any[]>(`/api/games/${game_id}/my-tickets`)
+    apiFetch<TicketDetail[]>(`/api/games/${game_id}/my-tickets`)
       .then((tickets) => {
         if (!alive) return;
         if (tickets && tickets.length > 0) {
@@ -284,7 +288,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    apiFetch<any[]>(`/api/games/${game_id}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
+    apiFetch<TicketDetail[]>(`/api/games/${game_id}/search-tickets?query=${encodeURIComponent(searchQuery)}`)
       .then((tickets) => {
         const mapped = tickets.map((t) => ({
           number: t.ticket_number,
@@ -341,10 +345,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           soundSynthesizer.playCelebration();
         }
         setWinOverlay(w);
-        setRecentWinners(prev => [...prev, w]); 
         delay(() => {
            setWinOverlay(null);
-           setRecentWinners(prev => prev.filter(win => win.ticket_id !== w.ticket_id)); // cleanup
         }, 6000);
       }, 1400);
     } else if (data.event === "emoji_reaction") {
@@ -389,8 +391,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       if (response.whatsapp_url) {
         window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
       }
-    } catch (err: any) {
-      alert(err.message || "Failed to initiate claim");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to initiate claim");
     } finally {
       setClaimingPrize(null);
     }

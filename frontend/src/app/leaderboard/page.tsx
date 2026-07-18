@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Footer, EmptyHint } from "@/components/ui";
+import { Footer } from "@/components/ui";
 import type { HallOfFameEntry } from "@/lib/types";
 
 type SortTab = "wins" | "earnings" | "biggestWin";
@@ -48,6 +48,9 @@ export default function Leaderboard() {
 
   // Fetch leaderboard data filtered by active timeframe
   useEffect(() => {
+    // Refetch when the timeframe changes: flips the loading flag then resolves
+    // async — the effect fetch the set-state-in-effect rule over-flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     apiFetch<HallOfFameEntry[]>(`/api/stats/hall-of-fame?timeframe=${timeframe}`)
       .then((res) => {
@@ -80,7 +83,7 @@ export default function Leaderboard() {
     if (!entries) return [];
     
     // 1. Filter by query
-    let list = entries.filter((e) =>
+    const list = entries.filter((e) =>
       e.housie_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
     );
 

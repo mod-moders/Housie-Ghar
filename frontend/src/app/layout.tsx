@@ -20,6 +20,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Let the page extend under the notch / home indicator so we can reclaim that
+  // space with env(safe-area-inset-*) padding (applied to the nav, frame and
+  // footer in globals.css). Without this, notched phones letterbox the frame.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -50,7 +54,9 @@ document.addEventListener('touchend', function(e){
             </div>
             <div style={{
               width: "100%",
-              padding: "24px 16px",
+              // Extra bottom padding clears the home indicator on notched phones;
+              // env() resolves to 0 elsewhere, so this is a no-op on other devices.
+              padding: "24px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
               textAlign: "center",
               fontSize: "15px",
               fontFamily: "var(--font-body)",
