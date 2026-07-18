@@ -124,7 +124,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 20, width: "100%", maxWidth: 1000 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(360px, 100%), 1fr))", gap: 20, width: "100%", maxWidth: 1000 }}>
         <div className="hg-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16, height: "fit-content" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--border-light)", paddingBottom: 14, marginBottom: 4 }}>
             <Avatar src={roleAvatar(me)} name={me.full_name} className="hg-avatar-sm" style={{ width: 44, height: 44, fontSize: 18 }} />

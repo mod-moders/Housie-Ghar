@@ -107,7 +107,7 @@ export function SettingsSection() {
       )}
 
       {/* ── 2-Column Layout ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
+      <div className="hg-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
 
         {/* ── LEFT: Announcements Manager ── */}
         <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>

@@ -217,7 +217,7 @@
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), inset 0 0 15px rgba(0, 255, 255, 0.2) !important;
   padding: 20px !important;
 }
-@media (min-width: 768px) {
+@media (min-width: 900px) {
   .hg-root[data-theme='retro_arcade'] .hg-card { padding: 18px 20px !important; }
   .hg-root[data-theme='retro_arcade'] .hg-hero-card { padding: 24px 28px !important; }
   .hg-root[data-theme='retro_arcade'] .hg-hero-title { font-size: 32px !important; }
@@ -2431,6 +2431,39 @@ select option {
   .hg-split-r{min-width:0}
 }
 
+/* ============ STAFF DASHBOARD — mobile + tablet (<900px), desktop untouched ============
+   .hg-status-role ("Full Name · Role") had no truncation/shrink, so it kept its
+   full nowrap intrinsic width in the statusbar's flex row and forced
+   .hg-status-title (the current section name) to wrap onto two cramped lines
+   instead of sharing the row — this is the "username occupies the entire
+   space, tab name congested" bug. Ellipsis-truncate both below 900px. */
+@media(max-width:899px){
+  .hg-status-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hg-status-role{max-width:112px;overflow:hidden;text-overflow:ellipsis}
+}
+
+/* ============ Bookie Management — segmented pill tabs, mobile + tablet ============
+   The pill tab row (Registered/Created/Applications) has no CSS class (inline
+   styles only) and no flex-wrap/overflow handling, so on a narrow viewport it
+   grows wider than the screen and — centered by its flex parent — overflows
+   equally past both edges, silently clipped by the ancestor's overflow-x:hidden.
+   That reads as the pill bar "expanding to the corners." Wrapping the buttons
+   instead keeps the pill shape intact and everything on-screen. */
+@media(max-width:899px){
+  .hg-pill-tabs{flex-wrap:wrap !important;justify-content:center !important}
+  .hg-pill-tabs button{padding:8px 14px !important;font-size:12px !important}
+}
+
+/* ============ Website Settings — Announcements 2-col layout, mobile + tablet ============
+   The Announcements/Theme layout is a fixed "1fr 300px" grid with no
+   responsive override, so below ~600px the fixed 300px column plus the left
+   column's min-content width exceeds the viewport and the right column
+   (Theme/Info Groups cards) gets silently clipped by the ancestor's
+   overflow-x:hidden. Stack to a single column below 900px instead. */
+@media(max-width:899px){
+  .hg-settings-grid{grid-template-columns:1fr !important}
+}
+
 /* ====================================================================
    "Sticker" surface + pill-button layer (prototype RESTYLE v2 cascade)
    ==================================================================== */
@@ -2540,7 +2573,7 @@ select option {
 .hg-live-body,.hg-live-left,.hg-live-right{display:contents}
 .hg-room-aside-hint{display:none}  /* desktop-rail placeholder only */
 
-@media(min-width:768px){
+@media(min-width:900px){
   /* ---- de-phone the chrome: the page fills the viewport, the frame
      stops being a bordered floating device and becomes a centered
      content column scrolling with the document ---- */
@@ -3166,7 +3199,7 @@ select option {
   border-color: var(--brand) !important;
 }
 
-@media(min-width:560px) and (max-width:767px) {
+@media(min-width:560px) and (max-width:899px) {
   .hg-feed-list {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -3179,10 +3212,26 @@ select option {
   .hg-card-title {
     font-size: 17px;
   }
+  /* A lone leftover card in the final row (odd total) would otherwise sit
+     half-width and left-aligned since a 2-col grid doesn't span/center a
+     single trailing item automatically. */
+  .hg-feed-list > :nth-child(odd):last-child {
+    grid-column: 1 / -1;
+    max-width: calc(50% - 8px);
+    margin: 0 auto;
+  }
 }
 
-.hg-feed-list--past {
-  align-items: start !important;
+/* Scoped to >=560px (tablet/desktop grid) only: on the <560px phone layout
+   .hg-feed-list is a flex column, where align-items:start (vs. the default
+   stretch) shrinks Past cards to their content width and left-aligns them —
+   the only reason Past cards looked a different size/alignment than Live/
+   Upcoming cards on phones. Keeping it above 560px preserves the existing
+   tablet/desktop grid behavior (natural per-card height) untouched. */
+@media(min-width:560px) {
+  .hg-feed-list--past {
+    align-items: start !important;
+  }
 }
 
 /* ====================================================================
@@ -3304,7 +3353,7 @@ select option {
   border-color: #d35400 !important;
 }
 
-@media(min-width:768px) {
+@media(min-width:900px) {
   .hg-leaderboard {
     width: 100% !important;
     max-width: 940px !important;

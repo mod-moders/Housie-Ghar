@@ -592,7 +592,7 @@ export function CallVoiceSettings() {
       </div>
 
       {/* Grid of Mixer & Core Options */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: "24px" }}>
         
         {/* CARD 1: Mixing Console & Master Audio Controls */}
         <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "20px", border: "1px solid rgba(212, 175, 55, 0.25)", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>
@@ -945,7 +945,7 @@ export function CallVoiceSettings() {
       </div>
 
       {/* Grid of Voice Notes & Game BG Music */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: "24px" }}>
         
         {/* CARD 3: Intro Voice Notes */}
         <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "rgba(21, 21, 24, 0.6)", backdropFilter: "blur(12px)", padding: "20px 24px", borderRadius: "var(--radius-md)" }}>

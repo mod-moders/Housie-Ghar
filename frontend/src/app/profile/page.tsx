@@ -230,7 +230,7 @@ export default function ProfilePage() {
 
             {error && <div className="hg-sec-err" style={{ padding: 12, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8 }}>{error}</div>}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(360px, 100%), 1fr))", gap: 24 }}>
               
               {/* Left Column: Personal Information */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
