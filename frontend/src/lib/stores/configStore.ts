@@ -22,6 +22,13 @@ export interface PublicConfig {
   background_music_enabled?: string;
   background_music_volume?: string;
   master_calls_volume?: string;
+  cage_sound_type?: string;
+  winner_sound_type?: string;
+  lobby_music_url_1?: string;
+  lobby_music_url_2?: string;
+  lobby_music_url_3?: string;
+  lobby_music_url_4?: string;
+  lobby_music_url_5?: string;
 }
 
 interface ConfigState {

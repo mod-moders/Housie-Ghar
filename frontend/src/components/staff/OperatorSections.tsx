@@ -57,15 +57,17 @@ export function OperatorHudSection() {
   const audioCtx = useRef<AudioContext | null>(null);
 
   const { config } = useConfigStore();
+  const game = games.find((g) => g.game_id === selectedId) ?? null;
+  const activeGameStatus = game?.game_status || gameStatus;
+  const isGameRunning = activeGameStatus === "Live" || activeGameStatus === "Paused" || activeGameStatus === "Draw_Ended";
+
   const { playGreeting, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true" && !muted,
     ((games.find((g) => g.game_id === selectedId)?.game_status === "Live") || gameStatus === "Live")
   );
 
-  // Draws that arrive while the welcome/instruction intro is still playing get
-  // queued here instead of revealed immediately, so the operator HUD never
-  // shows/calls a number over the intro (mirrors LiveBoardContent.tsx).
   const pendingDrawsRef = useRef<number[]>([]);
+
 
   const beep = useCallback(() => {
     if (muted) return;
@@ -88,6 +90,20 @@ export function OperatorHudSection() {
     }
   }, [muted]);
 
+  const flushPendingDraws = useCallback(() => {
+    const queued = pendingDrawsRef.current.splice(0);
+    queued.forEach((num, i) => {
+      const offset = i * 2500;
+      setTimeout(() => setRevealed(false), offset);
+      setTimeout(() => {
+        beep();
+        addDrawn(num);
+        setRevealed(true);
+        playNumberCall(num);
+      }, offset + 2000);
+    });
+  }, [beep, addDrawn, playNumberCall]);
+
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
       .then((g) => {
@@ -97,29 +113,10 @@ export function OperatorHudSection() {
       .catch(() => {});
   }, []);
 
-  const revealDraw = useCallback((num: number) => {
-    beep();
-    addDrawn(num);     // set new number FIRST
-    setRevealed(true); // THEN reveal badge — no stale flash
-    playNumberCall(num);
-  }, [beep, addDrawn, playNumberCall]);
-
-  const flushPendingDraws = useCallback(() => {
-    const queued = pendingDrawsRef.current.splice(0);
-    queued.forEach((num, i) => {
-      const offset = i * 2500;
-      setTimeout(() => setRevealed(false), offset);
-      setTimeout(() => revealDraw(num), offset + 2000);
-    });
-  }, [revealDraw]);
-
   const onEvent = useCallback((data: SSEEventData) => {
     if (data.event === "draw") {
       const num = data.draw_number as number;
 
-      // Intro (welcome + instruction voice notes) still playing — queue the
-      // draw instead of revealing/calling it now, so the HUD never shows or
-      // calls a number over the intro.
       if (introPlayingRef.current) {
         pendingDrawsRef.current.push(num);
         return;
@@ -127,7 +124,10 @@ export function OperatorHudSection() {
 
       setRevealed(false);
       setTimeout(() => {
-        revealDraw(num);
+        beep();
+        addDrawn(num);
+        setRevealed(true);
+        playNumberCall(num);
       }, 2000);
     } else if (data.event === "winner") {
       const w = data as any;
@@ -140,7 +140,7 @@ export function OperatorHudSection() {
       );
       playCelebration();
     }
-  }, [revealDraw, playCelebration, introPlayingRef]);
+  }, [beep, playNumberCall, playCelebration, addDrawn]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -159,9 +159,6 @@ export function OperatorHudSection() {
       })
       .catch(() => {});
   }, [selectedId]);
-
-  const game = games.find((g) => g.game_id === selectedId) ?? null;
-  const activeGameStatus = game?.game_status || gameStatus;
 
   const gameStartedAnnouncedRef = useRef<boolean>(false);
   useEffect(() => {

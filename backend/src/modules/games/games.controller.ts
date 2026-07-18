@@ -1384,7 +1384,7 @@ export async function disbursePrize(req: AuthenticatedRequest, res: Response): P
 
     // Get prize details
     const prizeRes = await pool.query(
-      `SELECT p.prize_id, p.pattern_name, p.amount_per_winner, p.prize_amount, p.player_claimed, p.disbursed, p.winner_housie_name, p.winner_ticket_id,
+      `SELECT p.prize_id, p.pattern_name, p.amount_per_winner, p.prize_amount, p.player_claimed, p.claimed, p.disbursed, p.winner_housie_name, p.winner_ticket_id,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
        LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id

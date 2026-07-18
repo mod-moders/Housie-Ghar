@@ -39,12 +39,11 @@ export function CallVoiceSettings() {
   const [bgMusicVolume, setBgMusicVolume] = useState(parseFloat(config?.background_music_volume || "0.15"));
   const [masterCallsVolume, setMasterCallsVolume] = useState(parseFloat(config?.master_calls_volume || "1.0"));
   const [uploadingVoiceKey, setUploadingVoiceKey] = useState<string | null>(null);
-  // Which preview button is currently playing. Previously this was keyed off the
-  // audio content itself (a shared "tts" sentinel for any text-to-speech preview),
-  // so the Welcome and Instruction Listen buttons — both defaulting to TTS with no
-  // uploaded file — collided: starting either one flipped BOTH buttons to "Stop".
-  // Keying off which button was clicked instead makes each one track only itself.
-  const [previewingKey, setPreviewingKey] = useState<"welcome" | "instruction" | "bgMusic" | null>(null);
+  const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+  const [previewStatus, setPreviewStatus] = useState<"playing" | "paused" | "stopped">("stopped");
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const ttsUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [previewingCage, setPreviewingCage] = useState(false);
 
   // Voice note fallbacks & voice choices states
   const [welcomeText, setWelcomeText] = useState(config?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
@@ -73,12 +72,16 @@ export function CallVoiceSettings() {
       if (masterVolumeSaveTimeoutRef.current) {
         clearTimeout(masterVolumeSaveTimeoutRef.current);
       }
-      if (activePreviewRef.current) {
+      if (audioPlayerRef.current) {
         try {
-          activePreviewRef.current.audio.pause();
-          activePreviewRef.current.audio.src = "";
+          audioPlayerRef.current.pause();
+          audioPlayerRef.current.src = "";
         } catch {}
       }
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      soundSynthesizer.stopCageSpin();
     };
   }, []);
 
@@ -108,7 +111,11 @@ export function CallVoiceSettings() {
     reader.onload = async () => {
       try {
         const base64 = reader.result as string;
-        await handleSaveConfig({ [key]: base64 });
+        const res = await apiFetch<{ url: string }>("/api/config/upload", {
+          method: "POST",
+          body: JSON.stringify({ key, audio_data: base64 }),
+        });
+        updateConfigLocally({ [key]: res.url });
       } catch {
         alert("Upload failed.");
       } finally {
@@ -118,54 +125,138 @@ export function CallVoiceSettings() {
     reader.readAsDataURL(file);
   };
 
-  const stopPreview = () => {
-    window.speechSynthesis.cancel();
-    const existing = document.getElementById("preview-audio-element") as HTMLAudioElement;
-    if (existing) {
-      existing.pause();
-      existing.src = "";
+  const playPreview = (key: string, audioUrl: string, fallbackText: string, voiceName: string | null = null) => {
+    // Stop cage spin if playing
+    if (previewingCage) {
+      soundSynthesizer.stopCageSpin();
+      setPreviewingCage(false);
     }
-    setPreviewingKey(null);
-  };
 
-  const handlePreviewAudio = (key: "welcome" | "instruction" | "bgMusic", audioData: string, fallbackText: string, forcedVoiceName: string | null = null) => {
-    const wasPlayingThis = previewingKey === key;
-    // Stop whatever is currently playing (a different button's preview, or this
-    // same one being toggled off) before deciding whether to start a new one.
-    stopPreview();
-    if (wasPlayingThis) return;
+    // If another preview is active, stop it first
+    if (activePreviewKey && activePreviewKey !== key) {
+      stopPreview(activePreviewKey);
+    }
 
-    if (!audioData) {
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(fallbackText);
-        const voices = window.speechSynthesis.getVoices();
-        let voice = voices.find(v => v.name === forcedVoiceName);
-        if (!voice) {
-          voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));
-        }
-        if (voice) {
-          utterance.voice = voice;
-        }
-        window.speechSynthesis.speak(utterance);
-        setPreviewingKey(key);
-        utterance.onend = () => setPreviewingKey((cur) => (cur === key ? null : cur));
-      } else {
-        alert("Audio not uploaded, and TTS not supported in this browser.");
-      }
+    // If same key is playing, do nothing
+    if (activePreviewKey === key && previewStatus === "playing") {
       return;
     }
 
-    const audio = new Audio(audioData);
+    // If same key is paused, resume
+    if (activePreviewKey === key && previewStatus === "paused") {
+      const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+      if (!isCustomFile) {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        } else {
+          startNewTTS(fallbackText, voiceName, key);
+        }
+      } else {
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.play().catch(() => {});
+        }
+      }
+      setPreviewStatus("playing");
+      return;
+    }
+
+    // Start a brand new playback
+    setActivePreviewKey(key);
+    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    if (!isCustomFile) {
+      startNewTTS(fallbackText, voiceName, key);
+    } else {
+      startNewAudio(audioUrl, key);
+    }
+  };
+
+  const startNewTTS = (text: string, voiceName: string | null, key: string) => {
+    if (!("speechSynthesis" in window)) {
+      alert("TTS not supported in this browser.");
+      setActivePreviewKey(null);
+      setPreviewStatus("stopped");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    let voice = voices.find(v => v.name === voiceName);
+    if (!voice) {
+      voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));
+    }
+    if (voice) utterance.voice = voice;
+
+    utterance.onend = () => {
+      setActivePreviewKey(null);
+      setPreviewStatus("stopped");
+    };
+
+    utterance.onerror = () => {
+      setActivePreviewKey(null);
+      setPreviewStatus("stopped");
+    };
+
+    ttsUtteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setPreviewStatus("playing");
+  };
+
+  const startNewAudio = (url: string, key: string) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.src = "";
+    }
+
+    const audio = new Audio(url);
     audio.id = "preview-audio-element";
-    audio.volume = 0.8;
+    const isBgOrLobby = url === bgMusicUrl || [1, 2, 3, 4, 5].some((idx) => url === (config as any)?.[`lobby_music_url_${idx}`]);
+    audio.volume = isBgOrLobby ? bgMusicVolume : 0.8;
+
+    audio.onended = () => {
+      setActivePreviewKey(null);
+      setPreviewStatus("stopped");
+    };
+
+    audioPlayerRef.current = audio;
     audio.play().then(() => {
-      setPreviewingKey(key);
+      setPreviewStatus("playing");
     }).catch(() => {
       alert("Failed to play audio preview.");
+      setActivePreviewKey(null);
+      setPreviewStatus("stopped");
     });
-    audio.onended = () => {
-      setPreviewingKey((cur) => (cur === key ? null : cur));
-    };
+  };
+
+  const pausePreview = (key: string) => {
+    if (activePreviewKey !== key) return;
+
+    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    if (!isCustomFile) {
+      window.speechSynthesis.pause();
+    } else {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+    }
+    setPreviewStatus("paused");
+  };
+
+  const stopPreview = (key: string) => {
+    if (activePreviewKey !== key) return;
+
+    const isCustomFile = key === "welcome" ? welcomeVoice : key === "instruction" ? instructionVoice : bgMusicUrl;
+    if (!isCustomFile) {
+      window.speechSynthesis.cancel();
+    } else {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
+      }
+    }
+    setActivePreviewKey(null);
+    setPreviewStatus("stopped");
   };
 
   const handleToggleGlobalCaller = async () => {
@@ -639,39 +730,85 @@ export function CallVoiceSettings() {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
-                <label className="hg-btn" style={{
-                  background: "var(--brand-20)", color: "var(--brand)", border: "1px solid var(--brand)",
-                  padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  opacity: uploadingVoiceKey === "welcome_voice_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center"
-                }}>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => handleConfigAudioUpload("welcome_voice_url", e)}
-                    style={{ display: "none" }}
-                    disabled={uploadingVoiceKey !== null}
-                  />
-                  {uploadingVoiceKey === "welcome_voice_url" ? "Uploading..." : welcomeVoice ? "Replace File" : "Upload File"}
-                </label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio("welcome", welcomeVoice, welcomeText, selectedWelcomeVoice)}
-                >
-                  {previewingKey === "welcome" ? "⏹ Stop" : "🔊 Listen"}
-                </Button>
-                {welcomeVoice && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    style={{ color: "var(--danger)", padding: "4px 8px", fontSize: 11 }}
-                    onClick={() => handleSaveConfig({ welcome_voice_url: "" })}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <label className="hg-btn" style={{
+                    background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.3)",
+                    padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    opacity: uploadingVoiceKey === "welcome_voice_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 4,
+                    margin: 0
+                  }}>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => handleConfigAudioUpload("welcome_voice_url", e)}
+                      style={{ display: "none" }}
+                      disabled={uploadingVoiceKey !== null}
+                    />
+                    <span>📁 {uploadingVoiceKey === "welcome_voice_url" ? "..." : welcomeVoice ? "Replace" : "Upload"}</span>
+                  </label>
+                  {welcomeVoice && (
+                    <button
+                      onClick={() => handleSaveConfig({ welcome_voice_url: "" })}
+                      title="Delete custom file"
+                      style={{
+                        background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444",
+                        width: "28px", height: "28px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <Icon name="trash" size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 6, alignItems: "center", background: "var(--bg)", padding: "4px 8px", borderRadius: "30px", border: "1px solid var(--border-2)" }}>
+                  <button
+                    onClick={() => playPreview("welcome", welcomeVoice, welcomeText, selectedWelcomeVoice)}
+                    disabled={activePreviewKey === "welcome" && previewStatus === "playing"}
+                    title="Play"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "welcome" && previewStatus === "playing" ? "var(--accent)" : "transparent",
+                      color: activePreviewKey === "welcome" && previewStatus === "playing" ? "#000" : "var(--text)",
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
                   >
-                    Delete
-                  </Button>
-                )}
+                    <Icon name="play" size={12} fill={activePreviewKey === "welcome" && previewStatus === "playing" ? "currentColor" : "none"} />
+                  </button>
+
+                  <button
+                    onClick={() => pausePreview("welcome")}
+                    disabled={activePreviewKey !== "welcome" || previewStatus !== "playing"}
+                    title="Pause"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "welcome" && previewStatus === "paused" ? "rgba(255,255,255,0.15)" : "transparent",
+                      color: activePreviewKey === "welcome" && previewStatus === "playing" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "welcome" && previewStatus === "playing" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <Icon name="pause" size={12} />
+                  </button>
+
+                  <button
+                    onClick={() => stopPreview("welcome")}
+                    disabled={activePreviewKey !== "welcome" || previewStatus === "stopped"}
+                    title="Stop"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: "transparent",
+                      color: activePreviewKey === "welcome" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "welcome" && previewStatus !== "stopped" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -735,39 +872,85 @@ export function CallVoiceSettings() {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
-                <label className="hg-btn" style={{
-                  background: "var(--brand-20)", color: "var(--brand)", border: "1px solid var(--brand)",
-                  padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  opacity: uploadingVoiceKey === "instruction_voice_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center"
-                }}>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => handleConfigAudioUpload("instruction_voice_url", e)}
-                    style={{ display: "none" }}
-                    disabled={uploadingVoiceKey !== null}
-                  />
-                  {uploadingVoiceKey === "instruction_voice_url" ? "Uploading..." : instructionVoice ? "Replace File" : "Upload File"}
-                </label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio("instruction", instructionVoice, instructionText, selectedInstructionVoice)}
-                >
-                  {previewingKey === "instruction" ? "⏹ Stop" : "🔊 Listen"}
-                </Button>
-                {instructionVoice && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    style={{ color: "var(--danger)", padding: "4px 8px", fontSize: 11 }}
-                    onClick={() => handleSaveConfig({ instruction_voice_url: "" })}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <label className="hg-btn" style={{
+                    background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.3)",
+                    padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    opacity: uploadingVoiceKey === "instruction_voice_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 4,
+                    margin: 0
+                  }}>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => handleConfigAudioUpload("instruction_voice_url", e)}
+                      style={{ display: "none" }}
+                      disabled={uploadingVoiceKey !== null}
+                    />
+                    <span>📁 {uploadingVoiceKey === "instruction_voice_url" ? "..." : instructionVoice ? "Replace" : "Upload"}</span>
+                  </label>
+                  {instructionVoice && (
+                    <button
+                      onClick={() => handleSaveConfig({ instruction_voice_url: "" })}
+                      title="Delete custom file"
+                      style={{
+                        background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444",
+                        width: "28px", height: "28px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <Icon name="trash" size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 6, alignItems: "center", background: "var(--bg)", padding: "4px 8px", borderRadius: "30px", border: "1px solid var(--border-2)" }}>
+                  <button
+                    onClick={() => playPreview("instruction", instructionVoice, instructionText, selectedInstructionVoice)}
+                    disabled={activePreviewKey === "instruction" && previewStatus === "playing"}
+                    title="Play"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "instruction" && previewStatus === "playing" ? "var(--accent)" : "transparent",
+                      color: activePreviewKey === "instruction" && previewStatus === "playing" ? "#000" : "var(--text)",
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
                   >
-                    Delete
-                  </Button>
-                )}
+                    <Icon name="play" size={12} fill={activePreviewKey === "instruction" && previewStatus === "playing" ? "currentColor" : "none"} />
+                  </button>
+
+                  <button
+                    onClick={() => pausePreview("instruction")}
+                    disabled={activePreviewKey !== "instruction" || previewStatus !== "playing"}
+                    title="Pause"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "instruction" && previewStatus === "paused" ? "rgba(255,255,255,0.15)" : "transparent",
+                      color: activePreviewKey === "instruction" && previewStatus === "playing" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "instruction" && previewStatus === "playing" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <Icon name="pause" size={12} />
+                  </button>
+
+                  <button
+                    onClick={() => stopPreview("instruction")}
+                    disabled={activePreviewKey !== "instruction" || previewStatus === "stopped"}
+                    title="Stop"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: "transparent",
+                      color: activePreviewKey === "instruction" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "instruction" && previewStatus !== "stopped" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -796,45 +979,72 @@ export function CallVoiceSettings() {
               Enable loopable BG music during live game
             </label>
 
-            {/* Selection list */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
-                Select Audio Sound
-              </span>
-              <select
-                value={bgMusicUrl.startsWith("data:") ? "custom" : bgMusicUrl}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "custom") {
-                    // Do nothing
-                  } else {
+            {/* Selection list or custom filename badge */}
+            {bgMusicUrl && !["", "/audio/music/soft_lounge.wav", "/audio/music/retro_arcade.wav", "/audio/music/traditional_flute.wav"].includes(bgMusicUrl) ? (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                padding: "10px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid rgba(212, 175, 55, 0.3)",
+                background: "rgba(212, 175, 55, 0.05)"
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Active Custom BG Music
+                </span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    🎵 {bgMusicUrl.startsWith("data:") ? "custom_uploaded_music.mp3" : decodeURIComponent(bgMusicUrl.split("/").pop() || "custom_uploaded_music.mp3")}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setBgMusicUrl("");
+                      handleSaveConfig({ background_music_url: "" });
+                    }}
+                    title="Remove Custom Music"
+                    style={{
+                      background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer",
+                      fontSize: "11px", fontWeight: 700, textDecoration: "underline", padding: 0
+                    }}
+                  >
+                    Reset to Presets
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Select Audio Sound
+                </span>
+                <select
+                  value={bgMusicUrl}
+                  onChange={(e) => {
+                    const val = e.target.value;
                     setBgMusicUrl(val);
                     handleSaveConfig({ background_music_url: val });
-                  }
-                }}
-                style={{
-                  padding: "7px 10px", borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--border-2)", background: "var(--surface-2)",
-                  color: "var(--text)", outline: "none", fontWeight: 600,
-                  cursor: "pointer", fontSize: 12, width: "100%"
-                }}
-              >
-                <option value="">None / Silent</option>
-                <option value="/audio/music/soft_lounge.wav">Preset 1: Soft Lounge Loop</option>
-                <option value="/audio/music/retro_arcade.wav">Preset 2: Retro Arcade Loop</option>
-                <option value="/audio/music/traditional_flute.wav">Preset 3: Calm Indian Flute</option>
-                {bgMusicUrl.startsWith("data:") && (
-                  <option value="custom">✓ Custom Uploaded Music</option>
-                )}
-              </select>
-            </div>
+                  }}
+                  style={{
+                    padding: "7px 10px", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border-2)", background: "var(--surface-2)",
+                    color: "var(--text)", outline: "none", fontWeight: 600,
+                    cursor: "pointer", fontSize: 12, width: "100%"
+                  }}
+                >
+                  <option value="">None / Silent</option>
+                  <option value="/audio/music/soft_lounge.wav">Preset 1: Soft Lounge Loop</option>
+                  <option value="/audio/music/retro_arcade.wav">Preset 2: Retro Arcade Loop</option>
+                  <option value="/audio/music/traditional_flute.wav">Preset 3: Calm Indian Flute</option>
+                </select>
+              </div>
+            )}
 
-            {/* Custom music upload field */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 4 }}>
               <label className="hg-btn" style={{
-                background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border-2)",
+                background: "rgba(212, 175, 55, 0.1)", color: "var(--accent)", border: "1px solid rgba(212, 175, 55, 0.3)",
                 padding: "5px 12px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 600, cursor: "pointer",
-                opacity: uploadingVoiceKey === "background_music_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center"
+                opacity: uploadingVoiceKey === "background_music_url" ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 4,
+                margin: 0
               }}>
                 <input
                   type="file"
@@ -843,18 +1053,57 @@ export function CallVoiceSettings() {
                   style={{ display: "none" }}
                   disabled={uploadingVoiceKey !== null}
                 />
-                📁 {uploadingVoiceKey === "background_music_url" ? "Uploading..." : "Upload Custom BG Music"}
+                <span>📁 {uploadingVoiceKey === "background_music_url" ? "..." : "Upload Music"}</span>
               </label>
 
               {bgMusicUrl && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  style={{ padding: "4px 8px", fontSize: 11 }}
-                  onClick={() => handlePreviewAudio("bgMusic", bgMusicUrl, "")}
-                >
-                  {previewingKey === "bgMusic" ? "⏹ Stop Preview" : "🔊 Preview"}
-                </Button>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", background: "var(--bg)", padding: "4px 8px", borderRadius: "30px", border: "1px solid var(--border-2)" }}>
+                  <button
+                    onClick={() => playPreview("bg", bgMusicUrl, "")}
+                    disabled={activePreviewKey === "bg" && previewStatus === "playing"}
+                    title="Play"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "bg" && previewStatus === "playing" ? "var(--accent)" : "transparent",
+                      color: activePreviewKey === "bg" && previewStatus === "playing" ? "#000" : "var(--text)",
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <Icon name="play" size={12} fill={activePreviewKey === "bg" && previewStatus === "playing" ? "currentColor" : "none"} />
+                  </button>
+
+                  <button
+                    onClick={() => pausePreview("bg")}
+                    disabled={activePreviewKey !== "bg" || previewStatus !== "playing"}
+                    title="Pause"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: activePreviewKey === "bg" && previewStatus === "paused" ? "rgba(255,255,255,0.15)" : "transparent",
+                      color: activePreviewKey === "bg" && previewStatus === "playing" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "bg" && previewStatus === "playing" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <Icon name="pause" size={12} />
+                  </button>
+
+                  <button
+                    onClick={() => stopPreview("bg")}
+                    disabled={activePreviewKey !== "bg" || previewStatus === "stopped"}
+                    title="Stop"
+                    style={{
+                      width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                      background: "transparent",
+                      color: activePreviewKey === "bg" && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)",
+                      opacity: activePreviewKey === "bg" && previewStatus !== "stopped" ? 1 : 0.4,
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                    }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -873,6 +1122,11 @@ export function CallVoiceSettings() {
                   const val = parseFloat(e.target.value);
                   setBgMusicVolume(val);
                   handleSaveConfig({ background_music_volume: String(val) });
+
+                  // Dynamically adjust currently playing preview volume if exists
+                  if (audioPlayerRef.current) {
+                    audioPlayerRef.current.volume = val;
+                  }
                 }}
                 style={{ flex: 1, accentColor: "var(--accent)", height: 4, cursor: "pointer" }}
               />
@@ -949,6 +1203,237 @@ export function CallVoiceSettings() {
                 Winner Sound
               </label>
             </div>
+
+            {/* Custom Sound Types Dropdowns */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, borderTop: "1px solid var(--border-2)", paddingTop: 12 }}>
+              {/* Cage Sound Type */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Cage Sound Type
+                </span>
+                <div style={{ display: "flex", gap: 6, width: "100%" }}>
+                  <select
+                    value={config?.cage_sound_type || "steel_wooden"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleSaveConfig({ cage_sound_type: val });
+                      if (previewingCage) {
+                        soundSynthesizer.stopCageSpin();
+                        setTimeout(() => {
+                          soundSynthesizer.startCageSpin();
+                        }, 50);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      background: "var(--surface-2)",
+                      color: "var(--text)",
+                      border: "1px solid var(--border-2)",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: 11.5,
+                      padding: "6px 10px",
+                      fontWeight: 600,
+                      outline: "none",
+                      cursor: "pointer",
+                      minWidth: 0
+                    }}
+                  >
+                    <option value="steel_wooden">Steel Cage with Wooden Balls</option>
+                    <option value="steel_ceramic">Steel Cage with Ceramic Balls</option>
+                    <option value="traditional_plastic">Traditional Plastic Cage</option>
+                    <option value="classic_wooden">Classic Wooden Cage</option>
+                  </select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    style={{ padding: "6px 12px", fontSize: 11, fontWeight: 600, flexShrink: 0, height: "auto" }}
+                    onClick={() => {
+                      if (previewingCage) {
+                        soundSynthesizer.stopCageSpin();
+                        setPreviewingCage(false);
+                      } else {
+                        if (activePreviewKey) {
+                          stopPreview(activePreviewKey);
+                        }
+                        soundSynthesizer.startCageSpin();
+                        setPreviewingCage(true);
+                      }
+                    }}
+                  >
+                    {previewingCage ? "⏹ Stop" : "🔊 Listen"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Celebratory Winner Sound */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  Celebratory Winner Sound
+                </span>
+                <div style={{ display: "flex", gap: 6, width: "100%" }}>
+                  <select
+                    value={config?.winner_sound_type || "trumpet_cheering"}
+                    onChange={(e) => handleSaveConfig({ winner_sound_type: e.target.value })}
+                    style={{
+                      flex: 1,
+                      background: "var(--surface-2)",
+                      color: "var(--text)",
+                      border: "1px solid var(--border-2)",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: 11.5,
+                      padding: "6px 10px",
+                      fontWeight: 600,
+                      outline: "none",
+                      cursor: "pointer",
+                      minWidth: 0
+                    }}
+                  >
+                    <option value="trumpet_cheering">Trumpet Fanfare with Cheering</option>
+                    <option value="cheering">Crowd Cheering</option>
+                    <option value="clapping">Applause Clapping</option>
+                    <option value="voice_yes">Vocal "Yes!!"</option>
+                    <option value="default_chime">Classic Bell Chimes</option>
+                  </select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    style={{ padding: "6px 12px", fontSize: 11, fontWeight: 600, flexShrink: 0, height: "auto" }}
+                    onClick={() => {
+                      if (activePreviewKey) {
+                        stopPreview(activePreviewKey);
+                      }
+                      if (previewingCage) {
+                        soundSynthesizer.stopCageSpin();
+                        setPreviewingCage(false);
+                      }
+                      soundSynthesizer.playCelebration();
+                    }}
+                  >
+                    🔊 Listen
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Third Column: Lobby & Waiting Music */}
+        <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12, background: "var(--surface)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="music" size={18} style={{ color: "var(--accent)" }} />
+            <h3 style={{ margin: 0, fontSize: 15 }}>Lobby &amp; Waiting Music</h3>
+          </div>
+          <p className="hg-dim" style={{ fontSize: 11.5, margin: 0, lineHeight: 1.3 }}>
+            Upload up to five tracks to play sequentially in the player lobby &amp; staff Live HUD when the game is not running.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4, maxHeight: "360px", overflowY: "auto", paddingRight: 4 }}>
+            {[1, 2, 3, 4, 5].map((index) => {
+              const key = `lobby_music_url_${index}` as const;
+              const url = (config as any)?.[key] || "";
+
+              return (
+                <div key={index} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-2)", background: "var(--surface-2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text)" }}>Track {index}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 600, color: url ? "var(--success)" : "var(--text-dim)" }}>
+                      {url ? "✓ Active" : "Empty"}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 4 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <label className="hg-btn" style={{
+                        background: "rgba(255, 255, 255, 0.05)", color: "var(--text)", border: "1px solid var(--border-2)",
+                        padding: "5px 10px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                        opacity: uploadingVoiceKey === key ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 4,
+                        margin: 0
+                      }}>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={(e) => handleConfigAudioUpload(key, e)}
+                          style={{ display: "none" }}
+                          disabled={uploadingVoiceKey !== null}
+                        />
+                        <span>📁 {uploadingVoiceKey === key ? "..." : url ? "Replace" : "Upload"}</span>
+                      </label>
+
+                      {url && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete Lobby Track ${index}?`)) {
+                              handleSaveConfig({ [key]: "" });
+                            }
+                          }}
+                          title={`Delete Track ${index}`}
+                          style={{
+                            background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444",
+                            width: "28px", height: "28px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {url && (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", background: "var(--bg)", padding: "4px 8px", borderRadius: "30px", border: "1px solid var(--border-2)" }}>
+                        {/* Play button */}
+                        <button
+                          onClick={() => playPreview(`lobby_${index}`, url, "")}
+                          disabled={activePreviewKey === `lobby_${index}` && previewStatus === "playing"}
+                          title="Play"
+                          style={{
+                            width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                            background: activePreviewKey === `lobby_${index}` && previewStatus === "playing" ? "var(--accent)" : "transparent",
+                            color: activePreviewKey === `lobby_${index}` && previewStatus === "playing" ? "#000" : "var(--text)",
+                            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                          }}
+                        >
+                          <Icon name="play" size={12} fill={activePreviewKey === `lobby_${index}` && previewStatus === "playing" ? "currentColor" : "none"} />
+                        </button>
+
+                        {/* Pause button */}
+                        <button
+                          onClick={() => pausePreview(`lobby_${index}`)}
+                          disabled={activePreviewKey !== `lobby_${index}` || previewStatus !== "playing"}
+                          title="Pause"
+                          style={{
+                            width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                            background: activePreviewKey === `lobby_${index}` && previewStatus === "paused" ? "rgba(255,255,255,0.15)" : "transparent",
+                            color: activePreviewKey === `lobby_${index}` && previewStatus === "playing" ? "var(--text)" : "var(--text-dim)",
+                            opacity: activePreviewKey === `lobby_${index}` && previewStatus === "playing" ? 1 : 0.4,
+                            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                          }}
+                        >
+                          <Icon name="pause" size={12} />
+                        </button>
+
+                        {/* Stop button */}
+                        <button
+                          onClick={() => stopPreview(`lobby_${index}`)}
+                          disabled={activePreviewKey !== `lobby_${index}` || previewStatus === "stopped"}
+                          title="Stop"
+                          style={{
+                            width: "26px", height: "26px", borderRadius: "50%", border: "none",
+                            background: "transparent",
+                            color: activePreviewKey === `lobby_${index}` && previewStatus !== "stopped" ? "var(--text)" : "var(--text-dim)",
+                            opacity: activePreviewKey === `lobby_${index}` && previewStatus !== "stopped" ? 1 : 0.4,
+                            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s"
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

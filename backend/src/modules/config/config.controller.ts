@@ -4,6 +4,8 @@
  */
 
 import { Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
@@ -34,7 +36,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume')`
+       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -120,7 +122,7 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     await client.query('COMMIT');
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume'];
+    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
       if (publicKeys.includes(key)) {
@@ -207,3 +209,106 @@ export async function resetDatabase(req: AuthenticatedRequest, res: Response): P
     client.release();
   }
 }
+
+/**
+ * Upload an audio file for a config setting key (Superadmin only)
+ * Expects key and audio_data (base64 string) in JSON body
+ */
+export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { key, audio_data } = req.body;
+  const actor = req.user!;
+
+  if (!key || !audio_data || typeof audio_data !== 'string') {
+    res.status(400).json({ message: 'key and audio_data are required' });
+    return;
+  }
+
+  const allowedKeys = [
+    'welcome_voice_url',
+    'instruction_voice_url',
+    'background_music_url',
+    'lobby_music_url_1',
+    'lobby_music_url_2',
+    'lobby_music_url_3',
+    'lobby_music_url_4',
+    'lobby_music_url_5'
+  ];
+
+  if (!allowedKeys.includes(key)) {
+    res.status(400).json({ message: `Invalid config key for audio upload: ${key}` });
+    return;
+  }
+
+  try {
+    const mimeMatch = audio_data.match(/^data:([^;]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : '';
+    
+    let ext = 'mp3';
+    if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) {
+      ext = 'mp4';
+    } else if (mimeType.includes('wav')) {
+      ext = 'wav';
+    } else if (mimeType.includes('m4a')) {
+      ext = 'm4a';
+    }
+
+    const base64Data = audio_data.split(';base64,').pop();
+    if (!base64Data) {
+      res.status(400).json({ message: 'Invalid base64 audio data' });
+      return;
+    }
+
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Resolve destination: frontend/public/audio/config/
+    const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/config');
+    fs.mkdirSync(destDir, { recursive: true });
+
+    // Clean up any existing files for this key
+    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
+    possibleExts.forEach((e) => {
+      const oldPath = path.join(destDir, `${key}.${e}`);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch {}
+      }
+    });
+
+    const destPath = path.join(destDir, `${key}.${ext}`);
+    fs.writeFileSync(destPath, buffer);
+
+    const audioUrl = `/audio/config/${key}.${ext}`;
+
+    const result = await pool.query(
+      `UPDATE Platform_Config 
+       SET config_value = $1, updated_by = $2, updated_at = NOW() 
+       WHERE config_key = $3
+       RETURNING *`,
+      [audioUrl, actor.userId, key]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Config key not found' });
+      return;
+    }
+
+    // Broadcast config updates
+    io.emit('config_update', { [key]: audioUrl });
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'UPDATE_PLATFORM_CONFIG',
+      targetType: 'Platform_Config',
+      targetDescription: `Uploaded audio config for key: ${key}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ message: 'Audio uploaded successfully', url: audioUrl });
+  } catch (error) {
+    console.error('Error uploading config audio:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+

@@ -193,6 +193,12 @@ export default function Lobby() {
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  const isAnyGameLive = useMemo(() => {
+    if (!games) return false;
+    return games.some(g => g.game_status === "Live" || g.game_status === "Paused");
+  }, [games]);
+
+
   // The quote rotates through HOOKS every 5s. A client-only random start (via
   // useSyncExternalStore: null on the server → no hydration mismatch) keeps the
   // first quote fresh each visit; `step` advances on a timer; `key={step}` on the

@@ -118,6 +118,13 @@ export async function ensurePlatformConfig(): Promise<void> {
     { key: 'background_music_enabled', val: 'false', desc: 'Enable background music during game' },
     { key: 'background_music_volume', val: '0.15', desc: 'Background music volume (0.0 to 1.0)' },
     { key: 'master_calls_volume', val: '1.0', desc: 'Master calls volume gain multiplier (0.0 to 2.0)' },
+    { key: 'cage_sound_type', val: 'steel_wooden', desc: 'Active cage spinning sound type' },
+    { key: 'winner_sound_type', val: 'trumpet_cheering', desc: 'Active winner celebratory sound type' },
+    { key: 'lobby_music_url_1', val: '', desc: 'Lobby wait music 1 audio URL or Base64' },
+    { key: 'lobby_music_url_2', val: '', desc: 'Lobby wait music 2 audio URL or Base64' },
+    { key: 'lobby_music_url_3', val: '', desc: 'Lobby wait music 3 audio URL or Base64' },
+    { key: 'lobby_music_url_4', val: '', desc: 'Lobby wait music 4 audio URL or Base64' },
+    { key: 'lobby_music_url_5', val: '', desc: 'Lobby wait music 5 audio URL or Base64' },
   ];
 
   try {
