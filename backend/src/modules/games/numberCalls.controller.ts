@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import pool from '../../db';
+import { faststartMp4 } from '../../utils/mp4Faststart';
 
 /**
  * List all number call settings (public so players can download caller voices)
@@ -110,7 +111,12 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
       return;
     }
 
-    const buffer = Buffer.from(base64Data, 'base64');
+    const rawBuffer = Buffer.from(base64Data, 'base64');
+    // Phone/voice-recorder exports almost always land with `moov` after `mdat` —
+    // valid, but Chrome's <audio>/<video> progressive playback can fail or hang
+    // on that layout. Relocate moov to the front where possible; no-ops for
+    // mp3/wav or anything it doesn't recognize.
+    const buffer = faststartMp4(rawBuffer);
 
     // Resolve destination: frontend/public/audio/calls/
     const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');

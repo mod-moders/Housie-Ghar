@@ -14,17 +14,18 @@ interface NumberCallConfig {
   volume?: number;
 }
 
-export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean) {
+export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean, muted: boolean = false) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
   const { config: platformConfig } = useConfigStore();
-  
+
   const activeAudiosRef = useRef<HTMLAudioElement[]>([]);
   const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
   const isMountedRef = useRef<boolean>(true);
-  
+
   const isIntroPlayingRef = useRef<boolean>(false);
   const pendingNumbersQueueRef = useRef<number[]>([]);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+  const mutedRef = useRef<boolean>(muted);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -97,9 +98,11 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
         audio.loop = true;
         audio.volume = bgVol;
         bgMusicRef.current = audio;
-        audio.play().catch(() => {
-          // auto-play blocked
-        });
+        if (!mutedRef.current) {
+          audio.play().catch(() => {
+            // auto-play blocked
+          });
+        }
       } else {
         bgMusicRef.current.volume = bgVol;
       }
@@ -142,6 +145,22 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean)
       } catch {}
     }
   };
+
+  // Master mute: immediately silence anything already in flight (a caller
+  // phrase/TTS mid-utterance) and pause/resume the background-music loop in
+  // place (no restart-from-zero). playGreeting/playOutro/playNumberCall/
+  // playCelebration already refuse to START new audio while muted via
+  // englishCallerEnabled, but that alone doesn't stop something already
+  // playing, and never touched background music at all.
+  useEffect(() => {
+    mutedRef.current = muted;
+    if (muted) {
+      stopAllActiveAudios();
+      bgMusicRef.current?.pause();
+    } else {
+      bgMusicRef.current?.play().catch(() => {});
+    }
+  }, [muted]);
 
   const playGreeting = async () => {
     if (!englishCallerEnabled) return;

@@ -132,7 +132,7 @@ export function SettingsSection() {
           </div>
 
           {/* Add + Speed row */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="hg-settings-addrow" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
               type="text"
               className="hg-input"

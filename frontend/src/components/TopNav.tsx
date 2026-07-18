@@ -14,25 +14,36 @@ export function TopNav() {
   const [user, setUser] = useState<{ role: "player" | "staff"; name: string; label: string } | null>(null);
 
   useEffect(() => {
-    // 1. First check if logged in as player
-    apiFetch<{ player: { housie_name: string } }>("/api/player/me")
-      .then((res) => {
-        setUser({ role: "player", name: res.player.housie_name, label: res.player.housie_name });
-      })
-      .catch(() => {
-        // 2. If not player, check if logged in as staff
-        apiFetch<{ user: { full_name: string; role_name: string } }>("/api/auth/me")
-          .then((res) => {
-            setUser({
-              role: "staff",
-              name: res.user.full_name,
-              label: `${res.user.full_name} (${res.user.role_name})`
-            });
-          })
-          .catch(() => {
-            setUser(null);
-          });
-      });
+    let cancelled = false;
+    // Staff and player sessions are independent cookies (hg_auth_token vs
+    // hg_player_token) and can both be valid at once — e.g. a bookie who
+    // also plays. Checking player first (and only checking staff on
+    // failure) meant an active staff session was silently masked whenever
+    // a player cookie was also present: the header showed "Staff Login"
+    // and hid the Staff Panel shortcut even though the user was already
+    // authenticated as staff. Run both checks in parallel and prefer
+    // staff whenever it succeeds, so a real staff session is never hidden.
+    const playerCheck = apiFetch<{ player: { housie_name: string } }>("/api/player/me").catch(() => null);
+    const staffCheck = apiFetch<{ user: { full_name: string; role_name: string } }>("/api/auth/me").catch(() => null);
+
+    Promise.all([playerCheck, staffCheck]).then(([playerRes, staffRes]) => {
+      if (cancelled) return;
+      if (staffRes) {
+        setUser({
+          role: "staff",
+          name: staffRes.user.full_name,
+          label: `${staffRes.user.full_name} (${staffRes.user.role_name})`
+        });
+      } else if (playerRes) {
+        setUser({ role: "player", name: playerRes.player.housie_name, label: playerRes.player.housie_name });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const go = (href: string) => {
@@ -66,13 +77,9 @@ export function TopNav() {
       </nav>
 
       <div className="hg-nav-right">
-        {user?.role === "staff" ? (
+        {user?.role === "staff" && (
           <button className="hg-staff-btn is-active" onClick={() => go("/staff")} aria-label="Staff panel" title="Staff panel">
             <Icon name="shield" size={18} strokeWidth={2.2} />
-          </button>
-        ) : (
-          <button className="hg-staff-btn" onClick={() => go("/staff/login")} aria-label="Staff login" title="Staff login">
-            <Icon name="lock" size={18} strokeWidth={2.2} />
           </button>
         )}
         <button className="hg-burger" onClick={() => setOpen((o) => !o)} aria-label="Menu">

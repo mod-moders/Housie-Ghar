@@ -219,17 +219,19 @@ export function RealisticBingoCage({
   isTeasing,
   drawn = new Set<number>(),
   compact = false,
+  muted = false,
 }: {
   lastDrawn: number | null;
   isTeasing: boolean;
   drawn?: Set<number>;
   compact?: boolean;
+  muted?: boolean;
 }) {
   useEffect(() => {
     const config = useConfigStore.getState().config;
     const isSoundEnabled = config?.cage_sound_enabled !== "false";
 
-    if (isTeasing && isSoundEnabled) {
+    if (isTeasing && isSoundEnabled && !muted) {
       soundSynthesizer.startCageSpin();
     } else {
       soundSynthesizer.stopCageSpin();
@@ -238,7 +240,7 @@ export function RealisticBingoCage({
     return () => {
       soundSynthesizer.stopCageSpin();
     };
-  }, [isTeasing]);
+  }, [isTeasing, muted]);
 
   const ballHue = lastDrawn !== null ? (lastDrawn * 37) % 360 : 0;
   const ballColor = lastDrawn !== null ? `hsl(${ballHue}, 75%, 50%)` : "transparent";

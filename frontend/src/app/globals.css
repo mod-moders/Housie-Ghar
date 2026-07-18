@@ -2476,6 +2476,22 @@ select option {
   .hg-settings-grid{grid-template-columns:1fr !important}
 }
 
+/* ============ Website Settings — Add-announcement row, mobile + tablet ============
+   Stacking the grid to one column (above) fixed the outer layout, but the
+   "new announcement" row (text input + Add button + speed <select>) is a
+   nowrap flex row with no wrap/shrink handling — its combined min-content
+   width (~400px: unconstrained input default + non-shrinking button/select
+   text) is wider than the card on a real phone (sidebar rail + content
+   padding + card padding easily eats 130px+ of a 375-428px screen). That
+   forces the card, and therefore the single grid column, wider than the
+   viewport — same silent overflow-x:hidden clipping as the outer grid bug,
+   just one level deeper. Let it wrap: input takes its own full-width line,
+   Add + speed share the line below. */
+@media(max-width:899px){
+  .hg-settings-addrow{flex-wrap:wrap}
+  .hg-settings-addrow input{flex:1 1 100%}
+}
+
 /* ============ Audio Settings — Number Call Phrases row, mobile + tablet ============
    Each row's right-hand controls group (upload/Listen/delete, volume slider,
    TTS/MP3 toggle) is flex-wrap:wrap but also flex-shrink:0 with no width cap —
