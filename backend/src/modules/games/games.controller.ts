@@ -181,6 +181,19 @@ async function getFinancialOfficerWhatsApp(): Promise<string | null> {
  */
 export async function getGames(req: Request, res: Response): Promise<void> {
   try {
+    let playerHousieName: string | null = null;
+    let authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        playerHousieName = decoded.housieName || null;
+      } catch {}
+    }
+
     const result = await pool.query(
       `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
        FROM Scheduled_Games
@@ -198,6 +211,15 @@ export async function getGames(req: Request, res: Response): Promise<void> {
       const playerCount = parseInt(playersRes.rows[0].count, 10);
       const totalCount = parseInt(game.total_tickets, 10);
       const availableCount = totalCount - (soldCount + lockedCount);
+
+      let myTicketsCount = 0;
+      if (playerHousieName) {
+        const myCountRes = await pool.query(
+          `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+          [game.game_id, playerHousieName]
+        );
+        myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
+      }
 
       // Fetch prize pool
       const prizesRes = await pool.query(
@@ -241,6 +263,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         locked_count: lockedCount,
         available_count: availableCount,
         player_count: playerCount,
+        my_tickets_count: myTicketsCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
         prize_pool: formattedPrizes.map((row) => ({
@@ -271,6 +294,19 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
 
   try {
+    let playerHousieName: string | null = null;
+    let authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        playerHousieName = decoded.housieName || null;
+      } catch {}
+    }
+
     const result = await pool.query(
       `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
        FROM Scheduled_Games
@@ -291,6 +327,15 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const lockedCount = parseInt(lockedRes.rows[0].count, 10);
     const playerCount = parseInt(playersRes.rows[0].count, 10);
     const totalCount = parseInt(game.total_tickets, 10);
+
+    let myTicketsCount = 0;
+    if (playerHousieName) {
+      const myCountRes = await pool.query(
+        `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+        [game_id, playerHousieName]
+      );
+      myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
+    }
 
     const prizesRes = await pool.query(
       `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
@@ -334,6 +379,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       locked_count: lockedCount,
       available_count: totalCount - (soldCount + lockedCount),
       player_count: playerCount,
+      my_tickets_count: myTicketsCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
       prize_pool: formattedPrizes.map((row) => ({

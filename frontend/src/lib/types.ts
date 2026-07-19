@@ -42,6 +42,7 @@ export interface GameSummary {
   locked_count: number;
   available_count: number;
   player_count?: number; // Optional since it might be missing in older API versions
+  my_tickets_count?: number;
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
   prize_pool: Prize[];
