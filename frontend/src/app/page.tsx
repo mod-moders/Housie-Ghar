@@ -52,6 +52,7 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
   const isLive = game.game_status === "Live" || game.game_status === "Paused" || game.game_status === "Draw_Ended";
   const status = cardStatus(game);
   const sold = status === "sold";
+  const myTicketsCount = game.my_tickets_count ?? 0;
   const totalPool = game.prize_pool.reduce((s, p) => s + p.prize_amount, 0);
   const when = formatWhen(game.scheduled_at);
   const presetClass = getPresetClass(game.title);
@@ -103,9 +104,15 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
         {isLive ? (
           <Button variant="cta" size="md" iconRight="chevR" onClick={() => goLive(game.game_id)}>Watch Live</Button>
         ) : sold ? (
-          <Button variant="ghost" size="md" disabled>Sold Out</Button>
+          myTicketsCount > 0 ? (
+            <Button variant="cta" size="md" iconRight="chevR" onClick={() => go(game.game_id)}>View Tickets</Button>
+          ) : (
+            <Button variant="ghost" size="md" disabled>Sold Out</Button>
+          )
         ) : (
-          <Button variant="cta" size="md" iconRight="chevR" onClick={() => go(game.game_id)}>Get Tickets</Button>
+          <Button variant="cta" size="md" iconRight="chevR" onClick={() => go(game.game_id)}>
+            {myTicketsCount > 0 ? "View / Get Tickets" : "Get Tickets"}
+          </Button>
         )}
       </div>
     </article>

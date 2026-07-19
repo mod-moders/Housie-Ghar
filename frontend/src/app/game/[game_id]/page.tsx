@@ -39,6 +39,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const [locking, setLocking] = useState(false);
   const requestedMatrices = useRef<Set<number>>(new Set());
   const restoredLock = useRef(false);
+  const [myBoughtTickets, setMyBoughtTickets] = useState<TicketDetail[]>([]);
 
   const booking = useBookingStore();
 
@@ -62,51 +63,67 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     return () => { cancelled = true; };
   }, [router]);
 
+  const loadTicketsAndBought = useCallback((isAliveRef?: { current: boolean }) => {
+    apiFetch<TicketListResponse>(`/api/games/${game_id}/tickets`)
+      .then((res) => {
+        if (isAliveRef && !isAliveRef.current) return;
+        setTickets(res.tickets);
+        const b = useBookingStore.getState();
+        if (
+          !restoredLock.current &&
+          b.bookingId &&
+          b.gameId === game_id &&
+          b.status === "locked" &&
+          b.lockedUntil &&
+          new Date(b.lockedUntil).getTime() > Date.now()
+        ) {
+          restoredLock.current = true;
+          setLock({
+            booking_id: b.bookingId,
+            locked_until: b.lockedUntil,
+            agent_name: b.agentName,
+            agent_phone: b.agentPhone,
+            agent_town: null,
+            total_amount: b.totalAmount,
+            whatsapp_link: b.whatsappLink,
+            is_overflow: false,
+          });
+          setName(b.housieName || "");
+          setSelected(
+            b.ticketIds
+              .map((id) => res.tickets.find((t) => t.ticket_id === id)?.ticket_number ?? 0)
+              .filter(Boolean)
+          );
+        }
+      })
+      .catch(() => {});
+
+    apiFetch<TicketDetail[]>(`/api/games/${game_id}/my-tickets`)
+      .then((res) => {
+        if (isAliveRef && !isAliveRef.current) return;
+        setMyBoughtTickets(res);
+      })
+      .catch(() => {});
+  }, [game_id]);
+
   // Load game meta once; refresh the ticket grid every 5s so locks/sales appear live.
   // On the first tickets load, restore an in-flight lock for this game after a reload.
   useEffect(() => {
-    let alive = true;
+    let alive = { current: true };
     apiFetch<GameSummary>(`/api/games/${game_id}`)
-      .then((g) => { if (alive) setGame(g); })
+      .then((g) => { if (alive.current) setGame(g); })
       .catch(() => {});
-    const loadTickets = () =>
-      apiFetch<TicketListResponse>(`/api/games/${game_id}/tickets`)
-        .then((res) => {
-          if (!alive) return;
-          setTickets(res.tickets);
-          const b = useBookingStore.getState();
-          if (
-            !restoredLock.current &&
-            b.bookingId &&
-            b.gameId === game_id &&
-            b.status === "locked" &&
-            b.lockedUntil &&
-            new Date(b.lockedUntil).getTime() > Date.now()
-          ) {
-            restoredLock.current = true;
-            setLock({
-              booking_id: b.bookingId,
-              locked_until: b.lockedUntil,
-              agent_name: b.agentName,
-              agent_phone: b.agentPhone,
-              agent_town: null,
-              total_amount: b.totalAmount,
-              whatsapp_link: b.whatsappLink,
-              is_overflow: false,
-            });
-            setName(b.housieName || "");
-            setSelected(
-              b.ticketIds
-                .map((id) => res.tickets.find((t) => t.ticket_id === id)?.ticket_number ?? 0)
-                .filter(Boolean)
-            );
-          }
-        })
-        .catch(() => {});
-    loadTickets();
-    const id = setInterval(loadTickets, 5000);
-    return () => { alive = false; clearInterval(id); };
-  }, [game_id]);
+
+    const load = () => {
+      if (alive.current) {
+        loadTicketsAndBought(alive);
+      }
+    };
+    
+    load();
+    const id = setInterval(load, 5000);
+    return () => { alive.current = false; clearInterval(id); };
+  }, [game_id, loadTicketsAndBought]);
 
   const fetchMatrix = useCallback((ticketId: number, ticketNumber: number) => {
     if (requestedMatrices.current.has(ticketNumber)) return;
@@ -193,17 +210,30 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
               {tickets.map((t) => {
                 const st = t.status.toLowerCase() as "available" | "locked" | "sold";
                 const isSel = selected.includes(t.ticket_number);
+                const isMine = myBoughtTickets.some((myT) => myT.ticket_number === t.ticket_number);
                 return (
                   <button
                     key={t.ticket_id}
-                    className={`hg-num hg-num-${st}${isSel ? " is-sel" : ""}`}
+                    className={`hg-num hg-num-${st}${isSel ? " is-sel" : ""}${isMine ? " is-mine" : ""}`}
                     onClick={() => toggle(t)}
                     disabled={st !== "available"}
+                    style={isMine ? {
+                      borderColor: "var(--success)",
+                      background: "rgba(34, 197, 94, 0.15)",
+                      color: "var(--success)",
+                      cursor: "default"
+                    } : undefined}
                   >
                     {st === "locked" ? (
                       <Icon name="lock" size={13} strokeWidth={2.4} />
                     ) : st === "sold" ? (
-                      <span className="hg-num-sold">{t.ticket_number}</span>
+                      isMine ? (
+                        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2px", color: "var(--success)", fontWeight: 800 }}>
+                          {t.ticket_number} <Icon name="check" size={10} strokeWidth={3} />
+                        </span>
+                      ) : (
+                        <span className="hg-num-sold">{t.ticket_number}</span>
+                      )
                     ) : (
                       t.ticket_number
                     )}
@@ -215,7 +245,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
           </main>
 
           <aside className="hg-room-aside">
-            {selected.length > 0 ? (
+            {selected.length > 0 && (
               <>
                 <div className="hg-previews">
                   <div className="hg-previews-head">
@@ -278,12 +308,41 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                   </div>
                 </div>
               </>
-            ) : (
+            )}
+
+            {selected.length === 0 && myBoughtTickets.length === 0 && (
               <div className="hg-room-aside-hint">
                 <div className="hg-empty">
                   <div className="hg-empty-icon"><Icon name="ticket" size={32} /></div>
                   <strong>No tickets selected</strong>
                   <span>Select tickets from the grid to customize your booking.</span>
+                </div>
+              </div>
+            )}
+
+            {myBoughtTickets.length > 0 && (
+              <div className="hg-previews" style={{ marginTop: selected.length > 0 ? "24px" : "0" }}>
+                <div className="hg-previews-head">
+                  <h2 className="hg-section-title" style={{ color: "var(--success)" }}>
+                    🏆 Purchased Tickets ({myBoughtTickets.length})
+                  </h2>
+                </div>
+                <div className="hg-previews-scroll">
+                  {myBoughtTickets.map((t) => (
+                    <div key={t.ticket_id} className="hg-preview-item">
+                      <div className="hg-live-ticket-card" style={{ border: "1.5px solid rgba(34, 197, 94, 0.4)" }}>
+                        <div className="hg-live-ticket-header" style={{ background: "rgba(34, 197, 94, 0.1)" }}>
+                          <span className="hg-live-ticket-game-name">{game?.title || "Housie Ghar"}</span>
+                          <span className="hg-live-ticket-datetime">{when}</span>
+                        </div>
+                        <HousieTicket matrix={gridToMatrix(t.grid_data)} compact />
+                        <div className="hg-live-ticket-footer" style={{ background: "rgba(34, 197, 94, 0.05)" }}>
+                          <span className="hg-live-ticket-number">Ticket #{t.ticket_number}</span>
+                          <span className="hg-live-ticket-player-name">{t.owner_housie_name || name || "You"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -297,7 +356,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             gameTitle={game.title}
             ticketNumbers={selected}
             matrices={matrices}
-            onClose={() => { setLock(null); setSelected([]); }}
+            onClose={() => { setLock(null); setSelected([]); loadTicketsAndBought(); }}
             goLive={() => router.push(`/game/${game_id}/live`)}
           />
         )}

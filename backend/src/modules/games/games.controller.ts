@@ -181,8 +181,21 @@ async function getFinancialOfficerWhatsApp(): Promise<string | null> {
  */
 export async function getGames(req: Request, res: Response): Promise<void> {
   try {
+    let playerHousieName: string | null = null;
+    let authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        playerHousieName = decoded.housieName || null;
+      } catch {}
+    }
+
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
        FROM Scheduled_Games
        ORDER BY scheduled_at ASC`
     );
@@ -199,9 +212,18 @@ export async function getGames(req: Request, res: Response): Promise<void> {
       const totalCount = parseInt(game.total_tickets, 10);
       const availableCount = totalCount - (soldCount + lockedCount);
 
+      let myTicketsCount = 0;
+      if (playerHousieName) {
+        const myCountRes = await pool.query(
+          `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+          [game.game_id, playerHousieName]
+        );
+        myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
+      }
+
       // Fetch prize pool
       const prizesRes = await pool.query(
-        `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
+        `SELECT p.prize_id, p.formatted_claim_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
                 t.ticket_number AS winner_ticket_number
          FROM Prize_Pool p
          LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
@@ -241,10 +263,16 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         locked_count: lockedCount,
         available_count: availableCount,
         player_count: playerCount,
+        my_tickets_count: myTicketsCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
+        call_mode: game.call_mode || 'Audio',
+        bg_music_enabled: game.bg_music_enabled !== false,
+        intro_mode: game.intro_mode || 'Audio',
+        outro_mode: game.outro_mode || 'TTS',
         prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
+          formatted_claim_id: (row as any).formatted_claim_id,
           pattern_name: row.pattern_name,
           prize_amount: parseFloat(row.prize_amount),
           claimed: row.claimed,
@@ -271,8 +299,21 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
 
   try {
+    let playerHousieName: string | null = null;
+    let authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+        playerHousieName = decoded.housieName || null;
+      } catch {}
+    }
+
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
        FROM Scheduled_Games
        WHERE game_id = $1`,
       [game_id]
@@ -292,8 +333,17 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const playerCount = parseInt(playersRes.rows[0].count, 10);
     const totalCount = parseInt(game.total_tickets, 10);
 
+    let myTicketsCount = 0;
+    if (playerHousieName) {
+      const myCountRes = await pool.query(
+        `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+        [game_id, playerHousieName]
+      );
+      myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
+    }
+
     const prizesRes = await pool.query(
-      `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
+      `SELECT p.prize_id, p.formatted_claim_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
               p.player_claimed, p.disbursed,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
@@ -334,10 +384,16 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       locked_count: lockedCount,
       available_count: totalCount - (soldCount + lockedCount),
       player_count: playerCount,
+      my_tickets_count: myTicketsCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
+      call_mode: game.call_mode || 'Audio',
+      bg_music_enabled: game.bg_music_enabled !== false,
+      intro_mode: game.intro_mode || 'Audio',
+      outro_mode: game.outro_mode || 'TTS',
       prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
+        formatted_claim_id: (row as any).formatted_claim_id,
         pattern_name: row.pattern_name,
         prize_amount: parseFloat(row.prize_amount),
         claimed: row.claimed,
@@ -361,7 +417,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
  * Body: { title, scheduled_at, ticket_price, total_tickets, operator_id?, prizes: [{ pattern_name, prize_amount }] }
  */
 export async function createGame(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode } = req.body;
   const actor = req.user!;
 
   // 1. Validation
@@ -420,12 +476,16 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   try {
     await client.query('BEGIN');
 
+    const selectedCallMode = call_mode === 'TTS' ? 'TTS' : 'Audio';
+    const selectedBgMusic = bg_music_enabled !== false;
+    const selectedIntroMode = intro_mode === 'TTS' ? 'TTS' : 'Audio';
+    const selectedOutroMode = outro_mode === 'Audio' ? 'Audio' : 'TTS';
     // 3. Insert the game
     const gameRes = await client.query(
-      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by)
-       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6)
+      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by, call_mode, bg_music_enabled, intro_mode, outro_mode)
+       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6, $7, $8, $9, $10)
        RETURNING game_id`,
-      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId]
+      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId, selectedCallMode, selectedBgMusic, selectedIntroMode, selectedOutroMode]
     );
     const gameId = gameRes.rows[0].game_id;
 
@@ -612,7 +672,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // Send initial payload immediately
   try {
     const gameRes = await pool.query(
-      `SELECT game_status, title FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
     const gameLogRes = await pool.query(
@@ -651,6 +711,10 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
       game_status: gameRes.rows[0]?.game_status || 'Scheduled',
+      call_mode: gameRes.rows[0]?.call_mode || 'Audio',
+      bg_music_enabled: gameRes.rows[0]?.bg_music_enabled !== false,
+      intro_mode: gameRes.rows[0]?.intro_mode || 'Audio',
+      outro_mode: gameRes.rows[0]?.outro_mode || 'TTS',
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,
       claimed_prizes: formattedPrizes.map((row) => ({
@@ -735,13 +799,13 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function updateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
   const game_id = req.params.game_id as string;
-  const { title, scheduled_at, ticket_price, total_tickets, prizes } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode } = req.body;
   const actor = req.user!;
 
   try {
     // 1. Fetch current game state
     const gameRes = await pool.query(
-      `SELECT game_status, title, ticket_price, total_tickets FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, ticket_price, total_tickets, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
 
@@ -830,12 +894,16 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
     try {
       await client.query('BEGIN');
 
+      const updatedCallMode = call_mode !== undefined ? (call_mode === 'TTS' ? 'TTS' : 'Audio') : game.call_mode || 'Audio';
+      const updatedBgMusic = bg_music_enabled !== undefined ? bg_music_enabled !== false : game.bg_music_enabled !== false;
+      const updatedIntroMode = intro_mode !== undefined ? (intro_mode === 'TTS' ? 'TTS' : 'Audio') : game.intro_mode || 'Audio';
+      const updatedOutroMode = outro_mode !== undefined ? (outro_mode === 'Audio' ? 'Audio' : 'TTS') : game.outro_mode || 'TTS';
       // 4. Update the game details
       await client.query(
         `UPDATE Scheduled_Games
-         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4
-         WHERE game_id = $5`,
-        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, game_id]
+         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4, call_mode = $5, bg_music_enabled = $6, intro_mode = $7, outro_mode = $8
+         WHERE game_id = $9`,
+        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, updatedCallMode, updatedBgMusic, updatedIntroMode, updatedOutroMode, game_id]
       );
 
       // 5. Update prizes if provided
@@ -1367,86 +1435,179 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    const result = await pool.query(
-      `SELECT * FROM (
-      (
-        SELECT
-          p.prize_id,
-          p.game_id,
-          p.pattern_name,
-          p.amount_per_winner,
-          p.prize_amount,
-          p.player_claimed,
-          p.player_claimed_at,
-          p.disbursed,
-          p.disbursed_at,
-          p.winner_housie_name,
-          p.winner_ticket_id,
-          t.ticket_number AS winner_ticket_number,
-          sg.title AS game_title,
-          sg.scheduled_at AS game_date,
-          bu.full_name AS bookie_name,
-          bu.phone AS bookie_phone,
-          1 AS sort_order
-         FROM Prize_Pool p
-         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND (p.disbursed = FALSE OR p.disbursed IS NULL)
-      )
-      UNION ALL
-      (
-        SELECT 
-          p.prize_id,
-          p.game_id,
-          p.pattern_name,
-          p.amount_per_winner,
-          p.prize_amount,
-          p.player_claimed,
-          p.player_claimed_at,
-          p.disbursed,
-          p.disbursed_at,
-          p.winner_housie_name,
-          p.winner_ticket_id,
-          t.ticket_number AS winner_ticket_number,
-          sg.title AS game_title,
-          sg.scheduled_at AS game_date,
-          bu.full_name AS bookie_name,
-          bu.phone AS bookie_phone,
-          2 AS sort_order
-         FROM Prize_Pool p
-         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND p.disbursed = TRUE
-         ORDER BY p.disbursed_at DESC
-         LIMIT 10
-      )
-      ) AS combined
-      ORDER BY sort_order ASC, COALESCE(player_claimed_at, disbursed_at) DESC`
+    // 1. Active Claims Received (Pending Disbursal)
+    const activeRes = await pool.query(
+      `SELECT 
+        p.game_id,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date,
+        p.winner_housie_name,
+        MIN(p.formatted_claim_id) AS formatted_claim_id,
+        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
+        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
+        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
+        MAX(p.player_claimed_at) AS player_claimed_at,
+        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
+        COALESCE(MAX(bu.phone), '') AS bookie_phone
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) 
+         AND (p.disbursed = FALSE OR p.disbursed IS NULL)
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, p.winner_housie_name
+       ORDER BY MAX(p.player_claimed_at) DESC`
     );
 
-    const claims = result.rows.map((row) => ({
-      game_id: row.game_id,
-      prize_id: row.prize_id,
-      game_title: row.game_title,
-      game_date: row.game_date,
-      pattern_name: row.pattern_name,
-      amount: parseFloat(row.amount_per_winner ?? row.prize_amount),
-      winner_housie_name: row.winner_housie_name,
-      winner_ticket_number: row.winner_ticket_number,
-      player_claimed_at: row.player_claimed_at,
-      disbursed: row.disbursed,
-      disbursed_at: row.disbursed_at,
-      bookie_name: row.bookie_name || 'System/Operator',
-      bookie_phone: row.bookie_phone || '',
-    }));
+    // 2. Past Claim Request History (Disbursed in the last 2 days)
+    const historyRes = await pool.query(
+      `SELECT 
+        p.game_id,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date,
+        p.winner_housie_name,
+        MIN(p.formatted_claim_id) AS formatted_claim_id,
+        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
+        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
+        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
+        MAX(p.player_claimed_at) AS player_claimed_at,
+        MAX(p.disbursed_at) AS disbursed_at,
+        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
+        COALESCE(MAX(bu.phone), '') AS bookie_phone
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) 
+         AND p.disbursed = TRUE
+         AND p.disbursed_at >= NOW() - INTERVAL '2 days'
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, p.winner_housie_name
+       ORDER BY MAX(p.disbursed_at) DESC`
+    );
 
-    res.json(claims);
+    const mapClaimRow = (row: any, isDisbursed: boolean) => {
+      const patterns: string[] = row.pattern_names || [];
+      const ticketNums: (number | null)[] = row.ticket_numbers || [];
+      const patternDetails = patterns.map((pat, idx) => {
+        const tk = ticketNums[idx];
+        return tk ? `${pat} (Tk #${tk})` : pat;
+      });
+
+      return {
+        claim_key: `${row.game_id}-${row.winner_housie_name}`,
+        game_id: row.game_id,
+        game_title: row.game_title,
+        game_date: row.game_date,
+        winner_housie_name: row.winner_housie_name,
+        formatted_claim_id: row.formatted_claim_id || 'HGCR001',
+        prize_ids: row.prize_ids || [],
+        patterns: patterns,
+        pattern_details: patternDetails,
+        ticket_numbers: ticketNums.filter(Boolean),
+        total_amount: parseFloat(row.total_amount),
+        player_claimed_at: row.player_claimed_at,
+        disbursed: isDisbursed,
+        disbursed_at: row.disbursed_at || null,
+        bookie_name: row.bookie_name || 'System/Operator',
+        bookie_phone: row.bookie_phone || '',
+      };
+    };
+
+    const active_claims = activeRes.rows.map((r) => mapClaimRow(r, false));
+    const history_claims = historyRes.rows.map((r) => mapClaimRow(r, true));
+
+    res.json({
+      active_claims,
+      history_claims,
+    });
   } catch (error) {
-    console.error('Error fetching prize claims:', error);
+    console.error('Error fetching consolidated prize claims:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Disburse a consolidated claim for a player in a game (Financial Admin)
+ */
+export async function disburseConsolidatedClaim(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { game_id } = req.params;
+  const { winner_housie_name, prize_ids } = req.body;
+  const admin = req.user!;
+
+  if (!winner_housie_name && (!Array.isArray(prize_ids) || prize_ids.length === 0)) {
+    res.status(400).json({ message: 'winner_housie_name or prize_ids is required' });
+    return;
+  }
+
+  try {
+    let updateQuery: string;
+    let queryParams: any[];
+
+    if (Array.isArray(prize_ids) && prize_ids.length > 0) {
+      updateQuery = `
+        UPDATE Prize_Pool 
+        SET disbursed = TRUE, 
+            disbursed_at = NOW(), 
+            disbursed_by = $1,
+            player_claimed = TRUE,
+            player_claimed_at = COALESCE(player_claimed_at, NOW())
+        WHERE game_id = $2 AND prize_id = ANY($3) AND (disbursed = FALSE OR disbursed IS NULL)
+        RETURNING prize_id`;
+      queryParams = [admin.userId, game_id, prize_ids];
+    } else {
+      updateQuery = `
+        UPDATE Prize_Pool 
+        SET disbursed = TRUE, 
+            disbursed_at = NOW(), 
+            disbursed_by = $1,
+            player_claimed = TRUE,
+            player_claimed_at = COALESCE(player_claimed_at, NOW())
+        WHERE game_id = $2 AND (winner_housie_name = $3 OR winner_housie_name LIKE '%' || $3 || '%') AND (disbursed = FALSE OR disbursed IS NULL)
+        RETURNING prize_id`;
+      queryParams = [admin.userId, game_id, winner_housie_name];
+    }
+
+    const result = await pool.query(updateQuery, queryParams);
+
+    if (result.rowCount === 0) {
+      res.status(400).json({ message: 'No pending claims found to disburse' });
+      return;
+    }
+
+    io.emit('prize_disbursed', { game_id, winner_housie_name });
+    io.emit('ticket_status_change');
+
+    // Check if all won prizes for this game are now disbursed
+    const allPrizesRes = await pool.query(
+      `SELECT COUNT(*)::integer as total_won, COUNT(*) FILTER (WHERE disbursed = TRUE)::integer as disbursed_count
+       FROM Prize_Pool 
+       WHERE game_id = $1 AND claimed = TRUE`,
+      [game_id]
+    );
+
+    const { total_won, disbursed_count } = allPrizesRes.rows[0];
+
+    // If all won prizes (claims) are disbursed, mark game as Completed
+    if (parseInt(total_won) === parseInt(disbursed_count)) {
+      await pool.query(
+        `UPDATE Scheduled_Games 
+         SET game_status = 'Completed', completed_at = NOW()
+         WHERE game_id = $1 AND game_status != 'Completed'`,
+        [game_id]
+      );
+      io.emit('game_list_update');
+    }
+
+    res.json({
+      message: 'Consolidated claim disbursed successfully',
+      disbursed_prizes_count: result.rowCount,
+    });
+  } catch (error) {
+    console.error('Error disbursing consolidated claim:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

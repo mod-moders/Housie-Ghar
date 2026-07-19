@@ -17,6 +17,7 @@ import {
   claimPrize,
   claimAllPrizes,
   disbursePrize,
+  disburseConsolidatedClaim,
   getPrizeClaims,
   getPrizeClaimsDashboard,
 } from './games.controller';
@@ -82,5 +83,6 @@ router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator'
 router.post('/:game_id/claim-all', claimAllPrizes);
 router.post('/:game_id/prizes/:prize_id/claim', claimPrize);
 router.post('/:game_id/prizes/:prize_id/disburse', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disbursePrize);
+router.post('/:game_id/disburse-consolidated', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disburseConsolidatedClaim);
 
 export default router;

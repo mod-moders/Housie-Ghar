@@ -126,8 +126,9 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       }
     };
 
-    const makeBookingWaLink = (phone: string, fullName: string, bookingId: string): string => {
-      const msg = `Hi ${fullName}, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: #${bookingId.substring(0, 8).toUpperCase()}. Amount: ₹${totalAmount}.`;
+    const makeBookingWaLink = (phone: string, fullName: string, bookingId: string, formattedBookingId?: string): string => {
+      const code = formattedBookingId || `#${bookingId.substring(0, 8).toUpperCase()}`;
+      const msg = `Hi ${fullName}, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: ${code}. Amount: ₹${totalAmount}.`;
       return buildWaLink(phone, msg);
     };
 
@@ -158,7 +159,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
            game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
            booking_status, locked_at, locked_until, is_overflow
          ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE)
-         RETURNING booking_id`,
+         RETURNING booking_id, formatted_booking_id`,
         [game_id, ticket_ids, housie_name, selectedStaff.user_id, totalAmount, lockedUntil]
       );
       const overflowBookingId = overflowRes.rows[0].booking_id;
@@ -184,12 +185,13 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
       res.json({
         booking_id: overflowBookingId,
+        formatted_booking_id: overflowRes.rows[0].formatted_booking_id,
         locked_until: lockedUntil.toISOString(),
         agent_name: selectedStaff.full_name,
         agent_phone: selectedStaff.phone,
         agent_town: selectedStaff.town ?? null,
         total_amount: totalAmount,
-        whatsapp_link: makeBookingWaLink(selectedStaff.phone, selectedStaff.full_name, overflowBookingId),
+        whatsapp_link: makeBookingWaLink(selectedStaff.phone, selectedStaff.full_name, overflowBookingId, overflowRes.rows[0].formatted_booking_id),
         is_overflow: true,
       });
       return;
@@ -201,7 +203,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
         booking_status, locked_at, locked_until
       ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6)
-      RETURNING booking_id`,
+      RETURNING booking_id, formatted_booking_id`,
       [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil]
     );
     const bookingId = bookingRes.rows[0].booking_id;
@@ -228,12 +230,13 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
     res.json({
       booking_id: bookingId,
+      formatted_booking_id: bookingRes.rows[0].formatted_booking_id,
       locked_until: lockedUntil.toISOString(),
       agent_phone: assigned.phone,
       agent_name: assigned.full_name,
       agent_town: assigned.town,
       total_amount: totalAmount,
-      whatsapp_link: makeBookingWaLink(assigned.phone, assigned.full_name, bookingId),
+      whatsapp_link: makeBookingWaLink(assigned.phone, assigned.full_name, bookingId, bookingRes.rows[0].formatted_booking_id),
       is_overflow: false,
     });
   } catch (error) {
@@ -253,7 +256,7 @@ export async function getBookingStatus(req: Request, res: Response): Promise<voi
 
   try {
     const result = await pool.query(
-      `SELECT booking_id, booking_status, confirmed_at
+      `SELECT booking_id, formatted_booking_id, booking_status, confirmed_at
        FROM Bookings
        WHERE booking_id = $1`,
       [booking_id]
@@ -266,6 +269,7 @@ export async function getBookingStatus(req: Request, res: Response): Promise<voi
 
     res.json({
       booking_id: result.rows[0].booking_id,
+      formatted_booking_id: result.rows[0].formatted_booking_id,
       booking_status: result.rows[0].booking_status,
       confirmed_at: result.rows[0].confirmed_at,
     });
@@ -596,7 +600,7 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
          game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
          booking_status, locked_at, locked_until, confirmed_at, confirmed_by
        ) VALUES ($1, $2, $3, $4, $5, 'Sold', $6, $6, $6, $4)
-       RETURNING booking_id`,
+       RETURNING booking_id, formatted_booking_id`,
       [game_id, ticket_ids, housie_name, agentId, totalAmount, now]
     );
     const bookingId = bookingRes.rows[0].booking_id;
@@ -646,6 +650,7 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
 
     res.status(201).json({
       booking_id: bookingId,
+      formatted_booking_id: bookingRes.rows[0].formatted_booking_id,
       total_amount: totalAmount,
       balance_after: newBalance,
     });

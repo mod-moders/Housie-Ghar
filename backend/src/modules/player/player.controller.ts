@@ -30,7 +30,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
 
     // 2. Insert player
     const result = await pool.query(
-      'INSERT INTO Players (full_name, housie_name) VALUES ($1, $2) RETURNING player_id, full_name, housie_name',
+      'INSERT INTO Players (full_name, housie_name) VALUES ($1, $2) RETURNING player_id, player_code, full_name, housie_name',
       [cleanFullName, cleanHousieName]
     );
 
@@ -88,7 +88,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   try {
     // 1. Fetch player
     const result = await pool.query(
-      'SELECT player_id, full_name, housie_name, password_hash, status FROM Players WHERE housie_name = $1',
+      'SELECT player_id, player_code, full_name, housie_name, password_hash, status FROM Players WHERE housie_name = $1',
       [cleanHousieName]
     );
 
@@ -152,7 +152,7 @@ export async function getProfile(req: any, res: Response): Promise<void> {
   
   try {
     const result = await pool.query(
-      'SELECT player_id, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
+      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
       [req.player.playerId]
     );
     if ((result.rowCount ?? 0) === 0) {
@@ -203,7 +203,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
            sound_enabled = COALESCE($5, sound_enabled),
            password_hash = CASE WHEN $6 = TRUE THEN $7 ELSE password_hash END
        WHERE player_id = $8
-       RETURNING player_id, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, (password_hash IS NOT NULL) AS has_password`,
+       RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, (password_hash IS NOT NULL) AS has_password`,
       [full_name, phone, email, theme_preference, sound_enabled, shouldUpdatePassword, passwordHashUpdate, req.player.playerId]
     );
 
@@ -344,6 +344,7 @@ export async function getAllPlayers(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT 
          p.player_id,
+         p.player_code,
          p.full_name,
          p.housie_name,
          p.registered_at,
@@ -360,7 +361,7 @@ export async function getAllPlayers(req: any, res: Response): Promise<void> {
          ) AS total_won
        FROM Players p
        LEFT JOIN Bookings b ON b.housie_name = p.housie_name AND b.booking_status = 'Sold'
-       GROUP BY p.player_id, p.full_name, p.housie_name, p.registered_at, p.phone, p.email, p.status
+       GROUP BY p.player_id, p.player_code, p.full_name, p.housie_name, p.registered_at, p.phone, p.email, p.status
        ORDER BY p.registered_at DESC`
     );
     res.json(result.rows);
