@@ -17,37 +17,85 @@ export function Logo({
   href?: string;
 }) {
   const content = (
-    <>
-      <Image
-        src="/HG Primary.png"
-        alt="Housie Ghar Logo"
-        width={size}
-        height={size}
-        priority
-        className="object-contain"
-      />
-      <span style={{
-        fontFamily: "var(--font-head)",
-        fontSize: "20px",
-        letterSpacing: "-0.03em",
-        color: "var(--text)"
-      }} className="hg-logo-word">
-        <span style={{ fontWeight: 500 }}>Housie</span>
-        <b style={{ fontWeight: 800 }}>Ghar</b>
+    <div className="hg-logo-container" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <div 
+        className="hg-logo-icon-badge"
+        style={{
+          position: "relative",
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: "50%",
+          padding: "2px",
+          background: "linear-gradient(135deg, var(--accent) 0%, rgba(255, 215, 0, 0.4) 50%, var(--accent-light, #ffd700) 100%)",
+          boxShadow: "0 0 14px var(--accent-soft), inset 0 0 6px rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), boxShadow 0.25s ease"
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            background: "#0d0d11",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden"
+          }}
+        >
+          <Image
+            src="/HG Primary.png"
+            alt="Housie Ghar Logo"
+            width={Math.round(size * 0.85)}
+            height={Math.round(size * 0.85)}
+            priority
+            className="object-contain"
+            style={{ objectFit: "contain" }}
+          />
+        </div>
+      </div>
+      <span
+        style={{
+          fontFamily: "var(--font-head), sans-serif",
+          fontSize: size >= 32 ? "20px" : "16px",
+          letterSpacing: "-0.02em",
+          lineHeight: "1.1",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "5px"
+        }}
+        className="hg-logo-word"
+      >
+        <span style={{ fontWeight: 600, color: "var(--text)" }}>Housie</span>
+        <b
+          style={{
+            fontWeight: 900,
+            background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 50%, var(--accent-light, #ffd700) 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            filter: "drop-shadow(0 1px 4px var(--accent-soft))"
+          }}
+        >
+          Ghar
+        </b>
       </span>
-    </>
+    </div>
   );
 
   if (onClick) {
     return (
-      <button className="hg-logo" onClick={onClick} aria-label="Housie Ghar home">
+      <button className="hg-logo" onClick={onClick} aria-label="Housie Ghar home" style={{ background: "none", border: 0, cursor: "pointer", padding: 0 }}>
         {content}
       </button>
     );
   }
 
   return (
-    <Link href={href} className="hg-logo" aria-label="Housie Ghar home">
+    <Link href={href} className="hg-logo" aria-label="Housie Ghar home" style={{ textDecoration: "none" }}>
       {content}
     </Link>
   );

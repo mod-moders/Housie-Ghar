@@ -3849,3 +3849,46 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   transform: translateY(-2px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
 }
+
+/* Redesigned Brand Logo & Badge Hover Styling */
+.hg-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hg-logo:hover .hg-logo-icon-badge {
+  transform: scale(1.08) rotate(3deg);
+  box-shadow: 0 0 20px var(--accent-soft), 0 0 8px var(--accent) !important;
+}
+
+.hg-logo:hover .hg-logo-word b {
+  filter: drop-shadow(0 2px 8px var(--accent));
+}
+
+.hg-root[data-theme='retro_arcade'] .hg-logo-word b {
+  background: linear-gradient(135deg, #00ffff 0%, #ff00ff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 6px #00ffff) !important;
+}
+
+.hg-root[data-theme='cyberpunk'] .hg-logo-word b {
+  background: linear-gradient(135deg, #ff0055 0%, #00f0ff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 6px #ff0055) !important;
+}
+
+.hg-root[data-theme='neon_night'] .hg-logo-word b {
+  background: linear-gradient(135deg, #00ffaa 0%, #00bcff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 6px #00ffaa) !important;
+}

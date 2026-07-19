@@ -299,7 +299,7 @@ export default function StaffDashboard() {
         <div className="hg-dash">
           {collapsed && <div className="hg-side-backdrop" onClick={() => setCollapsed(false)} />}
           <aside className={`hg-side${collapsed ? " is-collapsed" : ""}`}>
-            <div className="hg-side-brand"><Logo size={18} onClick={() => window.location.reload()} /></div>
+            <div className="hg-side-brand" style={{ padding: "8px 12px 14px", display: "flex", alignItems: "center" }}><Logo size={38} onClick={() => window.location.reload()} /></div>
              <nav className="hg-side-nav" style={{ gap: "4px" }}>
               {nav.map(([key, lbl, ic]) => {
                 const isFinance = key === "finance";
