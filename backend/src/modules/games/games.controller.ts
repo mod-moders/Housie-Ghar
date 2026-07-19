@@ -266,7 +266,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         my_tickets_count: myTicketsCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
-        call_mode: game.call_mode || 'TTS',
+        call_mode: game.call_mode || 'Audio',
         prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
           pattern_name: row.pattern_name,
@@ -383,7 +383,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       my_tickets_count: myTicketsCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
-      call_mode: game.call_mode || 'TTS',
+      call_mode: game.call_mode || 'Audio',
       prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
         pattern_name: row.pattern_name,
@@ -468,7 +468,7 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   try {
     await client.query('BEGIN');
 
-    const selectedCallMode = call_mode === 'Audio' ? 'Audio' : 'TTS';
+    const selectedCallMode = call_mode === 'TTS' ? 'TTS' : 'Audio';
     // 3. Insert the game
     const gameRes = await client.query(
       `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by, call_mode)
@@ -700,7 +700,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
       game_status: gameRes.rows[0]?.game_status || 'Scheduled',
-      call_mode: gameRes.rows[0]?.call_mode || 'TTS',
+      call_mode: gameRes.rows[0]?.call_mode || 'Audio',
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,
       claimed_prizes: formattedPrizes.map((row) => ({
@@ -880,7 +880,7 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
     try {
       await client.query('BEGIN');
 
-      const updatedCallMode = call_mode !== undefined ? (call_mode === 'Audio' ? 'Audio' : 'TTS') : game.call_mode || 'TTS';
+      const updatedCallMode = call_mode !== undefined ? (call_mode === 'TTS' ? 'TTS' : 'Audio') : game.call_mode || 'Audio';
       // 4. Update the game details
       await client.query(
         `UPDATE Scheduled_Games

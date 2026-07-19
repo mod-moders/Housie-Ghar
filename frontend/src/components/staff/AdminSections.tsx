@@ -596,7 +596,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
   const [salesGameId, setSalesGameId] = useState<string | null>(null);
   const [bookingGameId, setBookingGameId] = useState<string | null>(null);
   const [form, setForm] = useState<{ title: string; scheduled_at: string; ticket_price: string; total_tickets: string; call_mode: "TTS" | "Audio" }>({
-    title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "TTS"
+    title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio"
   });
 
   const [selectedGame, setSelectedGame] = useState<GameSummary | null>(null);
@@ -655,7 +655,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         scheduled_at: formatDateForLocalInput(g.scheduled_at),
         ticket_price: String(g.ticket_price),
         total_tickets: String(g.total_tickets),
-        call_mode: g.call_mode === "Audio" ? "Audio" : "TTS",
+        call_mode: g.call_mode === "TTS" ? "TTS" : "Audio",
       });
       setPrizes(PATTERN_DEFAULTS.map((pd) => {
         const matchingPrize = g.prize_pool.find((p) => p.pattern_name === pd.pattern_name || (pd.pattern_name === "1st Full House" && p.pattern_name === "Full House"));
@@ -744,7 +744,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
       }
       setCreating(false);
       setEditingGameId(null);
-      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "TTS" });
+      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
       setPrizes(PATTERN_DEFAULTS);
       load();
     } catch (e) {
@@ -773,7 +773,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
               if (creating) {
                 setEditingGameId(null);
-                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "TTS" });
+                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
                 setPrizes(PATTERN_DEFAULTS);
               }
               setCreating(!creating);
@@ -975,7 +975,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => {
               setCreating(false);
               setEditingGameId(null);
-              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "TTS" });
+              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
               setPrizes(PATTERN_DEFAULTS);
             }}>Cancel</Button>
             <Button
