@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveAudioUrl } from "@/lib/api";
 import { Button } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
@@ -366,11 +366,13 @@ export function CallVoiceSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const fileName = file.name.toLowerCase();
-    const isMimeValid = file.type.startsWith("audio/") || file.type.startsWith("video/mp4") || file.type.includes("mp4") || file.type.includes("mpeg");
-    const isExtValid = fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".m4a") || fileName.endsWith(".mp4") || fileName.endsWith(".mpeg") || fileName.endsWith(".mpg");
-    if (!isMimeValid && !isExtValid) {
-      alert("Please upload a valid audio or video file (MP3, MPEG, WAV, M4A, or MP4).");
+    const fileName = file.name.toLowerCase().trim();
+    const audioExtensions = [".mp3", ".wav", ".m4a", ".mp4", ".mpeg", ".mpg", ".ogg", ".webm", ".aac", ".flac", ".opus", ".3gp", ".wma", ".m4r"];
+    const hasAudioExt = audioExtensions.some(ext => fileName.endsWith(ext));
+    const isAudioType = file.type.startsWith("audio/") || file.type.startsWith("video/") || hasAudioExt;
+
+    if (!isAudioType) {
+      alert(`Please upload a valid audio file (MP3, WAV, M4A, OGG, WEBM, AAC, FLAC, OPUS, MP4, etc.). Detected: ${file.name}`);
       return;
     }
 
@@ -512,7 +514,8 @@ export function CallVoiceSettings() {
     setPreviewStatus("playing");
   };
 
-  const startNewAudio = (url: string, key: string) => {
+  const startNewAudio = (rawUrl: string, key: string) => {
+    const url = resolveAudioUrl(rawUrl);
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.src = "";
@@ -742,18 +745,12 @@ export function CallVoiceSettings() {
     if (!file) return;
 
     const fileName = file.name.toLowerCase().trim();
-    const hasAudioOrVideoExtension = fileName.endsWith(".mp3") ||
-                                     fileName.endsWith(".wav") ||
-                                     fileName.endsWith(".m4a") ||
-                                     fileName.endsWith(".mpeg") ||
-                                     fileName.endsWith(".aac") ||
-                                     fileName.endsWith(".ogg") ||
-                                     fileName.endsWith(".wma") ||
-                                     fileName.endsWith(".mp4");
-    const isAudioOrVideo = hasAudioOrVideoExtension || file.type.startsWith("audio/") || file.type === "video/mp4";
+    const audioExtensions = [".mp3", ".wav", ".m4a", ".mp4", ".mpeg", ".mpg", ".ogg", ".webm", ".aac", ".flac", ".opus", ".3gp", ".wma", ".m4r"];
+    const hasAudioExt = audioExtensions.some(ext => fileName.endsWith(ext));
+    const isAudioType = file.type.startsWith("audio/") || file.type.startsWith("video/") || hasAudioExt;
 
-    if (!isAudioOrVideo) {
-      alert(`Please upload an MP3, MP4 or standard audio/video file only. (Detected file: ${file.name}, type: ${file.type || "unknown"})`);
+    if (!isAudioType) {
+      alert(`Please upload a valid audio file (MP3, WAV, M4A, OGG, WEBM, AAC, FLAC, OPUS, MP4, etc.). Detected: ${file.name}`);
       return;
     }
 

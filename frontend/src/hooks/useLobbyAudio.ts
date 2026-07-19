@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useConfigStore } from "@/lib/stores/configStore";
+import { resolveAudioUrl } from "@/lib/api";
 
 export function useLobbyAudio(active: boolean) {
   const { config } = useConfigStore();
@@ -56,7 +57,7 @@ export function useLobbyAudio(active: boolean) {
         } catch {}
       }
 
-      const audio = new Audio(url);
+      const audio = new Audio(resolveAudioUrl(url));
       const bgVol = parseFloat(config?.lobby_music_volume || "0.15");
       audio.volume = bgVol;
       audioRef.current = audio;

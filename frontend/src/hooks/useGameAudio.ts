@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { englishPhrases } from "@/lib/englishPhrases";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveAudioUrl } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useSocket } from "@/lib/hooks/useSocket";
@@ -89,11 +89,12 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
     const bgVol = parseFloat(platformConfig?.background_music_volume || "0.15");
 
     if (isGameLive && bgEnabled && bgUrl && !isMuted) {
-      if (!bgMusicRef.current || bgMusicRef.current.src !== bgUrl) {
+      const resolvedBgUrl = resolveAudioUrl(bgUrl);
+      if (!bgMusicRef.current || bgMusicRef.current.src !== resolvedBgUrl) {
         if (bgMusicRef.current) {
           try { bgMusicRef.current.pause(); } catch {}
         }
-        const audio = new Audio(bgUrl);
+        const audio = new Audio(resolvedBgUrl);
         audio.loop = true;
         audio.volume = bgVol;
         audio.muted = false;
@@ -306,7 +307,7 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
         return;
       }
 
-      const audio = new Audio(mp3Path);
+      const audio = new Audio(resolveAudioUrl(mp3Path));
       activeAudiosRef.current.push(audio);
       audio.volume = 1.0;
       audio.muted = isMuted;

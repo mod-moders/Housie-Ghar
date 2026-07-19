@@ -91,18 +91,20 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
 
   try {
     const mimeMatch = audio_data.match(/^data:([^;]+);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : '';
+    const mimeType = (mimeMatch ? mimeMatch[1] : '').toLowerCase();
     
     let ext = 'mp3';
-    if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) {
-      ext = 'mp4';
-    } else if (mimeType.includes('wav')) {
-      ext = 'wav';
-    } else if (mimeType.includes('m4a')) {
-      ext = 'm4a';
-    } else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) {
-      ext = 'mpeg';
-    }
+    if (mimeType.includes('wav')) ext = 'wav';
+    else if (mimeType.includes('ogg')) ext = 'ogg';
+    else if (mimeType.includes('webm')) ext = 'webm';
+    else if (mimeType.includes('aac')) ext = 'aac';
+    else if (mimeType.includes('flac')) ext = 'flac';
+    else if (mimeType.includes('opus')) ext = 'opus';
+    else if (mimeType.includes('3gp') || mimeType.includes('3gpp')) ext = '3gp';
+    else if (mimeType.includes('wma')) ext = 'wma';
+    else if (mimeType.includes('m4a') || mimeType.includes('x-m4a') || mimeType.includes('mp4a')) ext = 'm4a';
+    else if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) ext = 'mp4';
+    else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) ext = 'mp3';
 
     const base64Data = audio_data.split(';base64,').pop();
     if (!base64Data) {
@@ -112,23 +114,36 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
 
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Resolve destination: frontend/public/audio/calls/
-    const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');
-    fs.mkdirSync(destDir, { recursive: true });
+    // Resolve destinations:
+    // 1. backend persistent uploads: backend/uploads/audio/calls
+    // 2. frontend public: frontend/public/audio/calls
+    const backendUploadDir = path.resolve(__dirname, '../../../uploads/audio/calls');
+    fs.mkdirSync(backendUploadDir, { recursive: true });
 
-    // Clean up any existing files for this number with common extensions so we don't have duplicate file forms
-    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
-    possibleExts.forEach((e) => {
-      const oldPath = path.join(destDir, `${number}.${e}`);
-      if (fs.existsSync(oldPath)) {
-        try { fs.unlinkSync(oldPath); } catch {}
+    let rootDir = process.cwd();
+    if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+      rootDir = path.resolve(rootDir, '..');
+    }
+    const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/calls');
+    try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
+
+    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'aac', 'flac', 'opus', '3gp', 'wma'];
+    [backendUploadDir, frontendPublicDir].forEach((dir) => {
+      if (fs.existsSync(dir)) {
+        possibleExts.forEach((e) => {
+          const oldPath = path.join(dir, `${number}.${e}`);
+          if (fs.existsSync(oldPath)) {
+            try { fs.unlinkSync(oldPath); } catch {}
+          }
+        });
       }
     });
 
-    const destPath = path.join(destDir, `${number}.${ext}`);
-    fs.writeFileSync(destPath, buffer);
+    const filename = `${number}.${ext}`;
+    fs.writeFileSync(path.join(backendUploadDir, filename), buffer);
+    try { fs.writeFileSync(path.join(frontendPublicDir, filename), buffer); } catch {}
 
-    const audioUrl = `/audio/calls/${number}.${ext}`;
+    const audioUrl = `/api/games/number-calls/audio-file/${filename}`;
 
     const result = await pool.query(
       `UPDATE Number_Calls 

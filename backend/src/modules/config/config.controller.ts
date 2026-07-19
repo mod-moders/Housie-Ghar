@@ -283,18 +283,20 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
 
   try {
     const mimeMatch = audio_data.match(/^data:([^;]+);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : '';
+    const mimeType = (mimeMatch ? mimeMatch[1] : '').toLowerCase();
     
     let ext = 'mp3';
-    if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) {
-      ext = 'mp4';
-    } else if (mimeType.includes('wav')) {
-      ext = 'wav';
-    } else if (mimeType.includes('m4a')) {
-      ext = 'm4a';
-    } else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) {
-      ext = 'mpeg';
-    }
+    if (mimeType.includes('wav')) ext = 'wav';
+    else if (mimeType.includes('ogg')) ext = 'ogg';
+    else if (mimeType.includes('webm')) ext = 'webm';
+    else if (mimeType.includes('aac')) ext = 'aac';
+    else if (mimeType.includes('flac')) ext = 'flac';
+    else if (mimeType.includes('opus')) ext = 'opus';
+    else if (mimeType.includes('3gp') || mimeType.includes('3gpp')) ext = '3gp';
+    else if (mimeType.includes('wma')) ext = 'wma';
+    else if (mimeType.includes('m4a') || mimeType.includes('x-m4a') || mimeType.includes('mp4a')) ext = 'm4a';
+    else if (mimeType.includes('video/mp4') || mimeType.includes('mp4')) ext = 'mp4';
+    else if (mimeType.includes('mpeg') || mimeType.includes('mpg')) ext = 'mp3';
 
     const base64Data = audio_data.split(';base64,').pop();
     if (!base64Data) {
@@ -304,30 +306,40 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
 
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Resolve destination: frontend/public/audio/config/
+    // Resolve destinations:
+    // 1. backend persistent uploads: backend/uploads/audio/config
+    // 2. frontend public: frontend/public/audio/config
+    const backendUploadDir = path.resolve(__dirname, '../../../uploads/audio/config');
+    fs.mkdirSync(backendUploadDir, { recursive: true });
+
     let rootDir = process.cwd();
     if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
       rootDir = path.resolve(rootDir, '..');
     }
-    const destDir = path.resolve(rootDir, 'frontend/public/audio/config');
-    fs.mkdirSync(destDir, { recursive: true });
+    const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/config');
+    try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
 
-    // Clean up any existing files for this key (wildcard to delete old versions)
-    if (fs.existsSync(destDir)) {
-      const files = fs.readdirSync(destDir);
-      files.forEach((file) => {
-        if (file.startsWith(`${key}-`) || file.startsWith(`${key}.`)) {
-          try { fs.unlinkSync(path.join(destDir, file)); } catch {}
-        }
-      });
-    }
+    // Clean up any existing files for this key
+    [backendUploadDir, frontendPublicDir].forEach((dir) => {
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir);
+          files.forEach((file) => {
+            if (file.startsWith(`${key}-`) || file.startsWith(`${key}.`)) {
+              try { fs.unlinkSync(path.join(dir, file)); } catch {}
+            }
+          });
+        } catch {}
+      }
+    });
 
     const timestamp = Date.now();
     const filename = `${key}-${timestamp}.${ext}`;
-    const destPath = path.join(destDir, filename);
-    fs.writeFileSync(destPath, buffer);
+    
+    fs.writeFileSync(path.join(backendUploadDir, filename), buffer);
+    try { fs.writeFileSync(path.join(frontendPublicDir, filename), buffer); } catch {}
 
-    const audioUrl = `/audio/config/${filename}`;
+    const audioUrl = `/api/config/audio-file/${filename}`;
 
     const result = await pool.query(
       `UPDATE Platform_Config 

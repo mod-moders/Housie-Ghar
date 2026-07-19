@@ -1,5 +1,27 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+export function resolveAudioUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("data:")) return url;
+
+  let path = url;
+  if (path.startsWith("/audio/config/")) {
+    path = path.replace("/audio/config/", "/api/config/audio-file/");
+  } else if (path.startsWith("/audio/calls/")) {
+    path = path.replace("/audio/calls/", "/api/games/number-calls/audio-file/");
+  }
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  if (!BASE || BASE.startsWith("/")) {
+    return cleanPath;
+  }
+  return `${BASE.replace(/\/api\/?$/, "")}${cleanPath}`;
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {}

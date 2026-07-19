@@ -98,6 +98,32 @@ const loginLimiter = rateLimit({
 });
 app.use('/api/auth/login', loginLimiter);
 
+import path from 'path';
+import fs from 'fs';
+
+// Serve audio uploaded files with byte-range requests support
+const backendConfigAudioDir = path.resolve(__dirname, '../uploads/audio/config');
+const backendCallsAudioDir = path.resolve(__dirname, '../uploads/audio/calls');
+let rootDir = process.cwd();
+if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+  rootDir = path.resolve(rootDir, '..');
+}
+const frontendConfigAudioDir = path.resolve(rootDir, 'frontend/public/audio/config');
+const frontendCallsAudioDir = path.resolve(rootDir, 'frontend/public/audio/calls');
+
+fs.mkdirSync(backendConfigAudioDir, { recursive: true });
+fs.mkdirSync(backendCallsAudioDir, { recursive: true });
+
+app.use('/api/config/audio-file', express.static(backendConfigAudioDir));
+app.use('/api/config/audio-file', express.static(frontendConfigAudioDir));
+app.use('/api/games/number-calls/audio-file', express.static(backendCallsAudioDir));
+app.use('/api/games/number-calls/audio-file', express.static(frontendCallsAudioDir));
+
+app.use('/audio/config', express.static(backendConfigAudioDir));
+app.use('/audio/config', express.static(frontendConfigAudioDir));
+app.use('/audio/calls', express.static(backendCallsAudioDir));
+app.use('/audio/calls', express.static(frontendCallsAudioDir));
+
 // 5. Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gamesRoutes);
