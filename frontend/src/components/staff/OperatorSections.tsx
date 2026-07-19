@@ -361,7 +361,7 @@ export function OperatorHudSection() {
         <div className="hg-live-left">
           {/* Cage + status */}
           <div className="hg-cage-area">
-            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} />
+            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} />
             
             <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
               {status === "Completed" || status === "Draw_Ended"

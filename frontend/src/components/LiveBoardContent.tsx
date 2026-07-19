@@ -363,7 +363,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
         playCelebration();
         const config = useConfigStore.getState().config;
         const isSoundEnabled = config?.celebration_sound_enabled !== "false";
-        if (isSoundEnabled) {
+        if (isSoundEnabled && !muted) {
           soundSynthesizer.playCelebration();
         }
         setWinOverlay(w);
@@ -376,7 +376,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       setReactions((r) => [...r, next]);
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     }
-  }, [revealDraw, playCelebration, introPlayingRef, delay]);
+  }, [revealDraw, playCelebration, introPlayingRef, delay, muted]);
 
   useSSE(game_id, onEvent);
 
@@ -457,7 +457,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
             <div className="hg-live-left">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
-                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} />
+                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} />
                 
                 <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"

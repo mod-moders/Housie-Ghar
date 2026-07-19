@@ -10,6 +10,7 @@ import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { logAuditEvent } from '../../services/audit.service';
 import { io } from '../../server';
+import { faststartMp4 } from '../../utils/mp4Faststart';
 
 /**
  * Read the entire platform configuration (Superadmin)
@@ -109,8 +110,6 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     return;
   }
 
-  clearPublicConfigCache();
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -160,6 +159,13 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
     }
 
     await client.query('COMMIT');
+
+    // Only clear the cache once the write has actually committed — clearing it
+    // beforehand leaves a window where a concurrent GET /api/config/public (the
+    // ConfigProvider on every client polls this every 30s) reads the old DB
+    // row, repopulates the cache with it, and that stale value then sticks
+    // until the next unrelated config write, since nothing else invalidates it.
+    clearPublicConfigCache();
 
     // Broadcast config updates to all connected players/clients instantly
     const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'welcome_voice_mode', 'instruction_voice_mode', 'welcome_voice_volume', 'instruction_voice_volume', 'tts_voice_name', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
@@ -263,8 +269,6 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
     return;
   }
 
-  clearPublicConfigCache();
-
   const allowedKeys = [
     'welcome_voice_url',
     'instruction_voice_url',
@@ -304,7 +308,12 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
       return;
     }
 
-    const buffer = Buffer.from(base64Data, 'base64');
+    const rawBuffer = Buffer.from(base64Data, 'base64');
+    // Phone/voice-recorder exports (and this upload's own mp4 branch) almost
+    // always land with `moov` after `mdat` — valid, but Chrome's <audio>/<video>
+    // progressive playback can fail or hang on that layout. Relocate moov to
+    // the front where possible; no-ops for mp3/wav or anything it doesn't recognize.
+    const buffer = faststartMp4(rawBuffer);
 
     // Resolve destinations:
     // 1. backend persistent uploads: backend/uploads/audio/config
@@ -353,6 +362,8 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
       res.status(404).json({ message: 'Config key not found' });
       return;
     }
+
+    clearPublicConfigCache();
 
     // Broadcast config updates
     io.emit('config_update', { [key]: audioUrl });
