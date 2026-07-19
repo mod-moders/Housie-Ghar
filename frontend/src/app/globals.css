@@ -1938,24 +1938,24 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-emoji-btn:hover{transform:scale(1.15)}
 .hg-emoji-btn:active{transform:scale(.9)}
 .hg-reactions{position:fixed;inset:0;pointer-events:none;z-index:90;max-width:452px;margin:0 auto}
-.hg-react-float{position:absolute;bottom:70px;animation:hg-rise 2.8s ease-out forwards}
+.hg-react-float{position:absolute;bottom:70px;transform:translateX(-50%);animation:hg-rise 2.8s ease-out forwards}
 @keyframes hg-rise {
   0% {
-    transform: translateY(0) translateX(0) scale(0.5);
+    transform: translateX(-50%) translateY(0) scale(0.5);
     opacity: 0;
   }
   8% {
     opacity: 1;
-    transform: translateY(-20px) translateX(-5px) scale(1);
+    transform: translateX(-50%) translateY(-20px) scale(1);
   }
   30% {
-    transform: translateY(-160px) translateX(12px) scale(1.05);
+    transform: translateX(-50%) translateY(-160px) scale(1.05);
   }
   60% {
-    transform: translateY(-360px) translateX(-12px) scale(1);
+    transform: translateX(-50%) translateY(-360px) scale(1);
   }
   100% {
-    transform: translateY(-720px) translateX(8px) scale(0.85) rotate(8deg);
+    transform: translateX(-50%) translateY(-720px) scale(0.85) rotate(8deg);
     opacity: 0;
   }
 }

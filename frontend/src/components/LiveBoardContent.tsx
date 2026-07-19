@@ -15,6 +15,7 @@ import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
@@ -42,8 +43,8 @@ interface FloatingReaction {
 let reactionSeq = 0;
 function makeReaction(emoji: string, senderName: string): FloatingReaction {
   reactionSeq += 1;
-  // Float from the right side of the screen (between 72% and 88%) to look like Facebook/Instagram Live
-  return { id: reactionSeq, emoji, senderName, x: 72 + Math.random() * 16 };
+  // Center reactions over the live board/HUD screen (between 35% and 65% with random drift)
+  return { id: reactionSeq, emoji, senderName, x: 50 + (Math.random() - 0.5) * 30 };
 }
 
 export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; isStaff?: boolean; onBack?: () => void }) {
@@ -187,13 +188,22 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     });
   }, [delay, revealDraw]);
 
+  // Prevent mobile device screen from sleeping during live game
+  useWakeLock(gameStatus === "Live");
+
   const gameStartedAnnouncedRef = useRef<boolean>(false);
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      playGreeting().then(flushPendingDraws);
+      // Play intro note ONLY if the player was present when the game started (0 drawn numbers)
+      // Players joining mid-game directly listen to incoming calls without re-playing the intro note
+      if (drawnNumbers.length === 0) {
+        playGreeting().then(flushPendingDraws);
+      } else {
+        flushPendingDraws();
+      }
     }
-  }, [gameStatus, playGreeting, flushPendingDraws]);
+  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);

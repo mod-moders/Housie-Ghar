@@ -192,7 +192,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     drawSequence,
     drawnNumbers,
     currentIndex,
-    intervalMs: 15000, // 15s to allow for TTS / Audio calling
+    intervalMs: 12000, // 12s default interval between calls
     timer: null,
     tickets,
     prizes,

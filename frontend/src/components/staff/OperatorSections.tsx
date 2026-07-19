@@ -16,6 +16,7 @@ import { getPresetClass } from "@/lib/presetHelper";
 import { HousieTicket, gridToMatrix, type TicketMatrix } from "@/components/HousieTicket";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import dynamic from "next/dynamic";
 
 const RealisticBingoCage = dynamic(
@@ -41,7 +42,7 @@ function fmtDateTime(iso: string): string {
 export function OperatorHudSection() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [speed, setSpeed] = useState(8);
+  const [speed, setSpeed] = useState(12);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -60,6 +61,7 @@ export function OperatorHudSection() {
   const game = games.find((g) => g.game_id === selectedId) ?? null;
   const activeGameStatus = game?.game_status || gameStatus;
   const isGameRunning = activeGameStatus === "Live" || activeGameStatus === "Paused" || activeGameStatus === "Draw_Ended";
+  useWakeLock(isGameRunning);
 
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true",
@@ -342,18 +344,35 @@ export function OperatorHudSection() {
           )}
         </div>
 
-        {/* Speed settings slider */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "240px" }}>
+        {/* Speed settings options: 8s, 10s, 12s (Default), 15s */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "260px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600 }}>
-            <span>Call Speed</span>
-            <span>{speed}s interval</span>
+            <span>Call Speed / Interval</span>
+            <span style={{ color: "var(--accent)" }}>{speed}s interval</span>
           </div>
-          <input
-            type="range" min={5} max={12} value={speed}
-            onChange={(e) => applySpeed(+e.target.value)}
-            disabled={status !== "Live"}
-            style={{ width: "100%", accentColor: "var(--accent)" }}
-          />
+          <div style={{ display: "flex", gap: "6px" }}>
+            {[8, 10, 12, 15].map((sec) => (
+              <button
+                key={sec}
+                onClick={() => applySpeed(sec)}
+                disabled={status !== "Live"}
+                style={{
+                  flex: 1,
+                  padding: "6px 0",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  border: "1.5px solid var(--border-2)",
+                  background: speed === sec ? "var(--accent)" : "var(--surface)",
+                  color: speed === sec ? "#000" : "var(--text-dim)",
+                  cursor: status === "Live" ? "pointer" : "not-allowed",
+                  transition: "all 0.2s"
+                }}
+              >
+                {sec}s{sec === 12 ? " ★" : ""}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
