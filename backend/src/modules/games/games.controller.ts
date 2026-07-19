@@ -195,7 +195,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
     }
 
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode
        FROM Scheduled_Games
        ORDER BY scheduled_at ASC`
     );
@@ -266,6 +266,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         my_tickets_count: myTicketsCount,
         fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
         game_status: game.game_status,
+        call_mode: game.call_mode || 'TTS',
         prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
           pattern_name: row.pattern_name,
@@ -308,7 +309,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     }
 
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode
        FROM Scheduled_Games
        WHERE game_id = $1`,
       [game_id]
@@ -382,6 +383,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       my_tickets_count: myTicketsCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
+      call_mode: game.call_mode || 'TTS',
       prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
         pattern_name: row.pattern_name,
@@ -407,7 +409,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
  * Body: { title, scheduled_at, ticket_price, total_tickets, operator_id?, prizes: [{ pattern_name, prize_amount }] }
  */
 export async function createGame(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes, call_mode } = req.body;
   const actor = req.user!;
 
   // 1. Validation
@@ -466,12 +468,13 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   try {
     await client.query('BEGIN');
 
+    const selectedCallMode = call_mode === 'Audio' ? 'Audio' : 'TTS';
     // 3. Insert the game
     const gameRes = await client.query(
-      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by)
-       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6)
+      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by, call_mode)
+       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6, $7)
        RETURNING game_id`,
-      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId]
+      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId, selectedCallMode]
     );
     const gameId = gameRes.rows[0].game_id;
 
@@ -658,7 +661,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // Send initial payload immediately
   try {
     const gameRes = await pool.query(
-      `SELECT game_status, title FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, call_mode FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
     const gameLogRes = await pool.query(
@@ -697,6 +700,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
       game_status: gameRes.rows[0]?.game_status || 'Scheduled',
+      call_mode: gameRes.rows[0]?.call_mode || 'TTS',
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,
       claimed_prizes: formattedPrizes.map((row) => ({
@@ -781,13 +785,13 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function updateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
   const game_id = req.params.game_id as string;
-  const { title, scheduled_at, ticket_price, total_tickets, prizes } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, prizes, call_mode } = req.body;
   const actor = req.user!;
 
   try {
     // 1. Fetch current game state
     const gameRes = await pool.query(
-      `SELECT game_status, title, ticket_price, total_tickets FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, ticket_price, total_tickets, call_mode FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
 
@@ -876,12 +880,13 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
     try {
       await client.query('BEGIN');
 
+      const updatedCallMode = call_mode !== undefined ? (call_mode === 'Audio' ? 'Audio' : 'TTS') : game.call_mode || 'TTS';
       // 4. Update the game details
       await client.query(
         `UPDATE Scheduled_Games
-         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4
-         WHERE game_id = $5`,
-        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, game_id]
+         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4, call_mode = $5
+         WHERE game_id = $6`,
+        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, updatedCallMode, game_id]
       );
 
       // 5. Update prizes if provided

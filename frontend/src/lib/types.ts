@@ -45,6 +45,7 @@ export interface GameSummary {
   my_tickets_count?: number;
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
+  call_mode?: "TTS" | "Audio" | "Text";
   prize_pool: Prize[];
 }
 

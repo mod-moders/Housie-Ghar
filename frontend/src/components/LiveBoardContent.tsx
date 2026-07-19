@@ -120,7 +120,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true",
     gameStatus === "Live" || gameStatus === "Paused" || gameStatus === "Draw_Ended",
-    muted
+    muted,
+    game?.call_mode
   );
 
   const wasLiveInSessionRef = useRef<boolean>(false);

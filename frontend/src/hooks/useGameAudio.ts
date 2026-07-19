@@ -14,7 +14,12 @@ interface NumberCallConfig {
   volume?: number;
 }
 
-export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean, isMuted: boolean = false) {
+export function useGameAudio(
+  englishCallerEnabled: boolean, 
+  isGameLive: boolean, 
+  isMuted: boolean = false,
+  gameCallMode?: "TTS" | "Audio" | "Text"
+) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
   const { config: platformConfig } = useConfigStore();
   
@@ -261,7 +266,12 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
     stopAllActiveAudios();
     const config = callsConfig[num];
     const phrase = config?.call_text || englishPhrases[num] || `Number ${num}`;
-    const mode = config?.call_mode || "Text";
+    const effectiveCallMode = (gameCallMode === "TTS" || gameCallMode === "Text") 
+      ? "Text" 
+      : gameCallMode === "Audio" 
+        ? "Audio" 
+        : (config?.call_mode || "Text");
+    const mode = effectiveCallMode;
     const audioUrl = config?.audio_url;
     const vol = config?.volume !== undefined ? config.volume : 1.0;
 

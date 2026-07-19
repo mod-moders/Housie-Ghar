@@ -66,7 +66,8 @@ export function OperatorHudSection() {
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true",
     isGameRunning,
-    muted
+    muted,
+    game?.call_mode
   );
 
   const pendingDrawsRef = useRef<number[]>([]);
