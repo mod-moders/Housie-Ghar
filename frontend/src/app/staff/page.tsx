@@ -34,7 +34,6 @@ function navFor(user: AuthUser): NavItem[] {
       ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["finance", "Finance Hub", "wallet"],
-      ["recharge", "Recharge Section", "creditCard"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
@@ -306,7 +305,7 @@ export default function StaffDashboard() {
              <nav className="hg-side-nav" style={{ gap: "4px" }}>
               {nav.map(([key, lbl, ic]) => {
                 const isRecharge = key === "recharge";
-                const showBadge = isRecharge && (user.role_name === "Financial Admin" || user.role_name === "Superadmin") && hud && hud.pending_topups > 0;
+                const showBadge = isRecharge && user.role_name === "Financial Admin" && hud && hud.pending_topups > 0;
                 return (
                   <button
                     key={key}
