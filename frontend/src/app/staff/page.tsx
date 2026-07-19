@@ -50,7 +50,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["finance", "Finance Hub", "wallet"],
-      ["recharge", "Recharge Section", "creditCard"],
+      ["recharge", "Requests", "rupee"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
