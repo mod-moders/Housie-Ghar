@@ -16,7 +16,7 @@ import {
 } from "@/components/staff/AdminSections";
 import { SettingsSection } from "@/components/staff/SettingsSection";
 import { PlayersSection } from "@/components/staff/PlayersSection";
-import { FinanceHubSection } from "@/components/staff/FinanceSections";
+import { FinanceHubSection, RechargeHubSection } from "@/components/staff/FinanceSections";
 import { OperatorHudSection, OverflowSection, ShareGamesSection } from "@/components/staff/OperatorSections";
 import { BookieQueueSection, BookieWalletSection } from "@/components/staff/BookieSections";
 import { ProfileSection } from "@/components/staff/ProfileSection";
@@ -34,6 +34,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["finance", "Finance Hub", "wallet"],
+      ["recharge", "Recharge Section", "creditCard"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
@@ -50,6 +51,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["finance", "Finance Hub", "wallet"],
+      ["recharge", "Recharge Section", "creditCard"],
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
@@ -272,6 +274,7 @@ export default function StaffDashboard() {
     switch (active) {
       case "overview": return <OverviewSection goSection={setSectionAndPersist} />;
       case "finance": return <FinanceHubSection me={user} onResolved={loadHud} />;
+      case "recharge": return <RechargeHubSection me={user} onResolved={loadHud} />;
       case "games": return <GamesSection me={user} />;
       case "history": return <HistorySection />;
       case "players": return <PlayersSection />;
@@ -302,8 +305,8 @@ export default function StaffDashboard() {
             <div className="hg-side-brand"><Logo size={38} onClick={() => window.location.reload()} /></div>
              <nav className="hg-side-nav" style={{ gap: "4px" }}>
               {nav.map(([key, lbl, ic]) => {
-                const isFinance = key === "finance";
-                const showBadge = isFinance && user.role_name === "Financial Admin" && hud && hud.pending_topups > 0;
+                const isRecharge = key === "recharge";
+                const showBadge = isRecharge && (user.role_name === "Financial Admin" || user.role_name === "Superadmin") && hud && hud.pending_topups > 0;
                 return (
                   <button
                     key={key}

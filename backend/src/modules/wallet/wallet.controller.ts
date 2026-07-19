@@ -189,12 +189,13 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
       recharge_wa_link = buildWaLink(contactRes.rows[0].phone, msg);
     }
 
-    // Notify staff dashboards (admins listening on the shared admin room)
-    io.to('admin-room').emit('topup_request_received', {
+    // Notify staff dashboards (admins listening on socket)
+    io.emit('topup_request_received', {
       request_id: request.request_id,
       agent_name: agent.fullName,
       amount,
     });
+    io.emit('wallet_update');
 
     res.status(201).json({
       request_id: request.request_id,
@@ -279,11 +280,13 @@ export async function approveTopUp(req: AuthenticatedRequest, res: Response): Pr
 
     await client.query('COMMIT');
 
-    // 5. Push wallet update to the agent in real time
+    // 5. Push wallet update to the agent and staff dashboards in real time
     io.to(`agent-${request.agent_id}`).emit('wallet_credited', {
       new_balance: newBalance,
       amount,
     });
+    io.emit('topup_approved', { request_id: id });
+    io.emit('wallet_update');
 
     await logAuditEvent({
       userId: actor.userId,
@@ -521,6 +524,9 @@ export async function rejectTopUp(req: AuthenticatedRequest, res: Response): Pro
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    io.emit('topup_rejected', { request_id: id });
+    io.emit('wallet_update');
 
     res.json({ message: 'Top-up request rejected' });
   } catch (error) {
