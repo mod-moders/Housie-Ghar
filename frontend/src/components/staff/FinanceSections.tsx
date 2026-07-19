@@ -62,20 +62,28 @@ interface FinanceInsights {
   retention: RetentionData;
 }
 
-interface PrizeClaimItem {
+interface ConsolidatedClaimItem {
+  claim_key: string;
   game_id: string;
-  prize_id: number;
   game_title: string;
   game_date: string;
-  pattern_name: string;
-  amount: number;
   winner_housie_name: string;
-  winner_ticket_number: number | null;
+  formatted_claim_id: string;
+  prize_ids: number[];
+  patterns: string[];
+  pattern_details: string[];
+  ticket_numbers: (number | null)[];
+  total_amount: number;
   player_claimed_at: string;
   disbursed: boolean;
-  disbursed_at?: string;
+  disbursed_at?: string | null;
   bookie_name: string;
   bookie_phone: string;
+}
+
+interface PrizeClaimsResponse {
+  active_claims: ConsolidatedClaimItem[];
+  history_claims: ConsolidatedClaimItem[];
 }
 
 export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
@@ -364,9 +372,10 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
   const [error, setError] = useState<string | null>(null);
 
   // Prize claims states
-  const [prizeClaims, setPrizeClaims] = useState<PrizeClaimItem[]>([]);
+  const [activeClaims, setActiveClaims] = useState<ConsolidatedClaimItem[]>([]);
+  const [historyClaims, setHistoryClaims] = useState<ConsolidatedClaimItem[]>([]);
   const [selClaimKey, setSelClaimKey] = useState<string | null>(null);
-  const [disbursingId, setDisbursingId] = useState<number | null>(null);
+  const [disbursingKey, setDisbursingKey] = useState<string | null>(null);
   const [disburseError, setDisburseError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -374,10 +383,16 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
   }, []);
 
   const loadPrizeClaims = useCallback(() => {
-    apiFetch<PrizeClaimItem[]>("/api/games/prize-claims")
+    apiFetch<PrizeClaimsResponse | ConsolidatedClaimItem[]>("/api/games/prize-claims")
       .then((res) => {
-        if (Array.isArray(res)) {
-          setPrizeClaims(res);
+        if (res && typeof res === "object" && !Array.isArray(res) && "active_claims" in res) {
+          setActiveClaims(res.active_claims || []);
+          setHistoryClaims(res.history_claims || []);
+        } else if (Array.isArray(res)) {
+          const active = res.filter((c: any) => !c.disbursed);
+          const hist = res.filter((c: any) => c.disbursed);
+          setActiveClaims(active as any);
+          setHistoryClaims(hist as any);
         }
       })
       .catch(() => {});
@@ -410,18 +425,25 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
     }
   });
 
-  const activeClaim = useMemo(
-    () => prizeClaims.find((c) => `${c.game_id}-${c.prize_id}` === selClaimKey) ?? prizeClaims[0],
-    [prizeClaims, selClaimKey]
-  );
+  const activeClaim = useMemo(() => {
+    if (selClaimKey) {
+      const foundActive = activeClaims.find((c) => c.claim_key === selClaimKey);
+      if (foundActive) return foundActive;
+      const foundHist = historyClaims.find((c) => c.claim_key === selClaimKey);
+      if (foundHist) return foundHist;
+    }
+    return activeClaims[0] || historyClaims[0] || null;
+  }, [activeClaims, historyClaims, selClaimKey]);
 
-  const handleDisbursePrize = async (gameId: string, prizeId: number) => {
-    if (disbursingId !== null) return;
-    setDisbursingId(prizeId);
+  const handleDisburseConsolidated = async (gameId: string, winnerHousieName: string, prizeIds: number[]) => {
+    if (disbursingKey !== null) return;
+    const key = `${gameId}-${winnerHousieName}`;
+    setDisbursingKey(key);
     setDisburseError(null);
     try {
-      await apiFetch(`/api/games/${gameId}/prizes/${prizeId}/disburse`, {
+      await apiFetch(`/api/games/${gameId}/disburse-consolidated`, {
         method: "POST",
+        body: JSON.stringify({ winner_housie_name: winnerHousieName, prize_ids: prizeIds }),
       });
       loadPrizeClaims();
       setSelClaimKey(null);
@@ -429,7 +451,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
     } catch (e) {
       setDisburseError(e instanceof Error ? e.message : "Disbursement failed");
     } finally {
-      setDisbursingId(null);
+      setDisbursingKey(null);
     }
   };
 
@@ -518,7 +540,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
             gap: "6px"
           }}
         >
-          Claim Requests ({prizeClaims.filter((c) => !c.disbursed).length})
+          Claim Requests ({activeClaims.length})
         </button>
       </div>
 
@@ -653,73 +675,123 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
         </div>
       ) : (
         <div style={{ display: "flex", gap: "20px", flex: 1, minHeight: 0, overflow: "hidden", flexWrap: "wrap" }}>
-          {/* Left Panel: Claim Requests List */}
-          <div style={{ flex: "0 0 320px", maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
+          {/* Left Panel: Consolidated Claim Requests List */}
+          <div style={{ flex: "0 0 340px", maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", paddingBottom: "10px", borderBottom: "1px solid var(--border-light)" }}>
               <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>Claim Requests</h3>
-              <span className="hg-q-count" style={{ background: prizeClaims.length > 0 ? "var(--accent)" : "var(--surface-2)", color: prizeClaims.length > 0 ? "#000" : "var(--text-dim)", fontWeight: 800, fontSize: "12px", padding: "2px 8px", borderRadius: "10px" }}>
-                {prizeClaims.length}
+              <span className="hg-q-count" style={{ background: activeClaims.length > 0 ? "var(--accent)" : "var(--surface-2)", color: activeClaims.length > 0 ? "#000" : "var(--text-dim)", fontWeight: 800, fontSize: "12px", padding: "2px 8px", borderRadius: "10px" }}>
+                {activeClaims.length}
               </span>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "4px" }}>
-              {prizeClaims.length === 0 && (
-                <EmptyHint icon="trophy" title="No Pending Claim Requests" sub="Player prize claims will appear here instantly when submitted." />
-              )}
-              {prizeClaims.map((c) => {
-                const key = `${c.game_id}-${c.prize_id}`;
-                const isActive = (activeClaim?.prize_id === c.prize_id && activeClaim?.game_id === c.game_id);
-                const isDisbursed = c.disbursed;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelClaimKey(key)}
-                    style={{
-                      width: "100%",
-                      padding: "14px 16px",
-                      background: isActive ? "var(--surface-2)" : "transparent",
-                      border: isActive ? "1.5px solid var(--accent)" : "1px solid var(--border-light)",
-                      borderRadius: "12px",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none",
-                      opacity: isDisbursed ? 0.85 : 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "10px"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                      <b style={{ color: "var(--text)", fontSize: "14.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}>{c.winner_housie_name}</b>
-                      <span style={{
-                        background: isDisbursed ? "rgba(34, 197, 94, 0.15)" : "rgba(234, 179, 8, 0.15)",
-                        color: isDisbursed ? "#22c55e" : "#eab308",
-                        fontSize: "10px",
-                        fontWeight: 800,
-                        padding: "3px 8px",
-                        borderRadius: "6px",
-                        textTransform: "uppercase",
-                        flexShrink: 0
-                      }}>
-                        {isDisbursed ? "DISBURSED" : "PENDING"}
-                      </span>
-                    </div>
-                    <b style={{ color: isDisbursed ? "#22c55e" : "var(--accent)", fontWeight: 800, fontSize: "20px" }}>{money(c.amount)}</b>
-                    <div style={{ fontSize: "12px", color: "var(--text-dim)", paddingTop: "8px", borderTop: "1px solid var(--border-light)", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span>{c.pattern_name} {c.winner_ticket_number ? `(Tk #${c.winner_ticket_number})` : ""}</span>
-                        <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
-                          {c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "11px", color: "var(--text-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.game_title}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px", paddingRight: "4px" }}>
+              {/* SECTION 1: ACTIVE CLAIMS RECEIVED */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Claims Received ({activeClaims.length})
+                  </span>
+                </div>
+                {activeClaims.length === 0 ? (
+                  <EmptyHint icon="trophy" title="No Active Claims" sub="Consolidated claim requests will appear here instantly when submitted." />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {activeClaims.map((c) => {
+                      const isActive = activeClaim?.claim_key === c.claim_key;
+                      return (
+                        <button
+                          key={c.claim_key}
+                          onClick={() => setSelClaimKey(c.claim_key)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            background: isActive ? "var(--surface-2)" : "transparent",
+                            border: isActive ? "1.5px solid var(--accent)" : "1px solid var(--border-light)",
+                            borderRadius: "12px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                            <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.winner_housie_name}</b>
+                            <span style={{ background: "rgba(234, 179, 8, 0.15)", color: "#eab308", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
+                              {c.formatted_claim_id}
+                            </span>
+                          </div>
+                          <b style={{ color: "var(--accent)", fontWeight: 800, fontSize: "18px" }}>{money(c.total_amount)}</b>
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <div style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {c.pattern_details.join(", ")}
+                            </div>
+                            <div style={{ color: "var(--text-mute)", fontSize: "10px" }}>
+                              {c.game_title} · {c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: PAST CLAIM REQUEST HISTORY (PAST 2 DAYS) */}
+              <div style={{ paddingTop: "14px", borderTop: "1px dashed var(--border-light)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Icon name="clock" size={13} /> Past History (2 Days) ({historyClaims.length})
+                  </span>
+                </div>
+                {historyClaims.length === 0 ? (
+                  <EmptyHint icon="check" title="No History in 2 Days" sub="Disbursed claims from the past 48 hours will show here." />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {historyClaims.map((c) => {
+                      const isActive = activeClaim?.claim_key === c.claim_key;
+                      return (
+                        <button
+                          key={c.claim_key}
+                          onClick={() => setSelClaimKey(c.claim_key)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            background: isActive ? "var(--surface-2)" : "transparent",
+                            border: isActive ? "1.5px solid #22c55e" : "1px solid var(--border-light)",
+                            borderRadius: "12px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            opacity: 0.85,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                            <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.winner_housie_name}</b>
+                            <span style={{ background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
+                              DISBURSED
+                            </span>
+                          </div>
+                          <b style={{ color: "#22c55e", fontWeight: 800, fontSize: "18px" }}>{money(c.total_amount)}</b>
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <div style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {c.pattern_details.join(", ")}
+                            </div>
+                            <div style={{ color: "var(--text-mute)", fontSize: "10px" }}>
+                              {c.game_title} · {c.disbursed_at ? new Date(c.disbursed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -734,24 +806,30 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                   <div>
                     <b style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>{activeClaim.winner_housie_name}</b>
                     <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
-                      Won {activeClaim.pattern_name} in "{activeClaim.game_title}"
+                      Consolidated Claim in "{activeClaim.game_title}"
                     </span>
                   </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Prize Reward Amount</span>
-                    <b style={{ display: "block", fontSize: "22px", color: activeClaim.disbursed ? "#22c55e" : "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Consolidated Payout Amount</span>
+                    <b style={{ display: "block", fontSize: "22px", color: activeClaim.disbursed ? "#22c55e" : "var(--accent)", marginTop: "2px" }}>{money(activeClaim.total_amount)}</b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Pattern</span>
-                    <b style={{ display: "block", fontSize: "16px", color: "var(--text)", marginTop: "4px" }}>{activeClaim.pattern_name}</b>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tracking Claim ID</span>
+                    <b style={{ display: "block", fontSize: "16px", color: "var(--cyan)", marginTop: "4px" }}>{activeClaim.formatted_claim_id}</b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Ticket</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Won Patterns ({activeClaim.patterns.length})</span>
                     <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>
-                      {activeClaim.winner_ticket_number ? `Ticket #${activeClaim.winner_ticket_number}` : "Verified Win"}
+                      {activeClaim.patterns.join(", ")}
+                    </b>
+                  </div>
+                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Tickets</span>
+                    <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>
+                      {activeClaim.ticket_numbers.length > 0 ? activeClaim.ticket_numbers.map(n => `Ticket #${n}`).join(", ") : "Verified Wins"}
                     </b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
@@ -760,29 +838,28 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                       {activeClaim.bookie_name} {activeClaim.bookie_phone ? `(${activeClaim.bookie_phone})` : ""}
                     </b>
                   </div>
-                </div>
-
-                <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Claimed At</span>
-                  <b style={{ display: "block", fontSize: "14px", color: "var(--text)", marginTop: "4px" }}>
-                    {new Date(activeClaim.player_claimed_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
-                  </b>
+                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Claimed At</span>
+                    <b style={{ display: "block", fontSize: "14px", color: "var(--text)", marginTop: "4px" }}>
+                      {new Date(activeClaim.player_claimed_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </b>
+                  </div>
                 </div>
 
                 {!activeClaim.disbursed ? (
                   <>
                     <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                      💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disbursed</b> below to mark it completed.
+                      💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the consolidated payout of <b>{money(activeClaim.total_amount)}</b>, then click <b>Disburse Consolidated Claim</b> below to mark it completed.
                     </div>
 
                     {disburseError && <p className="hg-sec-err">{disburseError}</p>}
 
                     <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
                       <button
-                        disabled={disbursingId === activeClaim.prize_id}
-                        onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
+                        disabled={disbursingKey === activeClaim.claim_key}
+                        onClick={() => handleDisburseConsolidated(activeClaim.game_id, activeClaim.winner_housie_name, activeClaim.prize_ids)}
                         style={{
-                          flex: "1 1 200px",
+                          flex: "1 1 220px",
                           padding: "14px 20px",
                           background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
                           color: "#000",
@@ -790,7 +867,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                           borderRadius: "10px",
                           fontSize: "15px",
                           fontWeight: 800,
-                          cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer",
+                          cursor: disbursingKey === activeClaim.claim_key ? "not-allowed" : "pointer",
                           boxShadow: "0 4px 15px var(--accent-soft)",
                           display: "flex",
                           alignItems: "center",
@@ -799,7 +876,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                         }}
                       >
                         <Icon name="check" size={18} strokeWidth={2.6} />
-                        {disbursingId === activeClaim.prize_id ? "Processing..." : "Disbursed"}
+                        {disbursingKey === activeClaim.claim_key ? "Processing..." : `Disburse Consolidated Claim (${money(activeClaim.total_amount)})`}
                       </button>
 
                       {activeClaim.bookie_phone && (
@@ -829,12 +906,12 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                   </>
                 ) : (
                   <div style={{ marginTop: "auto", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Icon name="check" size={18} /> Prize Payout Disbursed ({new Date(activeClaim.disbursed_at || activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+                    <Icon name="check" size={18} /> Consolidated Payout Disbursed ({new Date(activeClaim.disbursed_at || activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
                   </div>
                 )}
               </>
             ) : (
-              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending or past prize claim from the left list to view winner details." />
+              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending or past consolidated claim from the left list to view winner details." />
             )}
           </div>
         </div>

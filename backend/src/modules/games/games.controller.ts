@@ -1435,89 +1435,179 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    const result = await pool.query(
-      `SELECT * FROM (
-      (
-        SELECT 
-          p.prize_id,
-          p.formatted_claim_id,
-          p.game_id,
-          p.pattern_name,
-          p.amount_per_winner,
-          p.prize_amount,
-          p.player_claimed,
-          p.player_claimed_at,
-          p.disbursed,
-          p.disbursed_at,
-          p.winner_housie_name,
-          p.winner_ticket_id,
-          t.ticket_number AS winner_ticket_number,
-          sg.title AS game_title,
-          sg.scheduled_at AS game_date,
-          bu.full_name AS bookie_name,
-          bu.phone AS bookie_phone,
-          1 AS sort_order
-         FROM Prize_Pool p
-         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND (p.disbursed = FALSE OR p.disbursed IS NULL)
-      )
-      UNION ALL
-      (
-        SELECT 
-          p.prize_id,
-          p.formatted_claim_id,
-          p.game_id,
-          p.pattern_name,
-          p.amount_per_winner,
-          p.prize_amount,
-          p.player_claimed,
-          p.player_claimed_at,
-          p.disbursed,
-          p.disbursed_at,
-          p.winner_housie_name,
-          p.winner_ticket_id,
-          t.ticket_number AS winner_ticket_number,
-          sg.title AS game_title,
-          sg.scheduled_at AS game_date,
-          bu.full_name AS bookie_name,
-          bu.phone AS bookie_phone,
-          2 AS sort_order
-         FROM Prize_Pool p
-         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND p.disbursed = TRUE
-         ORDER BY p.disbursed_at DESC
-         LIMIT 10
-      )
-      ) AS combined
-      ORDER BY sort_order ASC, COALESCE(player_claimed_at, disbursed_at) DESC`
+    // 1. Active Claims Received (Pending Disbursal)
+    const activeRes = await pool.query(
+      `SELECT 
+        p.game_id,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date,
+        p.winner_housie_name,
+        MIN(p.formatted_claim_id) AS formatted_claim_id,
+        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
+        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
+        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
+        MAX(p.player_claimed_at) AS player_claimed_at,
+        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
+        COALESCE(MAX(bu.phone), '') AS bookie_phone
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) 
+         AND (p.disbursed = FALSE OR p.disbursed IS NULL)
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, p.winner_housie_name
+       ORDER BY MAX(p.player_claimed_at) DESC`
     );
 
-    const claims = result.rows.map((row) => ({
-      game_id: row.game_id,
-      prize_id: row.prize_id,
-      formatted_claim_id: row.formatted_claim_id,
-      game_title: row.game_title,
-      game_date: row.game_date,
-      pattern_name: row.pattern_name,
-      amount: parseFloat(row.amount_per_winner ?? row.prize_amount),
-      winner_housie_name: row.winner_housie_name,
-      winner_ticket_number: row.winner_ticket_number,
-      player_claimed_at: row.player_claimed_at,
-      disbursed: row.disbursed,
-      disbursed_at: row.disbursed_at,
-      bookie_name: row.bookie_name || 'System/Operator',
-      bookie_phone: row.bookie_phone || '',
-    }));
+    // 2. Past Claim Request History (Disbursed in the last 2 days)
+    const historyRes = await pool.query(
+      `SELECT 
+        p.game_id,
+        sg.title AS game_title,
+        sg.scheduled_at AS game_date,
+        p.winner_housie_name,
+        MIN(p.formatted_claim_id) AS formatted_claim_id,
+        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
+        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
+        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
+        MAX(p.player_claimed_at) AS player_claimed_at,
+        MAX(p.disbursed_at) AS disbursed_at,
+        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
+        COALESCE(MAX(bu.phone), '') AS bookie_phone
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+       WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) 
+         AND p.disbursed = TRUE
+         AND p.disbursed_at >= NOW() - INTERVAL '2 days'
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, p.winner_housie_name
+       ORDER BY MAX(p.disbursed_at) DESC`
+    );
 
-    res.json(claims);
+    const mapClaimRow = (row: any, isDisbursed: boolean) => {
+      const patterns: string[] = row.pattern_names || [];
+      const ticketNums: (number | null)[] = row.ticket_numbers || [];
+      const patternDetails = patterns.map((pat, idx) => {
+        const tk = ticketNums[idx];
+        return tk ? `${pat} (Tk #${tk})` : pat;
+      });
+
+      return {
+        claim_key: `${row.game_id}-${row.winner_housie_name}`,
+        game_id: row.game_id,
+        game_title: row.game_title,
+        game_date: row.game_date,
+        winner_housie_name: row.winner_housie_name,
+        formatted_claim_id: row.formatted_claim_id || 'HGCR001',
+        prize_ids: row.prize_ids || [],
+        patterns: patterns,
+        pattern_details: patternDetails,
+        ticket_numbers: ticketNums.filter(Boolean),
+        total_amount: parseFloat(row.total_amount),
+        player_claimed_at: row.player_claimed_at,
+        disbursed: isDisbursed,
+        disbursed_at: row.disbursed_at || null,
+        bookie_name: row.bookie_name || 'System/Operator',
+        bookie_phone: row.bookie_phone || '',
+      };
+    };
+
+    const active_claims = activeRes.rows.map((r) => mapClaimRow(r, false));
+    const history_claims = historyRes.rows.map((r) => mapClaimRow(r, true));
+
+    res.json({
+      active_claims,
+      history_claims,
+    });
   } catch (error) {
-    console.error('Error fetching prize claims:', error);
+    console.error('Error fetching consolidated prize claims:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Disburse a consolidated claim for a player in a game (Financial Admin)
+ */
+export async function disburseConsolidatedClaim(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { game_id } = req.params;
+  const { winner_housie_name, prize_ids } = req.body;
+  const admin = req.user!;
+
+  if (!winner_housie_name && (!Array.isArray(prize_ids) || prize_ids.length === 0)) {
+    res.status(400).json({ message: 'winner_housie_name or prize_ids is required' });
+    return;
+  }
+
+  try {
+    let updateQuery: string;
+    let queryParams: any[];
+
+    if (Array.isArray(prize_ids) && prize_ids.length > 0) {
+      updateQuery = `
+        UPDATE Prize_Pool 
+        SET disbursed = TRUE, 
+            disbursed_at = NOW(), 
+            disbursed_by = $1,
+            player_claimed = TRUE,
+            player_claimed_at = COALESCE(player_claimed_at, NOW())
+        WHERE game_id = $2 AND prize_id = ANY($3) AND (disbursed = FALSE OR disbursed IS NULL)
+        RETURNING prize_id`;
+      queryParams = [admin.userId, game_id, prize_ids];
+    } else {
+      updateQuery = `
+        UPDATE Prize_Pool 
+        SET disbursed = TRUE, 
+            disbursed_at = NOW(), 
+            disbursed_by = $1,
+            player_claimed = TRUE,
+            player_claimed_at = COALESCE(player_claimed_at, NOW())
+        WHERE game_id = $2 AND (winner_housie_name = $3 OR winner_housie_name LIKE '%' || $3 || '%') AND (disbursed = FALSE OR disbursed IS NULL)
+        RETURNING prize_id`;
+      queryParams = [admin.userId, game_id, winner_housie_name];
+    }
+
+    const result = await pool.query(updateQuery, queryParams);
+
+    if (result.rowCount === 0) {
+      res.status(400).json({ message: 'No pending claims found to disburse' });
+      return;
+    }
+
+    io.emit('prize_disbursed', { game_id, winner_housie_name });
+    io.emit('ticket_status_change');
+
+    // Check if all won prizes for this game are now disbursed
+    const allPrizesRes = await pool.query(
+      `SELECT COUNT(*)::integer as total_won, COUNT(*) FILTER (WHERE disbursed = TRUE)::integer as disbursed_count
+       FROM Prize_Pool 
+       WHERE game_id = $1 AND claimed = TRUE`,
+      [game_id]
+    );
+
+    const { total_won, disbursed_count } = allPrizesRes.rows[0];
+
+    // If all won prizes (claims) are disbursed, mark game as Completed
+    if (parseInt(total_won) === parseInt(disbursed_count)) {
+      await pool.query(
+        `UPDATE Scheduled_Games 
+         SET game_status = 'Completed', completed_at = NOW()
+         WHERE game_id = $1 AND game_status != 'Completed'`,
+        [game_id]
+      );
+      io.emit('game_list_update');
+    }
+
+    res.json({
+      message: 'Consolidated claim disbursed successfully',
+      disbursed_prizes_count: result.rowCount,
+    });
+  } catch (error) {
+    console.error('Error disbursing consolidated claim:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }
