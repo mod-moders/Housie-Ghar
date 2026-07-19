@@ -557,15 +557,24 @@ export function CallVoiceSettings() {
     };
 
     audioPlayerRef.current = audio;
-    audio.play().then(() => {
-      setPreviewStatus("playing");
-    }).catch(() => {
-      alert("Failed to play audio preview.");
-      setActivePreviewKey(null);
-      setPreviewStatus("stopped");
-      setCurrentTime(0);
-      setDuration(0);
-    });
+    const attemptPlay = (isRetry: boolean = false) => {
+      audio.play().then(() => {
+        setPreviewStatus("playing");
+      }).catch((err) => {
+        if (!isRetry && audio.crossOrigin) {
+          audio.crossOrigin = null;
+          attemptPlay(true);
+          return;
+        }
+        console.error("Preview play failed:", err, "URL:", url);
+        alert(`Failed to play audio preview (${err?.message || "Playback error"}). Please verify the audio file format.`);
+        setActivePreviewKey(null);
+        setPreviewStatus("stopped");
+        setCurrentTime(0);
+        setDuration(0);
+      });
+    };
+    attemptPlay();
   };
 
   const pausePreview = (key: string) => {

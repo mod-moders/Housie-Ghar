@@ -5,6 +5,14 @@ export function resolveAudioUrl(url: string | null | undefined): string {
   if (url.startsWith("data:")) return url;
 
   let path = url.trim();
+
+  // Strip localhost origin if running in a non-localhost browser environment
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    if (path.includes("localhost:4000") || path.includes("127.0.0.1:4000")) {
+      path = path.replace(/https?:\/\/(localhost|127\.0\.0\.1):4000/, "");
+    }
+  }
+
   if (!path.startsWith("/") && !path.startsWith("http://") && !path.startsWith("https://")) {
     path = `/${path}`;
   }
@@ -23,10 +31,12 @@ export function resolveAudioUrl(url: string | null | undefined): string {
     return path;
   }
 
-  if (!BASE || BASE.startsWith("/")) {
-    return path;
+  const apiEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (apiEnv && !apiEnv.startsWith("/") && !apiEnv.includes("localhost")) {
+    return `${apiEnv.replace(/\/api\/?$/, "")}${path}`;
   }
-  return `${BASE.replace(/\/api\/?$/, "")}${path}`;
+
+  return path;
 }
 
 export async function apiFetch<T>(
