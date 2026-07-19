@@ -833,6 +833,9 @@ class SoundSynthesizer {
    */
   applyLiveAnnouncementEcho(audio: HTMLAudioElement, customVolume: number = 1.0) {
     try {
+      if (!audio.crossOrigin && !audio.src.startsWith("data:")) {
+        audio.crossOrigin = "anonymous";
+      }
       this.initCtx();
       const boostFactor = 1.75;
       const boostedVolume = customVolume * boostFactor;
@@ -843,7 +846,18 @@ class SoundSynthesizer {
       }
       const ctx = this.ctx;
 
-      const source = ctx.createMediaElementSource(audio);
+      let source: MediaElementAudioSourceNode;
+      try {
+        source = ctx.createMediaElementSource(audio);
+      } catch {
+        // Fallback to direct HTMLAudioElement volume control if element source node cannot be created
+        audio.volume = Math.min(1.0, boostedVolume);
+        return {
+          updateVolume: (newVolume: number) => {
+            audio.volume = Math.min(1.0, newVolume * boostFactor);
+          }
+        };
+      }
       
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.95 * boostedVolume; // direct dry sound (clear, direct announcement)
@@ -882,7 +896,7 @@ class SoundSynthesizer {
           wetGain.gain.value = 0.18 * boostedNew;
         }
       };
-} catch (e) {
+    } catch (e) {
       const boostFactor = 1.75;
       audio.volume = Math.min(1.0, customVolume * boostFactor);
       return null;

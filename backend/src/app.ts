@@ -114,15 +114,24 @@ const frontendCallsAudioDir = path.resolve(rootDir, 'frontend/public/audio/calls
 fs.mkdirSync(backendConfigAudioDir, { recursive: true });
 fs.mkdirSync(backendCallsAudioDir, { recursive: true });
 
-app.use('/api/config/audio-file', express.static(backendConfigAudioDir));
-app.use('/api/config/audio-file', express.static(frontendConfigAudioDir));
-app.use('/api/games/number-calls/audio-file', express.static(backendCallsAudioDir));
-app.use('/api/games/number-calls/audio-file', express.static(frontendCallsAudioDir));
+const staticAudioOptions = {
+  setHeaders: (res: any) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Accept-Ranges', 'bytes');
+  }
+};
 
-app.use('/audio/config', express.static(backendConfigAudioDir));
-app.use('/audio/config', express.static(frontendConfigAudioDir));
-app.use('/audio/calls', express.static(backendCallsAudioDir));
-app.use('/audio/calls', express.static(frontendCallsAudioDir));
+app.use('/api/config/audio-file', express.static(backendConfigAudioDir, staticAudioOptions));
+app.use('/api/config/audio-file', express.static(frontendConfigAudioDir, staticAudioOptions));
+app.use('/api/games/number-calls/audio-file', express.static(backendCallsAudioDir, staticAudioOptions));
+app.use('/api/games/number-calls/audio-file', express.static(frontendCallsAudioDir, staticAudioOptions));
+
+app.use('/audio/config', express.static(backendConfigAudioDir, staticAudioOptions));
+app.use('/audio/config', express.static(frontendConfigAudioDir, staticAudioOptions));
+app.use('/audio/calls', express.static(backendCallsAudioDir, staticAudioOptions));
+app.use('/audio/calls', express.static(frontendCallsAudioDir, staticAudioOptions));
 
 // 5. Mount Routes
 app.use('/api/auth', authRoutes);

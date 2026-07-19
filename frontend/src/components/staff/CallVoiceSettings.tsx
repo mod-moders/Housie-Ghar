@@ -522,6 +522,9 @@ export function CallVoiceSettings() {
     }
 
     const audio = new Audio(url);
+    if (!url.startsWith("data:")) {
+      audio.crossOrigin = "anonymous";
+    }
     audio.id = "preview-audio-element";
     const isLobby = [1, 2, 3, 4, 5].some((idx) => url === (config as any)?.[`lobby_music_url_${idx}`]);
     const isBg = url === bgMusicUrl;
@@ -741,7 +744,8 @@ export function CallVoiceSettings() {
   };
 
   const handleFileUpload = async (num: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
     if (!file) return;
 
     const fileName = file.name.toLowerCase().trim();
@@ -759,15 +763,19 @@ export function CallVoiceSettings() {
     reader.onload = async () => {
       try {
         const base64 = reader.result as string;
-        await apiFetch(`/api/games/number-calls/${num}/upload`, {
+        const res = await apiFetch<{ audio_url?: string }>(`/api/games/number-calls/${num}/upload`, {
           method: "POST",
           body: JSON.stringify({ audio_data: base64 }),
         });
+        if (res?.audio_url) {
+          setSettings(prev => prev.map(s => s.number === num ? { ...s, audio_url: res.audio_url || null, call_mode: "Audio" } : s));
+        }
         load();
       } catch {
         alert("Upload failed. Ensure backend has write access.");
       } finally {
         setUploadingNum(null);
+        inputEl.value = "";
       }
     };
     reader.readAsDataURL(file);
@@ -830,7 +838,11 @@ export function CallVoiceSettings() {
     stopAllPreviews();
 
     if (item.call_mode === "Audio" && item.audio_url) {
-      const audio = new Audio(item.audio_url);
+      const resolvedUrl = resolveAudioUrl(item.audio_url);
+      const audio = new Audio(resolvedUrl);
+      if (!resolvedUrl.startsWith("data:")) {
+        audio.crossOrigin = "anonymous";
+      }
       audio.volume = 1.0;
       const itemVol = item.volume !== undefined ? item.volume : 1.0;
       const effectiveVol = itemVol * masterCallsVolume;

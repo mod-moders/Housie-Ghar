@@ -151,19 +151,16 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
 
     const audioUrl = `/api/games/number-calls/audio-file/${filename}`;
 
+    const numVal = parseInt(number as string, 10);
     const result = await pool.query(
-      `UPDATE Number_Calls 
-       SET audio_url = $1, 
-           call_mode = 'Audio' 
-       WHERE number = $2 
+      `INSERT INTO Number_Calls (number, audio_url, call_mode, call_text, default_text)
+       VALUES ($2, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
+       ON CONFLICT (number) DO UPDATE
+       SET audio_url = EXCLUDED.audio_url,
+           call_mode = 'Audio'
        RETURNING *`,
-      [audioUrl, parseInt(number as string, 10)]
+      [audioUrl, numVal]
     );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: 'Number call setting not found' });
-      return;
-    }
 
     req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);

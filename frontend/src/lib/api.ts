@@ -4,22 +4,29 @@ export function resolveAudioUrl(url: string | null | undefined): string {
   if (!url) return "";
   if (url.startsWith("data:")) return url;
 
-  let path = url;
+  let path = url.trim();
+  if (!path.startsWith("/") && !path.startsWith("http://") && !path.startsWith("https://")) {
+    path = `/${path}`;
+  }
+
   if (path.startsWith("/audio/config/")) {
     path = path.replace("/audio/config/", "/api/config/audio-file/");
   } else if (path.startsWith("/audio/calls/")) {
     path = path.replace("/audio/calls/", "/api/games/number-calls/audio-file/");
+  } else if (path.startsWith("/uploads/audio/config/")) {
+    path = path.replace("/uploads/audio/config/", "/api/config/audio-file/");
+  } else if (path.startsWith("/uploads/audio/calls/")) {
+    path = path.replace("/uploads/audio/calls/", "/api/games/number-calls/audio-file/");
   }
 
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
   if (!BASE || BASE.startsWith("/")) {
-    return cleanPath;
+    return path;
   }
-  return `${BASE.replace(/\/api\/?$/, "")}${cleanPath}`;
+  return `${BASE.replace(/\/api\/?$/, "")}${path}`;
 }
 
 export async function apiFetch<T>(

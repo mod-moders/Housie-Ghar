@@ -4,7 +4,7 @@
   "description": "Housie Ghar - Backend API Server",
   "main": "dist/backend/src/server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/server.ts",
+    "dev": "npx nodemon --exec npx ts-node --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/backend/src/server.js",
     "migrate": "ts-node src/db/migrate.ts",

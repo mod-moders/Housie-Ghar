@@ -15,10 +15,11 @@
     "sourceMap": true,
     "paths": {
       "@shared/*": ["../shared/*"]
-    },
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0"
+    }
   },
   "include": ["src/**/*", "../shared/**/*.ts"],
-  "exclude": ["node_modules", "dist", "../shared/**/*.d.ts"]
+  "exclude": ["node_modules", "dist", "../shared/**/*.d.ts"],
+  "ts-node": {
+    "transpileOnly": true
+  }
 }

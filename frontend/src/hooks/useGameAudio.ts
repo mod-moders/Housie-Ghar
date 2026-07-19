@@ -59,7 +59,6 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
   }, []);
 
   const loadCallsConfig = () => {
-    if (!englishCallerEnabled) return;
     apiFetch<NumberCallConfig[]>("/api/games/number-calls")
       .then((data) => {
         if (!isMountedRef.current) return;
@@ -74,7 +73,7 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
 
   useEffect(() => {
     loadCallsConfig();
-  }, [englishCallerEnabled]);
+  }, [englishCallerEnabled, isGameLive]);
 
   useSocket((event) => {
     if (event === "number_calls_update") {
@@ -95,6 +94,9 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
           try { bgMusicRef.current.pause(); } catch {}
         }
         const audio = new Audio(resolvedBgUrl);
+        if (!resolvedBgUrl.startsWith("data:")) {
+          audio.crossOrigin = "anonymous";
+        }
         audio.loop = true;
         audio.volume = bgVol;
         audio.muted = false;
@@ -307,7 +309,11 @@ export function useGameAudio(englishCallerEnabled: boolean, isGameLive: boolean,
         return;
       }
 
-      const audio = new Audio(resolveAudioUrl(mp3Path));
+      const resolvedUrl = resolveAudioUrl(mp3Path);
+      const audio = new Audio(resolvedUrl);
+      if (!resolvedUrl.startsWith("data:")) {
+        audio.crossOrigin = "anonymous";
+      }
       activeAudiosRef.current.push(audio);
       audio.volume = 1.0;
       audio.muted = isMuted;
