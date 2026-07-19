@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { money } from "@/lib/money";
+import { money, moneyStr } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { EmptyHint, Avatar } from "@/components/ui";
 import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
@@ -895,7 +895,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                     }}
                   >
                     <Icon name="check" size={18} strokeWidth={2.6} />
-                    {disbursingKey === activeClaim.claim_key ? "Processing..." : `Disburse Consolidated Claim (${money(activeClaim.total_amount)})`}
+                    {disbursingKey === activeClaim.claim_key ? "Processing..." : `Disburse Consolidated Claim (${moneyStr(activeClaim.total_amount)})`}
                   </button>
 
                   {activeClaim.bookie_phone && (
