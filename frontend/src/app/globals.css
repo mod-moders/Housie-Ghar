@@ -1930,7 +1930,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-prize-winner{font-family:var(--font-head);font-weight:700;font-size:13px;color:var(--accent)}
 .hg-prize-tk{font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
 .hg-prize-open{font-size:11px;color:var(--text-mute);font-style:italic}
-.hg-mytickets-row{display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;margin-top:10px;padding-bottom:6px}
+.hg-mytickets-row{display:flex;flex-direction:column;gap:12px;margin-top:10px;padding-bottom:6px}
 .hg-board90{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;padding:0 16px 16px;max-width:380px;margin:0 auto;width:100%}
 .hg-b90{aspect-ratio:1;display:grid;place-items:center;border-radius:8px;font-family:var(--font-mono);
   font-size:11px;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--text-mute)}
@@ -2772,7 +2772,7 @@ select option {
     color:var(--brand);
     border-color:var(--brand-40);
   }
-  .hg-mytickets-row{flex-wrap:wrap;overflow:visible}
+  .hg-mytickets-row{display:grid;grid-template-columns:repeat(2, 1fr);gap:14px;overflow:visible}
   .hg-live-spacer{height:40px}
 
   /* ---------- WINNERS ---------- */
