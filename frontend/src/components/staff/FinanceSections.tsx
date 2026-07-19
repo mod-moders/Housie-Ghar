@@ -411,7 +411,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
   });
 
   const activeClaim = useMemo(
-    () => prizeClaims.find((c) => `${c.game_id}-${c.prize_id}` === selClaimKey) ?? prizeClaims[0],
+    () => prizeClaims.find((c) => `${c.game_id}-${c.prize_id}` === selClaimKey) ?? null,
     [prizeClaims, selClaimKey]
   );
 
@@ -446,7 +446,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
     [agents]
   );
 
-  const active = queue.find((q) => q.request_id === selId) ?? queue[0];
+  const active = queue.find((q) => q.request_id === selId) ?? null;
 
   const resolve = async (approve: boolean) => {
     if (!active || busy) return;
@@ -523,9 +523,9 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
       </div>
 
       {activeTab === "requests" ? (
-        <div style={{ display: "flex", gap: "20px", flex: 1, minHeight: 0, overflow: "hidden", flexWrap: "wrap" }}>
-          {/* Left Panel: Recharge Queue */}
-          <div style={{ flex: "0 0 320px", maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
+        <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {/* Recharge Queue — clicking a row pops up its detail in a modal below, rather than an inline side panel */}
+          <div style={{ width: "100%", maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", paddingBottom: "10px", borderBottom: "1px solid var(--border-light)" }}>
               <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>Recharge Requests</h3>
               <span className="hg-q-count" style={{ background: queue.length > 0 ? "var(--cyan)" : "var(--surface-2)", color: queue.length > 0 ? "#000" : "var(--text-dim)", fontWeight: 800, fontSize: "12px", padding: "2px 8px", borderRadius: "10px" }}>
@@ -585,76 +585,11 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               })}
             </div>
           </div>
-
-          {/* Right Detail Panel */}
-          <div style={{ flex: "1 1 360px", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "24px", boxShadow: "var(--card-shadow)", overflowY: "auto" }}>
-            {active ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "16px", borderBottom: "1px solid var(--border-light)", marginBottom: "20px" }}>
-                  <Avatar src={BOOKIE_AVATAR} name={active.agent.full_name} className="hg-avatar-lg" />
-                  <div>
-                    <b style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>{active.agent.full_name}</b>
-                    <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>{active.agent.town ?? "—"} · Trust: {active.agent.trust}</span>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Requested Amount</span>
-                    <b style={{ display: "block", fontSize: "22px", color: "var(--cyan)", marginTop: "2px" }}>{money(active.requested_amount)}</b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Request Status</span>
-                    <b style={{ display: "block", fontSize: "16px", color: active.request_status === "Approved" ? "#22c55e" : active.request_status === "Rejected" ? "#ef4444" : "#eab308", marginTop: "4px" }}>
-                      {active.request_status || "Pending"}
-                    </b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Current Balance</span>
-                    <b style={{ display: "block", fontSize: "18px", color: "var(--text)", marginTop: "4px" }}>{money(active.agent.current_balance)}</b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Payment Reference</span>
-                    <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>{active.payment_reference}</b>
-                  </div>
-                </div>
-
-                {(active.request_status || "Pending") === "Pending" ? (
-                  <>
-                    <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                      💡 Verify the deposit in your banking app, then credit the wallet. Action is logged for auditing.
-                    </div>
-
-                    {error && <p className="hg-sec-err">{error}</p>}
-
-                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
-                      <button className="hg-fin-approve" disabled={busy} onClick={() => resolve(true)} style={{ flex: "1 1 200px", padding: "14px 20px" }}>
-                        <Icon name="check" size={17} strokeWidth={2.6} /> Credit Wallet {money(active.requested_amount)}
-                      </button>
-                      <button className="hg-fin-reject" disabled={busy} onClick={() => resolve(false)} style={{ flex: "1 1 180px", padding: "14px 20px" }}>
-                        <Icon name="x" size={17} strokeWidth={2.6} /> Reject / Dispute
-                      </button>
-                    </div>
-                  </>
-                ) : active.request_status === "Approved" ? (
-                  <div style={{ marginTop: "auto", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Icon name="check" size={18} /> Wallet Credited ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
-                  </div>
-                ) : (
-                  <div style={{ marginTop: "auto", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Icon name="x" size={18} /> Request Rejected ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
-                  </div>
-                )}
-              </>
-            ) : (
-              <EmptyHint icon="wallet" title="Select a request" sub="Pick a pending or past recharge to review details." />
-            )}
-          </div>
         </div>
       ) : (
-        <div style={{ display: "flex", gap: "20px", flex: 1, minHeight: 0, overflow: "hidden", flexWrap: "wrap" }}>
-          {/* Left Panel: Claim Requests List */}
-          <div style={{ flex: "0 0 320px", maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
+        <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {/* Claim Requests List — clicking a row pops up its detail in a modal below, rather than an inline side panel */}
+          <div style={{ width: "100%", maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", paddingBottom: "10px", borderBottom: "1px solid var(--border-light)" }}>
               <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>Claim Requests</h3>
               <span className="hg-q-count" style={{ background: prizeClaims.length > 0 ? "var(--accent)" : "var(--surface-2)", color: prizeClaims.length > 0 ? "#000" : "var(--text-dim)", fontWeight: 800, fontSize: "12px", padding: "2px 8px", borderRadius: "10px" }}>
@@ -722,119 +657,200 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               })}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Right Detail Panel */}
-          <div style={{ flex: "1 1 360px", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "24px", boxShadow: "var(--card-shadow)", overflowY: "auto" }}>
-            {activeClaim ? (
+      {/* Recharge Request Detail — pops up in front of the screen (rather than stacking under the queue list) */}
+      {activeTab === "requests" && active && (
+        <div className="hg-modal-scrim" onClick={() => setSelId(null)}>
+          <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ background: "var(--surface)", color: "var(--text)", maxWidth: "600px", width: "92%", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--text)" }}>Recharge Request</h3>
+              <button
+                onClick={() => setSelId(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", lineHeight: 1, color: "var(--text-dim)" }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "16px", borderBottom: "1px solid var(--border-light)", marginBottom: "20px" }}>
+              <Avatar src={BOOKIE_AVATAR} name={active.agent.full_name} className="hg-avatar-lg" />
+              <div>
+                <b style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>{active.agent.full_name}</b>
+                <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>{active.agent.town ?? "—"} · Trust: {active.agent.trust}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Requested Amount</span>
+                <b style={{ display: "block", fontSize: "22px", color: "var(--cyan)", marginTop: "2px" }}>{money(active.requested_amount)}</b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Request Status</span>
+                <b style={{ display: "block", fontSize: "16px", color: active.request_status === "Approved" ? "#22c55e" : active.request_status === "Rejected" ? "#ef4444" : "#eab308", marginTop: "4px" }}>
+                  {active.request_status || "Pending"}
+                </b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Current Balance</span>
+                <b style={{ display: "block", fontSize: "18px", color: "var(--text)", marginTop: "4px" }}>{money(active.agent.current_balance)}</b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Payment Reference</span>
+                <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>{active.payment_reference}</b>
+              </div>
+            </div>
+
+            {(active.request_status || "Pending") === "Pending" ? (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "16px", borderBottom: "1px solid var(--border-light)", marginBottom: "20px" }}>
-                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: activeClaim.disbursed ? "rgba(34, 197, 94, 0.2)" : "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: activeClaim.disbursed ? "#22c55e" : "#000", fontWeight: 800, fontSize: "20px", flexShrink: 0 }}>
-                    🏆
-                  </div>
-                  <div>
-                    <b style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>{activeClaim.winner_housie_name}</b>
-                    <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
-                      Won {activeClaim.pattern_name} in "{activeClaim.game_title}"
-                    </span>
-                  </div>
+                <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
+                  💡 Verify the deposit in your banking app, then credit the wallet. Action is logged for auditing.
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Prize Reward Amount</span>
-                    <b style={{ display: "block", fontSize: "22px", color: activeClaim.disbursed ? "#22c55e" : "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Pattern</span>
-                    <b style={{ display: "block", fontSize: "16px", color: "var(--text)", marginTop: "4px" }}>{activeClaim.pattern_name}</b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Ticket</span>
-                    <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>
-                      {activeClaim.winner_ticket_number ? `Ticket #${activeClaim.winner_ticket_number}` : "Verified Win"}
-                    </b>
-                  </div>
-                  <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sold By Agent / Bookie</span>
-                    <b style={{ display: "block", fontSize: "15px", color: "var(--cyan)", marginTop: "4px" }}>
-                      {activeClaim.bookie_name} {activeClaim.bookie_phone ? `(${activeClaim.bookie_phone})` : ""}
-                    </b>
-                  </div>
+                {error && <p className="hg-sec-err">{error}</p>}
+
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <button className="hg-fin-approve" disabled={busy} onClick={() => resolve(true)} style={{ flex: "1 1 200px", padding: "14px 20px" }}>
+                    <Icon name="check" size={17} strokeWidth={2.6} /> Credit Wallet {money(active.requested_amount)}
+                  </button>
+                  <button className="hg-fin-reject" disabled={busy} onClick={() => resolve(false)} style={{ flex: "1 1 180px", padding: "14px 20px" }}>
+                    <Icon name="x" size={17} strokeWidth={2.6} /> Reject / Dispute
+                  </button>
+                </div>
+              </>
+            ) : active.request_status === "Approved" ? (
+              <div style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Icon name="check" size={18} /> Wallet Credited ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+              </div>
+            ) : (
+              <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Icon name="x" size={18} /> Request Rejected ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Prize Claim Detail — pops up in front of the screen (rather than stacking under the claims list) */}
+      {activeTab === "claims" && activeClaim && (
+        <div className="hg-modal-scrim" onClick={() => setSelClaimKey(null)}>
+          <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ background: "var(--surface)", color: "var(--text)", maxWidth: "600px", width: "92%", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--text)" }}>Prize Claim</h3>
+              <button
+                onClick={() => setSelClaimKey(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", lineHeight: 1, color: "var(--text-dim)" }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "16px", borderBottom: "1px solid var(--border-light)", marginBottom: "20px" }}>
+              <div style={{ width: 46, height: 46, borderRadius: "50%", background: activeClaim.disbursed ? "rgba(34, 197, 94, 0.2)" : "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: activeClaim.disbursed ? "#22c55e" : "#000", fontWeight: 800, fontSize: "20px", flexShrink: 0 }}>
+                🏆
+              </div>
+              <div>
+                <b style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>{activeClaim.winner_housie_name}</b>
+                <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
+                  Won {activeClaim.pattern_name} in "{activeClaim.game_title}"
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Prize Reward Amount</span>
+                <b style={{ display: "block", fontSize: "22px", color: activeClaim.disbursed ? "#22c55e" : "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Pattern</span>
+                <b style={{ display: "block", fontSize: "16px", color: "var(--text)", marginTop: "4px" }}>{activeClaim.pattern_name}</b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Ticket</span>
+                <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>
+                  {activeClaim.winner_ticket_number ? `Ticket #${activeClaim.winner_ticket_number}` : "Verified Win"}
+                </b>
+              </div>
+              <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sold By Agent / Bookie</span>
+                <b style={{ display: "block", fontSize: "15px", color: "var(--cyan)", marginTop: "4px" }}>
+                  {activeClaim.bookie_name} {activeClaim.bookie_phone ? `(${activeClaim.bookie_phone})` : ""}
+                </b>
+              </div>
+            </div>
+
+            <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Claimed At</span>
+              <b style={{ display: "block", fontSize: "14px", color: "var(--text)", marginTop: "4px" }}>
+                {new Date(activeClaim.player_claimed_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+              </b>
+            </div>
+
+            {!activeClaim.disbursed ? (
+              <>
+                <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
+                  💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disbursed</b> below to mark it completed.
                 </div>
 
-                <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Claimed At</span>
-                  <b style={{ display: "block", fontSize: "14px", color: "var(--text)", marginTop: "4px" }}>
-                    {new Date(activeClaim.player_claimed_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
-                  </b>
+                {disburseError && <p className="hg-sec-err">{disburseError}</p>}
+
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <button
+                    disabled={disbursingId === activeClaim.prize_id}
+                    onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
+                    style={{
+                      flex: "1 1 200px",
+                      padding: "14px 20px",
+                      background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                      color: "#000",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontSize: "15px",
+                      fontWeight: 800,
+                      cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer",
+                      boxShadow: "0 4px 15px var(--accent-soft)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px"
+                    }}
+                  >
+                    <Icon name="check" size={18} strokeWidth={2.6} />
+                    {disbursingId === activeClaim.prize_id ? "Processing..." : "Disbursed"}
+                  </button>
+
+                  {activeClaim.bookie_phone && (
+                    <a
+                      href={`https://wa.me/${activeClaim.bookie_phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: "14px 20px",
+                        background: "#25D366",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        textDecoration: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px"
+                      }}
+                    >
+                      <Icon name="phone" size={16} /> WhatsApp Agent
+                    </a>
+                  )}
                 </div>
-
-                {!activeClaim.disbursed ? (
-                  <>
-                    <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                      💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disbursed</b> below to mark it completed.
-                    </div>
-
-                    {disburseError && <p className="hg-sec-err">{disburseError}</p>}
-
-                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
-                      <button
-                        disabled={disbursingId === activeClaim.prize_id}
-                        onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
-                        style={{
-                          flex: "1 1 200px",
-                          padding: "14px 20px",
-                          background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
-                          color: "#000",
-                          border: "none",
-                          borderRadius: "10px",
-                          fontSize: "15px",
-                          fontWeight: 800,
-                          cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer",
-                          boxShadow: "0 4px 15px var(--accent-soft)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "8px"
-                        }}
-                      >
-                        <Icon name="check" size={18} strokeWidth={2.6} />
-                        {disbursingId === activeClaim.prize_id ? "Processing..." : "Disbursed"}
-                      </button>
-
-                      {activeClaim.bookie_phone && (
-                        <a
-                          href={`https://wa.me/${activeClaim.bookie_phone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            padding: "14px 20px",
-                            background: "#25D366",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: "10px",
-                            fontSize: "14px",
-                            fontWeight: 700,
-                            textDecoration: "none",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "8px"
-                          }}
-                        >
-                          <Icon name="phone" size={16} /> WhatsApp Agent
-                        </a>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ marginTop: "auto", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Icon name="check" size={18} /> Prize Payout Disbursed ({new Date(activeClaim.disbursed_at || activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
-                  </div>
-                )}
               </>
             ) : (
-              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending or past prize claim from the left list to view winner details." />
+              <div style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Icon name="check" size={18} /> Prize Payout Disbursed ({new Date(activeClaim.disbursed_at || activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+              </div>
             )}
           </div>
         </div>
