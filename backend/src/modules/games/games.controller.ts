@@ -223,7 +223,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 
       // Fetch prize pool
       const prizesRes = await pool.query(
-        `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
+        `SELECT p.prize_id, p.formatted_claim_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
                 t.ticket_number AS winner_ticket_number
          FROM Prize_Pool p
          LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
@@ -272,6 +272,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         outro_mode: game.outro_mode || 'TTS',
         prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
+          formatted_claim_id: (row as any).formatted_claim_id,
           pattern_name: row.pattern_name,
           prize_amount: parseFloat(row.prize_amount),
           claimed: row.claimed,
@@ -342,7 +343,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     }
 
     const prizesRes = await pool.query(
-      `SELECT p.prize_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
+      `SELECT p.prize_id, p.formatted_claim_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
               p.player_claimed, p.disbursed,
               t.ticket_number AS winner_ticket_number
        FROM Prize_Pool p
@@ -392,6 +393,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       outro_mode: game.outro_mode || 'TTS',
       prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
+        formatted_claim_id: (row as any).formatted_claim_id,
         pattern_name: row.pattern_name,
         prize_amount: parseFloat(row.prize_amount),
         claimed: row.claimed,
@@ -1436,8 +1438,9 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
     const result = await pool.query(
       `SELECT * FROM (
       (
-        SELECT
+        SELECT 
           p.prize_id,
+          p.formatted_claim_id,
           p.game_id,
           p.pattern_name,
           p.amount_per_winner,
@@ -1465,6 +1468,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
       (
         SELECT 
           p.prize_id,
+          p.formatted_claim_id,
           p.game_id,
           p.pattern_name,
           p.amount_per_winner,
@@ -1497,6 +1501,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
     const claims = result.rows.map((row) => ({
       game_id: row.game_id,
       prize_id: row.prize_id,
+      formatted_claim_id: row.formatted_claim_id,
       game_title: row.game_title,
       game_date: row.game_date,
       pattern_name: row.pattern_name,

@@ -18,7 +18,7 @@ const VALID_ROLE_IDS = new Set([1, 2, 3, 4]);
 export async function listUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.username, u.phone, u.upi_id, u.town, u.status,
+      `SELECT u.user_id, u.staff_code, u.full_name, u.email, u.username, u.phone, u.upi_id, u.town, u.status,
               u.current_balance, u.last_login, u.role_id, u.is_cfo, r.role_name,
               (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count,
               (SELECT COUNT(*) FROM Bookings b
@@ -32,6 +32,7 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
     res.json(
       result.rows.map((row) => ({
         user_id: row.user_id,
+        staff_code: row.staff_code,
         full_name: row.full_name,
         role_name: row.role_name,
         role_id: row.role_id,
@@ -92,7 +93,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
     const result = await pool.query(
       `INSERT INTO Users (role_id, full_name, username, email, phone, upi_id, town, password_hash, temp_password_required, status, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, 'Active', $9)
-       RETURNING user_id, full_name, username, email, role_id, status`,
+       RETURNING user_id, staff_code, full_name, username, email, role_id, status`,
       [
         Number(role_id),
         full_name ? full_name.trim() : targetUsername,
@@ -120,7 +121,7 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
       userAgent: req.headers['user-agent'],
     });
 
-    res.status(201).json({ user_id: created.user_id, message: 'User created successfully' });
+    res.status(201).json({ user_id: created.user_id, staff_code: created.staff_code, message: 'User created successfully' });
   } catch (error: any) {
     if (error.code === '23505') {
       const detail = error.detail || '';
@@ -497,9 +498,10 @@ export async function createBookieApplication(req: Request, res: Response): Prom
   }
 
   try {
-    await pool.query(
+    const appRes = await pool.query(
       `INSERT INTO Bookie_Applications (full_name, nationality, date_of_birth, gender, phone, email, occupation)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING application_id, formatted_app_id`,
       [
         full_name.trim(),
         nationality.trim(),
@@ -511,7 +513,13 @@ export async function createBookieApplication(req: Request, res: Response): Prom
       ]
     );
 
-    res.json({ message: 'Application submitted successfully! Our team will contact you on WhatsApp shortly.' });
+    const createdApp = appRes.rows[0];
+
+    res.json({
+      application_id: createdApp.application_id,
+      formatted_app_id: createdApp.formatted_app_id,
+      message: `Application submitted successfully! Application ID: ${createdApp.formatted_app_id}. Our team will contact you on WhatsApp shortly.`
+    });
   } catch (error: any) {
     console.error('Error submitting bookie application:', error);
     res.status(500).json({ message: 'Failed to submit application. Please try again.' });
@@ -571,7 +579,7 @@ export async function updateBookieReceiveBookings(req: Request, res: Response): 
 export async function getBookieApplications(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT application_id, full_name, nationality, date_of_birth, gender, phone, email, occupation, status, created_at
+      `SELECT application_id, formatted_app_id, full_name, nationality, date_of_birth, gender, phone, email, occupation, status, created_at
        FROM Bookie_Applications
        ORDER BY created_at DESC`
     );

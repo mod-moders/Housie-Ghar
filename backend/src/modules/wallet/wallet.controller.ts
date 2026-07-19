@@ -53,7 +53,7 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
     const result = await pool.query(
       `SELECT * FROM (
         (
-          SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
                  t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 1 AS sort_order
           FROM TopUp_Requests t
           JOIN Users u ON t.agent_id = u.user_id
@@ -61,7 +61,7 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
          )
          UNION ALL
          (
-          SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
                  t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 2 AS sort_order
           FROM TopUp_Requests t
           JOIN Users u ON t.agent_id = u.user_id
@@ -76,6 +76,7 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
     res.json(
       result.rows.map((row) => ({
         request_id: row.request_id,
+        formatted_request_id: row.formatted_request_id,
         agent_id: row.agent_id,
         agent_name: row.agent_name,
         amount: parseFloat(row.requested_amount),
@@ -110,7 +111,7 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
     );
 
     const pendingRes = await pool.query(
-      `SELECT request_id, agent_id, requested_amount, payment_reference, payment_method, requested_at
+      `SELECT request_id, formatted_request_id, agent_id, requested_amount, payment_reference, payment_method, requested_at
        FROM TopUp_Requests
        WHERE request_status = 'Pending'
        ORDER BY requested_at ASC`
@@ -120,6 +121,7 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
     for (const r of pendingRes.rows) {
       (pendingByAgent[r.agent_id] ||= []).push({
         request_id: r.request_id,
+        formatted_request_id: r.formatted_request_id,
         requested_amount: parseFloat(r.requested_amount),
         payment_reference: r.payment_reference,
         payment_method: r.payment_method,
@@ -164,7 +166,7 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
     const result = await pool.query(
       `INSERT INTO TopUp_Requests (agent_id, requested_amount, payment_reference, payment_method, proof_screenshot_url, request_status)
        VALUES ($1, $2, $3, $4, $5, 'Pending')
-       RETURNING request_id, requested_at`,
+       RETURNING request_id, formatted_request_id, requested_at`,
       [agent.userId, amount, ref, payment_method || null, proof_screenshot_url || null]
     );
 
@@ -201,6 +203,7 @@ export async function requestTopUp(req: AuthenticatedRequest, res: Response): Pr
 
     res.status(201).json({
       request_id: request.request_id,
+      formatted_request_id: request.formatted_request_id,
       message: 'Top-up request submitted for approval',
       recharge_wa_link,
     });
