@@ -244,7 +244,16 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     apiFetch<GameSummary>(`/api/games/${game_id}`)
       .then((g) => {
         setGame(g);
-        setPrizes(g.prize_pool || []);
+        const pool = g.prize_pool || [];
+        setPrizes(pool);
+        if (g.game_status === "Completed" || g.game_status === "Draw_Ended" || (pool.length > 0 && pool.every((p) => p.claimed))) {
+          setShowWinnersOverlay(true);
+          if (g.game_status === "Completed" || g.game_status === "Draw_Ended") {
+            useGameStore.getState().setStatus(g.game_status);
+          } else {
+            useGameStore.getState().setStatus("Draw_Ended");
+          }
+        }
       })
       .catch(() => {});
   }, [game_id]);
@@ -253,6 +262,13 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   useEffect(() => {
     loadGameData();
   }, [loadGameData]);
+
+  // Automatically show Winners List modal as soon as all prizes in the list are won
+  useEffect(() => {
+    if (prizes.length > 0 && prizes.every((p) => p.claimed)) {
+      setShowWinnersOverlay(true);
+    }
+  }, [prizes]);
 
   const loadMyTickets = useCallback(() => {
     let alive = true;
@@ -310,7 +326,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   }, [loadMyTickets]);
 
   useSocket((event) => {
-    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received" || event === "prize_disbursed") {
+    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received" || event === "prize_disbursed" || event === "winner" || event === "prize_won" || event === "draw_ended" || event === "game_completed") {
       loadMyTickets();
       loadGameData();
     }
@@ -360,15 +376,20 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
       // Step 2 — After spin (2s), show badge + play audio together (number set in same tick)
       delay(() => revealDraw(num), 2000);
-    } else if (data.event === "winner") {
+    } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number };
-      setPrizes((prev) =>
-        prev.map((p) =>
+      setPrizes((prev) => {
+        const next = prev.map((p) =>
           p.pattern_name === w.prize
             ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
             : p
-        )
-      );
+        );
+        if (next.length > 0 && next.every((p) => p.claimed)) {
+          setShowWinnersOverlay(true);
+          useGameStore.getState().setStatus("Draw_Ended");
+        }
+        return next;
+      });
       delay(() => {
         playCelebration();
         const config = useConfigStore.getState().config;
@@ -389,13 +410,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
       useGameStore.getState().setStatus(nextStatus);
       setShowWinnersOverlay(true);
-      apiFetch<{ prizes: Prize[] }>(`/api/games/${game_id}/prizes`)
-        .then((res) => {
-          if (res.prizes) setPrizes(res.prizes);
-        })
-        .catch(() => {});
+      loadGameData();
     }
-  }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id]);
+  }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id, loadGameData]);
 
   useSSE(game_id, onEvent);
 
