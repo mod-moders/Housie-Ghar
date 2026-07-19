@@ -1392,7 +1392,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
          LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
          LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
          LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE p.player_claimed = TRUE AND (p.disbursed = FALSE OR p.disbursed IS NULL)
+         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND (p.disbursed = FALSE OR p.disbursed IS NULL)
       )
       UNION ALL
       (
@@ -1419,7 +1419,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
          LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
          LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
          LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE p.player_claimed = TRUE AND p.disbursed = TRUE
+         WHERE (p.player_claimed = TRUE OR p.claimed = TRUE) AND p.disbursed = TRUE
          ORDER BY p.disbursed_at DESC
          LIMIT 10
       )

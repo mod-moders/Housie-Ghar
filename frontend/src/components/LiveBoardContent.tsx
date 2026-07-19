@@ -121,24 +121,33 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     muted
   );
 
+  const wasLiveInSessionRef = useRef<boolean>(false);
   const outroPlayedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (gameStatus === "Live" || gameStatus === "Paused") {
+      wasLiveInSessionRef.current = true;
+    }
+  }, [gameStatus]);
+
   useEffect(() => {
     if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
       setShowWinnersOverlay(true);
       if (!outroPlayedRef.current) {
         outroPlayedRef.current = true;
-        playOutro();
+        if (wasLiveInSessionRef.current) {
+          playOutro();
+        }
         playCelebration();
         const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-        if (isSoundEnabled) {
+        if (isSoundEnabled && !muted) {
           soundSynthesizer.playCelebration();
         }
       }
     } else {
       setShowWinnersOverlay(false);
-      outroPlayedRef.current = false;
     }
-  }, [gameStatus, playOutro, playCelebration]);
+  }, [gameStatus, playOutro, playCelebration, muted]);
 
   // Track winners for audio celebration
 
@@ -656,7 +665,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                     }}
                   >
                     <Icon name="trophy" size={16} />
-                    {claimingAll ? "Claiming All Prizes..." : `Claim All My Prizes (${money(myUnclaimedTotalAmount)})`}
+                    {claimingAll ? "Claiming All Prizes..." : "Claim All My Prizes"}
                   </button>
                 )}
 
@@ -933,7 +942,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                         transition: "transform 0.2s, opacity 0.2s"
                       }}
                     >
-                      {claimingAll ? "Claiming All Prizes..." : `🏆 Claim All My Prizes (${money(myUnclaimedTotalAmount)})`}
+                      {claimingAll ? "Claiming All Prizes..." : "🏆 Claim All My Prizes"}
                     </button>
                   )}
 
