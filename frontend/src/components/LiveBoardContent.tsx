@@ -91,8 +91,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [showAllCalled, setShowAllCalled] = useState(false);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
 
-const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
+  const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
+  const [numberCallPlaying, setNumberCallPlaying] = useState(false);
+  const activeCallIdRef = useRef(0);
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -131,8 +133,10 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     }
   }, [gameStatus]);
 
+  const delayedGameEnd = (gameStatus === "Completed" || gameStatus === "Draw_Ended") && !numberCallPlaying;
+
   useEffect(() => {
-    if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
+    if (delayedGameEnd) {
       if (!userDismissedWinnersRef.current) {
         setShowWinnersOverlay(true);
       }
@@ -149,9 +153,12 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       }
     } else {
       setShowWinnersOverlay(false);
-      userDismissedWinnersRef.current = false;
+      outroPlayedRef.current = false;
+      if (gameStatus !== "Completed" && gameStatus !== "Draw_Ended") {
+        userDismissedWinnersRef.current = false;
+      }
     }
-  }, [gameStatus, playOutro, playCelebration, muted]);
+  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted]);
 
   // Track winners for audio celebration
 
@@ -189,7 +196,14 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     beep();
     addDrawn(num);       // set new number FIRST
     setRevealed(true);   // THEN reveal badge — no stale flash
-    playNumberCall(num);
+    
+    const currentCallId = ++activeCallIdRef.current;
+    setNumberCallPlaying(true);
+    playNumberCall(num).finally(() => {
+      if (activeCallIdRef.current === currentCallId) {
+        setNumberCallPlaying(false);
+      }
+    });
   }, [beep, addDrawn, playNumberCall]);
 
   const flushPendingDraws = useCallback(() => {
@@ -260,9 +274,6 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
         const pool = g.prize_pool || [];
         setPrizes(pool);
         if (g.game_status === "Completed" || g.game_status === "Draw_Ended" || (pool.length > 0 && pool.every((p) => p.claimed))) {
-          if (!userDismissedWinnersRef.current) {
-            setShowWinnersOverlay(true);
-          }
           if (g.game_status === "Completed" || g.game_status === "Draw_Ended") {
             useGameStore.getState().setStatus(g.game_status);
           } else {
@@ -277,13 +288,6 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   useEffect(() => {
     loadGameData();
   }, [loadGameData]);
-
-  // Automatically show Winners List modal as soon as all prizes in the list are won
-  useEffect(() => {
-    if (prizes.length > 0 && prizes.every((p) => p.claimed) && !userDismissedWinnersRef.current) {
-      setShowWinnersOverlay(true);
-    }
-  }, [prizes]);
 
   const handleCloseWinnersOverlay = useCallback(() => {
     userDismissedWinnersRef.current = true;
@@ -420,7 +424,6 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
             : p
         );
         if (next.length > 0 && next.every((p) => p.claimed) && !userDismissedWinnersRef.current) {
-          setShowWinnersOverlay(true);
           useGameStore.getState().setStatus("Draw_Ended");
         }
         return next;
@@ -444,9 +447,6 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
       const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
       useGameStore.getState().setStatus(nextStatus);
-      if (!userDismissedWinnersRef.current) {
-        setShowWinnersOverlay(true);
-      }
       loadGameData();
     }
   }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id, loadGameData]);
@@ -671,7 +671,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
               <div className="hg-prizeboard">
                 <h2 className="hg-section-title">Prizes</h2>
 
-                {myUnclaimedPrizes.length > 0 && (
+                {delayedGameEnd && myUnclaimedPrizes.length > 0 && (
                   <button
                     onClick={handleClaimAllMyPrizes}
                     disabled={claimingAll}
@@ -954,7 +954,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
                 {/* Footer Buttons */}
                 <div style={{ padding: "16px 24px 20px", borderTop: "1px solid var(--border-light)", background: "var(--surface-2)", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {myUnclaimedPrizes.length > 0 && (
+                  {delayedGameEnd && myUnclaimedPrizes.length > 0 && (
                     <button
                       onClick={handleClaimAllMyPrizes}
                       disabled={claimingAll}
