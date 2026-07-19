@@ -51,23 +51,25 @@ export async function getMyLedger(req: AuthenticatedRequest, res: Response): Pro
 export async function listPendingTopUps(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `(
-        SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
-               t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 1 AS sort_order
-        FROM TopUp_Requests t
-        JOIN Users u ON t.agent_id = u.user_id
-        WHERE t.request_status = 'Pending'
-       )
-       UNION ALL
-       (
-        SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
-               t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 2 AS sort_order
-        FROM TopUp_Requests t
-        JOIN Users u ON t.agent_id = u.user_id
-        WHERE t.request_status IN ('Approved', 'Rejected')
-        ORDER BY t.reviewed_at DESC
-        LIMIT 10
-       )
+      `SELECT * FROM (
+        (
+          SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 1 AS sort_order
+          FROM TopUp_Requests t
+          JOIN Users u ON t.agent_id = u.user_id
+          WHERE t.request_status = 'Pending'
+         )
+         UNION ALL
+         (
+          SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 2 AS sort_order
+          FROM TopUp_Requests t
+          JOIN Users u ON t.agent_id = u.user_id
+          WHERE t.request_status IN ('Approved', 'Rejected')
+          ORDER BY t.reviewed_at DESC
+          LIMIT 10
+         )
+       ) AS combined
        ORDER BY sort_order ASC, COALESCE(requested_at, reviewed_at) DESC`
     );
 
@@ -444,19 +446,21 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
     );
 
     const pendingRes = await pool.query(
-      `(
-        SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 1 AS sort_order
-        FROM TopUp_Requests
-        WHERE request_status = 'Pending'
-       )
-       UNION ALL
-       (
-        SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 2 AS sort_order
-        FROM TopUp_Requests
-        WHERE request_status IN ('Approved', 'Rejected')
-        ORDER BY reviewed_at DESC
-        LIMIT 10
-       )
+      `SELECT * FROM (
+        (
+          SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 1 AS sort_order
+          FROM TopUp_Requests
+          WHERE request_status = 'Pending'
+         )
+         UNION ALL
+         (
+          SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 2 AS sort_order
+          FROM TopUp_Requests
+          WHERE request_status IN ('Approved', 'Rejected')
+          ORDER BY reviewed_at DESC
+          LIMIT 10
+         )
+       ) AS combined
        ORDER BY sort_order ASC, COALESCE(requested_at, reviewed_at) DESC`
     );
     const pendingByAgent: Record<string, any[]> = {};

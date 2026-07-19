@@ -1368,8 +1368,9 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
     }
 
     const result = await pool.query(
-      `(
-        SELECT 
+      `SELECT * FROM (
+      (
+        SELECT
           p.prize_id,
           p.game_id,
           p.pattern_name,
@@ -1423,6 +1424,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
          ORDER BY p.disbursed_at DESC
          LIMIT 10
       )
+      ) AS combined
       ORDER BY sort_order ASC, COALESCE(player_claimed_at, disbursed_at) DESC`
     );
 

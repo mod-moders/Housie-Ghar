@@ -7,9 +7,11 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 // Every server-emitted event the dashboards care about.
 const EVENTS = [
   "draw_update", "winner_announced", "paused", "resumed", "completed",
-  "new_booking_request", "booking_expired", "wallet_credited",
+  "new_booking_request", "booking_expired", "wallet_credited", "wallet_debited",
   "booking_skipped", "overflow_booking", "ticket_status_change",
   "config_update", "game_list_update",
+  "topup_request_received", "topup_approved", "topup_rejected", "wallet_update",
+  "prize_claim_received", "prize_disbursed",
 ];
 
 /**
