@@ -350,17 +350,42 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
 
     const audioUrl = `/api/config/audio-file/${filename}`;
 
-    const result = await pool.query(
-      `UPDATE Platform_Config 
-       SET config_value = $1, updated_by = $2, updated_at = NOW() 
-       WHERE config_key = $3
-       RETURNING *`,
-      [audioUrl, actor.userId, key]
-    );
+    // Persist the raw bytes in Postgres (not just the local disk file) so this
+    // survives a Railway redeploy, which resets the backend's filesystem back
+    // to whatever's in the git image — wiping anything written here at
+    // runtime. On boot, restorePersistedAudioFiles() re-writes any missing
+    // file from this table back to disk before the server starts serving.
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('BEGIN');
+      result = await client.query(
+        `UPDATE Platform_Config
+         SET config_value = $1, updated_by = $2, updated_at = NOW()
+         WHERE config_key = $3
+         RETURNING *`,
+        [audioUrl, actor.userId, key]
+      );
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: 'Config key not found' });
-      return;
+      if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
+        res.status(404).json({ message: 'Config key not found' });
+        return;
+      }
+
+      await client.query(
+        `INSERT INTO Platform_Audio_Files (config_key, filename, mime_type, data, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (config_key) DO UPDATE SET filename = $2, mime_type = $3, data = $4, updated_at = NOW()`,
+        [key, filename, mimeType || null, buffer]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     clearPublicConfigCache();

@@ -24,6 +24,8 @@
  */
 
 import bcrypt from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
 import pool from '../db';
 
 const SUPERADMIN_ROLE_ID = 1;
@@ -144,5 +146,55 @@ export async function ensurePlatformConfig(): Promise<void> {
     console.log('✅ Checked/initialized sound configuration keys in Platform_Config');
   } catch (error) {
     console.error('Failed to initialize platform config keys:', error);
+  }
+}
+
+/**
+ * Restore uploaded audio config files (intro/outro voice notes, background
+ * music, lobby music) from Postgres back onto local disk on boot.
+ *
+ * Railway rebuilds the backend into a fresh container on every deploy, which
+ * resets the local filesystem to whatever's in the git image — silently
+ * wiping any audio file a Superadmin uploaded at runtime via
+ * uploadConfigAudio(), even though Platform_Config still points at that now-
+ * missing filename. uploadConfigAudio() also persists the raw bytes into
+ * Platform_Audio_Files, which lives in Postgres and survives redeploys; this
+ * writes those bytes back to disk for any file that's currently missing, so
+ * playback keeps working without a staff member re-uploading it every time.
+ */
+export async function restorePersistedAudioFiles(): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT config_key, filename, data FROM Platform_Audio_Files`
+    );
+    if (result.rowCount === 0) return;
+
+    const backendUploadDir = path.resolve(__dirname, '../../uploads/audio/config');
+    fs.mkdirSync(backendUploadDir, { recursive: true });
+
+    let rootDir = process.cwd();
+    if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+      rootDir = path.resolve(rootDir, '..');
+    }
+    const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/config');
+    try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
+
+    let restored = 0;
+    for (const row of result.rows) {
+      const backendPath = path.join(backendUploadDir, row.filename);
+      const frontendPath = path.join(frontendPublicDir, row.filename);
+      if (!fs.existsSync(backendPath)) {
+        fs.writeFileSync(backendPath, row.data);
+        restored++;
+      }
+      if (!fs.existsSync(frontendPath)) {
+        try { fs.writeFileSync(frontendPath, row.data); } catch {}
+      }
+    }
+    if (restored > 0) {
+      console.log(`✅ Restored ${restored} uploaded audio file(s) from Postgres after redeploy`);
+    }
+  } catch (error) {
+    console.error('Failed to restore persisted audio files:', error);
   }
 }

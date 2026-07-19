@@ -11,7 +11,7 @@ import { connectRedis } from './db/redis';
 import { initGameEngineSubscription, resumeInterruptedGames } from './services/gameEngine';
 import { startExpirySweeper } from './services/scheduler.service';
 import { socketAuth, authorizeRoomJoin } from './middleware/socketAuth';
-import { ensureSuperadminAccess, ensurePlatformConfig } from './services/superadminHeal';
+import { ensureSuperadminAccess, ensurePlatformConfig, restorePersistedAudioFiles } from './services/superadminHeal';
 
 const server = http.createServer(app);
 
@@ -81,6 +81,7 @@ async function boot() {
     //     stored password is missing/not-a-real-bcrypt-hash.
     await ensureSuperadminAccess();
     await ensurePlatformConfig();
+    await restorePersistedAudioFiles();
 
     // 2c. JWT keypair self-check. A private/public mismatch is invisible at
     //     login (signing succeeds) but kills every session (verify fails), so
