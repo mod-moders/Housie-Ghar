@@ -539,7 +539,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
               {gameStatus === "Live" && (
                 <span className="hg-live-badge"><span className="hg-live-dot" /> LIVE</span>
               )}
-              {gameStatus === "Paused" && <span className="hg-live-badge">PAUSED</span>}
+              {gameStatus === "Paused" && <span className="hg-live-badge" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#f59e0b" }}>PAUSED</span>}
+              {gameStatus === "Draw_Ended" && <span className="hg-live-badge" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308" }}>DRAW ENDED</span>}
+              {gameStatus === "Completed" && <span className="hg-live-badge" style={{ background: "rgba(34, 197, 94, 0.2)", color: "#22c55e" }}>COMPLETED</span>}
               {game?.title ?? ""}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
