@@ -121,7 +121,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     config?.english_caller_enabled === "true",
     gameStatus === "Live" || gameStatus === "Paused" || gameStatus === "Draw_Ended",
     muted,
-    game?.call_mode
+    game?.call_mode,
+    game?.bg_music_enabled,
+    game?.intro_mode,
+    game?.outro_mode
   );
 
   const wasLiveInSessionRef = useRef<boolean>(false);

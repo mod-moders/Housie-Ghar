@@ -595,8 +595,24 @@ export function GamesSection({ me }: { me: AuthUser }) {
   const [ruleModal, setRuleModal] = useState<{ title: string; desc: string } | null>(null);
   const [salesGameId, setSalesGameId] = useState<string | null>(null);
   const [bookingGameId, setBookingGameId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ title: string; scheduled_at: string; ticket_price: string; total_tickets: string; call_mode: "TTS" | "Audio" }>({
-    title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio"
+  const [form, setForm] = useState<{
+    title: string;
+    scheduled_at: string;
+    ticket_price: string;
+    total_tickets: string;
+    call_mode: "TTS" | "Audio";
+    bg_music_enabled: boolean;
+    intro_mode: "TTS" | "Audio";
+    outro_mode: "TTS" | "Audio";
+  }>({
+    title: "",
+    scheduled_at: "",
+    ticket_price: "50",
+    total_tickets: "120",
+    call_mode: "Audio",
+    bg_music_enabled: true,
+    intro_mode: "Audio",
+    outro_mode: "TTS",
   });
 
   const [selectedGame, setSelectedGame] = useState<GameSummary | null>(null);
@@ -656,6 +672,9 @@ export function GamesSection({ me }: { me: AuthUser }) {
         ticket_price: String(g.ticket_price),
         total_tickets: String(g.total_tickets),
         call_mode: g.call_mode === "TTS" ? "TTS" : "Audio",
+        bg_music_enabled: g.bg_music_enabled !== false,
+        intro_mode: g.intro_mode === "TTS" ? "TTS" : "Audio",
+        outro_mode: g.outro_mode === "Audio" ? "Audio" : "TTS",
       });
       setPrizes(PATTERN_DEFAULTS.map((pd) => {
         const matchingPrize = g.prize_pool.find((p) => p.pattern_name === pd.pattern_name || (pd.pattern_name === "1st Full House" && p.pattern_name === "Full House"));
@@ -727,6 +746,9 @@ export function GamesSection({ me }: { me: AuthUser }) {
             total_tickets: parseInt(form.total_tickets, 10),
             prizes: activePrizes,
             call_mode: form.call_mode,
+            bg_music_enabled: form.bg_music_enabled,
+            intro_mode: form.intro_mode,
+            outro_mode: form.outro_mode,
           }),
         });
       } else {
@@ -739,12 +761,15 @@ export function GamesSection({ me }: { me: AuthUser }) {
             total_tickets: parseInt(form.total_tickets, 10),
             prizes: activePrizes,
             call_mode: form.call_mode,
+            bg_music_enabled: form.bg_music_enabled,
+            intro_mode: form.intro_mode,
+            outro_mode: form.outro_mode,
           }),
         });
       }
       setCreating(false);
       setEditingGameId(null);
-      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
+      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
       setPrizes(PATTERN_DEFAULTS);
       load();
     } catch (e) {
@@ -773,7 +798,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
               if (creating) {
                 setEditingGameId(null);
-                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
+                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
                 setPrizes(PATTERN_DEFAULTS);
               }
               setCreating(!creating);
@@ -832,6 +857,9 @@ export function GamesSection({ me }: { me: AuthUser }) {
               <span>Price of each ticket (₹)</span>
               <input type="number" min={1} value={form.ticket_price} onChange={(e) => setForm({ ...form, ticket_price: e.target.value })} />
             </label>
+          </div>
+
+          <div className="hg-form-row" style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
             <label className="hg-form-field">
               <span>Number Calling Style</span>
               <select
@@ -846,8 +874,65 @@ export function GamesSection({ me }: { me: AuthUser }) {
                   fontSize: "13px",
                 }}
               >
+                <option value="Audio">Pre-recorded Audio (Default)</option>
                 <option value="TTS">Text-to-Speech (TTS)</option>
+              </select>
+            </label>
+
+            <label className="hg-form-field">
+              <span>Intro Note Style</span>
+              <select
+                value={form.intro_mode}
+                onChange={(e) => setForm({ ...form, intro_mode: e.target.value as "TTS" | "Audio" })}
+                style={{
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border-2)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 12px",
+                  fontSize: "13px",
+                }}
+              >
+                <option value="Audio">Pre-recorded Audio (Default)</option>
+                <option value="TTS">Text-to-Speech (TTS)</option>
+              </select>
+            </label>
+
+            <label className="hg-form-field">
+              <span>Outro Note Style</span>
+              <select
+                value={form.outro_mode}
+                onChange={(e) => setForm({ ...form, outro_mode: e.target.value as "TTS" | "Audio" })}
+                style={{
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border-2)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 12px",
+                  fontSize: "13px",
+                }}
+              >
+                <option value="TTS">Text-to-Speech (TTS) (Default)</option>
                 <option value="Audio">Pre-recorded Audio</option>
+              </select>
+            </label>
+
+            <label className="hg-form-field">
+              <span>Background Music</span>
+              <select
+                value={form.bg_music_enabled ? "true" : "false"}
+                onChange={(e) => setForm({ ...form, bg_music_enabled: e.target.value === "true" })}
+                style={{
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border-2)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 12px",
+                  fontSize: "13px",
+                }}
+              >
+                <option value="true">ON / Enabled (Default)</option>
+                <option value="false">OFF / Disabled</option>
               </select>
             </label>
           </div>
@@ -975,7 +1060,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => {
               setCreating(false);
               setEditingGameId(null);
-              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio" });
+              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
               setPrizes(PATTERN_DEFAULTS);
             }}>Cancel</Button>
             <Button

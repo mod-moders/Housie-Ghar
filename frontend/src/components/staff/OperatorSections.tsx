@@ -67,7 +67,10 @@ export function OperatorHudSection() {
     config?.english_caller_enabled === "true",
     isGameRunning,
     muted,
-    game?.call_mode
+    game?.call_mode,
+    game?.bg_music_enabled,
+    game?.intro_mode,
+    game?.outro_mode
   );
 
   const pendingDrawsRef = useRef<number[]>([]);

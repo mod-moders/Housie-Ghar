@@ -18,7 +18,10 @@ export function useGameAudio(
   englishCallerEnabled: boolean, 
   isGameLive: boolean, 
   isMuted: boolean = false,
-  gameCallMode?: "TTS" | "Audio" | "Text"
+  gameCallMode?: "TTS" | "Audio" | "Text",
+  gameBgMusicEnabled?: boolean,
+  gameIntroMode?: "TTS" | "Audio" | "Text",
+  gameOutroMode?: "TTS" | "Audio" | "Text"
 ) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
   const { config: platformConfig } = useConfigStore();
@@ -88,7 +91,8 @@ export function useGameAudio(
 
   // Handle Gameplay Background Music Playback (responding to isMuted dynamically)
   useEffect(() => {
-    const bgEnabled = platformConfig?.background_music_enabled === "true";
+    const bgConfigEnabled = platformConfig?.background_music_enabled === "true";
+    const bgEnabled = gameBgMusicEnabled !== undefined ? gameBgMusicEnabled : bgConfigEnabled;
     const bgUrl = platformConfig?.background_music_url;
     const bgVol = parseFloat(platformConfig?.background_music_volume || "0.15");
 
@@ -135,7 +139,7 @@ export function useGameAudio(
         bgMusicRef.current = null;
       }
     };
-  }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, platformConfig?.background_music_volume, isMuted]);
+  }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, platformConfig?.background_music_volume, isMuted, gameBgMusicEnabled]);
 
   // Handle dynamic muting/unmuting of active audio tracks & speech synthesis
   useEffect(() => {
@@ -201,7 +205,11 @@ export function useGameAudio(
       });
       if (!isMountedRef.current || isMuted) return;
 
-      const mode = platformConfig?.welcome_voice_mode || "Text";
+      const mode = (gameIntroMode === "TTS" || gameIntroMode === "Text")
+        ? "Text"
+        : gameIntroMode === "Audio"
+          ? "Audio"
+          : (platformConfig?.welcome_voice_mode || "Audio");
       const welcomeUrl = platformConfig?.welcome_voice_url;
       const welcomeText = platformConfig?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
       const universalVoice = platformConfig?.tts_voice_name || null;
@@ -240,7 +248,11 @@ export function useGameAudio(
     stopAllActiveAudios();
     
     try {
-      const mode = platformConfig?.instruction_voice_mode || "Text";
+      const mode = (gameOutroMode === "Audio")
+        ? "Audio"
+        : (gameOutroMode === "TTS" || gameOutroMode === "Text")
+          ? "Text"
+          : (platformConfig?.instruction_voice_mode || "Text");
       const instructionUrl = platformConfig?.instruction_voice_url;
       const instructionText = platformConfig?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
       const universalVoice = platformConfig?.tts_voice_name || null;

@@ -46,6 +46,9 @@ export interface GameSummary {
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
   call_mode?: "TTS" | "Audio" | "Text";
+  bg_music_enabled?: boolean;
+  intro_mode?: "TTS" | "Audio" | "Text";
+  outro_mode?: "TTS" | "Audio" | "Text";
   prize_pool: Prize[];
 }
 
