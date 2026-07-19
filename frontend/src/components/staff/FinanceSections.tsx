@@ -18,6 +18,8 @@ interface QueueItem {
   requested_amount: number;
   payment_reference: string;
   requested_at: string;
+  request_status?: "Pending" | "Approved" | "Rejected";
+  reviewed_at?: string;
   agent: LedgerAgent;
 }
 
@@ -192,8 +194,13 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   const queue: QueueItem[] = useMemo(
     () =>
       agents
-        .flatMap((a) => a.pending_requests.map((r) => ({ ...r, agent: a })))
-        .sort((x, y) => new Date(x.requested_at).getTime() - new Date(y.requested_at).getTime()),
+        .flatMap((a) => (a.pending_requests || []).map((r) => ({ ...r, agent: a })))
+        .sort((x, y) => {
+          const statusOrder = (st?: string) => (st === "Pending" || !st ? 0 : 1);
+          const diff = statusOrder(x.request_status) - statusOrder(y.request_status);
+          if (diff !== 0) return diff;
+          return new Date(y.requested_at).getTime() - new Date(x.requested_at).getTime();
+        }),
     [agents]
   );
 
@@ -291,7 +298,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               gap: "6px"
             }}
           >
-            Recharge Requests ({queue.length})
+            Recharge Requests ({queue.filter((r) => (r.request_status || "Pending") === "Pending").length})
           </button>
         )}
 
@@ -318,7 +325,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               gap: "6px"
             }}
           >
-            Claim Requests ({prizeClaims.length})
+            Claim Requests ({prizeClaims.filter((c) => !c.disbursed).length})
           </button>
         )}
       </div>
@@ -334,34 +341,54 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               </span>
             </div>
             <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
-              {queue.length === 0 && <EmptyHint icon="check" title="Queue clear" sub="All recharge requests processed." />}
-              {queue.map((r) => (
-                <button
-                  key={r.request_id}
-                  onClick={() => setSelId(r.request_id)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    background: active?.request_id === r.request_id ? "var(--surface-2)" : "transparent",
-                    border: active?.request_id === r.request_id ? "1.5px solid var(--cyan)" : "1px solid var(--border-light)",
-                    borderRadius: "10px",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease"
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "180px" }}>{r.agent.full_name}</b>
-                    <span style={{ color: "var(--cyan)", fontWeight: 800, fontSize: "14px" }}>{money(r.requested_amount)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)" }}>
-                    <span>Ref: {r.payment_reference}</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
-                      {new Date(r.requested_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {queue.length === 0 && <EmptyHint icon="check" title="Queue clear" sub="No pending or past recharge requests." />}
+              {queue.map((r) => {
+                const isPending = (r.request_status || "Pending") === "Pending";
+                const isApproved = r.request_status === "Approved";
+                const isRejected = r.request_status === "Rejected";
+                const isActive = active?.request_id === r.request_id;
+                return (
+                  <button
+                    key={r.request_id}
+                    onClick={() => setSelId(r.request_id)}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      background: isActive ? "var(--surface-2)" : "transparent",
+                      border: isActive ? "1.5px solid var(--cyan)" : "1px solid var(--border-light)",
+                      borderRadius: "10px",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      opacity: isPending ? 1 : 0.85
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>{r.agent.full_name}</b>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isApproved ? "#22c55e" : isRejected ? "#ef4444" : "var(--cyan)", fontWeight: 800, fontSize: "14px" }}>{money(r.requested_amount)}</span>
+                        <span style={{
+                          background: isPending ? "rgba(234, 179, 8, 0.15)" : isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: isPending ? "#eab308" : isApproved ? "#22c55e" : "#ef4444",
+                          fontSize: "10px",
+                          fontWeight: 800,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          textTransform: "uppercase"
+                        }}>
+                          {r.request_status || "Pending"}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)" }}>
+                      <span>Ref: {r.payment_reference}</span>
+                      <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
+                        {new Date(r.requested_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -383,12 +410,14 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                     <b style={{ display: "block", fontSize: "22px", color: "var(--cyan)", marginTop: "2px" }}>{money(active.requested_amount)}</b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Current Balance</span>
-                    <b style={{ display: "block", fontSize: "18px", color: "var(--text)", marginTop: "4px" }}>{money(active.agent.current_balance)}</b>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Request Status</span>
+                    <b style={{ display: "block", fontSize: "16px", color: active.request_status === "Approved" ? "#22c55e" : active.request_status === "Rejected" ? "#ef4444" : "#eab308", marginTop: "4px" }}>
+                      {active.request_status || "Pending"}
+                    </b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Lifetime Top-ups</span>
-                    <b style={{ display: "block", fontSize: "16px", color: "var(--text)", marginTop: "4px" }}>{money(active.agent.lifetime_topups)}</b>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Current Balance</span>
+                    <b style={{ display: "block", fontSize: "18px", color: "var(--text)", marginTop: "4px" }}>{money(active.agent.current_balance)}</b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
                     <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Payment Reference</span>
@@ -396,23 +425,35 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                   </div>
                 </div>
 
-                <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                  💡 Verify the deposit in your banking app, then credit the wallet. Action is logged for auditing.
-                </div>
+                {(active.request_status || "Pending") === "Pending" ? (
+                  <>
+                    <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
+                      💡 Verify the deposit in your banking app, then credit the wallet. Action is logged for auditing.
+                    </div>
 
-                {error && <p className="hg-sec-err">{error}</p>}
+                    {error && <p className="hg-sec-err">{error}</p>}
 
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
-                  <button className="hg-fin-approve" disabled={busy} onClick={() => resolve(true)} style={{ flex: "1 1 200px", padding: "14px 20px" }}>
-                    <Icon name="check" size={17} strokeWidth={2.6} /> Credit Wallet {money(active.requested_amount)}
-                  </button>
-                  <button className="hg-fin-reject" disabled={busy} onClick={() => resolve(false)} style={{ flex: "1 1 180px", padding: "14px 20px" }}>
-                    <Icon name="x" size={17} strokeWidth={2.6} /> Reject / Dispute
-                  </button>
-                </div>
+                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
+                      <button className="hg-fin-approve" disabled={busy} onClick={() => resolve(true)} style={{ flex: "1 1 200px", padding: "14px 20px" }}>
+                        <Icon name="check" size={17} strokeWidth={2.6} /> Credit Wallet {money(active.requested_amount)}
+                      </button>
+                      <button className="hg-fin-reject" disabled={busy} onClick={() => resolve(false)} style={{ flex: "1 1 180px", padding: "14px 20px" }}>
+                        <Icon name="x" size={17} strokeWidth={2.6} /> Reject / Dispute
+                      </button>
+                    </div>
+                  </>
+                ) : active.request_status === "Approved" ? (
+                  <div style={{ marginTop: "auto", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Icon name="check" size={18} /> Wallet Credited ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "auto", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Icon name="x" size={18} /> Request Rejected ({new Date(active.reviewed_at || active.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+                  </div>
+                )}
               </>
             ) : (
-              <EmptyHint icon="wallet" title="Select a request" sub="Pick a pending recharge to review the bookie's ledger." />
+              <EmptyHint icon="wallet" title="Select a request" sub="Pick a pending or past recharge to review details." />
             )}
           </div>
         </div>
@@ -434,6 +475,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               {prizeClaims.map((c) => {
                 const key = `${c.game_id}-${c.prize_id}`;
                 const isActive = (activeClaim?.prize_id === c.prize_id && activeClaim?.game_id === c.game_id);
+                const isDisbursed = c.disbursed;
                 return (
                   <button
                     key={key}
@@ -447,12 +489,26 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                       textAlign: "left",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
-                      boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none"
+                      boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none",
+                      opacity: isDisbursed ? 0.85 : 1
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "180px" }}>{c.winner_housie_name}</b>
-                      <span style={{ color: "var(--accent)", fontWeight: 800, fontSize: "14px" }}>{money(c.amount)}</span>
+                      <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>{c.winner_housie_name}</b>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isDisbursed ? "#22c55e" : "var(--accent)", fontWeight: 800, fontSize: "14px" }}>{money(c.amount)}</span>
+                        <span style={{
+                          background: isDisbursed ? "rgba(34, 197, 94, 0.15)" : "rgba(234, 179, 8, 0.15)",
+                          color: isDisbursed ? "#22c55e" : "#eab308",
+                          fontSize: "10px",
+                          fontWeight: 800,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          textTransform: "uppercase"
+                        }}>
+                          {isDisbursed ? "DISBURSED" : "PENDING"}
+                        </span>
+                      </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)" }}>
                       <span>{c.pattern_name} {c.winner_ticket_number ? `(Tk #${c.winner_ticket_number})` : ""}</span>
@@ -474,7 +530,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
             {activeClaim ? (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "16px", borderBottom: "1px solid var(--border-light)", marginBottom: "20px" }}>
-                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontWeight: 800, fontSize: "20px", flexShrink: 0 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: activeClaim.disbursed ? "rgba(34, 197, 94, 0.2)" : "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: activeClaim.disbursed ? "#22c55e" : "#000", fontWeight: 800, fontSize: "20px", flexShrink: 0 }}>
                     🏆
                   </div>
                   <div>
@@ -488,7 +544,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "20px" }}>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
                     <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Prize Reward Amount</span>
-                    <b style={{ display: "block", fontSize: "22px", color: "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
+                    <b style={{ display: "block", fontSize: "22px", color: activeClaim.disbursed ? "#22c55e" : "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
                   </div>
                   <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
                     <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Winning Pattern</span>
@@ -515,65 +571,72 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                   </b>
                 </div>
 
-                <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                  💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disbursed</b> below to mark it completed.
-                </div>
+                {!activeClaim.disbursed ? (
+                  <>
+                    <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
+                      💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disbursed</b> below to mark it completed.
+                    </div>
 
-                {disburseError && <p className="hg-sec-err">{disburseError}</p>}
+                    {disburseError && <p className="hg-sec-err">{disburseError}</p>}
 
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
-                  {/* Requirement 4: Disbursed Button Only */}
-                  <button
-                    disabled={disbursingId === activeClaim.prize_id}
-                    onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
-                    style={{
-                      flex: "1 1 200px",
-                      padding: "14px 20px",
-                      background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
-                      color: "#000",
-                      border: "none",
-                      borderRadius: "10px",
-                      fontSize: "15px",
-                      fontWeight: 800,
-                      cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer",
-                      boxShadow: "0 4px 15px var(--accent-soft)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    <Icon name="check" size={18} strokeWidth={2.6} />
-                    {disbursingId === activeClaim.prize_id ? "Processing..." : "Disbursed"}
-                  </button>
+                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "auto" }}>
+                      <button
+                        disabled={disbursingId === activeClaim.prize_id}
+                        onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
+                        style={{
+                          flex: "1 1 200px",
+                          padding: "14px 20px",
+                          background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                          color: "#000",
+                          border: "none",
+                          borderRadius: "10px",
+                          fontSize: "15px",
+                          fontWeight: 800,
+                          cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer",
+                          boxShadow: "0 4px 15px var(--accent-soft)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px"
+                        }}
+                      >
+                        <Icon name="check" size={18} strokeWidth={2.6} />
+                        {disbursingId === activeClaim.prize_id ? "Processing..." : "Disbursed"}
+                      </button>
 
-                  {activeClaim.bookie_phone && (
-                    <a
-                      href={`https://wa.me/${activeClaim.bookie_phone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        padding: "14px 20px",
-                        background: "#25D366",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "10px",
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        textDecoration: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "8px"
-                      }}
-                    >
-                      <Icon name="phone" size={16} /> WhatsApp Agent
-                    </a>
-                  )}
-                </div>
+                      {activeClaim.bookie_phone && (
+                        <a
+                          href={`https://wa.me/${activeClaim.bookie_phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: "14px 20px",
+                            background: "#25D366",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            fontWeight: 700,
+                            textDecoration: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px"
+                          }}
+                        >
+                          <Icon name="phone" size={16} /> WhatsApp Agent
+                        </a>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ marginTop: "auto", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", color: "#22c55e", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Icon name="check" size={18} /> Prize Payout Disbursed ({new Date(activeClaim.disbursed_at || activeClaim.player_claimed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })})
+                  </div>
+                )}
               </>
             ) : (
-              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending prize claim from the left list to view winner details and disburse payout." />
+              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending or past prize claim from the left list to view winner details." />
             )}
           </div>
         </div>

@@ -1368,30 +1368,62 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
     }
 
     const result = await pool.query(
-      `SELECT 
-        p.prize_id,
-        p.game_id,
-        p.pattern_name,
-        p.amount_per_winner,
-        p.prize_amount,
-        p.player_claimed,
-        p.player_claimed_at,
-        p.disbursed,
-        p.disbursed_at,
-        p.winner_housie_name,
-        p.winner_ticket_id,
-        t.ticket_number AS winner_ticket_number,
-        sg.title AS game_title,
-        sg.scheduled_at AS game_date,
-        bu.full_name AS bookie_name,
-        bu.phone AS bookie_phone
-       FROM Prize_Pool p
-       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-       WHERE p.player_claimed = TRUE AND p.disbursed = FALSE
-       ORDER BY p.player_claimed_at DESC`
+      `(
+        SELECT 
+          p.prize_id,
+          p.game_id,
+          p.pattern_name,
+          p.amount_per_winner,
+          p.prize_amount,
+          p.player_claimed,
+          p.player_claimed_at,
+          p.disbursed,
+          p.disbursed_at,
+          p.winner_housie_name,
+          p.winner_ticket_id,
+          t.ticket_number AS winner_ticket_number,
+          sg.title AS game_title,
+          sg.scheduled_at AS game_date,
+          bu.full_name AS bookie_name,
+          bu.phone AS bookie_phone,
+          1 AS sort_order
+         FROM Prize_Pool p
+         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+         WHERE p.player_claimed = TRUE AND (p.disbursed = FALSE OR p.disbursed IS NULL)
+      )
+      UNION ALL
+      (
+        SELECT 
+          p.prize_id,
+          p.game_id,
+          p.pattern_name,
+          p.amount_per_winner,
+          p.prize_amount,
+          p.player_claimed,
+          p.player_claimed_at,
+          p.disbursed,
+          p.disbursed_at,
+          p.winner_housie_name,
+          p.winner_ticket_id,
+          t.ticket_number AS winner_ticket_number,
+          sg.title AS game_title,
+          sg.scheduled_at AS game_date,
+          bu.full_name AS bookie_name,
+          bu.phone AS bookie_phone,
+          2 AS sort_order
+         FROM Prize_Pool p
+         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+         WHERE p.player_claimed = TRUE AND p.disbursed = TRUE
+         ORDER BY p.disbursed_at DESC
+         LIMIT 10
+      )
+      ORDER BY sort_order ASC, COALESCE(player_claimed_at, disbursed_at) DESC`
     );
 
     const claims = result.rows.map((row) => ({
