@@ -37,7 +37,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["overflow", "Overflow Queue", "bell"],
       ["staff", "Staff Management", "shieldCheck"],
       ["bookies", "Bookie Management", "users"],
-      ["players", "Player Management", "users"],
+      ["players", "Player Management", "star"],
       ["settings", "Website Settings", "edit"],
       ["audio", "Audio Settings", "volume"],
       ["audit", "Website Audits", "shield"],
