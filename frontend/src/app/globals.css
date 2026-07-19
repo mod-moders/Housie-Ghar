@@ -2117,9 +2117,9 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   background:var(--bg);border-right:1.5px solid var(--card-line);height:100%;overflow-y:auto;scrollbar-width:none}
 .hg-side::-webkit-scrollbar{display:none}
 .hg-side.is-collapsed{width:64px}
-.hg-side.is-collapsed .hg-side-link span,.hg-side.is-collapsed .hg-side-mod,.hg-side.is-collapsed .hg-logo-word{display:none}
-.hg-side.is-collapsed .hg-side-brand{display:flex;justify-content:center;padding:4px 0 0}
-.hg-side-brand{padding:4px 8px 0}
+.hg-side.is-collapsed .hg-side-link span,.hg-side.is-collapsed .hg-side-mod,.hg-side.is-collapsed .hg-logo-word{display:none !important}
+.hg-side.is-collapsed .hg-side-brand{display:flex !important;justify-content:center !important;padding:10px 0 14px !important;width:100% !important}
+.hg-side-brand{padding:10px 12px 14px;display:flex;align-items:center}
 .hg-side-nav{display:flex;flex-direction:column;gap:3px;flex:1}
 .hg-side-link{display:flex;align-items:center;gap:11px;padding:8px 10px;border:1.5px solid transparent;border-radius:10px;background:none;
   color:var(--text-dim);font:600 12.5px var(--font-body);text-align:left;cursor:pointer;width:100%}

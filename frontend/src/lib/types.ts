@@ -150,6 +150,8 @@ export interface PendingTopupRequest {
   requested_amount: number;
   payment_reference: string;
   requested_at: string;
+  request_status?: "Pending" | "Approved" | "Rejected";
+  reviewed_at?: string;
 }
 
 export interface LedgerAgent {

@@ -51,23 +51,39 @@ export async function getMyLedger(req: AuthenticatedRequest, res: Response): Pro
 export async function listPendingTopUps(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT t.request_id, t.requested_amount, t.payment_reference, t.payment_method,
-              t.request_status, t.requested_at, u.full_name AS agent_name
-       FROM TopUp_Requests t
-       JOIN Users u ON t.agent_id = u.user_id
-       WHERE t.request_status = 'Pending'
-       ORDER BY t.requested_at ASC`
+      `(
+        SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+               t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 1 AS sort_order
+        FROM TopUp_Requests t
+        JOIN Users u ON t.agent_id = u.user_id
+        WHERE t.request_status = 'Pending'
+       )
+       UNION ALL
+       (
+        SELECT t.request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
+               t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 2 AS sort_order
+        FROM TopUp_Requests t
+        JOIN Users u ON t.agent_id = u.user_id
+        WHERE t.request_status IN ('Approved', 'Rejected')
+        ORDER BY t.reviewed_at DESC
+        LIMIT 10
+       )
+       ORDER BY sort_order ASC, COALESCE(requested_at, reviewed_at) DESC`
     );
 
     res.json(
       result.rows.map((row) => ({
         request_id: row.request_id,
+        agent_id: row.agent_id,
         agent_name: row.agent_name,
         amount: parseFloat(row.requested_amount),
+        requested_amount: parseFloat(row.requested_amount),
         payment_reference: row.payment_reference,
         payment_method: row.payment_method,
         status: row.request_status,
+        request_status: row.request_status,
         requested_at: row.requested_at,
+        reviewed_at: row.reviewed_at,
       }))
     );
   } catch (error) {
@@ -425,10 +441,20 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
     );
 
     const pendingRes = await pool.query(
-      `SELECT request_id, agent_id, requested_amount, payment_reference, requested_at
-       FROM TopUp_Requests
-       WHERE request_status = 'Pending'
-       ORDER BY requested_at ASC`
+      `(
+        SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 1 AS sort_order
+        FROM TopUp_Requests
+        WHERE request_status = 'Pending'
+       )
+       UNION ALL
+       (
+        SELECT request_id, agent_id, requested_amount, payment_reference, request_status, requested_at, reviewed_at, 2 AS sort_order
+        FROM TopUp_Requests
+        WHERE request_status IN ('Approved', 'Rejected')
+        ORDER BY reviewed_at DESC
+        LIMIT 10
+       )
+       ORDER BY sort_order ASC, COALESCE(requested_at, reviewed_at) DESC`
     );
     const pendingByAgent: Record<string, any[]> = {};
     for (const r of pendingRes.rows) {
@@ -436,7 +462,9 @@ export async function getMasterLedger(_req: AuthenticatedRequest, res: Response)
         request_id: r.request_id,
         requested_amount: parseFloat(r.requested_amount),
         payment_reference: r.payment_reference,
+        request_status: r.request_status,
         requested_at: r.requested_at,
+        reviewed_at: r.reviewed_at,
       });
     }
 
