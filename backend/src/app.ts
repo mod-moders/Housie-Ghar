@@ -63,7 +63,7 @@ app.use(cookieParser());
 // 3. Global Rate Limiter
 const globalLimiter = rateLimit({
   windowMs: CONSTANTS.RATE_LIMIT_WINDOW_MS,
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: env.RATE_LIMIT_GLOBAL_MAX, // Limit each IP per windowMs
   message: { message: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

@@ -102,4 +102,5 @@ export const env = {
   MAX_LOCK_ATTEMPTS_PER_MINUTE: parseInt(optionalEnv('MAX_LOCK_ATTEMPTS_PER_MINUTE', '5'), 10),
   SPAM_FLAG_THRESHOLD: parseInt(optionalEnv('SPAM_FLAG_THRESHOLD', '3'), 10),
   LOW_BALANCE_THRESHOLD: parseInt(optionalEnv('LOW_BALANCE_THRESHOLD', '500'), 10),
+  RATE_LIMIT_GLOBAL_MAX: parseInt(optionalEnv('RATE_LIMIT_GLOBAL_MAX', '1200'), 10),
 };
