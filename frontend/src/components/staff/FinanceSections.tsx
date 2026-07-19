@@ -77,8 +77,8 @@ interface PrizeClaimItem {
 }
 
 export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
-  const showRequestsTab = me.role_name === "Financial Admin" || me.role_name === "Superadmin";
-  const [activeTab, setActiveTab] = useState<"analysis" | "ledgers" | "requests" | "claims">("claims");
+  const showRequestsTab = me.role_name === "Financial Admin";
+  const [activeTab, setActiveTab] = useState<"analysis" | "ledgers" | "requests" | "claims">("analysis");
 
   useEffect(() => {
     if (!showRequestsTab && (activeTab === "requests" || activeTab === "claims")) {
