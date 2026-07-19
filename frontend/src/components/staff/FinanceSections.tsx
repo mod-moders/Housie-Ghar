@@ -60,16 +60,28 @@ interface FinanceInsights {
   retention: RetentionData;
 }
 
+interface PrizeClaimItem {
+  game_id: string;
+  prize_id: number;
+  game_title: string;
+  game_date: string;
+  pattern_name: string;
+  amount: number;
+  winner_housie_name: string;
+  winner_ticket_number: number | null;
+  player_claimed_at: string;
+  disbursed: boolean;
+  disbursed_at?: string;
+  bookie_name: string;
+  bookie_phone: string;
+}
+
 export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
-  const showRequestsTab = me.role_name === "Financial Admin";
-  const [activeTab, setActiveTab] = useState<"requests" | "ledgers" | "analysis">("analysis");
+  const showRequestsTab = me.role_name === "Financial Admin" || me.role_name === "Superadmin";
+  const [activeTab, setActiveTab] = useState<"analysis" | "ledgers" | "requests" | "claims">("claims");
 
   useEffect(() => {
-    if (!showRequestsTab && activeTab === "requests") {
-      // Guard: correct an out-of-range tab when a non-CFO admin loses access to
-      // "requests". showRequestsTab is derived from a stable prop, so this fires
-      // at most once — not a render loop.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!showRequestsTab && (activeTab === "requests" || activeTab === "claims")) {
       setActiveTab("analysis");
     }
   }, [showRequestsTab, activeTab]);
@@ -78,6 +90,12 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   const [selId, setSelId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prize claims states
+  const [prizeClaims, setPrizeClaims] = useState<PrizeClaimItem[]>([]);
+  const [selClaimKey, setSelClaimKey] = useState<string | null>(null);
+  const [disbursingId, setDisbursingId] = useState<number | null>(null);
+  const [disburseError, setDisburseError] = useState<string | null>(null);
 
   // Analysis & Overview states
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
@@ -89,9 +107,20 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
     apiFetch<LedgerAgent[]>("/api/wallet/master-ledger").then(setAgents).catch(() => {});
   }, []);
 
+  const loadPrizeClaims = useCallback(() => {
+    apiFetch<PrizeClaimItem[]>("/api/games/prize-claims")
+      .then((res) => {
+        if (Array.isArray(res)) {
+          setPrizeClaims(res);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadPrizeClaims();
+  }, [load, loadPrizeClaims]);
 
   // Load financial analysis & overview stats when tab is switched or via socket
   const loadStats = useCallback(() => {
@@ -124,6 +153,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
       event === "ticket_status_change" || 
       event === "game_list_update" || 
       event === "topup_request_received" || 
+      event === "prize_claim_received" ||
       event === "wallet_credited" || 
       event === "wallet_debited" ||
       event === "ledger_update" ||
@@ -131,8 +161,33 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
     ) {
       load();
       loadStats();
+      loadPrizeClaims();
     }
   });
+
+  const activeClaim = useMemo(
+    () => prizeClaims.find((c) => `${c.game_id}-${c.prize_id}` === selClaimKey) ?? prizeClaims[0],
+    [prizeClaims, selClaimKey]
+  );
+
+  const handleDisbursePrize = async (gameId: string, prizeId: number) => {
+    if (disbursingId !== null) return;
+    setDisbursingId(prizeId);
+    setDisburseError(null);
+    try {
+      await apiFetch(`/api/games/${gameId}/prizes/${prizeId}/disburse`, {
+        method: "POST",
+      });
+      loadPrizeClaims();
+      loadStats();
+      setSelClaimKey(null);
+      onResolved?.();
+    } catch (e) {
+      setDisburseError(e instanceof Error ? e.message : "Disbursement failed");
+    } finally {
+      setDisbursingId(null);
+    }
+  };
 
   const queue: QueueItem[] = useMemo(
     () =>
@@ -169,6 +224,43 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
     <div className="hg-sec" style={{ gap: "20px" }}>
       {/* Merged Section Tab Header */}
       <div style={{ display: "flex", gap: "6px", background: "var(--surface-2)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border)", width: "fit-content", marginBottom: "4px", flexShrink: 0 }}>
+        {showRequestsTab && (
+          <button
+            onClick={() => setActiveTab("claims")}
+            style={{
+              background: activeTab === "claims" ? "var(--surface)" : "none",
+              color: activeTab === "claims" ? "var(--accent)" : "var(--text-dim)",
+              border: "none",
+              outline: "none",
+              boxShadow: "none",
+              borderRadius: "6px",
+              padding: "6px 16px",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              margin: 0,
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            🏆 Prize Claim Requests
+            {prizeClaims.length > 0 && (
+              <span style={{
+                background: "var(--accent)",
+                color: "#000",
+                fontSize: "10px",
+                fontWeight: 800,
+                padding: "2px 6px",
+                borderRadius: "10px"
+              }}>
+                {prizeClaims.length}
+              </span>
+            )}
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("analysis")}
           style={{
@@ -228,12 +320,154 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               whiteSpace: "nowrap"
             }}
           >
-            Pending Requests ({queue.length})
+            Recharge Requests ({queue.length})
           </button>
         )}
       </div>
 
-      {activeTab === "requests" ? (
+      {activeTab === "claims" ? (
+        <div className="hg-split" style={{ height: "calc(100% - 60px)" }}>
+          {/* Left List: Pending Claims */}
+          <div className="hg-split-l" style={{ width: "360px" }}>
+            <div className="hg-split-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Prize Claim Requests</span>
+              <span className="hg-q-count" style={{ background: prizeClaims.length > 0 ? "var(--accent)" : undefined, color: prizeClaims.length > 0 ? "#000" : undefined }}>
+                {prizeClaims.length}
+              </span>
+            </div>
+            {prizeClaims.length === 0 && (
+              <EmptyHint icon="trophy" title="No Pending Claim Requests" sub="Player prize claims will appear here instantly when submitted." />
+            )}
+            {prizeClaims.map((c) => {
+              const key = `${c.game_id}-${c.prize_id}`;
+              const isActive = (activeClaim?.prize_id === c.prize_id && activeClaim?.game_id === c.game_id);
+              return (
+                <button
+                  key={key}
+                  className={`hg-q-card${isActive ? " is-active" : ""}`}
+                  onClick={() => setSelClaimKey(key)}
+                  style={{ textAlign: "left" }}
+                >
+                  <div className="hg-q-top">
+                    <b>{c.winner_housie_name}</b>
+                    <span className="hg-q-amt" style={{ color: "var(--accent)" }}>{money(c.amount)}</span>
+                  </div>
+                  <div className="hg-q-meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                    <span>{c.pattern_name} {c.winner_ticket_number ? `(Tk #${c.winner_ticket_number})` : ""}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
+                      {c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "2px" }}>
+                    {c.game_title}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Panel: Claim Details & Disbursement */}
+          <div className="hg-split-r" style={{ flex: 1 }}>
+            {activeClaim ? (
+              <>
+                <div className="hg-detail-head" style={{ alignItems: "center" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontWeight: 800, fontSize: "18px" }}>
+                    🏆
+                  </div>
+                  <div>
+                    <b style={{ fontSize: "18px", color: "var(--text)" }}>{activeClaim.winner_housie_name}</b>
+                    <span style={{ display: "block", color: "var(--text-dim)", fontSize: "12px", marginTop: "2px" }}>
+                      Won {activeClaim.pattern_name} in "{activeClaim.game_title}"
+                    </span>
+                  </div>
+                </div>
+
+                <div className="hg-detail-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "14px", margin: "20px 0" }}>
+                  <div style={{ background: "var(--surface-2)", padding: "12px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Prize Reward Amount</span>
+                    <b style={{ display: "block", fontSize: "22px", color: "var(--accent)", marginTop: "2px" }}>{money(activeClaim.amount)}</b>
+                  </div>
+                  <div style={{ background: "var(--surface-2)", padding: "12px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Winning Pattern</span>
+                    <b style={{ display: "block", fontSize: "16px", color: "var(--text)", marginTop: "4px" }}>{activeClaim.pattern_name}</b>
+                  </div>
+                  <div style={{ background: "var(--surface-2)", padding: "12px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Winning Ticket</span>
+                    <b style={{ display: "block", fontSize: "15px", color: "var(--text)", marginTop: "4px" }}>
+                      {activeClaim.winner_ticket_number ? `Ticket #${activeClaim.winner_ticket_number}` : "Verified Win"}
+                    </b>
+                  </div>
+                  <div style={{ background: "var(--surface-2)", padding: "12px 16px", borderRadius: "10px", border: "1px solid var(--border-light)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Sold By Agent / Bookie</span>
+                    <b style={{ display: "block", fontSize: "15px", color: "var(--cyan)", marginTop: "4px" }}>
+                      {activeClaim.bookie_name} {activeClaim.bookie_phone ? `(${activeClaim.bookie_phone})` : ""}
+                    </b>
+                  </div>
+                  <div style={{ background: "var(--surface-2)", padding: "12px 16px", borderRadius: "10px", border: "1px solid var(--border-light)", gridColumn: "span 2" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase" }}>Claimed At</span>
+                    <b style={{ display: "block", fontSize: "14px", color: "var(--text)", marginTop: "2px" }}>
+                      {new Date(activeClaim.player_claimed_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </b>
+                  </div>
+                </div>
+
+                <div className="hg-detail-note" style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px" }}>
+                  💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the payout money, then click <b>Disburse Prize Payout</b> below to mark it completed.
+                </div>
+
+                {disburseError && <p className="hg-sec-err">{disburseError}</p>}
+
+                <div className="hg-detail-actions" style={{ marginTop: "20px", display: "flex", gap: "12px" }}>
+                  <button
+                    className="hg-fin-approve"
+                    disabled={disbursingId === activeClaim.prize_id}
+                    onClick={() => handleDisbursePrize(activeClaim.game_id, activeClaim.prize_id)}
+                    style={{
+                      flex: 1,
+                      padding: "14px 20px",
+                      background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                      color: "#000",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontSize: "15px",
+                      fontWeight: 800,
+                      cursor: disbursingId === activeClaim.prize_id ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <Icon name="check" size={18} strokeWidth={2.6} />
+                    {disbursingId === activeClaim.prize_id ? "Processing Disbursement..." : `Disburse Prize Payout ${money(activeClaim.amount)}`}
+                  </button>
+
+                  {activeClaim.bookie_phone && (
+                    <a
+                      href={`https://wa.me/${activeClaim.bookie_phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: "14px 20px",
+                        background: "#25D366",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        textDecoration: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}
+                    >
+                      <Icon name="phone" size={16} /> WhatsApp Agent
+                    </a>
+                  )}
+                </div>
+              </>
+            ) : (
+              <EmptyHint icon="trophy" title="Select a claim request" sub="Pick a pending prize claim from the left list to view winner details and disburse payout." />
+            )}
+          </div>
+        </div>
+      ) : activeTab === "requests" ? (
         <div className="hg-split" style={{ height: "calc(100% - 60px)" }}>
           <div className="hg-split-l">
             <div className="hg-split-head">Pending requests <span className="hg-q-count">{queue.length}</span></div>

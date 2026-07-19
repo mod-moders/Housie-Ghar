@@ -157,12 +157,14 @@ async function getFinancialOfficerWhatsApp(): Promise<string | null> {
       }
     }
 
-    // Fallback: Fetch from active Financial Admin user
+    // Fallback: Fetch from active Financial Admin or Superadmin user
     const userResult = await pool.query(
       `SELECT u.phone 
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
-       WHERE r.role_name = 'Financial Admin' AND u.phone IS NOT NULL AND u.phone != ''
+       WHERE (r.role_name = 'Financial Admin' OR r.role_name = 'Superadmin') 
+         AND u.phone IS NOT NULL AND u.phone != '' AND u.phone NOT LIKE '%X%' AND u.phone NOT LIKE '%x%'
+       ORDER BY CASE WHEN r.role_name = 'Financial Admin' THEN 1 ELSE 2 END
        LIMIT 1`
     );
     if (userResult.rows.length > 0 && userResult.rows[0].phone) {
