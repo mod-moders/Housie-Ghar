@@ -532,7 +532,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                 {queue.length}
               </span>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "4px" }}>
               {queue.length === 0 && <EmptyHint icon="check" title="Queue clear" sub="No pending or past recharge requests." />}
               {queue.map((r) => {
                 const isPending = (r.request_status || "Pending") === "Pending";
@@ -545,34 +545,36 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                     onClick={() => setSelId(r.request_id)}
                     style={{
                       width: "100%",
-                      padding: "12px 14px",
+                      padding: "14px 16px",
                       background: isActive ? "var(--surface-2)" : "transparent",
                       border: isActive ? "1.5px solid var(--cyan)" : "1px solid var(--border-light)",
-                      borderRadius: "10px",
+                      borderRadius: "12px",
                       textAlign: "left",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
-                      opacity: isPending ? 1 : 0.85
+                      opacity: isPending ? 1 : 0.85,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px"
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>{r.agent.full_name}</b>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ color: isApproved ? "#22c55e" : isRejected ? "#ef4444" : "var(--cyan)", fontWeight: 800, fontSize: "14px" }}>{money(r.requested_amount)}</span>
-                        <span style={{
-                          background: isPending ? "rgba(234, 179, 8, 0.15)" : isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                          color: isPending ? "#eab308" : isApproved ? "#22c55e" : "#ef4444",
-                          fontSize: "10px",
-                          fontWeight: 800,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          textTransform: "uppercase"
-                        }}>
-                          {r.request_status || "Pending"}
-                        </span>
-                      </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                      <b style={{ color: "var(--text)", fontSize: "14.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}>{r.agent.full_name}</b>
+                      <span style={{
+                        background: isPending ? "rgba(234, 179, 8, 0.15)" : isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                        color: isPending ? "#eab308" : isApproved ? "#22c55e" : "#ef4444",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        textTransform: "uppercase",
+                        flexShrink: 0
+                      }}>
+                        {r.request_status || "Pending"}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)" }}>
+                    <b style={{ color: isApproved ? "#22c55e" : isRejected ? "#ef4444" : "var(--cyan)", fontWeight: 800, fontSize: "20px" }}>{money(r.requested_amount)}</b>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)", paddingTop: "8px", borderTop: "1px solid var(--border-light)" }}>
                       <span>Ref: {r.payment_reference}</span>
                       <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
                         {new Date(r.requested_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
@@ -660,7 +662,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               </span>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "4px" }}>
               {prizeClaims.length === 0 && (
                 <EmptyHint icon="trophy" title="No Pending Claim Requests" sub="Player prize claims will appear here instantly when submitted." />
               )}
@@ -674,42 +676,46 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                     onClick={() => setSelClaimKey(key)}
                     style={{
                       width: "100%",
-                      padding: "12px 14px",
+                      padding: "14px 16px",
                       background: isActive ? "var(--surface-2)" : "transparent",
                       border: isActive ? "1.5px solid var(--accent)" : "1px solid var(--border-light)",
-                      borderRadius: "10px",
+                      borderRadius: "12px",
                       textAlign: "left",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                       boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none",
-                      opacity: isDisbursed ? 0.85 : 1
+                      opacity: isDisbursed ? 0.85 : 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px"
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>{c.winner_housie_name}</b>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ color: isDisbursed ? "#22c55e" : "var(--accent)", fontWeight: 800, fontSize: "14px" }}>{money(c.amount)}</span>
-                        <span style={{
-                          background: isDisbursed ? "rgba(34, 197, 94, 0.15)" : "rgba(234, 179, 8, 0.15)",
-                          color: isDisbursed ? "#22c55e" : "#eab308",
-                          fontSize: "10px",
-                          fontWeight: 800,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          textTransform: "uppercase"
-                        }}>
-                          {isDisbursed ? "DISBURSED" : "PENDING"}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-dim)" }}>
-                      <span>{c.pattern_name} {c.winner_ticket_number ? `(Tk #${c.winner_ticket_number})` : ""}</span>
-                      <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
-                        {c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                      <b style={{ color: "var(--text)", fontSize: "14.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}>{c.winner_housie_name}</b>
+                      <span style={{
+                        background: isDisbursed ? "rgba(34, 197, 94, 0.15)" : "rgba(234, 179, 8, 0.15)",
+                        color: isDisbursed ? "#22c55e" : "#eab308",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        textTransform: "uppercase",
+                        flexShrink: 0
+                      }}>
+                        {isDisbursed ? "DISBURSED" : "PENDING"}
                       </span>
                     </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-mute)", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {c.game_title}
+                    <b style={{ color: isDisbursed ? "#22c55e" : "var(--accent)", fontWeight: 800, fontSize: "20px" }}>{money(c.amount)}</b>
+                    <div style={{ fontSize: "12px", color: "var(--text-dim)", paddingTop: "8px", borderTop: "1px solid var(--border-light)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>{c.pattern_name} {c.winner_ticket_number ? `(Tk #${c.winner_ticket_number})` : ""}</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
+                          {c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--text-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.game_title}
+                      </div>
                     </div>
                   </button>
                 );
