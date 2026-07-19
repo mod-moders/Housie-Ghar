@@ -15,6 +15,7 @@ import {
   getGameSalesDetails,
   sendEmojiReaction,
   claimPrize,
+  claimAllPrizes,
   disbursePrize,
   getPrizeClaims,
   getPrizeClaimsDashboard,
@@ -78,6 +79,7 @@ router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Fina
 router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), getGameSalesDetails);
 
 // Prize claim specific parameterized endpoints
+router.post('/:game_id/claim-all', claimAllPrizes);
 router.post('/:game_id/prizes/:prize_id/claim', claimPrize);
 router.post('/:game_id/prizes/:prize_id/disburse', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disbursePrize);
 

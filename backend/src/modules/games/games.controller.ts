@@ -1225,6 +1225,136 @@ Here is my UPI ID/QR Code for disbursement:`;
 }
 
 /**
+ * Claim ALL prizes won by the player for a game at once
+ */
+export async function claimAllPrizes(req: Request, res: Response): Promise<void> {
+  const { game_id } = req.params;
+
+  let playerToken = null;
+  if (req.headers['authorization']) {
+    const authHeader = req.headers['authorization'] as string;
+    if (authHeader.startsWith('Bearer ')) {
+      playerToken = authHeader.substring(7);
+    }
+  }
+  if (!playerToken) {
+    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
+  }
+
+  if (!playerToken) {
+    res.status(401).json({ message: 'Player authentication required' });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+    const playerHousieName = decoded.housieName;
+
+    if (!playerHousieName) {
+      res.status(401).json({ message: 'Invalid player token' });
+      return;
+    }
+
+    const gameRes = await pool.query(
+      `SELECT game_status, title, scheduled_at FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+
+    if (gameRes.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+
+    const game = gameRes.rows[0];
+
+    // Fetch all claimed prizes for this game where the player is a winner and player_claimed is FALSE
+    const prizesRes = await pool.query(
+      `SELECT p.prize_id, p.pattern_name, p.claimed, p.winner_housie_name, p.amount_per_winner, p.prize_amount, p.split_count,
+              p.winner_ticket_id, t.ticket_number AS winner_ticket_number
+       FROM Prize_Pool p
+       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+       WHERE p.game_id = $1 AND p.claimed = TRUE AND p.player_claimed = FALSE`,
+      [game_id]
+    );
+
+    const myWonPrizes = prizesRes.rows.filter(p => {
+      if (!p.winner_housie_name) return false;
+      const lowerWinner = p.winner_housie_name.toLowerCase();
+      const lowerPlayer = playerHousieName.toLowerCase();
+      return lowerWinner === lowerPlayer || lowerWinner.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes(lowerPlayer);
+    });
+
+    if (myWonPrizes.length === 0) {
+      res.status(400).json({ message: 'No unclaimed prizes found for you in this game' });
+      return;
+    }
+
+    const prizeIds = myWonPrizes.map(p => p.prize_id);
+
+    // Update all to player_claimed = true
+    await pool.query(
+      `UPDATE Prize_Pool
+       SET player_claimed = TRUE, player_claimed_at = NOW()
+       WHERE prize_id = ANY($1::integer[])`,
+      [prizeIds]
+    );
+
+    // Notify financial admins via sockets
+    for (const p of myWonPrizes) {
+      io.emit('prize_claim_received', { game_id, prize_id: p.prize_id, player_housie_name: playerHousieName });
+    }
+    io.emit('ticket_status_change');
+
+    const foWhatsApp = await getFinancialOfficerWhatsApp();
+
+    const totalAmount = myWonPrizes.reduce((sum, p) => sum + parseFloat(p.amount_per_winner ?? p.prize_amount), 0);
+
+    const gameDateFormatted = game.scheduled_at
+      ? new Date(game.scheduled_at).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : '';
+
+    const prizeLines = myWonPrizes.map((p, idx) => {
+      const amt = parseFloat(p.amount_per_winner ?? p.prize_amount);
+      const tk = p.winner_ticket_number ? ` (Tk #${p.winner_ticket_number})` : '';
+      return `${idx + 1}. *${p.pattern_name}* — ₹${amt.toFixed(2)}${tk}`;
+    }).join('\n');
+
+    const whatsappMessage = `Hi, I am *${playerHousieName}* and I am claiming my prize rewards on Housie Ghar!
+
+*Consolidated Claim Details:*
+- *Game:* ${game.title || 'Housie Ghar Game'} (${gameDateFormatted})
+- *Prizes Won (${myWonPrizes.length}):*
+${prizeLines}
+
+- *Total Prize Claim:* ₹${totalAmount.toFixed(2)}
+
+Here is my UPI ID / QR Code for disbursement:`;
+
+    const whatsappUrl = foWhatsApp 
+      ? `https://wa.me/${foWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
+      : null;
+
+    res.json({
+      message: 'All prizes claimed successfully',
+      claimed_count: myWonPrizes.length,
+      total_amount: totalAmount,
+      whatsapp_url: whatsappUrl,
+      whatsapp_message: whatsappMessage,
+    });
+  } catch (error) {
+    console.error('Error claiming all prizes:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
  * Get all pending prize claims for Financial Admin dashboard
  */
 export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): Promise<void> {

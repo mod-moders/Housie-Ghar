@@ -1,7 +1,7 @@
 "use client";
 /** Live Execution Board Content component — no direct Promise unwrapping of Next.js routing params. */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
@@ -385,8 +385,17 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
       setReactions((r) => [...r, next]);
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
+    } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
+      const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
+      useGameStore.getState().setStatus(nextStatus);
+      setShowWinnersOverlay(true);
+      apiFetch<{ prizes: Prize[] }>(`/api/games/${game_id}/prizes`)
+        .then((res) => {
+          if (res.prizes) setPrizes(res.prizes);
+        })
+        .catch(() => {});
     }
-  }, [revealDraw, playCelebration, introPlayingRef, delay, muted]);
+  }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id]);
 
   useSSE(game_id, onEvent);
 
@@ -413,20 +422,48 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
-  const claimPrize = async (prizeId: number) => {
-    setClaimingPrize(String(prizeId));
+  const [claimingAll, setClaimingAll] = useState(false);
+
+  const myUnclaimedPrizes = useMemo(() => {
+    if (isStaff || !displayName) return [];
+    const lowerPlayer = displayName.toLowerCase();
+    return prizes.filter((p) => {
+      if (!p.claimed || p.player_claimed) return false;
+      if (!p.winner_housie_name) return false;
+      const lowerWinner = p.winner_housie_name.toLowerCase();
+      return (
+        lowerWinner === lowerPlayer ||
+        lowerWinner
+          .split(/[,&()]/)
+          .map((s) => s.trim().toLowerCase())
+          .includes(lowerPlayer)
+      );
+    });
+  }, [prizes, displayName, isStaff]);
+
+  const myUnclaimedTotalAmount = useMemo(() => {
+    return myUnclaimedPrizes.reduce(
+      (sum, p) => sum + parseFloat(String(p.amount_per_winner ?? p.prize_amount ?? 0)),
+      0
+    );
+  }, [myUnclaimedPrizes]);
+
+  const handleClaimAllMyPrizes = async () => {
+    if (myUnclaimedPrizes.length === 0) return;
+    setClaimingAll(true);
     try {
-      const response = await apiFetch<{ whatsapp_url?: string }>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
-        method: "POST",
-      });
+      const response = await apiFetch<{ whatsapp_url?: string }>(
+        `/api/games/${game_id}/claim-all`,
+        { method: "POST" }
+      );
       loadGameData();
       if (response.whatsapp_url) {
-        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+        window.open(response.whatsapp_url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to initiate claim");
+      alert(err instanceof Error ? err.message : "Failed to claim prizes");
     } finally {
-      setClaimingPrize(null);
+      setClaimingAll(false);
     }
   };
 
@@ -577,13 +614,40 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
             <div className="hg-live-right">
               <div className="hg-prizeboard">
                 <h2 className="hg-section-title">Prizes</h2>
+
+                {myUnclaimedPrizes.length > 0 && (
+                  <button
+                    onClick={handleClaimAllMyPrizes}
+                    disabled={claimingAll}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      marginBottom: "14px",
+                      background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                      color: "#000",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      cursor: claimingAll ? "not-allowed" : "pointer",
+                      boxShadow: "0 4px 15px var(--accent-soft)",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px"
+                    }}
+                  >
+                    <Icon name="trophy" size={16} />
+                    {claimingAll ? "Claiming All Prizes..." : `Claim All My Prizes (${money(myUnclaimedTotalAmount)})`}
+                  </button>
+                )}
+
                 <div className="hg-prizeboard-grid">
                   {prizes.map((p) => {
                     const isWinner = p.winner_housie_name === displayName || 
                       (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
                     const isClaimed = p.player_claimed;
-                    const isDrawFinished = gameStatus === "Completed" || gameStatus === "Draw_Ended";
-                    const showClaimBtn = !isStaff && isDrawFinished && isWinner && !isClaimed;
                     return (
                       <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${isWinner && isClaimed ? " player-claimed" : ""}`}>
                         <div className="hg-prize-l">
@@ -603,27 +667,6 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                               }}>
                                 {p.disbursed ? 'Disbursed' : 'Claimed'}
                               </span>
-                            )}
-                            {showClaimBtn && (
-                              <button
-                                className="hg-claim-btn"
-                                onClick={() => claimPrize(p.prize_id)}
-                                disabled={claimingPrize === String(p.prize_id)}
-                                style={{
-                                  background: 'var(--accent)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '4px 10px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
-                                  opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
-                                  transition: 'opacity 0.2s',
-                                }}
-                              >
-                                {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
-                              </button>
                             )}
                           </div>
                         </div>
@@ -776,86 +819,70 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
           )}
 
           {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && showWinnersOverlay && (
-            <div className="hg-game-over-overlay" style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.5s ease" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-                <Confetti recycle={gameStatus === "Draw_Ended"} numberOfPieces={600} gravity={0.08} />
+            <div className="hg-game-over-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", animation: "fadeIn 0.4s ease" }}>
+              <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                <Confetti recycle={gameStatus === "Draw_Ended"} numberOfPieces={500} gravity={0.08} />
               </div>
-              <div className="hg-card" style={{ padding: 40, width: "90%", maxWidth: 600, textAlign: "center", background: "var(--surface)", border: "2px solid var(--accent)", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
-                <h1 style={{ color: "var(--accent)", fontSize: "2.5rem", marginBottom: 8 }}>
-                  {gameStatus === "Completed" ? "Game Completed!" : "Draw Concluded!"}
-                </h1>
-                <p style={{ color: "var(--text-dim)", marginBottom: 32 }}>
-                  {gameStatus === "Completed" 
-                    ? "All prizes have been claimed and disbursed. Thank you for playing Housie Ghar." 
-                    : "The draw has concluded. Winners can claim their prize rewards directly below."}
-                </p>
+              <div className="hg-card" style={{ position: "relative", zIndex: 2, padding: 0, width: "100%", maxWidth: 540, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--surface)", border: "2px solid var(--accent)", borderRadius: 16, boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 30px var(--accent-soft)", overflow: "hidden" }}>
+                {/* Header */}
+                <div style={{ padding: "24px 24px 16px", textAlign: "center", borderBottom: "1px solid var(--border-light)" }}>
+                  <h2 style={{ color: "var(--accent)", fontSize: "1.8rem", fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+                    {gameStatus === "Completed" ? "🎉 Game Completed!" : "🏆 Draw Concluded!"}
+                  </h2>
+                  <p style={{ color: "var(--text-dim)", fontSize: "13px", margin: "6px 0 0 0" }}>
+                    {gameStatus === "Completed" 
+                      ? "All prizes have been claimed and disbursed." 
+                      : "The draw has concluded. See all game winners below."}
+                  </p>
+                </div>
                 
-                <h3 style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12, marginBottom: 16, textAlign: "left" }}>Final Winners List</h3>
-                <div style={{ maxHeight: "40vh", overflowY: "auto", textAlign: "left" }}>
+                {/* Winner List Body */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Final Winners List</h4>
+                    <span style={{ fontSize: "12px", color: "var(--accent)", fontWeight: 600 }}>
+                      {prizes.filter(p => p.claimed).length} / {prizes.length} Won
+                    </span>
+                  </div>
                   {prizes.filter(p => p.claimed).map((p) => {
                     const isWinner = p.winner_housie_name === displayName || 
-                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
+                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes((displayName || "").toLowerCase()));
                     const isClaimed = p.player_claimed;
-                    const showRowClaimBtn = !isStaff && gameStatus === "Draw_Ended" && isWinner && !isClaimed;
                     return (
-                      <div key={p.prize_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div key={p.prize_id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div style={{ fontWeight: "bold", fontSize: 16 }}>{p.pattern_name}</div>
-                          <div style={{ color: "var(--accent)", fontSize: 14, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{p.pattern_name}</div>
+                          <div style={{ color: "var(--accent)", fontSize: 13, display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{p.winner_housie_name}</span>
                             {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
-                              <span style={{ color: 'var(--text-mute)', fontSize: '12px' }}>
+                              <span style={{ color: 'var(--text-mute)', fontSize: '11px' }}>
                                 (Tk #{p.winner_ticket_number})
                               </span>
                             )}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontWeight: 600 }}>{money(p.amount_per_winner ?? p.prize_amount)}</span>
-                          
-                          {showRowClaimBtn && (
-                            <button
-                              onClick={() => claimPrize(p.prize_id)}
-                              disabled={claimingPrize === String(p.prize_id)}
-                              style={{
-                                background: 'var(--accent)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
-                                opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
-                                transition: 'opacity 0.2s',
-                              }}
-                            >
-                              {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
-                            </button>
-                          )}
-
-                          {isClaimed && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                          {isClaimed ? (
                             <span style={{
                               background: p.disbursed ? 'var(--success)' : '#d97706',
                               color: '#fff',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              padding: '4px 8px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
                               borderRadius: '4px',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
                             }}>
                               {p.disbursed ? 'Disbursed' : 'Claimed'}
                             </span>
-                          )}
-
-                          {!isClaimed && !showRowClaimBtn && (
+                          ) : (
                             <span style={{
                               background: 'rgba(255,255,255,0.05)',
                               color: 'var(--text-dim)',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              padding: '4px 8px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              padding: '2px 6px',
                               borderRadius: '4px',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -868,24 +895,68 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                     );
                   })}
                 </div>
-                
-                <div style={{ display: 'flex', gap: '12px', marginTop: 32 }}>
-                  <button 
-                    onClick={() => setShowWinnersOverlay(false)} 
-                    style={{ flex: 1, padding: "12px 24px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", transition: "opacity 0.2s" }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-                  >
-                    Close Winners List
-                  </button>
-                  <button 
-                    onClick={() => router.push("/")} 
-                    style={{ flex: 1, padding: "12px 24px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", transition: "background 0.2s" }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
-                  >
-                    Return to Lobby
-                  </button>
+
+                {/* Footer Buttons */}
+                <div style={{ padding: "16px 24px 20px", borderTop: "1px solid var(--border-light)", background: "var(--surface-2)", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {myUnclaimedPrizes.length > 0 && (
+                    <button
+                      onClick={handleClaimAllMyPrizes}
+                      disabled={claimingAll}
+                      style={{
+                        width: "100%",
+                        padding: "14px",
+                        background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                        color: "#000",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "15px",
+                        fontWeight: 800,
+                        cursor: claimingAll ? "not-allowed" : "pointer",
+                        boxShadow: "0 4px 15px var(--accent-soft)",
+                        transition: "transform 0.2s, opacity 0.2s"
+                      }}
+                    >
+                      {claimingAll ? "Claiming All Prizes..." : `🏆 Claim All My Prizes (${money(myUnclaimedTotalAmount)})`}
+                    </button>
+                  )}
+
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    <button 
+                      onClick={() => setShowWinnersOverlay(false)} 
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        background: "var(--surface)",
+                        color: "var(--text)",
+                        border: "1.5px solid var(--border-2)",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      Close Winners List
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowWinnersOverlay(false);
+                        if (onBack) onBack(); else router.push("/");
+                      }} 
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        background: "var(--accent)",
+                        color: "#000",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      Return to Lobby
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
