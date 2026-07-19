@@ -64,7 +64,6 @@ export function Logo({
           fontSize: size >= 32 ? "20px" : "16px",
           letterSpacing: "-0.02em",
           lineHeight: "1.1",
-          display: "inline-flex",
           alignItems: "center",
           gap: "5px"
         }}

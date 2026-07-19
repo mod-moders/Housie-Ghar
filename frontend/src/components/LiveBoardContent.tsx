@@ -16,7 +16,7 @@ import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
+import type { ClaimPrizeResponse, GameSummary, Prize, TicketDetail } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -124,9 +124,17 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const outroPlayedRef = useRef<boolean>(false);
   useEffect(() => {
     if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
-      setShowWinnersOverlay(true);
+      // Gate setShowWinnersOverlay(true) behind the same "already ran" ref as
+      // the outro audio, not just gameStatus. playOutro/playCelebration are
+      // recreated on every render (useGameAudio doesn't memoize them), so if
+      // this effect fires on every render while the deps array include them,
+      // and used to force the overlay open unconditionally each time — which
+      // silently re-opened it the instant the user clicked "Close Winners
+      // List" (setShowWinnersOverlay(false) triggers the very re-render that
+      // re-fires this effect). Only open it once, on the actual transition.
       if (!outroPlayedRef.current) {
         outroPlayedRef.current = true;
+        setShowWinnersOverlay(true);
         playOutro();
         playCelebration();
         const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
@@ -138,7 +146,8 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       setShowWinnersOverlay(false);
       outroPlayedRef.current = false;
     }
-  }, [gameStatus, playOutro, playCelebration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameStatus]);
 
   // Track winners for audio celebration
 
@@ -413,26 +422,65 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     }).catch((err) => console.error("Failed to send reaction:", err));
   };
 
-  const claimPrize = async (prizeId: number) => {
-    setClaimingPrize(String(prizeId));
-    try {
-      const response = await apiFetch<{ whatsapp_url?: string }>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
-        method: "POST",
-      });
-      loadGameData();
-      if (response.whatsapp_url) {
-        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+  const isMyPrize = (p: Prize) =>
+    p.winner_housie_name === displayName ||
+    (!!p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s) => s.trim()).includes(displayName));
+
+  // Prizes are only claimable once the draw has ended (enforced server-side
+  // too — see games.controller.ts claimPrize). One button claims every won
+  // prize for this player in one shot instead of a button beside each row.
+  const claimAllMyPrizes = async () => {
+    const unclaimed = prizes.filter((p) => p.claimed && isMyPrize(p) && !p.player_claimed);
+    if (unclaimed.length === 0) return;
+    setClaimingPrize("all");
+    const claimed: { pattern_name: string; amount: number; winner_ticket_number: number | null }[] = [];
+    let waNumber: string | null = null;
+    for (const p of unclaimed) {
+      try {
+        const response = await apiFetch<ClaimPrizeResponse>(`/api/games/${game_id}/prizes/${p.prize_id}/claim`, {
+          method: "POST",
+        });
+        claimed.push({
+          pattern_name: response.prize.pattern_name,
+          amount: response.prize.amount,
+          winner_ticket_number: response.prize.winner_ticket_number,
+        });
+        if (!waNumber && response.whatsapp_url) {
+          const match = response.whatsapp_url.match(/wa\.me\/(\d+)/);
+          if (match) waNumber = match[1];
+        }
+      } catch (err) {
+        console.error(`Failed to claim prize ${p.prize_id}:`, err);
       }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to initiate claim");
-    } finally {
-      setClaimingPrize(null);
     }
+    loadGameData();
+    if (claimed.length > 0 && waNumber) {
+      const total = claimed.reduce((sum, c) => sum + c.amount, 0);
+      const lines = claimed
+        .map((c) => `- *${c.pattern_name}*${c.winner_ticket_number ? ` (Ticket #${c.winner_ticket_number})` : ""}: ₹${c.amount.toFixed(2)}`)
+        .join("\n");
+      const message = `Hi, I am *${displayName}* and I am claiming my prizes on Housie Ghar!
+
+*Game:* ${game?.title ?? "Housie Ghar Game"}
+
+*Prizes Won:*
+${lines}
+
+*Total Amount:* ₹${total.toFixed(2)}
+
+Here is my UPI ID/QR Code for disbursement:`;
+      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    } else if (claimed.length === 0) {
+      alert("Failed to claim prizes. Please try again.");
+    }
+    setClaimingPrize(null);
   };
 
   const drawn = new Set(drawnNumbers);
   const count = drawnNumbers.length;
   const recent = drawnNumbers.slice(Math.max(0, count - 9)).reverse();
+  const isDrawFinished = gameStatus === "Completed" || gameStatus === "Draw_Ended";
+  const myUnclaimedPrizes = prizes.filter((p) => p.claimed && isMyPrize(p) && !p.player_claimed);
 
   return (
     <div className="hg-stage">
@@ -579,18 +627,15 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                 <h2 className="hg-section-title">Prizes</h2>
                 <div className="hg-prizeboard-grid">
                   {prizes.map((p) => {
-                    const isWinner = p.winner_housie_name === displayName || 
-                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
+                    const isWinner = isMyPrize(p);
                     const isClaimed = p.player_claimed;
-                    const isDrawFinished = gameStatus === "Completed" || gameStatus === "Draw_Ended";
-                    const showClaimBtn = !isStaff && isDrawFinished && isWinner && !isClaimed;
                     return (
                       <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${isWinner && isClaimed ? " player-claimed" : ""}`}>
                         <div className="hg-prize-l">
                           <span className="hg-prize-name">{p.pattern_name}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
                             <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
-                            {isClaimed && (
+                            {isClaimed ? (
                               <span className="hg-claimed-badge" style={{
                                 background: p.disbursed ? 'var(--success)' : '#d97706',
                                 color: '#fff',
@@ -603,27 +648,19 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                               }}>
                                 {p.disbursed ? 'Disbursed' : 'Claimed'}
                               </span>
-                            )}
-                            {showClaimBtn && (
-                              <button
-                                className="hg-claim-btn"
-                                onClick={() => claimPrize(p.prize_id)}
-                                disabled={claimingPrize === String(p.prize_id)}
-                                style={{
-                                  background: 'var(--accent)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '4px 10px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
-                                  opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
-                                  transition: 'opacity 0.2s',
-                                }}
-                              >
-                                {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
-                              </button>
+                            ) : (!isStaff && isWinner && p.claimed) && (
+                              <span style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                color: 'var(--text-dim)',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                {isDrawFinished ? 'Pending Claim' : 'Claim after game ends'}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -790,13 +827,36 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                     : "The draw has concluded. Winners can claim their prize rewards directly below."}
                 </p>
                 
+                {!isStaff && myUnclaimedPrizes.length > 0 && (
+                  <button
+                    onClick={claimAllMyPrizes}
+                    disabled={claimingPrize === "all"}
+                    style={{
+                      width: "100%",
+                      padding: "14px 20px",
+                      marginBottom: 20,
+                      background: "linear-gradient(135deg, var(--accent) 0%, #ff7043 100%)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      cursor: claimingPrize === "all" ? "not-allowed" : "pointer",
+                      opacity: claimingPrize === "all" ? 0.7 : 1,
+                      boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
+                      transition: "opacity 0.2s",
+                    }}
+                  >
+                    {claimingPrize === "all"
+                      ? "Claiming…"
+                      : `Claim ${myUnclaimedPrizes.length > 1 ? `All ${myUnclaimedPrizes.length} Prizes` : "My Prize"}`}
+                  </button>
+                )}
+
                 <h3 style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12, marginBottom: 16, textAlign: "left" }}>Final Winners List</h3>
                 <div style={{ maxHeight: "40vh", overflowY: "auto", textAlign: "left" }}>
                   {prizes.filter(p => p.claimed).map((p) => {
-                    const isWinner = p.winner_housie_name === displayName || 
-                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
                     const isClaimed = p.player_claimed;
-                    const showRowClaimBtn = !isStaff && gameStatus === "Draw_Ended" && isWinner && !isClaimed;
                     return (
                       <div key={p.prize_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
@@ -812,29 +872,8 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontWeight: 600 }}>{money(p.amount_per_winner ?? p.prize_amount)}</span>
-                          
-                          {showRowClaimBtn && (
-                            <button
-                              onClick={() => claimPrize(p.prize_id)}
-                              disabled={claimingPrize === String(p.prize_id)}
-                              style={{
-                                background: 'var(--accent)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: claimingPrize === String(p.prize_id) ? 'not-allowed' : 'pointer',
-                                opacity: claimingPrize === String(p.prize_id) ? 0.7 : 1,
-                                transition: 'opacity 0.2s',
-                              }}
-                            >
-                              {claimingPrize === String(p.prize_id) ? 'Claiming...' : 'Claim Prize'}
-                            </button>
-                          )}
 
-                          {isClaimed && (
+                          {isClaimed ? (
                             <span style={{
                               background: p.disbursed ? 'var(--success)' : '#d97706',
                               color: '#fff',
@@ -847,9 +886,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                             }}>
                               {p.disbursed ? 'Disbursed' : 'Claimed'}
                             </span>
-                          )}
-
-                          {!isClaimed && !showRowClaimBtn && (
+                          ) : (
                             <span style={{
                               background: 'rgba(255,255,255,0.05)',
                               color: 'var(--text-dim)',
@@ -868,7 +905,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                     );
                   })}
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '12px', marginTop: 32 }}>
                   <button 
                     onClick={() => setShowWinnersOverlay(false)} 

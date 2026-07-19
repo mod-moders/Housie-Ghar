@@ -1431,8 +1431,16 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-previews{padding:4px 16px 8px}
 .hg-previews-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .hg-clear{background:none;border:0;color:var(--text-dim);font-size:12px;cursor:pointer;text-decoration:underline}
-.hg-previews-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}
-.hg-preview-item{position:relative;flex-shrink:0}
+/* Was a horizontal flex row (overflow-x:auto) meant to let selected tickets be
+   swiped through side-by-side — but the ticket grid's min-content width (9
+   cols x >=30px cells) makes each card ~300px+, so 2+ selected tickets
+   overflowed a phone's width. The horizontal scroll never actually reached
+   the user: .hg-frame (the phone-frame ancestor) sets overflow-x:hidden, so
+   it silently clipped every ticket past the first instead of scrolling to
+   it. Stack them one after another instead — the >=900px override below
+   still tiles them in a 2-column grid on desktop. */
+.hg-previews-scroll{display:flex;flex-direction:column;gap:12px;padding-bottom:8px}
+.hg-preview-item{position:relative;width:100%}
 .hg-preview-x{position:absolute;top:-6px;right:-6px;z-index:2;width:22px;height:22px;border-radius:50%;
   border:1px solid var(--border);background:var(--elevate);color:var(--text);display:grid;place-items:center;cursor:pointer}
 

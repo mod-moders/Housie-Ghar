@@ -30,6 +30,22 @@ interface ActiveGame {
     prizeAmount: number;
     claimed: boolean;
   }>;
+  // Tickets that have already won any Full House tier (1st/2nd/3rd/generic).
+  // A ticket that completes all 15 numbers stays "isSubset(allNums, drawnSet)"
+  // for the rest of the game, so if 2+ Full House tiers are still unclaimed
+  // when it completes, it would otherwise match every one of them in the same
+  // tick and sweep 1st+2nd+3rd itself. Once a ticket lands here it's excluded
+  // from matching any further Full House tier — those must go to a different ticket.
+  fullHouseWinnerTicketIds: Set<number>;
+}
+
+function isFullHousePattern(patternName: PrizePattern): boolean {
+  return (
+    patternName === 'Full House' ||
+    patternName === '1st Full House' ||
+    patternName === '2nd Full House' ||
+    patternName === '3rd Full House'
+  );
 }
 
 const activeGames = new Map<string, ActiveGame>();
@@ -132,7 +148,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
 
   // 2. Fetch prizes
   const prizesRes = await pool.query(
-    `SELECT prize_id, pattern_name, prize_amount, claimed
+    `SELECT prize_id, pattern_name, prize_amount, claimed, winner_ticket_id
      FROM Prize_Pool
      WHERE game_id = $1`,
     [gameId]
@@ -143,6 +159,18 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     prizeAmount: parseFloat(row.prize_amount),
     claimed: row.claimed,
   }));
+
+  // Seed already-won Full House tickets so a resume after a process restart
+  // (game.game_status === 'Paused') still excludes them. Best-effort: split
+  // wins only persist the first winner's ticket_id (see checkWins), so a
+  // resumed game could in theory miss a split partner here — pre-existing
+  // limitation of winner_ticket_id, not something this fix introduces.
+  const fullHouseWinnerTicketIds = new Set<number>(
+    prizes
+      .filter((p) => p.claimed && isFullHousePattern(p.patternName))
+      .map((p) => prizesRes.rows.find((r) => r.prize_id === p.prizeId)?.winner_ticket_id)
+      .filter((id): id is number => id != null)
+  );
 
   // 3. Fetch sold tickets with their owner names
   const ticketsRes = await pool.query(
@@ -196,6 +224,7 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     timer: null,
     tickets,
     prizes,
+    fullHouseWinnerTicketIds,
   };
 
   activeGames.set(gameId, activeGame);
@@ -355,13 +384,12 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
         const row2 = getRowNumbers(t.gridData.row2).filter((n) => drawnSet.has(n));
         const row3 = getRowNumbers(t.gridData.row3).filter((n) => drawnSet.has(n));
         isWinner = row1.length >= 2 && row2.length >= 2 && row3.length >= 2;
-      } else if (
-        prize.patternName === 'Full House' ||
-        prize.patternName === '1st Full House' ||
-        prize.patternName === '2nd Full House' ||
-        prize.patternName === '3rd Full House'
-      ) {
-        isWinner = isSubset(allNums, drawnSet);
+      } else if (isFullHousePattern(prize.patternName)) {
+        // A ticket that already won a Full House tier stays fully-marked for
+        // the rest of the game, so without this check it would also win
+        // every other still-unclaimed Full House tier — 1st, 2nd and 3rd
+        // must go to different tickets.
+        isWinner = isSubset(allNums, drawnSet) && !game.fullHouseWinnerTicketIds.has(t.ticketId);
       }
 
       if (isWinner) {
@@ -434,6 +462,9 @@ async function checkWins(game: ActiveGame): Promise<Array<WinMatch & { amountPer
 
       if (committed) {
         prize.claimed = true;
+        if (isFullHousePattern(prize.patternName)) {
+          patternWinners.forEach((win) => game.fullHouseWinnerTicketIds.add(win.ticketId));
+        }
         patternWinners.forEach((win) => {
           const ticketNums = grouped.get(win.housieName) || [win.ticketNumber];
           const formattedName = ticketNums.length === 1 
