@@ -123,6 +123,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
   const wasLiveInSessionRef = useRef<boolean>(false);
   const outroPlayedRef = useRef<boolean>(false);
+  const userDismissedWinnersRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (gameStatus === "Live" || gameStatus === "Paused") {
@@ -132,7 +133,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
   useEffect(() => {
     if (gameStatus === "Completed" || gameStatus === "Draw_Ended") {
-      setShowWinnersOverlay(true);
+      if (!userDismissedWinnersRef.current) {
+        setShowWinnersOverlay(true);
+      }
       if (!outroPlayedRef.current) {
         outroPlayedRef.current = true;
         if (wasLiveInSessionRef.current) {
@@ -146,6 +149,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
       }
     } else {
       setShowWinnersOverlay(false);
+      userDismissedWinnersRef.current = false;
     }
   }, [gameStatus, playOutro, playCelebration, muted]);
 
@@ -256,7 +260,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
         const pool = g.prize_pool || [];
         setPrizes(pool);
         if (g.game_status === "Completed" || g.game_status === "Draw_Ended" || (pool.length > 0 && pool.every((p) => p.claimed))) {
-          setShowWinnersOverlay(true);
+          if (!userDismissedWinnersRef.current) {
+            setShowWinnersOverlay(true);
+          }
           if (g.game_status === "Completed" || g.game_status === "Draw_Ended") {
             useGameStore.getState().setStatus(g.game_status);
           } else {
@@ -274,10 +280,30 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
   // Automatically show Winners List modal as soon as all prizes in the list are won
   useEffect(() => {
-    if (prizes.length > 0 && prizes.every((p) => p.claimed)) {
+    if (prizes.length > 0 && prizes.every((p) => p.claimed) && !userDismissedWinnersRef.current) {
       setShowWinnersOverlay(true);
     }
   }, [prizes]);
+
+  const handleCloseWinnersOverlay = useCallback(() => {
+    userDismissedWinnersRef.current = true;
+    setShowWinnersOverlay(false);
+  }, []);
+
+  const handleReturnToLobby = useCallback(() => {
+    userDismissedWinnersRef.current = true;
+    setShowWinnersOverlay(false);
+    if (onBack) {
+      onBack();
+    } else {
+      router.push("/");
+    }
+  }, [onBack, router]);
+
+  const handleReopenWinnersOverlay = useCallback(() => {
+    userDismissedWinnersRef.current = false;
+    setShowWinnersOverlay(true);
+  }, []);
 
   const loadMyTickets = useCallback(() => {
     let alive = true;
@@ -393,7 +419,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
             ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
             : p
         );
-        if (next.length > 0 && next.every((p) => p.claimed)) {
+        if (next.length > 0 && next.every((p) => p.claimed) && !userDismissedWinnersRef.current) {
           setShowWinnersOverlay(true);
           useGameStore.getState().setStatus("Draw_Ended");
         }
@@ -418,7 +444,9 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
     } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
       const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
       useGameStore.getState().setStatus(nextStatus);
-      setShowWinnersOverlay(true);
+      if (!userDismissedWinnersRef.current) {
+        setShowWinnersOverlay(true);
+      }
       loadGameData();
     }
   }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id, loadGameData]);
@@ -543,7 +571,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                 </div>
                 {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && !showWinnersOverlay && (
                   <button
-                    onClick={() => setShowWinnersOverlay(true)}
+                    onClick={handleReopenWinnersOverlay}
                     style={{
                       marginTop: "12px",
                       width: "100%",
@@ -948,7 +976,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
 
                   <div style={{ display: "flex", gap: "12px" }}>
                     <button 
-                      onClick={() => setShowWinnersOverlay(false)} 
+                      onClick={handleCloseWinnersOverlay} 
                       style={{
                         flex: 1,
                         padding: "12px",
@@ -964,10 +992,7 @@ const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
                       Close Winners List
                     </button>
                     <button 
-                      onClick={() => {
-                        setShowWinnersOverlay(false);
-                        if (onBack) onBack(); else router.push("/");
-                      }} 
+                      onClick={handleReturnToLobby} 
                       style={{
                         flex: 1,
                         padding: "12px",
