@@ -318,7 +318,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
               gap: "6px"
             }}
           >
-            🏆 Claim Requests ({prizeClaims.length})
+            Claim Requests ({prizeClaims.length})
           </button>
         )}
       </div>
