@@ -8,18 +8,6 @@ import { Icon } from "@/components/Icon";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
 
-const AVATAR_PRESETS = [
-  { id: "crown", label: "Crown", icon: "👑" },
-  { id: "dice", label: "Dice", icon: "🎲" },
-  { id: "star", label: "Star", icon: "⭐" },
-  { id: "fire", label: "Fire", icon: "🔥" },
-  { id: "zap", label: "Spark", icon: "⚡" },
-  { id: "clover", label: "Lucky", icon: "🍀" },
-  { id: "diamond", label: "Diamond", icon: "💎" },
-  { id: "trophy", label: "Trophy", icon: "🏆" },
-  { id: "target", label: "Target", icon: "🎯" },
-];
-
 const inputStyle: React.CSSProperties = {
   padding: "10px 14px",
   borderRadius: 10,
@@ -49,7 +37,6 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [email, setEmail] = useState(me.email ?? "");
   const [nationality, setNationality] = useState(me.nationality ?? "");
   const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? "");
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -76,6 +63,22 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     email.trim() !== (me.email ?? "") ||
     nationality.trim() !== (me.nationality ?? "") ||
     avatarUrl.trim() !== (me.avatar_url ?? "");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image file size must be under 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setAvatarUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async () => {
     if (!fullName.trim() || !phone.trim()) {
@@ -160,11 +163,9 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
                   overflow: "hidden"
                 }}
               >
-                {avatarUrl && avatarUrl.startsWith("http") ? (
+                {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarUrl} alt={me.full_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : avatarUrl && !avatarUrl.startsWith("http") ? (
-                  <span style={{ fontSize: "28px" }}>{avatarUrl}</span>
                 ) : (
                   <Avatar src={roleAvatar(me)} name={me.full_name} style={{ width: "100%", height: "100%" }} />
                 )}
@@ -193,73 +194,55 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
             </div>
           </div>
 
-          <button
-            onClick={() => setShowAvatarPicker(!showAvatarPicker)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "10px",
-              border: "1px solid var(--border)",
-              background: "rgba(255,255,255,0.04)",
-              color: "var(--text)",
-              fontSize: "12px",
-              fontWeight: "600",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px"
-            }}
-          >
-            <Icon name="edit" size={14} /> Change Avatar
-          </button>
-
-        </div>
-
-        {/* Avatar Preset & URL Selector Accordion */}
-        {showAvatarPicker && (
-          <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-            <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-dim)", display: "block", marginBottom: "10px" }}>
-              Select Profile Picture Badge or Custom Image URL
-            </span>
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
-              {AVATAR_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => { setAvatarUrl(p.icon); setShowAvatarPicker(false); }}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "10px",
-                    fontSize: "16px",
-                    cursor: "pointer",
-                    border: avatarUrl === p.icon ? "2px solid var(--accent)" : "1px solid var(--border-2)",
-                    background: avatarUrl === p.icon ? "rgba(244, 201, 93, 0.15)" : "rgba(255,255,255,0.02)",
-                    transition: "all 0.2s"
-                  }}
-                  title={p.label}
-                >
-                  {p.icon} <span style={{ fontSize: "11px", marginLeft: "4px", color: "var(--text-dim)" }}>{p.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <label
+              style={{
+                padding: "8px 16px",
+                borderRadius: "10px",
+                border: "1px solid var(--border)",
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text)",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px"
+              }}
+            >
+              <Icon name="edit" size={14} /> Upload Profile Picture
               <input
-                type="text"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="Or paste custom image URL (https://...)"
-                style={{ ...inputStyle, flex: 1 }}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: "none" }}
               />
+            </label>
+
+            {avatarUrl && (
               <button
                 type="button"
-                onClick={() => setShowAvatarPicker(false)}
-                style={{ padding: "8px 16px", background: "var(--brand)", color: "var(--accent-ink)", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                onClick={() => setAvatarUrl("")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  color: "#EF4444",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
               >
-                Apply
+                <Icon name="x" size={14} /> Reset to Default
               </button>
-            </div>
+            )}
           </div>
-        )}
+
+        </div>
       </div>
 
       {message && (

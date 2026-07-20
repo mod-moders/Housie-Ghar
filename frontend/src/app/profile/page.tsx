@@ -147,6 +147,23 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, winningsLoading]);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image file size must be under 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setAvatarUrl(reader.result);
+        setShowAvatarPicker(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -270,10 +287,10 @@ export default function ProfilePage() {
                   overflow: "hidden"
                 }}
               >
-                {avatarUrl && avatarUrl.startsWith("http") ? (
+                {avatarUrl && avatarUrl.startsWith("data:") ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarUrl} alt={profile?.housie_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : avatarUrl && !avatarUrl.startsWith("http") ? (
+                ) : avatarUrl ? (
                   <span>{avatarUrl}</span>
                 ) : (
                   (profile?.full_name || profile?.housie_name || "?")[0].toUpperCase()
@@ -323,13 +340,40 @@ export default function ProfilePage() {
 
           </div>
 
-          {/* Avatar Selector */}
+          {/* Avatar Selector Options for Player */}
           {showAvatarPicker && (
             <div style={{ marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--border-light)" }}>
-              <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-dim)", display: "block", marginBottom: "8px" }}>
-                Select Profile Avatar Badge or Custom Image URL
-              </span>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-dim)" }}>
+                  Choose Avatar Badge or Upload Picture
+                </span>
+
+                <label
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--accent)",
+                    background: "rgba(244, 201, 93, 0.15)",
+                    color: "var(--accent)",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <Icon name="upload" size={14} /> Upload Picture from Device
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {AVATAR_PRESETS.map((p) => (
                   <button
                     key={p.id}
@@ -349,23 +393,6 @@ export default function ProfilePage() {
                     {p.icon} <span style={{ fontSize: "11px", marginLeft: "4px", color: "var(--text-dim)" }}>{p.label}</span>
                   </button>
                 ))}
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <input
-                  type="text"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="Or paste image URL (https://...)"
-                  style={{ ...inputStyle, flex: 1, padding: "8px 12px" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAvatarPicker(false)}
-                  style={{ padding: "8px 14px", background: "var(--brand)", color: "var(--accent-ink)", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
-                >
-                  Apply
-                </button>
               </div>
             </div>
           )}
