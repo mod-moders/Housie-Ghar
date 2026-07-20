@@ -675,7 +675,7 @@ export function CallVoiceSettings() {
       const all = window.speechSynthesis.getVoices();
       setVoices(all);
 
-      const ranked = getRankedVoices(all);
+      const ranked = getTop5CuratedVoices(all);
       const bestDefault = ranked.find((v) => v.isNeural) || ranked[0];
       const stored = localStorage.getItem("preferred_caller_voice");
 
