@@ -1188,24 +1188,70 @@ export function CallVoiceSettings() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid var(--card-line)", padding: "14px 16px", flexWrap: "wrap", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Icon name="grid" size={20} style={{ color: "var(--accent)" }} />
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Number Call Recorded Audio Files (1 to 90)</h3>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>1-90 Call Audio Files</h3>
           </div>
-          <input
-            type="text"
-            placeholder="Search number or phrase..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "999px",
-              border: "1.5px solid var(--border-2)",
-              background: "var(--surface-2)",
-              color: "var(--text)",
-              fontSize: "12.5px",
-              outline: "none",
-              minWidth: "250px"
-            }}
-          />
+          
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            {/* Universal Language Switch Toggle for 1-90 Calls */}
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--surface-2)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", marginRight: "4px" }}>Universal Language:</span>
+              <button
+                onClick={() => {
+                  setAudioLang("en");
+                  handleSaveConfig({ audio_language: "en" });
+                }}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: audioLang === "en" ? "var(--accent)" : "transparent",
+                  color: audioLang === "en" ? "#000" : "var(--text-dim)",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                🇬🇧 ENG
+              </button>
+              <button
+                onClick={() => {
+                  setAudioLang("ne");
+                  handleSaveConfig({ audio_language: "ne" });
+                }}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: audioLang === "ne" ? "var(--accent)" : "transparent",
+                  color: audioLang === "ne" ? "#000" : "var(--text-dim)",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                🇳🇵 NEP
+              </button>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Search number or phrase..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "999px",
+                border: "1.5px solid var(--border-2)",
+                background: "var(--surface-2)",
+                color: "var(--text)",
+                fontSize: "12.5px",
+                outline: "none",
+                minWidth: "220px"
+              }}
+            />
+          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "650px", overflowY: "auto", padding: "16px 20px" }}>
