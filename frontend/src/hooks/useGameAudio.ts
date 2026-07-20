@@ -4,6 +4,7 @@ import { apiFetch, resolveAudioUrl } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useSocket } from "@/lib/hooks/useSocket";
+import { usePauseAudioOnHidden } from "@/hooks/usePauseAudioOnHidden";
 
 interface NumberCallConfig {
   number: number;
@@ -35,6 +36,8 @@ export function useGameAudio(
   const isIntroPlayingRef = useRef<boolean>(false);
   const pendingNumbersQueueRef = useRef<number[]>([]);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  usePauseAudioOnHidden(bgMusicRef);
 
   useEffect(() => {
     isMountedRef.current = true;

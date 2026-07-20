@@ -1,11 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { resolveAudioUrl } from "@/lib/api";
+import { usePauseAudioOnHidden } from "@/hooks/usePauseAudioOnHidden";
 
 export function useLobbyAudio(active: boolean) {
   const { config } = useConfigStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackIndexRef = useRef<number>(0);
+
+  usePauseAudioOnHidden(audioRef);
 
   // Handle dynamically updating the volume without restarting/skipping tracks
   useEffect(() => {
