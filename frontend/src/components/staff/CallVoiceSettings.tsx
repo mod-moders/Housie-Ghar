@@ -184,15 +184,15 @@ export function CallVoiceSettings() {
   const [bgMusicVolume, setBgMusicVolume] = useState(parseFloat(config?.background_music_volume || "0.15"));
   const [masterCallsVolume, setMasterCallsVolume] = useState(parseFloat(config?.master_calls_volume || "1.0"));
 
-  // Intro (Welcome Voice) States
+  // Intro (Welcome Voice) States — Legacy welcome_voice_url is Nepali
   const [welcomeVoiceEnabled, setWelcomeVoiceEnabled] = useState(config?.welcome_voice_enabled !== "false");
-  const [welcomeVoiceUrlEn, setWelcomeVoiceUrlEn] = useState(config?.welcome_voice_url_en || config?.welcome_voice_url || "");
-  const [welcomeVoiceUrlNe, setWelcomeVoiceUrlNe] = useState(config?.welcome_voice_url_ne || "");
-  const [welcomeVoiceVolEn, setWelcomeVoiceVolEn] = useState(parseFloat(config?.welcome_voice_volume_en || config?.welcome_voice_volume || "1.0"));
-  const [welcomeVoiceVolNe, setWelcomeVoiceVolNe] = useState(parseFloat(config?.welcome_voice_volume_ne || "1.0"));
-  const [welcomeVoiceLang, setWelcomeVoiceLang] = useState<"en" | "ne">((config?.welcome_voice_lang as "en" | "ne") || "en");
+  const [welcomeVoiceUrlEn, setWelcomeVoiceUrlEn] = useState(config?.welcome_voice_url_en || "");
+  const [welcomeVoiceUrlNe, setWelcomeVoiceUrlNe] = useState(config?.welcome_voice_url_ne || config?.welcome_voice_url || "");
+  const [welcomeVoiceVolEn, setWelcomeVoiceVolEn] = useState(parseFloat(config?.welcome_voice_volume_en || "1.0"));
+  const [welcomeVoiceVolNe, setWelcomeVoiceVolNe] = useState(parseFloat(config?.welcome_voice_volume_ne || config?.welcome_voice_volume || "1.0"));
+  const [welcomeVoiceLang, setWelcomeVoiceLang] = useState<"en" | "ne">((config?.welcome_voice_lang as "en" | "ne") || "ne");
 
-  // Outro (Instruction Voice) States
+  // Outro (Instruction Voice) States — Legacy instruction_voice_url is English
   const [instructionVoiceEnabled, setInstructionVoiceEnabled] = useState(config?.instruction_voice_enabled !== "false");
   const [instructionVoiceUrlEn, setInstructionVoiceUrlEn] = useState(config?.instruction_voice_url_en || config?.instruction_voice_url || "");
   const [instructionVoiceUrlNe, setInstructionVoiceUrlNe] = useState(config?.instruction_voice_url_ne || "");
@@ -217,11 +217,11 @@ export function CallVoiceSettings() {
       setCelebrationSound(config.celebration_sound_enabled !== "false");
       
       setWelcomeVoiceEnabled(config.welcome_voice_enabled !== "false");
-      setWelcomeVoiceUrlEn(config.welcome_voice_url_en || config.welcome_voice_url || "");
-      setWelcomeVoiceUrlNe(config.welcome_voice_url_ne || "");
-      setWelcomeVoiceVolEn(parseFloat(config.welcome_voice_volume_en || config.welcome_voice_volume || "1.0"));
-      setWelcomeVoiceVolNe(parseFloat(config.welcome_voice_volume_ne || "1.0"));
-      setWelcomeVoiceLang((config.welcome_voice_lang as "en" | "ne") || "en");
+      setWelcomeVoiceUrlEn(config.welcome_voice_url_en || "");
+      setWelcomeVoiceUrlNe(config.welcome_voice_url_ne || config.welcome_voice_url || "");
+      setWelcomeVoiceVolEn(parseFloat(config.welcome_voice_volume_en || "1.0"));
+      setWelcomeVoiceVolNe(parseFloat(config.welcome_voice_volume_ne || config.welcome_voice_volume || "1.0"));
+      setWelcomeVoiceLang((config.welcome_voice_lang as "en" | "ne") || "ne");
 
       setInstructionVoiceEnabled(config.instruction_voice_enabled !== "false");
       setInstructionVoiceUrlEn(config.instruction_voice_url_en || config.instruction_voice_url || "");
