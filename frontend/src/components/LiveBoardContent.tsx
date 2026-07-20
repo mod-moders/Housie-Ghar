@@ -229,6 +229,23 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   // Prevent mobile device screen from sleeping during live game
   useWakeLock(gameStatus === "Live");
 
+  // Measure the sticky top nav's real height so the sticky cage area (mobile) can sit flush
+  // below it without overlap — hardcoding this would break if a long game title wraps to 2 lines.
+  const liveTopRef = useRef<HTMLDivElement>(null);
+  const liveScreenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const topEl = liveTopRef.current;
+    const screenEl = liveScreenRef.current;
+    if (!topEl || !screenEl) return;
+    const applyHeight = () => {
+      screenEl.style.setProperty("--hg-live-top-h", `${topEl.offsetHeight}px`);
+    };
+    applyHeight();
+    const observer = new ResizeObserver(applyHeight);
+    observer.observe(topEl);
+    return () => observer.disconnect();
+  }, []);
+
   const gameStartedAnnouncedRef = useRef<boolean>(false);
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
@@ -612,8 +629,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   return (
     <div className="hg-stage">
       <div className="hg-frame">
-        <div className="hg-screen hg-live">
-          <div className="hg-live-top">
+        <div className="hg-screen hg-live" ref={liveScreenRef}>
+          <div className="hg-live-top" ref={liveTopRef}>
             {!isStaff && (
               <button className="hg-back" onClick={onBack || (() => router.push("/"))} aria-label="Back">
                 <Icon name="arrowL" size={20} />
@@ -642,6 +659,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
           <div className="hg-live-body">
             <div className="hg-live-left">
+              {/* Cage + Recent Calls — sticky on mobile so they stay visible while the rest scrolls */}
+              <div className="hg-live-sticky">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
                 <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} />
@@ -734,6 +753,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                     );
                   })}
                 </div>
+              </div>
               </div>
 
               {/* 90 number box — shown in another box below */}

@@ -18,7 +18,7 @@ import {
   claimAllPrizes,
   disbursePrize,
   disburseConsolidatedClaim,
-  getPrizeClaims,
+  getClaimRequests,
   getPrizeClaimsDashboard,
 } from './games.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
@@ -53,7 +53,7 @@ router.delete('/number-calls/:number/audio', authenticateToken, requireRole(['Su
 
 // Financial Admin / Superadmin static dashboard/listing endpoints
 router.get('/prize-claims/dashboard', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), getPrizeClaimsDashboard);
-router.get('/prize-claims', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), getPrizeClaims);
+router.get('/prize-claims', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), getClaimRequests);
 
 // ==========================================
 // 2. Collection Base Routes
