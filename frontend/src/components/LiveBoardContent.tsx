@@ -93,6 +93,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
+  const [welcomeTextVisible, setWelcomeTextVisible] = useState(false);
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
   const activeCallIdRef = useRef(0);
 
@@ -141,19 +142,22 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
   useEffect(() => {
     if (delayedGameEnd) {
-      if (!userDismissedWinnersRef.current) {
-        setShowWinnersOverlay(true);
-      }
       if (!outroPlayedRef.current) {
         outroPlayedRef.current = true;
-        if (wasLiveInSessionRef.current) {
-          playOutro();
-        }
-        playCelebration();
-        const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-        if (isSoundEnabled && !muted) {
-          soundSynthesizer.playCelebration();
-        }
+        // 4. After the last called number's audio/TTS finishes playing, wait 3 seconds before playing outro note & popping out winners list simultaneously
+        delay(() => {
+          if (!userDismissedWinnersRef.current) {
+            setShowWinnersOverlay(true);
+          }
+          if (wasLiveInSessionRef.current) {
+            playOutro();
+          }
+          playCelebration();
+          const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
+          }
+        }, 3000);
       }
     } else {
       setShowWinnersOverlay(false);
@@ -162,7 +166,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted]);
+  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted, delay]);
 
   // Track winners for audio celebration
 
@@ -226,15 +230,27 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      // Play intro note ONLY if the player was present when the game started (0 drawn numbers)
-      // Players joining mid-game directly listen to incoming calls without re-playing the intro note
       if (drawnNumbers.length === 0) {
-        playGreeting().then(flushPendingDraws);
+        // 2. Welcome text displays on gameplay screen (BGM plays automatically).
+        setWelcomeTextVisible(true);
+        // After 15 seconds that the operator started the game, the Intro note will play.
+        delay(() => {
+          setWelcomeTextVisible(false);
+          playGreeting().then(() => {
+            // 3. After intro note finishes playing, after 3 secs, cage starts rolling & first number call is displayed and played
+            delay(() => {
+              setRevealed(false);
+              delay(() => {
+                flushPendingDraws();
+              }, 2000);
+            }, 3000);
+          });
+        }, 15000);
       } else {
         flushPendingDraws();
       }
     }
-  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws]);
+  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);
@@ -893,6 +909,46 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 </div>
               </div>
             </>
+          )}
+
+          {welcomeTextVisible && (
+            <div 
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 99999,
+                background: "rgba(0, 0, 0, 0.85)",
+                backdropFilter: "blur(8px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "24px",
+                animation: "fadeIn 0.3s ease-out"
+              }}
+            >
+              <div 
+                className="hg-card"
+                style={{
+                  padding: "36px 48px",
+                  borderRadius: "20px",
+                  textAlign: "center",
+                  border: "2px solid var(--accent)",
+                  background: "linear-gradient(135deg, rgba(24, 24, 24, 0.98) 0%, rgba(12, 12, 12, 0.99) 100%)",
+                  boxShadow: "0 0 50px rgba(244, 201, 93, 0.35)",
+                  maxWidth: "540px",
+                  width: "90%"
+                }}
+              >
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</div>
+                <h2 style={{ fontSize: "26px", fontWeight: "800", color: "var(--accent)", margin: "0 0 12px 0", letterSpacing: "-0.02em" }}>
+                  Welcome to Housie Ghar!
+                </h2>
+                <p style={{ fontSize: "14px", color: "var(--text-dim)", margin: 0, lineHeight: 1.6 }}>
+                  The game has been started by the operator. Please hold tight — background music is playing, and number calls will begin shortly!
+                </p>
+              </div>
+            </div>
           )}
 
           {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && showWinnersOverlay && (

@@ -188,7 +188,7 @@ export function useGameAudio(
     }
   };
 
-  const playGreeting = async () => {
+  const playGreeting = async (): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
     // Check if Intro is enabled
@@ -199,10 +199,6 @@ export function useGameAudio(
     isIntroPlayingRef.current = true;
     
     try {
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, 2500);
-        activeTimersRef.current.push(timer);
-      });
       if (!isMountedRef.current || isMuted) return;
 
       const mode = (gameIntroMode === "TTS" || gameIntroMode === "Text")
@@ -221,12 +217,6 @@ export function useGameAudio(
       } else {
         await fallbackToTTS(welcomeText, universalVoice);
       }
-
-      // AFTER the intro note is played, trigger the Celebratory Winner Fanfare audio
-      if (!isMuted && platformConfig?.celebration_sound_enabled !== "false") {
-        playCelebration();
-        soundSynthesizer.playCelebration();
-      }
     } finally {
       isIntroPlayingRef.current = false;
       if (isMountedRef.current && pendingNumbersQueueRef.current.length > 0) {
@@ -238,7 +228,7 @@ export function useGameAudio(
     }
   };
 
-  const playOutro = async () => {
+  const playOutro = async (): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
     // Check if Outro is enabled
@@ -267,7 +257,7 @@ export function useGameAudio(
     } catch {}
   };
 
-  const playNumberCall = async (num: number) => {
+  const playNumberCall = async (num: number): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
     if (isIntroPlayingRef.current) {
@@ -278,12 +268,14 @@ export function useGameAudio(
     stopAllActiveAudios();
     const config = callsConfig[num];
     const phrase = config?.call_text || englishPhrases[num] || `Number ${num}`;
-    const effectiveCallMode = (gameCallMode === "TTS" || gameCallMode === "Text") 
-      ? "Text" 
-      : gameCallMode === "Audio" 
-        ? "Audio" 
-        : (config?.call_mode || "Text");
-    const mode = effectiveCallMode;
+    
+    // Strict Mode Enforcement:
+    // If gameCallMode === "TTS", whole game MUST use TTS only.
+    // If gameCallMode === "Audio", whole game MUST use Audio only.
+    const isStrictTTS = gameCallMode === "TTS" || gameCallMode === "Text";
+    const isStrictAudio = gameCallMode === "Audio";
+
+    const mode = isStrictTTS ? "Text" : isStrictAudio ? "Audio" : (config?.call_mode || "Text");
     const audioUrl = config?.audio_url;
     const vol = config?.volume !== undefined ? config.volume : 1.0;
 
@@ -292,6 +284,10 @@ export function useGameAudio(
 
     if (mode === "Audio" && audioUrl) {
       await playAudioOrFallback(audioUrl, phrase, effectiveVol);
+    } else if (mode === "Audio" && !audioUrl) {
+      // If Audio mode is set but number has no custom file, use standard audio call file
+      const defaultAudioUrl = `/audio/calls/${num}.mp3`;
+      await playAudioOrFallback(defaultAudioUrl, phrase, effectiveVol);
     } else {
       await fallbackToTTS(phrase);
     }

@@ -230,16 +230,19 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
   activeGames.set(gameId, activeGame);
   console.log(`🎮 Game started: ${game.title} (ID: ${gameId}). Total tickets: ${tickets.length}`);
 
-  // Start conduction ticks
-  runConductorTick(gameId);
+  // Start conduction ticks (24s initial delay for fresh games: 15s welcome + ~6s intro note + 3s cage roll)
+  const initialDelay = currentIndex === 0 ? 24000 : 3000;
+  runConductorTick(gameId, initialDelay);
 }
 
 /**
  * Main game loop tick
  */
-function runConductorTick(gameId: string): void {
+function runConductorTick(gameId: string, customDelayMs?: number): void {
   const game = activeGames.get(gameId);
   if (!game) return;
+
+  const delayMs = customDelayMs !== undefined ? customDelayMs : game.intervalMs;
 
   game.timer = setTimeout(async () => {
     try {
@@ -249,7 +252,7 @@ function runConductorTick(gameId: string): void {
       // Reschedule tick on failure to keep game running
       runConductorTick(gameId);
     }
-  }, game.intervalMs);
+  }, delayMs);
 }
 
 /**
