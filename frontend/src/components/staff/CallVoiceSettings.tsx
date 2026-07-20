@@ -513,142 +513,131 @@ export function CallVoiceSettings() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       
-      {/* Top Header Card Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(450px, 100%), 1fr))", gap: "24px" }}>
-        
-        {/* CARD 1: Voice & Volume Settings */}
-        <div className="hg-panel">
-          <div className="hg-panel-head">
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <Icon name="volume" size={20} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Voice &amp; Volume Settings</h3>
-            </div>
-          </div>
-          
-          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Master Voice Volume */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700 }}>
-                <span style={{ color: "var(--text)" }}>🎙️ Master Voice Volume</span>
-                <span style={{ color: "var(--accent)" }}>{Math.round(masterCallsVolume * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1.0"
-                step="0.01"
-                value={masterCallsVolume}
-                onChange={(e) => {
-                  const gainVal = parseFloat(e.target.value);
-                  setMasterCallsVolume(gainVal);
-                  handleSaveConfigDebounced({ master_calls_volume: String(gainVal) });
-                }}
-                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "var(--border-2)" }}
-              />
-            </div>
-
-            {/* Global Language Toggle Switch: ENG vs NEP */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>🌐 Language Switch</span>
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: callerEnabled ? "var(--accent)" : "var(--text-dim)" }}>
-                  <input
-                    type="checkbox"
-                    checked={callerEnabled}
-                    onChange={handleToggleGlobalCaller}
-                    style={{ accentColor: "var(--accent)", width: "13px", height: "13px" }}
-                  />
-                  <span>Enable Live Audio</span>
-                </label>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", marginTop: "4px" }}>
-                <button
-                  onClick={() => {
-                    setAudioLang("en");
-                    setWelcomeVoiceLang("en");
-                    setInstructionVoiceLang("en");
-                    handleSaveConfig({
-                      audio_language: "en",
-                      welcome_voice_lang: "en",
-                      instruction_voice_lang: "en"
-                    });
-                  }}
-                  className="hg-btn"
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "10px 14px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: audioLang === "en" ? "var(--accent)" : "var(--surface)",
-                    color: audioLang === "en" ? "var(--accent-ink)" : "var(--text)",
-                    border: audioLang === "en" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
-                    boxShadow: audioLang === "en" ? "0 4px 0 -1px var(--ink)" : "none",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  <span>🇬🇧 ENG (English MP3)</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setAudioLang("ne");
-                    setWelcomeVoiceLang("ne");
-                    setInstructionVoiceLang("ne");
-                    handleSaveConfig({
-                      audio_language: "ne",
-                      welcome_voice_lang: "ne",
-                      instruction_voice_lang: "ne"
-                    });
-                  }}
-                  className="hg-btn"
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "10px 14px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: audioLang === "ne" ? "var(--accent)" : "var(--surface)",
-                    color: audioLang === "ne" ? "var(--accent-ink)" : "var(--text)",
-                    border: audioLang === "ne" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
-                    boxShadow: audioLang === "ne" ? "0 4px 0 -1px var(--ink)" : "none",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  <span>🇳🇵 NEP (Nepali MP3)</span>
-                </button>
-              </div>
-            </div>
-
+      {/* SECTION 1: Game Audio Settings (Merged Voice & Volume Settings with Gameplay Sounds) */}
+      <div className="hg-panel">
+        <div className="hg-panel-head">
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Icon name="volume" size={20} style={{ color: "var(--accent)" }} />
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Game Audio Settings</h3>
           </div>
         </div>
 
-        {/* CARD 2: Gameplay Sounds */}
-        <div className="hg-panel">
-          <div className="hg-panel-head">
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <Icon name="zap" size={20} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Gameplay Sounds</h3>
-            </div>
-          </div>
-
-          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: "20px" }}>
             
-            {/* Subsection: Gameplay Background Music */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+            {/* 1. 1-90 Call Volume & Language Switch */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* 1-90 Call Volume */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700 }}>
+                  <span style={{ color: "var(--text)" }}>1-90 Call Volume</span>
+                  <span style={{ color: "var(--accent)" }}>{Math.round(masterCallsVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1.0"
+                  step="0.01"
+                  value={masterCallsVolume}
+                  onChange={(e) => {
+                    const gainVal = parseFloat(e.target.value);
+                    setMasterCallsVolume(gainVal);
+                    handleSaveConfigDebounced({ master_calls_volume: String(gainVal) });
+                  }}
+                  style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "var(--border-2)" }}
+                />
+              </div>
+
+              {/* Language Switch */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>Language Switch</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: callerEnabled ? "var(--accent)" : "var(--text-dim)" }}>
+                    <input
+                      type="checkbox"
+                      checked={callerEnabled}
+                      onChange={handleToggleGlobalCaller}
+                      style={{ accentColor: "var(--accent)", width: "13px", height: "13px" }}
+                    />
+                    <span>Enable Live Audio</span>
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+                  <button
+                    onClick={() => {
+                      setAudioLang("en");
+                      setWelcomeVoiceLang("en");
+                      setInstructionVoiceLang("en");
+                      handleSaveConfig({
+                        audio_language: "en",
+                        welcome_voice_lang: "en",
+                        instruction_voice_lang: "en"
+                      });
+                    }}
+                    className="hg-btn"
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "10px 14px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      background: audioLang === "en" ? "var(--accent)" : "var(--surface)",
+                      color: audioLang === "en" ? "var(--accent-ink)" : "var(--text)",
+                      border: audioLang === "en" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
+                      boxShadow: audioLang === "en" ? "0 4px 0 -1px var(--ink)" : "none",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <span>🇬🇧 ENG (English MP3)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAudioLang("ne");
+                      setWelcomeVoiceLang("ne");
+                      setInstructionVoiceLang("ne");
+                      handleSaveConfig({
+                        audio_language: "ne",
+                        welcome_voice_lang: "ne",
+                        instruction_voice_lang: "ne"
+                      });
+                    }}
+                    className="hg-btn"
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "10px 14px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      background: audioLang === "ne" ? "var(--accent)" : "var(--surface)",
+                      color: audioLang === "ne" ? "var(--accent-ink)" : "var(--text)",
+                      border: audioLang === "ne" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
+                      boxShadow: audioLang === "ne" ? "0 4px 0 -1px var(--ink)" : "none",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <span>🇳🇵 NEP (Nepali MP3)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Background Music */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>🎵 Gameplay Background Music</span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Background Music</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: bgMusicEnabled ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -667,7 +656,7 @@ export function CallVoiceSettings() {
               <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginTop: "4px" }}>
                 <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
                   <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("background_music_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
-                  <span>📁 {uploadingVoiceKey === "background_music_url" ? "..." : bgMusicUrl ? "Replace Loop" : "Upload Background MP3"}</span>
+                  <span>{uploadingVoiceKey === "background_music_url" ? "..." : bgMusicUrl ? "Replace Loop" : "Upload Background MP3"}</span>
                 </label>
 
                 {bgMusicUrl && (
@@ -711,14 +700,14 @@ export function CallVoiceSettings() {
                 onClick={() => handleSaveConfig({ background_music_enabled: String(bgMusicEnabled), background_music_url: bgMusicUrl, background_music_volume: String(bgMusicVolume) })}
                 style={{ alignSelf: "flex-end", fontSize: "11px", padding: "6px 14px", borderRadius: "999px", marginTop: "4px" }}
               >
-                💾 Save Music Settings
+                Save Music Settings
               </Button>
             </div>
 
-            {/* Subsection: Realistic Tambola Cage Draw */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+            {/* 3. Cage Sound */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>⚙️ Realistic Tambola Cage Draw</span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Cage Sound</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: cageSound ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -751,12 +740,12 @@ export function CallVoiceSettings() {
                 >
                   <option value="steel_wooden">Steel Cage with Wooden Balls</option>
                   <option value="steel_ceramic">Steel Cage with Ceramic Balls</option>
-                  <option value="golden_brass">Golden Brass Cage ✨</option>
+                  <option value="golden_brass">Golden Brass Cage</option>
                 </select>
 
                 <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                   <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("cage_sound_url", e)} style={{ display: "none" }} />
-                  <span>📁 {config?.cage_sound_url ? "Replace" : "Upload MP3"}</span>
+                  <span>{config?.cage_sound_url ? "Replace" : "Upload MP3"}</span>
                 </label>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
@@ -780,15 +769,15 @@ export function CallVoiceSettings() {
                     }
                   }}
                 >
-                  {previewingCage ? "⏹ Stop" : "🔊 Preview"}
+                  {previewingCage ? "Stop" : "Preview"}
                 </Button>
               </div>
             </div>
 
-            {/* Subsection: Celebratory Winner Fanfare */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+            {/* 4. Celebration Notification */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>🏆 Celebratory Winner Fanfare</span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Celebration Notification</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: celebrationSound ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -821,12 +810,12 @@ export function CallVoiceSettings() {
                 >
                   <option value="trumpet_cheering">Trumpet Fanfare with Cheering</option>
                   <option value="cheering">Crowd Cheering</option>
-                  <option value="symphony_orchestra">Symphony Orchestra 🎺</option>
+                  <option value="symphony_orchestra">Symphony Orchestra</option>
                 </select>
 
                 <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                   <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("celebration_sound_url", e)} style={{ display: "none" }} />
-                  <span>📁 {config?.celebration_sound_url ? "Replace" : "Upload Fanfare MP3"}</span>
+                  <span>{config?.celebration_sound_url ? "Replace" : "Upload Fanfare MP3"}</span>
                 </label>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
@@ -844,7 +833,7 @@ export function CallVoiceSettings() {
                     soundSynthesizer.playCelebration();
                   }}
                 >
-                  🔊 Preview
+                  Preview
                 </Button>
               </div>
             </div>
@@ -854,27 +843,26 @@ export function CallVoiceSettings() {
 
       </div>
 
-      {/* Grid of Voice Notes */}
+      {/* SECTION 2: Gameplay Announcements */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px" }}>
         
-        {/* CARD 3: Voice Announcements (Intro & Outro Messages) */}
         <div className="hg-panel">
           <div className="hg-panel-head">
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <Icon name="chat" size={20} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Voice Announcements (Intro &amp; Outro Audio Messages)</h3>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>Gameplay Announcements</h3>
             </div>
           </div>
           
           <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
             
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(450px, 100%), 1fr))", gap: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(400px, 100%), 1fr))", gap: "20px" }}>
               
-              {/* Intro Note */}
+              {/* 1. Intro */}
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>1. Intro Message (Welcome Audio)</span>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>1. Intro</span>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: welcomeVoiceEnabled ? "var(--accent)" : "var(--text-dim)" }}>
                       <input
                         type="checkbox"
@@ -938,7 +926,7 @@ export function CallVoiceSettings() {
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇬🇧 English Intro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("welcome_voice_url_en", e)} style={{ display: "none" }} />
-                      <span>📁 {welcomeVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
+                      <span>{welcomeVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
                     </label>
                     {welcomeVoiceUrlEn && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -958,7 +946,7 @@ export function CallVoiceSettings() {
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇳🇵 Nepali Intro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("welcome_voice_url_ne", e)} style={{ display: "none" }} />
-                      <span>📁 {welcomeVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
+                      <span>{welcomeVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
                     </label>
                     {welcomeVoiceUrlNe && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1013,15 +1001,15 @@ export function CallVoiceSettings() {
                   })}
                   style={{ alignSelf: "flex-end", fontSize: "11px", padding: "6px 14px", borderRadius: "999px" }}
                 >
-                  💾 Save Intro Settings
+                  Save Intro Settings
                 </Button>
               </div>
 
-              {/* Outro Note */}
+              {/* 2. Outro */}
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>2. Outro Message (Ending Audio)</span>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>2. Outro</span>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: instructionVoiceEnabled ? "var(--accent)" : "var(--text-dim)" }}>
                       <input
                         type="checkbox"
@@ -1085,7 +1073,7 @@ export function CallVoiceSettings() {
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇬🇧 English Outro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("instruction_voice_url_en", e)} style={{ display: "none" }} />
-                      <span>📁 {instructionVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
+                      <span>{instructionVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
                     </label>
                     {instructionVoiceUrlEn && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1105,7 +1093,7 @@ export function CallVoiceSettings() {
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇳🇵 Nepali Outro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("instruction_voice_url_ne", e)} style={{ display: "none" }} />
-                      <span>📁 {instructionVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
+                      <span>{instructionVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
                     </label>
                     {instructionVoiceUrlNe && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1160,7 +1148,7 @@ export function CallVoiceSettings() {
                   })}
                   style={{ alignSelf: "flex-end", fontSize: "11px", padding: "6px 14px", borderRadius: "999px" }}
                 >
-                  💾 Save Outro Settings
+                  Save Outro Settings
                 </Button>
               </div>
 
