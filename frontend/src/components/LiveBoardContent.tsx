@@ -16,7 +16,7 @@ import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import type { GameSummary, Prize, TicketDetail } from "@/lib/types";
+import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -481,6 +481,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   };
 
   const [claimingAll, setClaimingAll] = useState(false);
+  const [claimingPrizeId, setClaimingPrizeId] = useState<number | null>(null);
 
   const myUnclaimedPrizes = useMemo(() => {
     if (isStaff || !displayName) return [];
@@ -501,7 +502,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
   const myUnclaimedTotalAmount = useMemo(() => {
     return myUnclaimedPrizes.reduce(
-      (sum, p) => sum + parseFloat(String(p.amount_per_winner ?? p.prize_amount ?? 0)),
+      (sum, p) => sum + parseFloat(String(p.prize_amount ?? 0)),
       0
     );
   }, [myUnclaimedPrizes]);
@@ -522,6 +523,23 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       alert(err instanceof Error ? err.message : "Failed to claim prizes");
     } finally {
       setClaimingAll(false);
+    }
+  };
+
+  const handleClaimSinglePrize = async (prizeId: number) => {
+    setClaimingPrizeId(prizeId);
+    try {
+      const res = await apiFetch<ClaimPrizeResponse>(`/api/games/${game_id}/prizes/${prizeId}/claim`, {
+        method: "POST",
+      });
+      loadGameData();
+      if (res.whatsapp_url) {
+        window.open(res.whatsapp_url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to claim prize");
+    } finally {
+      setClaimingPrizeId(null);
     }
   };
 
@@ -705,22 +723,21 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
                 <div className="hg-prizeboard-grid">
                   {prizes.map((p) => {
-                    const isWinner = p.winner_housie_name === displayName || 
-                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim()).includes(displayName));
+                    const isWinner = (p.winner_housie_name?.toLowerCase() === (displayName || "").toLowerCase()) || 
+                      (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes((displayName || "").toLowerCase()));
                     const isClaimed = p.player_claimed;
                     return (
                       <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}${isWinner && isClaimed ? " player-claimed" : ""}`}>
                         <div className="hg-prize-l">
-                          <span className="hg-prize-name">{p.pattern_name}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                            <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span className="hg-prize-name">{p.pattern_name}</span>
                             {isClaimed && (
                               <span className="hg-claimed-badge" style={{
                                 background: p.disbursed ? 'var(--success)' : '#d97706',
                                 color: '#fff',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                padding: '2px 8px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 6px',
                                 borderRadius: '4px',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px',
@@ -729,6 +746,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                               </span>
                             )}
                           </div>
+                          <span className="hg-prize-amt">{money(p.prize_amount)}</span>
                         </div>
                         <div className="hg-prize-r">
                           {p.claimed && p.winner_housie_name ? (
@@ -743,7 +761,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                                   )}
                                 </span>
                               </div>
-                              {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
                             </div>
                           ) : (
                             <span className="hg-prize-open">Open</span>
@@ -905,14 +922,63 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                     </span>
                   </div>
                   {prizes.filter(p => p.claimed).map((p) => {
-                    const isWinner = p.winner_housie_name === displayName || 
+                    const isWinner = (p.winner_housie_name?.toLowerCase() === (displayName || "").toLowerCase()) || 
                       (p.winner_housie_name && p.winner_housie_name.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes((displayName || "").toLowerCase()));
                     const isClaimed = p.player_claimed;
                     return (
                       <div key={p.prize_id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{p.pattern_name}</div>
-                          <div style={{ color: "var(--accent)", fontSize: 13, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{p.pattern_name}</span>
+                            {isWinner && !isClaimed && !isStaff ? (
+                              <button
+                                onClick={() => handleClaimSinglePrize(p.prize_id)}
+                                disabled={claimingPrizeId === p.prize_id}
+                                style={{
+                                  background: 'linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)',
+                                  color: '#000',
+                                  border: 'none',
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  cursor: claimingPrizeId === p.prize_id ? 'not-allowed' : 'pointer',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  boxShadow: '0 2px 6px var(--accent-soft)',
+                                }}
+                              >
+                                {claimingPrizeId === p.prize_id ? "Claiming..." : "Claim"}
+                              </button>
+                            ) : isClaimed ? (
+                              <span style={{
+                                background: p.disbursed ? 'var(--success)' : '#d97706',
+                                color: '#fff',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                {p.disbursed ? 'Disbursed' : 'Claimed'}
+                              </span>
+                            ) : (
+                              <span style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                color: 'var(--text-dim)',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Pending Claim
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: "var(--accent)", fontSize: 13, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                             <span>{p.winner_housie_name}</span>
                             {p.winner_ticket_number && !p.winner_housie_name?.includes('(') && (
                               <span style={{ color: 'var(--text-mute)', fontSize: '11px' }}>
@@ -922,34 +988,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{money(p.amount_per_winner ?? p.prize_amount)}</span>
-                          {isClaimed ? (
-                            <span style={{
-                              background: p.disbursed ? 'var(--success)' : '#d97706',
-                              color: '#fff',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                            }}>
-                              {p.disbursed ? 'Disbursed' : 'Claimed'}
-                            </span>
-                          ) : (
-                            <span style={{
-                              background: 'rgba(255,255,255,0.05)',
-                              color: 'var(--text-dim)',
-                              fontSize: '10px',
-                              fontWeight: 600,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                            }}>
-                              Pending Claim
-                            </span>
-                          )}
+                          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{money(p.prize_amount)}</span>
                         </div>
                       </div>
                     );
