@@ -47,7 +47,7 @@ export async function getPublicConfig(req: any, res: Response): Promise<void> {
     const result = await pool.query(
       `SELECT config_key, config_value
        FROM Platform_Config
-       WHERE config_key IN ('active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'welcome_voice_mode', 'instruction_voice_mode', 'welcome_voice_volume', 'instruction_voice_volume', 'tts_voice_name', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5')`
+       WHERE config_key NOT IN ('whatsapp_share_groups', 'jwt_secret')`
     );
     // Convert to a simple key-value object
     const configObj = result.rows.reduce((acc, row) => {
@@ -142,36 +142,24 @@ export async function updateConfig(req: AuthenticatedRequest, res: Response): Pr
         }
       }
       
-      // Only update keys that already exist — config keys are not free-form
-      const result = await client.query(
-        `UPDATE Platform_Config
-         SET config_value = $1, updated_by = $2, updated_at = NOW()
-         WHERE config_key = $3
-         RETURNING config_key`,
+      // Upsert keys into Platform_Config
+      await client.query(
+        `INSERT INTO Platform_Config (config_key, config_value, updated_by, updated_at)
+         VALUES ($3, $1, $2, NOW())
+         ON CONFLICT (config_key) DO UPDATE
+         SET config_value = EXCLUDED.config_value, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
         [String(value), actor.userId, key]
       );
-
-      if (result.rowCount === 0) {
-        await client.query('ROLLBACK');
-        res.status(400).json({ message: `Unknown config key: ${key}` });
-        return;
-      }
     }
 
     await client.query('COMMIT');
 
-    // Only clear the cache once the write has actually committed — clearing it
-    // beforehand leaves a window where a concurrent GET /api/config/public (the
-    // ConfigProvider on every client polls this every 30s) reads the old DB
-    // row, repopulates the cache with it, and that stale value then sticks
-    // until the next unrelated config write, since nothing else invalidates it.
     clearPublicConfigCache();
 
     // Broadcast config updates to all connected players/clients instantly
-    const publicKeys = ['active_theme', 'marquee_text', 'announcement_text', 'site_title', 'maintenance_mode', 'english_caller_enabled', 'announcements_list', 'announcement_speed', 'announcements_muted', 'bookie_commission_per_ticket', 'cage_sound_enabled', 'celebration_sound_enabled', 'welcome_voice_url', 'instruction_voice_url', 'welcome_voice_text', 'instruction_voice_text', 'welcome_voice_mode', 'instruction_voice_mode', 'welcome_voice_volume', 'instruction_voice_volume', 'tts_voice_name', 'background_music_url', 'background_music_enabled', 'background_music_volume', 'lobby_music_volume', 'master_calls_volume', 'cage_sound_type', 'winner_sound_type', 'lobby_music_url_1', 'lobby_music_url_2', 'lobby_music_url_3', 'lobby_music_url_4', 'lobby_music_url_5'];
     const publicUpdates: Record<string, string> = {};
     for (const [key, val] of Object.entries(updates)) {
-      if (publicKeys.includes(key)) {
+      if (key !== 'whatsapp_share_groups' && key !== 'jwt_secret') {
         publicUpdates[key] = String(val);
       }
     }

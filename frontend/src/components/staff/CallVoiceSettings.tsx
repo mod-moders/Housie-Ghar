@@ -375,6 +375,8 @@ export function CallVoiceSettings() {
     }
   };
 
+  const debouncedSaveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+
   const handleSaveConfig = async (updates: Record<string, string>) => {
     try {
       await apiFetch("/api/config", {
@@ -385,6 +387,18 @@ export function CallVoiceSettings() {
     } catch (err: any) {
       alert(err?.message || "Failed to update sound config settings.");
     }
+  };
+
+  const handleSaveConfigDebounced = (updates: Record<string, string>, delayMs: number = 400) => {
+    updateConfigLocally(updates);
+    Object.keys(updates).forEach(key => {
+      if (debouncedSaveTimeoutRef.current[key]) {
+        clearTimeout(debouncedSaveTimeoutRef.current[key]);
+      }
+      debouncedSaveTimeoutRef.current[key] = setTimeout(() => {
+        handleSaveConfig({ [key]: updates[key] });
+      }, delayMs);
+    });
   };
 
   const handleConfigAudioUpload = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -527,7 +541,7 @@ export function CallVoiceSettings() {
                 onChange={(e) => {
                   const gainVal = parseFloat(e.target.value);
                   setMasterCallsVolume(gainVal);
-                  handleSaveConfig({ master_calls_volume: String(gainVal) });
+                  handleSaveConfigDebounced({ master_calls_volume: String(gainVal) });
                 }}
                 style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer", height: "6px", borderRadius: "3px", background: "var(--border-2)" }}
               />
@@ -661,7 +675,7 @@ export function CallVoiceSettings() {
                 volume={bgMusicVolume}
                 onVolumeChange={(val) => {
                   setBgMusicVolume(val);
-                  updateConfigLocally({ background_music_volume: String(val) });
+                  handleSaveConfigDebounced({ background_music_volume: String(val) });
                   if (audioPlayerRef.current && activePreviewKey === "bg") {
                     audioPlayerRef.current.volume = val;
                   }
@@ -735,7 +749,7 @@ export function CallVoiceSettings() {
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
                   <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />
-                  <input type="range" min="0" max="1" step="0.05" value={cageVolume} onChange={(e) => { const v = parseFloat(e.target.value); setCageVolume(v); handleSaveConfig({ cage_sound_volume: String(v) }); }} style={{ width: "50px", accentColor: "var(--accent)", height: "3px" }} />
+                  <input type="range" min="0" max="1" step="0.05" value={cageVolume} onChange={(e) => { const v = parseFloat(e.target.value); setCageVolume(v); handleSaveConfigDebounced({ cage_sound_volume: String(v) }); }} style={{ width: "50px", accentColor: "var(--accent)", height: "3px" }} />
                   <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(cageVolume * 100)}%</span>
                 </div>
 
@@ -805,7 +819,7 @@ export function CallVoiceSettings() {
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
                   <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />
-                  <input type="range" min="0" max="1" step="0.05" value={winnerVolume} onChange={(e) => { const v = parseFloat(e.target.value); setWinnerVolume(v); handleSaveConfig({ winner_sound_volume: String(v) }); }} style={{ width: "50px", accentColor: "var(--accent)", height: "3px" }} />
+                  <input type="range" min="0" max="1" step="0.05" value={winnerVolume} onChange={(e) => { const v = parseFloat(e.target.value); setWinnerVolume(v); handleSaveConfigDebounced({ winner_sound_volume: String(v) }); }} style={{ width: "50px", accentColor: "var(--accent)", height: "3px" }} />
                   <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(winnerVolume * 100)}%</span>
                 </div>
 
@@ -922,7 +936,7 @@ export function CallVoiceSettings() {
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
                       <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolEn(v); handleSaveConfig({ welcome_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
+                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolEn(v); handleSaveConfigDebounced({ welcome_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
                       <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(welcomeVoiceVolEn * 100)}%</span>
                     </div>
                   </div>
@@ -942,7 +956,7 @@ export function CallVoiceSettings() {
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
                       <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolNe(v); handleSaveConfig({ welcome_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
+                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolNe(v); handleSaveConfigDebounced({ welcome_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
                       <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(welcomeVoiceVolNe * 100)}%</span>
                     </div>
                   </div>
@@ -956,10 +970,10 @@ export function CallVoiceSettings() {
                   onVolumeChange={(val) => {
                     if (welcomeVoiceLang === "ne") {
                       setWelcomeVoiceVolNe(val);
-                      handleSaveConfig({ welcome_voice_volume_ne: String(val) });
+                      handleSaveConfigDebounced({ welcome_voice_volume_ne: String(val) });
                     } else {
                       setWelcomeVoiceVolEn(val);
-                      handleSaveConfig({ welcome_voice_volume_en: String(val) });
+                      handleSaveConfigDebounced({ welcome_voice_volume_en: String(val) });
                     }
                   }}
                   title={`Intro Player (${welcomeVoiceLang.toUpperCase()})`}
@@ -1069,7 +1083,7 @@ export function CallVoiceSettings() {
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
                       <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolEn(v); handleSaveConfig({ instruction_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
+                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolEn(v); handleSaveConfigDebounced({ instruction_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
                       <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(instructionVoiceVolEn * 100)}%</span>
                     </div>
                   </div>
@@ -1089,7 +1103,7 @@ export function CallVoiceSettings() {
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
                       <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolNe(v); handleSaveConfig({ instruction_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
+                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolNe(v); handleSaveConfigDebounced({ instruction_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
                       <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(instructionVoiceVolNe * 100)}%</span>
                     </div>
                   </div>
@@ -1103,10 +1117,10 @@ export function CallVoiceSettings() {
                   onVolumeChange={(val) => {
                     if (instructionVoiceLang === "ne") {
                       setInstructionVoiceVolNe(val);
-                      handleSaveConfig({ instruction_voice_volume_ne: String(val) });
+                      handleSaveConfigDebounced({ instruction_voice_volume_ne: String(val) });
                     } else {
                       setInstructionVoiceVolEn(val);
-                      handleSaveConfig({ instruction_voice_volume_en: String(val) });
+                      handleSaveConfigDebounced({ instruction_voice_volume_en: String(val) });
                     }
                   }}
                   title={`Outro Player (${instructionVoiceLang.toUpperCase()})`}
