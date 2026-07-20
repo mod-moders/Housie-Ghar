@@ -144,7 +144,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
           
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ relative: "relative" }}>
+            <div style={{ position: "relative" }}>
               <div 
                 className="hg-avatar-sm" 
                 style={{ 
