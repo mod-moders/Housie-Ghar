@@ -230,28 +230,33 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      
-      let elapsedMs = 999999;
-      if (game?.started_at) {
-        elapsedMs = Date.now() - new Date(game.started_at).getTime();
-      }
 
-      // Mid-Game Joiner Check:
-      // A player is present at the fresh start if 0 numbers have drawn AND game started <= 24s ago.
-      // If numbers have drawn OR > 24s elapsed, the player joined mid-game:
-      // SKIP Welcome Text & Intro Note completely and sync directly to live feed!
-      const isFreshStart = drawnNumbers.length === 0 && (isNaN(elapsedMs) || elapsedMs <= 24000);
+      const startedAt = game?.started_at ? new Date(game.started_at).getTime() : Date.now();
+      const elapsedMs = Math.max(0, Date.now() - startedAt);
+      const sessionIntroKey = `hg_intro_done_${game_id}`;
+      const alreadyPlayedIntro = typeof window !== "undefined" && sessionStorage.getItem(sessionIntroKey) === "true";
 
-      if (isFreshStart) {
-        // 2. Welcome text displays on gameplay screen for remaining duration of initial 15s (BGM plays automatically).
+      // Trigger intro sequence ONLY if:
+      // 1. No numbers have been drawn yet (fresh game)
+      // 2. Elapsed time since operator clicked start is less than 30 seconds
+      // 3. This client session hasn't already played the intro
+      if (drawnNumbers.length === 0 && elapsedMs < 30000 && !alreadyPlayedIntro) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(sessionIntroKey, "true");
+        }
+
+        // Action 1: Display Welcome text on gameplay screen (BGM plays automatically).
+        // Welcome note pops in the screen for 3 seconds.
         setWelcomeTextVisible(true);
-        const welcomeDuration = Math.max(1000, 15000 - (isNaN(elapsedMs) ? 0 : elapsedMs));
-
         delay(() => {
           setWelcomeTextVisible(false);
-          // 2 (cont). After 15 seconds from game start, Intro note plays.
+        }, 3000);
+
+        // Action 2: Set 30-second timer from exact operator start moment before playing Intro note.
+        const timeRemainingToIntro = Math.max(0, 30000 - elapsedMs);
+        delay(() => {
           playGreeting().then(() => {
-            // 3. After intro note finishes playing, after 3 secs, cage starts rolling & first number call is displayed and played
+            // Action 3: Wait 3 seconds after Intro note audio completes before starting cage roll & Ball #1 call.
             delay(() => {
               setRevealed(false);
               delay(() => {
@@ -259,14 +264,14 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               }, 2000);
             }, 3000);
           });
-        }, welcomeDuration);
+        }, timeRemainingToIntro);
       } else {
-        // Mid-Game Joiner: Skip past events, live feed only!
-        setWelcomeTextVisible(false);
+        // Mid-Game Joiner State Logic: Skip welcome text and intro note completely.
+        // Sync directly to current live feed without triggering historical events.
         flushPendingDraws();
       }
     }
-  }, [gameStatus, drawnNumbers.length, game?.started_at, playGreeting, flushPendingDraws, delay]);
+  }, [gameStatus, drawnNumbers.length, game?.started_at, game_id, playGreeting, flushPendingDraws, delay]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);

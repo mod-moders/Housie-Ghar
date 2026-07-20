@@ -230,8 +230,8 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
   activeGames.set(gameId, activeGame);
   console.log(`🎮 Game started: ${game.title} (ID: ${gameId}). Total tickets: ${tickets.length}`);
 
-  // Start conduction ticks (24s initial delay for fresh games: 15s welcome + ~6s intro note + 3s cage roll)
-  const initialDelay = currentIndex === 0 ? 24000 : 3000;
+  // Start conduction ticks (39s initial delay for fresh games: 30s operator timer + ~6s intro note + 3s cage roll)
+  const initialDelay = currentIndex === 0 ? 39000 : 3000;
   runConductorTick(gameId, initialDelay);
 }
 

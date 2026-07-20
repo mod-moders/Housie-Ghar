@@ -296,11 +296,11 @@ export function useGameAudio(
     const effectiveVol = vol * masterVol;
 
     if (mode === "Audio" && audioUrl) {
-      await playAudioOrFallback(audioUrl, phrase, effectiveVol, null, true);
+      await playAudioOrFallback(audioUrl, phrase, effectiveVol);
     } else if (mode === "Audio" && !audioUrl) {
       // If Audio mode is set but number has no custom file, use standard audio call file
       const defaultAudioUrl = `/audio/calls/${num}.mp3`;
-      await playAudioOrFallback(defaultAudioUrl, phrase, effectiveVol, null, true);
+      await playAudioOrFallback(defaultAudioUrl, phrase, effectiveVol);
     } else {
       await fallbackToTTS(phrase);
     }
@@ -331,18 +331,11 @@ export function useGameAudio(
       });
   };
 
-  const playAudioOrFallback = (
-    mp3Path: string, 
-    fallbackText: string, 
-    customVolume: number = 1.0, 
-    forcedVoiceName: string | null = null,
-    strictAudioMode: boolean = false
-  ): Promise<void> => {
+  const playAudioOrFallback = (mp3Path: string, fallbackText: string, customVolume: number = 1.0, forcedVoiceName: string | null = null): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current || isMuted) return resolve();
 
       if (!mp3Path) {
-        if (strictAudioMode) return resolve();
         fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
         return;
       }
@@ -363,7 +356,7 @@ export function useGameAudio(
       };
       audio.onerror = () => {
         activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
-        if (isMountedRef.current && !isMuted && !strictAudioMode) {
+        if (isMountedRef.current && !isMuted) {
           fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
         } else {
           resolve();
@@ -379,7 +372,7 @@ export function useGameAudio(
         })
         .catch(() => {
           activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
-          if (isMountedRef.current && !isMuted && !strictAudioMode) {
+          if (isMountedRef.current && !isMuted) {
             fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
           } else {
             resolve();
