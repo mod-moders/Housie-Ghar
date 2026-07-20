@@ -251,8 +251,8 @@ function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElemen
 
 async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
   const logo = await loadLogo();
-  const logoSize = 240;
-  const logoY = 46;
+  const logoSize = 190;
+  const logoY = 40;
   if (logo) {
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
@@ -261,15 +261,15 @@ async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
     ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
     ctx.restore();
 
-    return logoY + logoSize + 28;
+    return logoY + logoSize + 20;
   }
 
   // fallback if the logo fails to load: plain wordmark, still on-brand
   ctx.textAlign = "center";
   ctx.fillStyle = GOLD;
-  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText("HOUSIE GHAR", W / 2, logoY + 40);
-  return logoY + 80;
+  return logoY + 70;
 }
 
 function paintFooter(ctx: CanvasRenderingContext2D) {
@@ -527,25 +527,26 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   const seg = timeSegment(new Date(game.scheduled_at));
 
+  y += 12;
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
-  ctx.font = "700 28px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 24px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText(`GET READY — ${seg.label.toUpperCase()} GAME`, W / 2, y);
-  y += 48;
+  y += 44;
 
   ctx.fillStyle = GOLD;
-  ctx.font = "700 58px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 52px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 66;
+    y += 60;
   }
-  y += 6;
+  y += 8;
 
   ctx.fillStyle = CYAN;
-  ctx.font = "600 30px 'JetBrains Mono', ui-monospace, monospace";
+  ctx.font = "600 26px 'JetBrains Mono', ui-monospace, monospace";
   ctx.fillText(`${fmtDateTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
-  y += 46;
+  y += 40;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -565,9 +566,9 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   });
 
   const footerY = H - 52;
-  const subtextY = Math.min(cardBottom + 134, footerY - 44);
-  const pillY = Math.min(cardBottom + 24, subtextY - 106);
-  const pillH = 84;
+  const subtextY = Math.min(cardBottom + 130, footerY - 44);
+  const pillY = Math.min(cardBottom + 24, subtextY - 100);
+  const pillH = 80;
   const grad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
   grad.addColorStop(0, GOLD);
   grad.addColorStop(1, GOLD_DIM);
@@ -575,14 +576,14 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   roundRect(ctx, 120, pillY, W - 240, pillH, pillH / 2);
   ctx.fill();
 
-  drawIcon(ctx, "ticket", W / 2 - 190, pillY + pillH / 2, 34, INK);
+  drawIcon(ctx, "ticket", W / 2 - 190, pillY + pillH / 2, 32, INK);
   ctx.textAlign = "center";
   ctx.fillStyle = INK;
-  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 12);
+  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText(`TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 11);
 
   ctx.fillStyle = DIM;
-  ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
+  ctx.font = "italic 500 26px 'DM Sans', system-ui, sans-serif";
   ctx.fillText("The entire town is playing! Are you?", W / 2, subtextY);
 
   paintFooter(ctx);
@@ -594,31 +595,32 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
-  drawIcon(ctx, "trophy", W / 2 - 168, y - 16, 40, GOLD);
-  drawIcon(ctx, "trophy", W / 2 + 168, y - 16, 40, GOLD);
+  y += 12;
+  drawIcon(ctx, "trophy", W / 2 - 150, y - 12, 34, GOLD);
+  drawIcon(ctx, "trophy", W / 2 + 150, y - 12, 34, GOLD);
   ctx.textAlign = "center";
   ctx.fillStyle = GOLD;
-  ctx.font = "700 40px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText("WINNERS", W / 2, y);
-  y += 54;
+  y += 48;
 
   ctx.fillStyle = WHITE;
-  ctx.font = "700 56px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 52px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 64;
+    y += 60;
   }
-  y += 6;
+  y += 8;
 
   const gameDateStr = fmtDateTime(game.scheduled_at ?? game.completed_at);
   if (gameDateStr) {
     ctx.fillStyle = CYAN;
-    ctx.font = "600 28px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.font = "600 24px 'JetBrains Mono', ui-monospace, monospace";
     ctx.fillText(gameDateStr, W / 2, y);
-    y += 44;
+    y += 38;
   } else {
-    y += 16;
+    y += 10;
   }
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
@@ -646,12 +648,12 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   });
 
   const footerY = H - 52;
-  const subtextY = Math.min(cardBottom + 88, footerY - 44);
-  const congratsY = subtextY - 44;
+  const subtextY = Math.min(cardBottom + 84, footerY - 44);
+  const congratsY = subtextY - 42;
 
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
-  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 30px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText("Congratulations to all our winners! 🎉", W / 2, congratsY);
 
   ctx.fillStyle = DIM;
