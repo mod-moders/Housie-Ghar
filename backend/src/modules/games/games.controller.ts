@@ -1592,13 +1592,17 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
             amount: combinedAmount,
           });
 
+          // entry.tickets already falls back to [fallbackTk] above when a segment's own
+          // parentheses had no ticket number (legacy/malformed name data) — unconditionally
+          // re-adding fallbackTk here too (as this used to) injected the row's single
+          // winner_ticket_id (whichever tied winner the engine happened to record as
+          // representative) into EVERY tied player's ticket_numbers, not just whoever
+          // actually lacked their own. E.g. a 3-way tie "A (1) & B (2) & C (3)" would show
+          // ticket #1 on B and C's claim cards too, even though only A won on ticket #1.
           for (const tkNum of entry.tickets) {
             if (tkNum && !claimObj.ticket_numbers.includes(tkNum)) {
               claimObj.ticket_numbers.push(tkNum);
             }
-          }
-          if (fallbackTk && !claimObj.ticket_numbers.includes(fallbackTk)) {
-            claimObj.ticket_numbers.push(fallbackTk);
           }
 
           claimObj.total_amount += combinedAmount;
