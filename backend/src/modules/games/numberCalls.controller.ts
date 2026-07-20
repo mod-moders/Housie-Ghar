@@ -10,7 +10,7 @@ import { faststartMp4 } from '../../utils/mp4Faststart';
 export async function listNumberCalls(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      'SELECT number, call_text, default_text, audio_url, call_mode, volume FROM Number_Calls ORDER BY number ASC'
+      'SELECT number, call_text, default_text, audio_url, audio_url_en, audio_url_ne, call_mode, volume FROM Number_Calls ORDER BY number ASC'
     );
     res.json(result.rows);
   } catch (error) {
@@ -79,11 +79,12 @@ export async function restoreDefaultCallText(req: Request, res: Response): Promi
 
 /**
  * Upload mp3 audio file for a number (Admin+)
- * Expects audio_data as base64 string in JSON body
+ * Expects audio_data as base64 string and optional lang ('en' | 'ne') in JSON body
  */
 export async function uploadNumberAudio(req: Request, res: Response): Promise<void> {
   const { number } = req.params;
-  const { audio_data } = req.body;
+  const { audio_data, lang } = req.body;
+  const targetLang = (lang === 'ne' || lang === 'nepali') ? 'ne' : 'en';
 
   if (!audio_data || typeof audio_data !== 'string') {
     res.status(400).json({ message: 'audio_data is required as a base64 string' });
@@ -114,15 +115,8 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     }
 
     const rawBuffer = Buffer.from(base64Data, 'base64');
-    // Phone/voice-recorder exports almost always land with `moov` after `mdat` —
-    // valid, but Chrome's <audio>/<video> progressive playback can fail or hang
-    // on that layout. Relocate moov to the front where possible; no-ops for
-    // mp3/wav or anything it doesn't recognize.
     const buffer = faststartMp4(rawBuffer);
 
-    // Resolve destinations:
-    // 1. backend persistent uploads: backend/uploads/audio/calls
-    // 2. frontend public: frontend/public/audio/calls
     const backendUploadDir = path.resolve(__dirname, '../../../uploads/audio/calls');
     fs.mkdirSync(backendUploadDir, { recursive: true });
 
@@ -133,11 +127,12 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/calls');
     try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
 
+    const filePrefix = targetLang === 'ne' ? `${number}_ne` : `${number}_en`;
     const possibleExts = ['mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'aac', 'flac', 'opus', '3gp', 'wma'];
     [backendUploadDir, frontendPublicDir].forEach((dir) => {
       if (fs.existsSync(dir)) {
         possibleExts.forEach((e) => {
-          const oldPath = path.join(dir, `${number}.${e}`);
+          const oldPath = path.join(dir, `${filePrefix}.${e}`);
           if (fs.existsSync(oldPath)) {
             try { fs.unlinkSync(oldPath); } catch {}
           }
@@ -145,22 +140,30 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
       }
     });
 
-    const filename = `${number}.${ext}`;
+    const filename = `${filePrefix}.${ext}`;
     fs.writeFileSync(path.join(backendUploadDir, filename), buffer);
     try { fs.writeFileSync(path.join(frontendPublicDir, filename), buffer); } catch {}
 
     const audioUrl = `/api/games/number-calls/audio-file/${filename}`;
-
     const numVal = parseInt(number as string, 10);
-    const result = await pool.query(
-      `INSERT INTO Number_Calls (number, audio_url, call_mode, call_text, default_text)
-       VALUES ($2, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
-       ON CONFLICT (number) DO UPDATE
-       SET audio_url = EXCLUDED.audio_url,
-           call_mode = 'Audio'
-       RETURNING *`,
-      [audioUrl, numVal]
-    );
+
+    const updateQuery = targetLang === 'ne'
+      ? `INSERT INTO Number_Calls (number, audio_url_ne, audio_url, call_mode, call_text, default_text)
+         VALUES ($2, $1, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
+         ON CONFLICT (number) DO UPDATE
+         SET audio_url_ne = EXCLUDED.audio_url_ne,
+             audio_url = COALESCE(Number_Calls.audio_url_en, EXCLUDED.audio_url_ne),
+             call_mode = 'Audio'
+         RETURNING *`
+      : `INSERT INTO Number_Calls (number, audio_url_en, audio_url, call_mode, call_text, default_text)
+         VALUES ($2, $1, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
+         ON CONFLICT (number) DO UPDATE
+         SET audio_url_en = EXCLUDED.audio_url_en,
+             audio_url = EXCLUDED.audio_url_en,
+             call_mode = 'Audio'
+         RETURNING *`;
+
+    const result = await pool.query(updateQuery, [audioUrl, numVal]);
 
     req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);
@@ -171,36 +174,65 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
 }
 
 /**
- * Delete audio file for a number and reset call mode back to 'Text' (Admin+)
+ * Delete audio file for a number and reset call mode back to 'Text' if both are empty (Admin+)
  */
 export async function deleteNumberAudio(req: Request, res: Response): Promise<void> {
   const { number } = req.params;
+  const { lang } = req.body || req.query || {};
 
   try {
-    // 1. Resolve path and clean up existing files
     const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');
     const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
-    possibleExts.forEach((e) => {
-      const filePath = path.join(destDir, `${number}.${e}`);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch {}
-      }
-    });
+    
+    if (lang === 'ne') {
+      possibleExts.forEach((e) => {
+        const filePath = path.join(destDir, `${number}_ne.${e}`);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch {}
+        }
+      });
+      await pool.query(
+        `UPDATE Number_Calls 
+         SET audio_url_ne = NULL,
+             audio_url = audio_url_en
+         WHERE number = $1`,
+        [parseInt(number as string, 10)]
+      );
+    } else if (lang === 'en') {
+      possibleExts.forEach((e) => {
+        const filePath = path.join(destDir, `${number}_en.${e}`);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch {}
+        }
+      });
+      await pool.query(
+        `UPDATE Number_Calls 
+         SET audio_url_en = NULL,
+             audio_url = audio_url_ne
+         WHERE number = $1`,
+        [parseInt(number as string, 10)]
+      );
+    } else {
+      possibleExts.forEach((e) => {
+        [`${number}_en.${e}`, `${number}_ne.${e}`, `${number}.${e}`].forEach((f) => {
+          const filePath = path.join(destDir, f);
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch {}
+          }
+        });
+      });
+      await pool.query(
+        `UPDATE Number_Calls 
+         SET audio_url = NULL, audio_url_en = NULL, audio_url_ne = NULL, call_mode = 'Text'
+         WHERE number = $1`,
+        [parseInt(number as string, 10)]
+      );
+    }
 
-    // 2. Clear audio_url and reset call_mode to 'Text' in DB
     const result = await pool.query(
-      `UPDATE Number_Calls 
-       SET audio_url = NULL, 
-           call_mode = 'Text'
-       WHERE number = $1 
-       RETURNING *`,
+      `SELECT * FROM Number_Calls WHERE number = $1`,
       [parseInt(number as string, 10)]
     );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: 'Number call setting not found' });
-      return;
-    }
 
     req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);

@@ -10,6 +10,8 @@ interface NumberCallConfig {
   call_text: string;
   default_text: string;
   audio_url: string | null;
+  audio_url_en?: string | null;
+  audio_url_ne?: string | null;
   call_mode: "Text" | "Audio";
   volume?: number;
 }
@@ -57,12 +59,6 @@ export function useGameAudio(
         } catch {}
         bgMusicRef.current = null;
       }
-
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {}
-      }
     };
   }, []);
 
@@ -91,7 +87,7 @@ export function useGameAudio(
 
   const activeBgUrlRef = useRef<string>("");
 
-  // Smoothly update gameplay background music volume in realtime without restarting or stopping the track
+  // Smoothly update gameplay background music volume in realtime
   useEffect(() => {
     if (bgMusicRef.current) {
       const bgVol = parseFloat(platformConfig?.background_music_volume || "0.15");
@@ -121,9 +117,7 @@ export function useGameAudio(
         audio.volume = bgVol;
         audio.muted = false;
         bgMusicRef.current = audio;
-        audio.play().catch(() => {
-          // auto-play blocked
-        });
+        audio.play().catch(() => {});
       } else {
         bgMusicRef.current.volume = bgVol;
         bgMusicRef.current.muted = false;
@@ -154,7 +148,7 @@ export function useGameAudio(
     };
   }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, isMuted, gameBgMusicEnabled]);
 
-  // Handle dynamic muting/unmuting of active audio tracks & speech synthesis
+  // Handle dynamic muting/unmuting of active audio tracks
   useEffect(() => {
     if (isMuted) {
       activeAudiosRef.current.forEach((audio) => {
@@ -164,11 +158,6 @@ export function useGameAudio(
       });
       if (bgMusicRef.current) {
         bgMusicRef.current.muted = true;
-      }
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {}
       }
     } else {
       if (bgMusicRef.current) {
@@ -190,21 +179,13 @@ export function useGameAudio(
       } catch {}
     });
     activeAudiosRef.current = [];
-
     activeTimersRef.current.forEach((t) => clearTimeout(t));
     activeTimersRef.current = [];
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-    }
   };
 
   const playGreeting = async (): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
-    // Check if Intro is enabled
     const introEnabled = platformConfig?.welcome_voice_enabled !== "false";
     if (!introEnabled) return;
 
@@ -214,21 +195,18 @@ export function useGameAudio(
     try {
       if (!isMountedRef.current || isMuted) return;
 
-      const mode = (gameIntroMode === "TTS" || gameIntroMode === "Text")
-        ? "Text"
-        : gameIntroMode === "Audio"
-          ? "Audio"
-          : (platformConfig?.welcome_voice_mode || "Audio");
-      const welcomeUrl = platformConfig?.welcome_voice_url;
-      const welcomeText = platformConfig?.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.";
-      const universalVoice = platformConfig?.tts_voice_name || null;
-      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
-      const volMultiplier = platformConfig?.welcome_voice_volume !== undefined ? parseFloat(platformConfig.welcome_voice_volume) : 1.0;
+      const activeLang = platformConfig?.welcome_voice_lang || platformConfig?.audio_language || "en";
+      const welcomeUrl = activeLang === "ne"
+        ? (platformConfig?.welcome_voice_url_ne || platformConfig?.welcome_voice_url)
+        : (platformConfig?.welcome_voice_url_en || platformConfig?.welcome_voice_url);
 
-      if (mode === "Audio" && welcomeUrl) {
-        await playAudioOrFallback(welcomeUrl, welcomeText, masterVol * volMultiplier, universalVoice);
-      } else {
-        await fallbackToTTS(welcomeText, universalVoice);
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = activeLang === "ne"
+        ? parseFloat(platformConfig?.welcome_voice_volume_ne || platformConfig?.welcome_voice_volume || "1.0")
+        : parseFloat(platformConfig?.welcome_voice_volume_en || platformConfig?.welcome_voice_volume || "1.0");
+
+      if (welcomeUrl) {
+        await playAudioFile(welcomeUrl, masterVol * volMultiplier);
       }
     } finally {
       isIntroPlayingRef.current = false;
@@ -244,28 +222,24 @@ export function useGameAudio(
   const playOutro = async (): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
-    // Check if Outro is enabled
     const outroEnabled = platformConfig?.instruction_voice_enabled !== "false";
     if (!outroEnabled) return;
 
     stopAllActiveAudios();
     
     try {
-      const mode = (gameOutroMode === "Audio")
-        ? "Audio"
-        : (gameOutroMode === "TTS" || gameOutroMode === "Text")
-          ? "Text"
-          : (platformConfig?.instruction_voice_mode || "Text");
-      const instructionUrl = platformConfig?.instruction_voice_url;
-      const instructionText = platformConfig?.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.";
-      const universalVoice = platformConfig?.tts_voice_name || null;
-      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
-      const volMultiplier = platformConfig?.instruction_voice_volume !== undefined ? parseFloat(platformConfig.instruction_voice_volume) : 1.0;
+      const activeLang = platformConfig?.instruction_voice_lang || platformConfig?.audio_language || "en";
+      const instructionUrl = activeLang === "ne"
+        ? (platformConfig?.instruction_voice_url_ne || platformConfig?.instruction_voice_url)
+        : (platformConfig?.instruction_voice_url_en || platformConfig?.instruction_voice_url);
 
-      if (mode === "Audio" && instructionUrl) {
-        await playAudioOrFallback(instructionUrl, instructionText, masterVol * volMultiplier, universalVoice);
-      } else {
-        await fallbackToTTS(instructionText, universalVoice);
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = activeLang === "ne"
+        ? parseFloat(platformConfig?.instruction_voice_volume_ne || platformConfig?.instruction_voice_volume || "1.0")
+        : parseFloat(platformConfig?.instruction_voice_volume_en || platformConfig?.instruction_voice_volume || "1.0");
+
+      if (instructionUrl) {
+        await playAudioFile(instructionUrl, masterVol * volMultiplier);
       }
     } catch {}
   };
@@ -280,40 +254,23 @@ export function useGameAudio(
 
     stopAllActiveAudios();
     const config = callsConfig[num];
-    const phrase = config?.call_text || englishPhrases[num] || `Number ${num}`;
-    
-    // Strict Mode Enforcement:
-    // If gameCallMode === "TTS", whole game MUST use TTS only.
-    // If gameCallMode === "Audio", whole game MUST use Audio only.
-    const isStrictTTS = gameCallMode === "TTS" || gameCallMode === "Text";
-    const isStrictAudio = gameCallMode === "Audio";
+    const activeLang = platformConfig?.audio_language || "en";
 
-    const mode = isStrictTTS ? "Text" : isStrictAudio ? "Audio" : (config?.call_mode || "Text");
-    const audioUrl = config?.audio_url;
+    const audioUrl = activeLang === "ne"
+      ? (config?.audio_url_ne || `/audio/calls/${num}_ne.mp3`)
+      : (config?.audio_url_en || config?.audio_url || `/audio/calls/${num}_en.mp3` || `/audio/calls/${num}.mp3`);
+
     const vol = config?.volume !== undefined ? config.volume : 1.0;
-
     const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
     const effectiveVol = vol * masterVol;
 
-    if (mode === "Audio" && audioUrl) {
-      await playAudioOrFallback(audioUrl, phrase, effectiveVol);
-    } else if (mode === "Audio" && !audioUrl) {
-      // If Audio mode is set but number has no custom file, use standard audio call file
-      const defaultAudioUrl = `/audio/calls/${num}.mp3`;
-      await playAudioOrFallback(defaultAudioUrl, phrase, effectiveVol);
-    } else {
-      await fallbackToTTS(phrase);
+    if (audioUrl) {
+      await playAudioFile(audioUrl, effectiveVol);
     }
   };
 
   const playCelebration = () => {
     if (!englishCallerEnabled || isMuted) return;
-    
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-    }
 
     const audio = new Audio("/audio/calls/celebration.mp3");
     activeAudiosRef.current.push(audio);
@@ -326,18 +283,15 @@ export function useGameAudio(
           audio.src = "";
         }
       })
-      .catch(() => {
-        // Ignore if file doesn't exist
-      });
+      .catch(() => {});
   };
 
-  const playAudioOrFallback = (mp3Path: string, fallbackText: string, customVolume: number = 1.0, forcedVoiceName: string | null = null): Promise<void> => {
+  const playAudioFile = (mp3Path: string, customVolume: number = 1.0): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current || isMuted) return resolve();
 
       if (!mp3Path) {
-        fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
-        return;
+        return resolve();
       }
 
       const resolvedUrl = resolveAudioUrl(mp3Path);
@@ -346,83 +300,34 @@ export function useGameAudio(
         audio.crossOrigin = "anonymous";
       }
       activeAudiosRef.current.push(audio);
-      audio.volume = 1.0;
+      audio.volume = Math.max(0, Math.min(1, customVolume));
       audio.muted = isMuted;
-      soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
-      
-      audio.onended = () => {
-        activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
+
+      let hasEnded = false;
+      const cleanupAndResolve = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        audio.removeEventListener("ended", cleanupAndResolve);
+        audio.removeEventListener("error", cleanupAndResolve);
+        const idx = activeAudiosRef.current.indexOf(audio);
+        if (idx > -1) activeAudiosRef.current.splice(idx, 1);
         resolve();
       };
-      audio.onerror = () => {
-        activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
-        if (isMountedRef.current && !isMuted) {
-          fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
-        } else {
-          resolve();
-        }
-      };
 
-      audio.play()
-        .then(() => {
-          if (!isMountedRef.current || isMuted) {
-            audio.pause();
-            audio.src = "";
-          }
-        })
-        .catch(() => {
-          activeAudiosRef.current = activeAudiosRef.current.filter(a => a !== audio);
-          if (isMountedRef.current && !isMuted) {
-            fallbackToTTS(fallbackText, forcedVoiceName).then(resolve);
-          } else {
-            resolve();
-          }
-        });
+      audio.addEventListener("ended", cleanupAndResolve);
+      audio.addEventListener("error", cleanupAndResolve);
+
+      audio.play().catch(() => {
+        cleanupAndResolve();
+      });
     });
   };
 
-  const fallbackToTTS = (text: string, forcedVoiceName: string | null = null): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!isMountedRef.current || isMuted || !("speechSynthesis" in window)) {
-        return resolve();
-      }
-
-      const timer = setTimeout(() => {
-        activeTimersRef.current = activeTimersRef.current.filter(t => t !== timer);
-        if (!isMountedRef.current || isMuted) return resolve();
-
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        const voices = window.speechSynthesis.getVoices();
-        const preferredName = forcedVoiceName || platformConfig?.tts_voice_name || (typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null);
-        let voice = voices.find(v => v.name === preferredName);
-        if (!voice && preferredName) {
-          const cleanSearch = preferredName.replace(/undefined/gi, "").trim();
-          if (cleanSearch) {
-            voice = voices.find(v => v.name.includes(cleanSearch) || cleanSearch.includes(v.name));
-          }
-        }
-        if (!voice) {
-          voice = voices.find(v => (v.name.includes("Natural") || v.name.includes("Neural") || v.name.includes("Google")) && (v.lang.startsWith("en") || v.lang.startsWith("hi"))) ||
-                  voices.find(v => v.lang.includes("en-IN") || v.lang.includes("en-GB") || v.lang.includes("en-US")) ||
-                  voices[0];
-        }
-        if (voice) {
-          utterance.voice = voice;
-        }
-
-        utterance.pitch = 1.0; 
-        utterance.rate = 0.95;
-
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        
-        window.speechSynthesis.speak(utterance);
-      }, 300);
-
-      activeTimersRef.current.push(timer);
-    });
+  return {
+    playGreeting,
+    playOutro,
+    playNumberCall,
+    playCelebration,
+    stopAllActiveAudios
   };
-
-  return { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef: isIntroPlayingRef };
 }

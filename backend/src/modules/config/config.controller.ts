@@ -271,7 +271,11 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
 
   const allowedKeys = [
     'welcome_voice_url',
+    'welcome_voice_url_en',
+    'welcome_voice_url_ne',
     'instruction_voice_url',
+    'instruction_voice_url_en',
+    'instruction_voice_url_ne',
     'background_music_url',
     'cage_sound_url',
     'celebration_sound_url',
