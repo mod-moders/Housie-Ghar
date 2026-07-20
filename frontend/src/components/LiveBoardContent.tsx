@@ -16,6 +16,7 @@ import { useGameAudio } from "@/hooks/useGameAudio";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { usePullToRefresh } from "@/components/usePullToRefresh";
 import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
 
 const RealisticBingoCage = dynamic(
@@ -228,6 +229,11 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
   // Prevent mobile device screen from sleeping during live game
   useWakeLock(gameStatus === "Live");
+
+  // Pull-to-refresh — .hg-frame is a manually-scrolled div, not html/body, so neither browser's
+  // native gesture can fire here (see usePullToRefresh.ts). Player-facing only: the staff embedded
+  // HUD (isStaff) shouldn't reload out from under an operator mid-monitoring.
+  const { ref: ptrRef, indicatorStyle: ptrIndicatorStyle, contentStyle: ptrContentStyle } = usePullToRefresh();
 
   // Measure the sticky top nav's real height so the sticky cage area (mobile) can sit flush
   // below it without overlap — hardcoding this would break if a long game title wraps to 2 lines.
@@ -639,8 +645,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
   return (
     <div className="hg-stage">
-      <div className="hg-frame">
-        <div className="hg-screen hg-live" ref={liveScreenRef}>
+      <div className="hg-frame" ref={!isStaff ? ptrRef : undefined}>
+        {!isStaff && <div className="hg-ptr-indicator" style={ptrIndicatorStyle}>↓</div>}
+        <div className="hg-screen hg-live" ref={liveScreenRef} style={!isStaff ? ptrContentStyle : undefined}>
           <div className="hg-live-top" ref={liveTopRef}>
             {!isStaff && (
               <button className="hg-back" onClick={onBack || (() => router.push("/"))} aria-label="Back">
