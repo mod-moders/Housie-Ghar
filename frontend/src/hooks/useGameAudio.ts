@@ -328,6 +328,7 @@ export function useGameAudio(
     playOutro,
     playNumberCall,
     playCelebration,
-    stopAllActiveAudios
+    stopAllActiveAudios,
+    introPlayingRef: isIntroPlayingRef
   };
 }
