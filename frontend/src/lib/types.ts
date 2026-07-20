@@ -97,6 +97,9 @@ export interface HallOfFameEntry {
   wins: number;
   total_won: number;
   biggest_win: number;
+  points?: number;
+  games_played?: number;
+  tickets_bought?: number;
 }
 
 export interface OverviewStats {
