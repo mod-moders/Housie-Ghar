@@ -288,8 +288,9 @@ export function useGameAudio(
         audio.crossOrigin = "anonymous";
       }
       activeAudiosRef.current.push(audio);
-      audio.volume = Math.max(0, Math.min(1, customVolume));
-      audio.muted = isMuted;
+
+      // Apply Live Announcement Echo / Reverb filter to uploaded audio announcements
+      soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
 
       let hasEnded = false;
       const cleanupAndResolve = () => {

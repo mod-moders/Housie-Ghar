@@ -322,17 +322,28 @@ export function CallVoiceSettings() {
     
     let targetVol = 1.0;
     if (key === "bg") targetVol = bgMusicVolume;
+    else if (key === "cage") targetVol = cageVolume;
+    else if (key === "celebration") targetVol = winnerVolume;
     else if (key === "welcome_en") targetVol = welcomeVoiceVolEn * masterCallsVolume;
     else if (key === "welcome_ne") targetVol = welcomeVoiceVolNe * masterCallsVolume;
     else if (key === "instruction_en") targetVol = instructionVoiceVolEn * masterCallsVolume;
     else if (key === "instruction_ne") targetVol = instructionVoiceVolNe * masterCallsVolume;
 
-    audio.volume = Math.max(0, Math.min(1, targetVol));
+    let echoHandle: any = null;
+    if (key.startsWith("welcome") || key.startsWith("instruction")) {
+      echoHandle = soundSynthesizer.applyLiveAnnouncementEcho(audio, targetVol);
+    } else {
+      audio.volume = Math.max(0, Math.min(1, targetVol));
+    }
 
     activeAnnouncementHandleRef.current = {
       audio,
       updateVolume: (v: number) => {
-        if (audio) audio.volume = Math.max(0, Math.min(1, v));
+        if (echoHandle && echoHandle.updateVolume) {
+          echoHandle.updateVolume(v);
+        } else if (audio) {
+          audio.volume = Math.max(0, Math.min(1, v));
+        }
       }
     };
 
@@ -494,12 +505,21 @@ export function CallVoiceSettings() {
     const resolved = resolveAudioUrl(url);
     const audio = new Audio(resolved);
     const itemVol = item.volume !== undefined ? item.volume : 1.0;
-    audio.volume = Math.max(0, Math.min(1, itemVol * masterCallsVolume));
+    const targetVol = itemVol * masterCallsVolume;
+
+    // Apply Live Announcement Echo filter to preview playback
+    const echoHandle = soundSynthesizer.applyLiveAnnouncementEcho(audio, targetVol);
 
     activePreviewRef.current = {
       number: item.number,
       audio,
-      updateVolume: (v) => { if (audio) audio.volume = Math.max(0, Math.min(1, v)); }
+      updateVolume: (v) => {
+        if (echoHandle && echoHandle.updateVolume) {
+          echoHandle.updateVolume(v);
+        } else if (audio) {
+          audio.volume = Math.max(0, Math.min(1, v));
+        }
+      }
     };
 
     audio.play().catch(() => {});
