@@ -965,44 +965,44 @@ export function CallVoiceSettings() {
                 </div>
 
                 {/* Dual Upload Inputs for Intro */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "10px" }}>
                   {/* English Intro File */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)", minWidth: 0 }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇬🇧 English Intro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("welcome_voice_url_en", e)} style={{ display: "none" }} />
                       <span>{welcomeVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
                     </label>
                     {welcomeVoiceUrlEn && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span className="hg-dim" style={{ fontSize: "10px", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{welcomeVoiceUrlEn.split("/").pop()}</span>
-                        <button onClick={() => { setWelcomeVoiceUrlEn(""); handleSaveConfig({ welcome_voice_url_en: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0 }}>
+                        <span className="hg-dim" style={{ fontSize: "10px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{welcomeVoiceUrlEn.split("/").pop()}</span>
+                        <button onClick={() => { setWelcomeVoiceUrlEn(""); handleSaveConfig({ welcome_voice_url_en: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", flexShrink: 0 }}><Icon name="trash" size={12} /></button>
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                      <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolEn(v); handleSaveConfigDebounced({ welcome_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
-                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(welcomeVoiceVolEn * 100)}%</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", minWidth: 0 }}>
+                      <Icon name="volume" size={12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolEn(v); handleSaveConfigDebounced({ welcome_voice_volume_en: String(v) }); }} style={{ flex: 1, minWidth: 0, accentColor: "var(--accent)", height: "3px" }} />
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)", flexShrink: 0 }}>{Math.round(welcomeVoiceVolEn * 100)}%</span>
                     </div>
                   </div>
 
                   {/* Nepali Intro File */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)", minWidth: 0 }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇳🇵 Nepali Intro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("welcome_voice_url_ne", e)} style={{ display: "none" }} />
                       <span>{welcomeVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
                     </label>
                     {welcomeVoiceUrlNe && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span className="hg-dim" style={{ fontSize: "10px", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{welcomeVoiceUrlNe.split("/").pop()}</span>
-                        <button onClick={() => { setWelcomeVoiceUrlNe(""); handleSaveConfig({ welcome_voice_url_ne: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0 }}>
+                        <span className="hg-dim" style={{ fontSize: "10px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{welcomeVoiceUrlNe.split("/").pop()}</span>
+                        <button onClick={() => { setWelcomeVoiceUrlNe(""); handleSaveConfig({ welcome_voice_url_ne: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", flexShrink: 0 }}><Icon name="trash" size={12} /></button>
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                      <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolNe(v); handleSaveConfigDebounced({ welcome_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
-                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(welcomeVoiceVolNe * 100)}%</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", minWidth: 0 }}>
+                      <Icon name="volume" size={12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                      <input type="range" min="0" max="1" step="0.05" value={welcomeVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setWelcomeVoiceVolNe(v); handleSaveConfigDebounced({ welcome_voice_volume_ne: String(v) }); }} style={{ flex: 1, minWidth: 0, accentColor: "var(--accent)", height: "3px" }} />
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)", flexShrink: 0 }}>{Math.round(welcomeVoiceVolNe * 100)}%</span>
                     </div>
                   </div>
                 </div>
@@ -1112,44 +1112,44 @@ export function CallVoiceSettings() {
                 </div>
 
                 {/* Dual Upload Inputs for Outro */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "10px" }}>
                   {/* English Outro File */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)", minWidth: 0 }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇬🇧 English Outro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("instruction_voice_url_en", e)} style={{ display: "none" }} />
                       <span>{instructionVoiceUrlEn ? "Replace ENG" : "Upload ENG MP3"}</span>
                     </label>
                     {instructionVoiceUrlEn && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span className="hg-dim" style={{ fontSize: "10px", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructionVoiceUrlEn.split("/").pop()}</span>
-                        <button onClick={() => { setInstructionVoiceUrlEn(""); handleSaveConfig({ instruction_voice_url_en: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0 }}>
+                        <span className="hg-dim" style={{ fontSize: "10px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructionVoiceUrlEn.split("/").pop()}</span>
+                        <button onClick={() => { setInstructionVoiceUrlEn(""); handleSaveConfig({ instruction_voice_url_en: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", flexShrink: 0 }}><Icon name="trash" size={12} /></button>
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                      <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolEn(v); handleSaveConfigDebounced({ instruction_voice_volume_en: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
-                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(instructionVoiceVolEn * 100)}%</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", minWidth: 0 }}>
+                      <Icon name="volume" size={12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolEn} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolEn(v); handleSaveConfigDebounced({ instruction_voice_volume_en: String(v) }); }} style={{ flex: 1, minWidth: 0, accentColor: "var(--accent)", height: "3px" }} />
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)", flexShrink: 0 }}>{Math.round(instructionVoiceVolEn * 100)}%</span>
                     </div>
                   </div>
 
                   {/* Nepali Outro File */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-2)", minWidth: 0 }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text)" }}>🇳🇵 Nepali Outro MP3</span>
                     <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--ink)", padding: "6px 10px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
                       <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("instruction_voice_url_ne", e)} style={{ display: "none" }} />
                       <span>{instructionVoiceUrlNe ? "Replace NEP" : "Upload NEP MP3"}</span>
                     </label>
                     {instructionVoiceUrlNe && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span className="hg-dim" style={{ fontSize: "10px", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructionVoiceUrlNe.split("/").pop()}</span>
-                        <button onClick={() => { setInstructionVoiceUrlNe(""); handleSaveConfig({ instruction_voice_url_ne: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0 }}>
+                        <span className="hg-dim" style={{ fontSize: "10px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructionVoiceUrlNe.split("/").pop()}</span>
+                        <button onClick={() => { setInstructionVoiceUrlNe(""); handleSaveConfig({ instruction_voice_url_ne: "" }); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", flexShrink: 0 }}><Icon name="trash" size={12} /></button>
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                      <Icon name="volume" size={12} style={{ color: "var(--accent)" }} />
-                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolNe(v); handleSaveConfigDebounced({ instruction_voice_volume_ne: String(v) }); }} style={{ flex: 1, accentColor: "var(--accent)", height: "3px" }} />
-                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)" }}>{Math.round(instructionVoiceVolNe * 100)}%</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", minWidth: 0 }}>
+                      <Icon name="volume" size={12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                      <input type="range" min="0" max="1" step="0.05" value={instructionVoiceVolNe} onChange={(e) => { const v = parseFloat(e.target.value); setInstructionVoiceVolNe(v); handleSaveConfigDebounced({ instruction_voice_volume_ne: String(v) }); }} style={{ flex: 1, minWidth: 0, accentColor: "var(--accent)", height: "3px" }} />
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--text-mute)", flexShrink: 0 }}>{Math.round(instructionVoiceVolNe * 100)}%</span>
                     </div>
                   </div>
                 </div>

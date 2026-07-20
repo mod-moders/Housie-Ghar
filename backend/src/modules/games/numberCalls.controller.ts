@@ -147,16 +147,22 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     const audioUrl = `/api/games/number-calls/audio-file/${filename}`;
     const numVal = parseInt(number as string, 10);
 
+    // $2::int cast is required: $2 is also used inside 'Number ' || $2 below, and Postgres
+    // infers a single type per placeholder across the whole query — left bare, that text
+    // concatenation makes it infer $2 as text, conflicting with its use as the integer
+    // `number` column ("inconsistent types deduced for parameter $2"). This 500'd on EVERY
+    // upload (both languages; EN just happened to be the one actually exercised, since NEP's
+    // existing files came from migration 042's backfill UPDATE, not this INSERT).
     const updateQuery = targetLang === 'ne'
       ? `INSERT INTO Number_Calls (number, audio_url_ne, audio_url, call_mode, call_text, default_text)
-         VALUES ($2, $1, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
+         VALUES ($2::int, $1, $1, 'Audio', 'Number ' || $2::int, 'Number ' || $2::int)
          ON CONFLICT (number) DO UPDATE
          SET audio_url_ne = EXCLUDED.audio_url_ne,
              audio_url = COALESCE(Number_Calls.audio_url_en, EXCLUDED.audio_url_ne),
              call_mode = 'Audio'
          RETURNING *`
       : `INSERT INTO Number_Calls (number, audio_url_en, audio_url, call_mode, call_text, default_text)
-         VALUES ($2, $1, $1, 'Audio', 'Number ' || $2, 'Number ' || $2)
+         VALUES ($2::int, $1, $1, 'Audio', 'Number ' || $2::int, 'Number ' || $2::int)
          ON CONFLICT (number) DO UPDATE
          SET audio_url_en = EXCLUDED.audio_url_en,
              audio_url = EXCLUDED.audio_url_en,
