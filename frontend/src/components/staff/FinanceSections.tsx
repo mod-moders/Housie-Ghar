@@ -538,7 +538,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               gap: "8px"
             }}
           >
-            ⚡ Recharge Requests ({activeRecharges.length})
+            Recharge Requests ({activeRecharges.length})
           </button>
 
           {/* 2. Claim Requests Tab */}
@@ -561,7 +561,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               gap: "8px"
             }}
           >
-            🏆 Claim Requests ({activeClaims.length})
+            Claim Requests ({activeClaims.length})
           </button>
         </div>
       </div>
