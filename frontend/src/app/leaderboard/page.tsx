@@ -8,7 +8,7 @@ import { Icon } from "@/components/Icon";
 import { Footer } from "@/components/ui";
 import type { HallOfFameEntry } from "@/lib/types";
 
-type SortTab = "points" | "wins" | "earnings" | "biggestWin";
+type SortTab = "wins" | "earnings" | "biggestWin";
 type Timeframe = "all-time" | "monthly" | "weekly" | "daily";
 
 const HIGH_ROLLER_THRESHOLD = 10000;
@@ -30,7 +30,7 @@ function getPlayerInsight(entry: HallOfFameEntry) {
 export default function Leaderboard() {
   const [entries, setEntries] = useState<HallOfFameEntry[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<SortTab>("points");
+  const [activeTab, setActiveTab] = useState<SortTab>("wins");
   const [timeframe, setTimeframe] = useState<Timeframe>("all-time");
   const [expandedName, setExpandedName] = useState<string | null>(null);
   const [loggedInName, setLoggedInName] = useState<string | null>(null);
@@ -66,14 +66,12 @@ export default function Leaderboard() {
     if (!entries || entries.length === 0) return null;
     const totalEarnings = entries.reduce((sum, e) => sum + e.total_won, 0);
     const maxWin = Math.max(...entries.map(e => e.biggest_win));
-    const topPoints = Math.max(...entries.map(e => e.points || 0));
     const totalWins = entries.reduce((sum, e) => sum + e.wins, 0);
     const avgWinValue = totalWins > 0 ? totalEarnings / totalWins : 0;
     
     return {
       totalEarnings,
       maxWin,
-      topPoints,
       avgWinValue,
     };
   }, [entries]);
@@ -88,14 +86,12 @@ export default function Leaderboard() {
     );
 
     // 2. Sort by active tab
-    if (activeTab === "points") {
-      list.sort((a, b) => (b.points || 0) - (a.points || 0) || b.wins - a.wins || b.total_won - a.total_won);
-    } else if (activeTab === "wins") {
-      list.sort((a, b) => b.wins - a.wins || (b.points || 0) - (a.points || 0));
+    if (activeTab === "wins") {
+      list.sort((a, b) => b.wins - a.wins || b.total_won - a.total_won);
     } else if (activeTab === "earnings") {
-      list.sort((a, b) => b.total_won - a.total_won || (b.points || 0) - (a.points || 0));
+      list.sort((a, b) => b.total_won - a.total_won || b.wins - a.wins);
     } else if (activeTab === "biggestWin") {
-      list.sort((a, b) => b.biggest_win - a.biggest_win || (b.points || 0) - (a.points || 0));
+      list.sort((a, b) => b.biggest_win - a.biggest_win || b.wins - a.wins);
     }
 
     return list;
@@ -114,7 +110,7 @@ export default function Leaderboard() {
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
           <div>
             <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame</h1>
-            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Official player account rankings based on consolidated game performance, wins & points score.</p>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Check top-ranked individual player accounts, total wins, and biggest payouts.</p>
           </div>
         </div>
 
@@ -123,12 +119,11 @@ export default function Leaderboard() {
           <div style={{ ...containerStyle, display: "flex", gap: 12, flexWrap: "wrap", paddingTop: 12, paddingBottom: 16 }}>
             {[
               { label: "Total Payouts", value: money(insights.totalEarnings), accent: true },
-              { label: "Top Score", value: `${insights.topPoints.toLocaleString()} PTS`, accent: false },
               { label: "Highest Payout", value: money(insights.maxWin), accent: false },
               { label: "Avg Payout/Win", value: money(insights.avgWinValue), accent: false },
             ].map((k) => (
               <div key={k.label} className="hg-kpi-card-hover" style={{
-                flex: "1 1 180px",
+                flex: "1 1 200px",
                 background: "var(--surface)", border: "1.5px solid var(--card-line)",
                 borderRadius: "var(--radius)", padding: "14px 18px",
                 boxShadow: "var(--card-shadow-sm)",
@@ -193,10 +188,9 @@ export default function Leaderboard() {
             padding: 4, borderRadius: "var(--radius)",
             border: "1.5px solid var(--border-2)",
             boxShadow: "var(--card-shadow-sm)",
-            width: "100%", gap: 4,
-            overflowX: "auto"
+            width: "100%", gap: 4
           }}>
-            {(["points", "wins", "earnings", "biggestWin"] as SortTab[]).map((tab) => {
+            {(["wins", "earnings", "biggestWin"] as SortTab[]).map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -218,8 +212,8 @@ export default function Leaderboard() {
                     gap: 6
                   }}
                 >
-                  <Icon name={tab === "points" ? "star" : tab === "wins" ? "trophy" : tab === "earnings" ? "wallet" : "flame"} size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
-                  {tab === "points" ? "Rank By Points" : tab === "wins" ? "Most Wins" : tab === "earnings" ? "Total Earnings" : "Biggest Win"}
+                  <Icon name={tab === "wins" ? "trophy" : tab === "earnings" ? "wallet" : "flame"} size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
+                  {tab === "wins" ? "Most Wins" : tab === "earnings" ? "Total Earnings" : "Biggest Win"}
                 </button>
               );
             })}
@@ -230,7 +224,7 @@ export default function Leaderboard() {
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
             <span className="hg-poll-spin" style={{ display: "inline-block", width: "24px", height: "24px", border: "2px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            <p style={{ marginTop: "12px", fontSize: "14px" }}>Loading player account rankings…</p>
+            <p style={{ marginTop: "12px", fontSize: "14px" }}>Loading leaderboard statistics…</p>
           </div>
         ) : processedEntries.length > 0 ? (
           <div className="hg-leaderboard" style={{ marginTop: 4 }}>
@@ -241,8 +235,7 @@ export default function Leaderboard() {
               const isExpanded = expandedName === w.housie_name;
               const insight = getPlayerInsight(w);
               const isHighRoller = w.total_won > HIGH_ROLLER_THRESHOLD;
-              const pointsVal = w.points || 0;
-              const rankGapPoints = rank > 1 ? ((processedEntries[i - 1].points || 0) - pointsVal) : 0;
+              const rankGap = rank > 1 ? processedEntries[i - 1].total_won - w.total_won : 0;
 
               return (
                 <div key={w.housie_name}>
@@ -281,9 +274,6 @@ export default function Leaderboard() {
                     <div className="hg-lb-info">
                       <strong style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "15px" }}>{w.housie_name}</span>
-                        <span className="hg-pill hg-pill-accent" style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", background: "rgba(244, 201, 93, 0.12)", color: "var(--accent)", border: "1px solid rgba(244, 201, 93, 0.3)" }}>
-                          ⭐ {pointsVal.toLocaleString()} PTS
-                        </span>
                         {isCurrentUser && (
                           <span style={{ fontSize: "9px", background: "var(--accent)", color: "#000", fontWeight: 800, padding: "1px 6px", borderRadius: "999px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>
                         )}
@@ -292,22 +282,21 @@ export default function Leaderboard() {
                         <span style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "12px" }}>
                           <span>Total Won: <b style={{ color: "var(--accent)" }}>{money(w.total_won)}</b></span>
                           <span>Wins: <b>{w.wins}</b></span>
-                          <span>Games Played: <b>{insight.gamesPlayed}</b></span>
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
                           Avg payout/win: <b>{money(avgPayout)}</b> · Best win: <b>{money(w.biggest_win)}</b>
                         </span>
-                        {rank > 1 && activeTab === "points" && rankGapPoints > 0 && (
+                        {rank > 1 && activeTab === "earnings" && rankGap > 0 && (
                           <span style={{ fontSize: "10px", color: "var(--text-dim)", opacity: 0.85 }}>
-                            {rankGapPoints.toLocaleString()} PTS to Rank {rank - 1}
+                            {money(rankGap)} to Rank {rank - 1}
                           </span>
                         )}
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                       <span className="hg-lb-wins">
-                        {activeTab === "points" ? `${pointsVal.toLocaleString()}` : activeTab === "earnings" ? money(w.total_won) : activeTab === "biggestWin" ? money(w.biggest_win) : `${w.wins}`}
-                        <i>{activeTab === "points" ? "points" : activeTab === "earnings" ? "won" : activeTab === "biggestWin" ? "best win" : "wins"}</i>
+                        {activeTab === "earnings" ? money(w.total_won) : activeTab === "biggestWin" ? money(w.biggest_win) : `${w.wins}`}
+                        <i>{activeTab === "earnings" ? "won" : activeTab === "biggestWin" ? "best win" : "wins"}</i>
                       </span>
                       {insight.currentStreak >= 3 && (
                         <span
@@ -361,12 +350,10 @@ export default function Leaderboard() {
                         }}
                       >
                         {[
-                          { label: "Points Score", value: `⭐ ${pointsVal.toLocaleString()} PTS` },
                           { label: "Total Wins", value: w.wins },
                           { label: "Total Winnings", value: money(w.total_won) },
-                          { label: "Games Played", value: insight.gamesPlayed },
-                          { label: "Tickets Bought", value: insight.totalTickets },
-                          { label: "Win Rate", value: `${insight.winRate}%` },
+                          { label: "Biggest Single Win", value: money(w.biggest_win) },
+                          { label: "Avg Payout / Win", value: money(avgPayout) },
                         ].map((m) => (
                           <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                             <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>

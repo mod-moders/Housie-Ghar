@@ -98,49 +98,20 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
     }
 
     const result = await pool.query(
-      `WITH player_wins AS (
-        SELECT 
-          LOWER(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g'))) AS clean_name,
-          MIN(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g'))) AS housie_name,
-          COUNT(*)::INTEGER AS wins,
-          COALESCE(SUM(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS total_won,
-          COALESCE(MAX(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS biggest_win
-        FROM Prize_Pool p,
-        LATERAL REGEXP_SPLIT_TO_TABLE(p.winner_housie_name, ',\\s*') AS split_name
-        WHERE p.claimed = TRUE 
-          AND p.winner_housie_name IS NOT NULL 
-          AND TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')) != ''
-          ${timeFilter}
-        GROUP BY LOWER(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')))
-      ),
-      player_activity AS (
-        SELECT 
-          LOWER(TRIM(REGEXP_REPLACE(t.owner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))) AS clean_name,
-          COUNT(DISTINCT t.game_id)::INTEGER AS games_played,
-          COUNT(t.ticket_id)::INTEGER AS tickets_bought
-        FROM Tickets t
-        WHERE t.owner_housie_name IS NOT NULL 
-          AND TRIM(REGEXP_REPLACE(t.owner_housie_name, '\\s*\\([^)]*\\)', '', 'g')) != ''
-        GROUP BY LOWER(TRIM(REGEXP_REPLACE(t.owner_housie_name, '\\s*\\([^)]*\\)', '', 'g')))
-      )
-      SELECT 
-        pw.housie_name,
-        pw.wins,
-        pw.total_won,
-        pw.biggest_win,
-        COALESCE(pa.games_played, 1) AS games_played,
-        COALESCE(pa.tickets_bought, pw.wins * 2) AS tickets_bought,
-        (
-          (pw.wins * 100) + 
-          FLOOR(pw.total_won / 10)::INTEGER + 
-          (COALESCE(pa.games_played, 1) * 15) + 
-          (COALESCE(pa.tickets_bought, pw.wins * 2) * 5) + 
-          FLOOR(pw.biggest_win / 20)::INTEGER
-        ) AS points
-      FROM player_wins pw
-      LEFT JOIN player_activity pa ON pw.clean_name = pa.clean_name
-      ORDER BY points DESC, pw.wins DESC, pw.total_won DESC
-      LIMIT 50`
+      `SELECT 
+        MIN(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g'))) AS housie_name,
+        COUNT(*)::INTEGER AS wins,
+        COALESCE(SUM(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS total_won,
+        COALESCE(MAX(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS biggest_win
+       FROM Prize_Pool p,
+       LATERAL REGEXP_SPLIT_TO_TABLE(p.winner_housie_name, ',\\s*') AS split_name
+       WHERE p.claimed = TRUE 
+         AND p.winner_housie_name IS NOT NULL 
+         AND TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')) != ''
+         ${timeFilter}
+       GROUP BY LOWER(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')))
+       ORDER BY wins DESC, total_won DESC
+       LIMIT 50`
     );
 
     res.json(
@@ -149,9 +120,6 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
         wins: row.wins,
         total_won: parseFloat(row.total_won),
         biggest_win: parseFloat(row.biggest_win),
-        games_played: row.games_played,
-        tickets_bought: row.tickets_bought,
-        points: parseInt(row.points, 10),
       }))
     );
   } catch (error) {
