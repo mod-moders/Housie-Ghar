@@ -406,3 +406,229 @@ export async function getFinancialAnalysis(req: AuthenticatedRequest, res: Respo
   }
 }
 
+/**
+ * Personal analytics dashboard for an Operator user.
+ */
+export async function getOperatorStats(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const operatorId = req.user?.user_id;
+    if (!operatorId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const [gamesSummary, numbersCalled, ticketsAndPayout, recentGames] = await Promise.all([
+      pool.query(
+        `SELECT
+           COUNT(*)::INTEGER AS total_games,
+           COUNT(*) FILTER (WHERE game_status = 'Completed')::INTEGER AS completed_games,
+           COUNT(*) FILTER (WHERE game_status IN ('Live', 'Paused'))::INTEGER AS live_games,
+           COUNT(*) FILTER (WHERE game_status = 'Scheduled')::INTEGER AS scheduled_games
+         FROM Scheduled_Games
+         WHERE operator_id = $1`,
+        [operatorId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::INTEGER AS total_calls
+         FROM Number_Calls nc
+         JOIN Scheduled_Games g ON g.game_id = nc.game_id
+         WHERE g.operator_id = $1`,
+        [operatorId]
+      ),
+      pool.query(
+        `SELECT
+           COALESCE(COUNT(DISTINCT t.ticket_id), 0)::INTEGER AS total_tickets_sold,
+           COALESCE(SUM(p.prize_amount) FILTER (WHERE p.claimed = TRUE), 0) AS total_payouts_disbursed,
+           COALESCE(COUNT(DISTINCT p.prize_id) FILTER (WHERE p.claimed = TRUE), 0)::INTEGER AS total_prizes_claimed
+         FROM Scheduled_Games g
+         LEFT JOIN Tickets t ON t.game_id = g.game_id AND t.status = 'Sold'
+         LEFT JOIN Prize_Pool p ON p.game_id = g.game_id
+         WHERE g.operator_id = $1`,
+        [operatorId]
+      ),
+      pool.query(
+        `SELECT
+           g.game_id,
+           g.title,
+           g.scheduled_at,
+           g.completed_at,
+           g.game_status,
+           g.total_tickets,
+           g.ticket_price,
+           (SELECT COUNT(*)::INTEGER FROM Tickets t WHERE t.game_id = g.game_id AND t.status = 'Sold') AS tickets_sold,
+           (SELECT COUNT(*)::INTEGER FROM Number_Calls nc WHERE nc.game_id = g.game_id) AS numbers_called,
+           COALESCE((SELECT SUM(p.prize_amount) FROM Prize_Pool p WHERE p.game_id = g.game_id AND p.claimed = TRUE), 0) AS total_payout
+         FROM Scheduled_Games g
+         WHERE g.operator_id = $1
+         ORDER BY g.created_at DESC
+         LIMIT 20`,
+        [operatorId]
+      ),
+    ]);
+
+    const summary = gamesSummary.rows[0];
+    const tickets = ticketsAndPayout.rows[0];
+
+    res.json({
+      total_games_operated: summary.total_games || 0,
+      completed_games: summary.completed_games || 0,
+      live_games: summary.live_games || 0,
+      scheduled_games: summary.scheduled_games || 0,
+      total_numbers_called: numbersCalled.rows[0].total_calls || 0,
+      total_tickets_sold: tickets.total_tickets_sold || 0,
+      total_payouts_disbursed: parseFloat(tickets.total_payouts_disbursed || '0'),
+      total_prizes_claimed: tickets.total_prizes_claimed || 0,
+      recent_games: recentGames.rows.map((row: any) => ({
+        game_id: row.game_id,
+        title: row.title,
+        scheduled_at: row.scheduled_at,
+        completed_at: row.completed_at,
+        game_status: row.game_status,
+        total_tickets: row.total_tickets,
+        ticket_price: parseFloat(row.ticket_price),
+        tickets_sold: row.tickets_sold,
+        numbers_called: row.numbers_called,
+        total_payout: parseFloat(row.total_payout),
+        fill_rate: row.total_tickets > 0 ? Math.round((row.tickets_sold / row.total_tickets) * 100) : 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching operator stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Personal analytics dashboard for a Bookie / Promoter user.
+ */
+export async function getBookieStats(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const bookieId = req.user?.user_id;
+    if (!bookieId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const [salesTimeframes, bookingStatusCounts, walletBalance, topupStats, recentBookings] = await Promise.all([
+      pool.query(
+        `SELECT
+           COALESCE(SUM(array_length(ticket_ids, 1)) FILTER (WHERE booking_status = 'Sold'), 0)::INTEGER AS total_tickets_sold,
+           COALESCE(SUM(total_amount) FILTER (WHERE booking_status = 'Sold'), 0) AS total_gross_collection,
+
+           COALESCE(SUM(array_length(ticket_ids, 1)) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '24 hours'), 0)::INTEGER AS tickets_sold_daily,
+           COALESCE(SUM(total_amount) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '24 hours'), 0) AS collection_daily,
+
+           COALESCE(SUM(array_length(ticket_ids, 1)) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '7 days'), 0)::INTEGER AS tickets_sold_weekly,
+           COALESCE(SUM(total_amount) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '7 days'), 0) AS collection_weekly,
+
+           COALESCE(SUM(array_length(ticket_ids, 1)) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '30 days'), 0)::INTEGER AS tickets_sold_monthly,
+           COALESCE(SUM(total_amount) FILTER (WHERE booking_status = 'Sold' AND confirmed_at >= NOW() - INTERVAL '30 days'), 0) AS collection_monthly
+         FROM Bookings
+         WHERE assigned_agent_id = $1`,
+        [bookieId]
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*)::INTEGER AS total_bookings_attempted,
+           COUNT(*) FILTER (WHERE booking_status = 'Sold')::INTEGER AS confirmed_count,
+           COUNT(*) FILTER (WHERE booking_status = 'Expired')::INTEGER AS expired_missed_count,
+           COUNT(*) FILTER (WHERE booking_status IN ('Cancelled', 'Rejected'))::INTEGER AS cancelled_count
+         FROM Bookings
+         WHERE assigned_agent_id = $1`,
+        [bookieId]
+      ),
+      pool.query(
+        `SELECT balance_after
+         FROM Wallet_Ledger
+         WHERE agent_id = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [bookieId]
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE request_status = 'Approved')::INTEGER AS approved_recharges_count,
+           COALESCE(SUM(requested_amount) FILTER (WHERE request_status = 'Approved'), 0) AS total_recharged_amount,
+           COUNT(*) FILTER (WHERE request_status = 'Pending')::INTEGER AS pending_recharges_count
+         FROM TopUp_Requests
+         WHERE agent_id = $1`,
+        [bookieId]
+      ),
+      pool.query(
+        `SELECT
+           b.booking_id,
+           b.game_id,
+           g.title AS game_title,
+           b.housie_name,
+           array_length(b.ticket_ids, 1)::INTEGER AS ticket_count,
+           b.total_amount,
+           b.booking_status,
+           b.locked_at,
+           b.confirmed_at
+         FROM Bookings b
+         JOIN Scheduled_Games g ON g.game_id = b.game_id
+         WHERE b.assigned_agent_id = $1
+         ORDER BY b.locked_at DESC
+         LIMIT 20`,
+        [bookieId]
+      )
+    ]);
+
+    const sales = salesTimeframes.rows[0];
+    const status = bookingStatusCounts.rows[0];
+    const balance = walletBalance.rows[0]?.balance_after ? parseFloat(walletBalance.rows[0].balance_after) : 0;
+    const topups = topupStats.rows[0];
+
+    const totalAttempted = status.total_bookings_attempted || 0;
+    const confirmedCount = status.confirmed_count || 0;
+    const conversionRate = totalAttempted > 0 ? Math.round((confirmedCount / totalAttempted) * 100) : 0;
+
+    res.json({
+      sales: {
+        total_tickets_sold: sales.total_tickets_sold || 0,
+        total_gross_collection: parseFloat(sales.total_gross_collection || '0'),
+        daily: {
+          tickets_sold: sales.tickets_sold_daily || 0,
+          collection: parseFloat(sales.collection_daily || '0'),
+        },
+        weekly: {
+          tickets_sold: sales.tickets_sold_weekly || 0,
+          collection: parseFloat(sales.collection_weekly || '0'),
+        },
+        monthly: {
+          tickets_sold: sales.tickets_sold_monthly || 0,
+          collection: parseFloat(sales.collection_monthly || '0'),
+        },
+      },
+      bookings: {
+        total_attempted: totalAttempted,
+        confirmed_count: confirmedCount,
+        expired_missed_count: status.expired_missed_count || 0,
+        cancelled_count: status.cancelled_count || 0,
+        conversion_rate: conversionRate,
+      },
+      wallet: {
+        current_balance: balance,
+        approved_recharges_count: topups.approved_recharges_count || 0,
+        total_recharged_amount: parseFloat(topups.total_recharged_amount || '0'),
+        pending_recharges_count: topups.pending_recharges_count || 0,
+      },
+      recent_bookings: recentBookings.rows.map((r: any) => ({
+        booking_id: r.booking_id,
+        game_id: r.game_id,
+        game_title: r.game_title,
+        housie_name: r.housie_name,
+        ticket_count: r.ticket_count || 0,
+        total_amount: parseFloat(r.total_amount),
+        booking_status: r.booking_status,
+        locked_at: r.locked_at,
+        confirmed_at: r.confirmed_at,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching bookie stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+

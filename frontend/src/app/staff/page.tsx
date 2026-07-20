@@ -24,6 +24,7 @@ import { FirstTimeSetup } from "@/components/staff/FirstTimeSetup";
 import { BookieManagementSection } from "@/components/staff/BookieManagementSection";
 import { BookieLiveHudSection } from "@/components/staff/BookieLiveHudSection";
 import { CallVoiceSettings } from "@/components/staff/CallVoiceSettings";
+import { OperatorStatsSection, BookieStatsSection } from "@/components/staff/MyStatsSections";
 import type { FinancialHud } from "@/lib/types";
 
 type NavItem = [key: string, label: string, icon: string];
@@ -64,6 +65,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["hud", "Live HUD & Games", "play"],
       ["broadcast", "Share to WhatsApp", "chat"],
       ["overflow", "Overflow Queue", "bell"],
+      ["stats", "My Stats", "chart"],
       ["profile", "My Profile", "user"],
     ];
   }
@@ -73,6 +75,7 @@ function navFor(user: AuthUser): NavItem[] {
       ["live-hud", "Live HUD & Games", "play"],
       ["bookings", "Bookings", "bell"],
       ["wallet", "My Wallet", "wallet"],
+      ["stats", "My Stats", "chart"],
       ["profile", "My Profile", "user"],
     ];
   }
@@ -291,6 +294,12 @@ export default function StaffDashboard() {
       case "wallet": return <BookieWalletSection me={user} />;
       case "profile": return <ProfileSection me={user} onUpdated={setUser} />;
       case "live-hud": return <BookieLiveHudSection />;
+      case "stats":
+        return user.role_name === "Operator" ? (
+          <OperatorStatsSection me={user} />
+        ) : (
+          <BookieStatsSection me={user} />
+        );
       default: return null;
     }
   };
