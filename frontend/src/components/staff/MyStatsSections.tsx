@@ -127,7 +127,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
             Operator Performance & Game Statistics
           </h2>
           <p className="hg-dim" style={{ fontSize: "13px", marginTop: "4px" }}>
-            Overview of games hosted, draw frequency, ticket counts, and prize disbursements for <strong style={{ color: "var(--accent)" }}>{me.full_name}</strong>.
+            Overview of games hosted and player ticket counts for <strong style={{ color: "var(--accent)" }}>{me.full_name}</strong>.
           </p>
         </div>
         <button onClick={load} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)", color: "var(--text)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -136,7 +136,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
       </div>
 
       {/* KPI Cards Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
         
         <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -152,17 +152,6 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           </div>
         </div>
 
-        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(95, 212, 232, 0.25)", borderRadius: "14px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Numbers Drawn</span>
-            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(95, 212, 232, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="zap" size={16} style={{ color: "#5FD4E8" }} />
-            </div>
-          </div>
-          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "#5FD4E8" }}>{data.total_numbers_called}</b>
-          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Total number calls called in games</span>
-        </div>
-
         <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(59, 130, 246, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Player Tickets Sold</span>
@@ -172,17 +161,6 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           </div>
           <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_tickets_sold}</b>
           <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Tickets hosted in operated games</span>
-        </div>
-
-        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(16, 185, 129, 0.25)", borderRadius: "14px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Payouts Disbursed</span>
-            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="wallet" size={16} style={{ color: "#10B981" }} />
-            </div>
-          </div>
-          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "#10B981" }}>{money(data.total_payouts_disbursed)}</b>
-          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>{data.total_prizes_claimed} claimed prizes processed</span>
         </div>
 
       </div>
@@ -199,13 +177,11 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           <EmptyHint icon="play" title="No games operated yet" sub="Games assigned to you will appear here once scheduled or completed." />
         ) : (
           <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
-            <div className="hg-table" style={{ minWidth: "820px" }}>
-              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "2fr 1.3fr 1.1fr 1fr 1.2fr 1fr" }}>
+            <div className="hg-table" style={{ minWidth: "650px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "2.5fr 1.5fr 1.5fr 1fr" }}>
                 <span>Game Title</span>
                 <span>Date & Time</span>
                 <span>Tickets Sold</span>
-                <span>Calls Made</span>
-                <span>Total Disbursed</span>
                 <span style={{ textAlign: "right" }}>Status</span>
               </div>
               {data.recent_games.map((g) => {
@@ -213,7 +189,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
                   day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"
                 });
                 return (
-                  <div key={g.game_id} className="hg-tr" style={{ gridTemplateColumns: "2fr 1.3fr 1.1fr 1fr 1.2fr 1fr", alignItems: "center" }}>
+                  <div key={g.game_id} className="hg-tr" style={{ gridTemplateColumns: "2.5fr 1.5fr 1.5fr 1fr", alignItems: "center" }}>
                     <div>
                       <b style={{ color: "var(--text)", fontSize: "14px" }}>{g.title}</b>
                       <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>Ticket Price: {money(g.ticket_price)}</div>
@@ -221,12 +197,10 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
                     <span className="hg-dim" style={{ fontSize: "12px" }}>{dateStr}</span>
                     <div>
                       <b style={{ fontSize: "13px" }}>{g.tickets_sold}</b> <span className="hg-dim">/ {g.total_tickets}</span>
-                      <div style={{ width: "60px", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", marginTop: "4px", overflow: "hidden" }}>
+                      <div style={{ width: "80px", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", marginTop: "4px", overflow: "hidden" }}>
                         <div style={{ width: `${Math.min(100, g.fill_rate)}%`, height: "100%", background: "var(--accent)" }} />
                       </div>
                     </div>
-                    <span><b style={{ color: "#5FD4E8" }}>{g.numbers_called}</b> calls</span>
-                    <strong style={{ color: "#10B981" }}>{money(g.total_payout)}</strong>
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <span
                         className="hg-pill"
