@@ -97,31 +97,62 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
       timeFilter = "AND p.claimed_at >= NOW() - INTERVAL '30 days'";
     }
 
-    const result = await pool.query(
-      `SELECT 
-        MIN(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g'))) AS housie_name,
-        COUNT(*)::INTEGER AS wins,
-        COALESCE(SUM(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS total_won,
-        COALESCE(MAX(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS biggest_win
-       FROM Prize_Pool p,
-       LATERAL REGEXP_SPLIT_TO_TABLE(p.winner_housie_name, '[,&]|\\s+and\\s+') AS split_name
-       WHERE p.claimed = TRUE 
-         AND p.winner_housie_name IS NOT NULL 
-         AND TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')) != ''
-         ${timeFilter}
-       GROUP BY LOWER(TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')))
-       ORDER BY wins DESC, total_won DESC
-       LIMIT 50`
+    const prizesRes = await pool.query(
+      `SELECT p.winner_housie_name, 
+              COALESCE(p.amount_per_winner, p.prize_amount)::float AS amount
+       FROM Prize_Pool p
+       WHERE p.claimed = TRUE AND p.winner_housie_name IS NOT NULL ${timeFilter}`
     );
 
-    res.json(
-      result.rows.map((row) => ({
-        housie_name: row.housie_name,
-        wins: row.wins,
-        total_won: parseFloat(row.total_won),
-        biggest_win: parseFloat(row.biggest_win),
-      }))
-    );
+    // Map to aggregate by clean player account name
+    const playerMap = new Map<string, { housie_name: string; wins: number; total_won: number; biggest_win: number }>();
+
+    for (const row of prizesRes.rows) {
+      const rawName = row.winner_housie_name || "";
+      const prizeAmount = parseFloat(row.amount) || 0;
+
+      // Extract individual player names using strict regex that strips ticket numbers & bracket contents
+      const rawTokens = rawName.split(/[,&]|\s+and\s+/i);
+
+      for (let token of rawTokens) {
+        // Remove ticket numbers in parentheses: "priyankarp (29)" -> "priyankarp"
+        // Also remove unclosed/unopened parentheses fragments: "priyankarp (29" -> "priyankarp", "27)" -> ""
+        token = token.replace(/\([^)]*\)/g, ""); // matched parens
+        token = token.replace(/\([^)]*/g, "");  // unclosed left paren
+        token = token.replace(/[^()]*\)/g, "");  // unopened right paren
+        token = token.trim();
+
+        // Skip empty tokens, numbers-only tokens (ticket numbers), or system names
+        if (!token || /^\d+$/.test(token) || ["and", "or", "system", "operator", "no winner"].includes(token.toLowerCase())) {
+          continue;
+        }
+
+        const key = token.toLowerCase();
+        let playerObj = playerMap.get(key);
+        if (!playerObj) {
+          playerObj = {
+            housie_name: token,
+            wins: 0,
+            total_won: 0,
+            biggest_win: 0,
+          };
+          playerMap.set(key, playerObj);
+        }
+
+        playerObj.wins += 1;
+        playerObj.total_won += prizeAmount;
+        if (prizeAmount > playerObj.biggest_win) {
+          playerObj.biggest_win = prizeAmount;
+        }
+      }
+    }
+
+    // Convert map to array and sort by wins DESC, total_won DESC
+    const leaderboard = Array.from(playerMap.values())
+      .sort((a, b) => b.wins - a.wins || b.total_won - a.total_won)
+      .slice(0, 50);
+
+    res.json(leaderboard);
   } catch (error) {
     console.error('Error fetching hall of fame:', error);
     res.status(500).json({ message: 'Internal server error' });
