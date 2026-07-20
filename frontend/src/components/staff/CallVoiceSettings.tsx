@@ -498,8 +498,8 @@ export function CallVoiceSettings() {
       }
     }
     if (!voice) {
-      const ranked = getRankedVoices(voices);
-      if (ranked.length > 0) voice = ranked[0].rawVoice;
+      const ranked = getTop5CuratedVoices(voices);
+      if (ranked.length > 0 && ranked[0].rawVoice) voice = ranked[0].rawVoice;
     }
     if (voice) utterance.voice = voice;
     utterance.pitch = 1.0;
