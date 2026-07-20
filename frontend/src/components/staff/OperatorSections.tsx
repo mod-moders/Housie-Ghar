@@ -466,7 +466,7 @@ export function OperatorHudSection() {
                 <div key={p.prize_id} className={`hg-prize-row${p.claimed ? " is-won" : ""}`}>
                   <div className="hg-prize-l">
                     <span className="hg-prize-name">{p.pattern_name}</span>
-                    <span className="hg-prize-amt">{money(p.amount_per_winner ?? p.prize_amount)}</span>
+                    <span className="hg-prize-amt">{money(p.prize_amount)}</span>
                   </div>
                   <div className="hg-prize-r">
                     {p.claimed && p.winner_housie_name ? (
@@ -479,7 +479,6 @@ export function OperatorHudSection() {
                             </span>
                           )}
                         </span>
-                        {p.split_count > 1 && <span className="hg-prize-tk">split ×{p.split_count}</span>}
                       </div>
                     ) : (
                       <span className="hg-prize-open">Open</span>
