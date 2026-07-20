@@ -87,7 +87,7 @@ export default function Leaderboard() {
       const avgPayout = e.wins > 0 ? e.total_won / e.wins : 0;
       const calcRating = e.rating_score !== undefined
         ? e.rating_score
-        : (e.wins * 1000) + Math.round(e.total_won) + Math.round(e.biggest_win * 0.5) + Math.round(avgPayout * 2);
+        : +(e.wins + (e.total_won + e.biggest_win + avgPayout) / 1000).toFixed(2);
       return {
         ...e,
         computedRating: calcRating,
@@ -204,7 +204,7 @@ export default function Leaderboard() {
               <strong style={{ color: "var(--accent)", fontWeight: 700 }}>Unified Master Performance Rating</strong>
             </div>
             <span style={{ fontSize: 11.5, opacity: 0.9 }}>
-              Rating = (Wins × 1,000) + Total Winnings (₹) + Best Win & Avg Payout Bonuses
+              Rating = No. of Wins + (Total Winnings + Best Win + Average Win) / 1,000
             </span>
           </div>
         </div>
@@ -372,7 +372,7 @@ export default function Leaderboard() {
                         padding: "4px 10px", borderRadius: "8px", textAlign: "right"
                       }}>
                         <span style={{ fontSize: 14, fontWeight: 900, color: "var(--accent)", fontFamily: "var(--font-head)" }}>
-                          ⚡ {w.computedRating.toLocaleString()}
+                          ⚡ {w.computedRating.toFixed(2)}
                         </span>
                         <span style={{ fontSize: 9, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 700 }}>
                           Rating PTS
@@ -417,17 +417,17 @@ export default function Leaderboard() {
                         }}
                       >
                         {[
-                          { label: "Master Rating", value: `⚡ ${w.computedRating.toLocaleString()} PTS` },
-                          { label: "Total Wins Score", value: `+${(w.wins * 1000).toLocaleString()} PTS` },
-                          { label: "Winnings Score", value: `+${Math.round(w.total_won).toLocaleString()} PTS` },
-                          { label: "Best Win Bonus", value: `+${Math.round(w.biggest_win * 0.5).toLocaleString()} PTS` },
-                          { label: "Avg Payout Bonus", value: `+${Math.round(avgPayout * 2).toLocaleString()} PTS` },
+                          { label: "Master Rating", value: `⚡ ${w.computedRating.toFixed(2)} PTS` },
+                          { label: "Wins Base", value: `+${w.wins.toFixed(2)}` },
+                          { label: "Total Winnings Boost", value: `+${(w.total_won / 1000).toFixed(2)}` },
+                          { label: "Best Win Boost", value: `+${(w.biggest_win / 1000).toFixed(2)}` },
+                          { label: "Average Win Boost", value: `+${(avgPayout / 1000).toFixed(2)}` },
                         ].map((m) => (
                           <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                             <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
                               {m.label}
                             </span>
-                            <strong style={{ fontSize: 13, color: m.label.includes("Bonus") || m.label.includes("Score") ? "var(--accent)" : "var(--text)" }}>
+                            <strong style={{ fontSize: 13, color: m.label.includes("Boost") || m.label.includes("Base") ? "var(--accent)" : "var(--text)" }}>
                               {m.value}
                             </strong>
                           </div>

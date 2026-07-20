@@ -151,7 +151,7 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
     const leaderboard = Array.from(playerMap.values())
       .map((p) => {
         const avgPayout = p.wins > 0 ? p.total_won / p.wins : 0;
-        const ratingScore = (p.wins * 1000) + Math.round(p.total_won) + Math.round(p.biggest_win * 0.5) + Math.round(avgPayout * 2);
+        const ratingScore = +(p.wins + (p.total_won + p.biggest_win + avgPayout) / 1000).toFixed(2);
         return {
           ...p,
           avg_payout: Math.round(avgPayout),
