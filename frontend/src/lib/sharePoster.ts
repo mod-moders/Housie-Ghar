@@ -588,13 +588,17 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   y += 24;
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
-  const rows: PrizeRowSpec[] = claimed.map((p) => ({
-    kind: prizeIconKind(p.pattern_name),
-    color: p.pattern_name.toLowerCase().includes("full house") ? (MEDAL_COLOR[prizeIconKind(p.pattern_name)] ?? GOLD) : PINK,
-    label: p.pattern_name,
-    sub: `${p.winner_housie_name ?? "—"}${p.winner_ticket_number ? `  ·  Tk #${p.winner_ticket_number}` : ""}`,
-    amount: inr(p.amount_per_winner ?? p.prize_amount),
-  }));
+  const rows: PrizeRowSpec[] = claimed.map((p) => {
+    const name = p.winner_housie_name ?? "—";
+    const sub = name.includes("(") || !p.winner_ticket_number ? name : `${name} (${p.winner_ticket_number})`;
+    return {
+      kind: prizeIconKind(p.pattern_name),
+      color: p.pattern_name.toLowerCase().includes("full house") ? (MEDAL_COLOR[prizeIconKind(p.pattern_name)] ?? GOLD) : PINK,
+      label: p.pattern_name,
+      sub,
+      amount: inr(p.prize_amount),
+    };
+  });
 
   const cardBottom = paintPrizeCard(ctx, {
     top: y,
