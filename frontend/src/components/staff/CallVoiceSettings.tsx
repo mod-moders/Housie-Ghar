@@ -1392,7 +1392,7 @@ export function CallVoiceSettings() {
 
                 {/* Real-time synchronized Volume control */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "4px 10px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
-                  <Icon name="volume-2" size={13} style={{ color: "var(--accent)" }} />
+                  <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />
                   <input
                     type="range"
                     min={0}
@@ -1501,7 +1501,7 @@ export function CallVoiceSettings() {
 
                 {/* Real-time synchronized Volume control */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "4px 10px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
-                  <Icon name="volume-2" size={13} style={{ color: "var(--accent)" }} />
+                  <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />
                   <input
                     type="range"
                     min={0}
