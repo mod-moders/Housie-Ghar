@@ -138,35 +138,38 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }
   }, [gameStatus]);
 
-  const delayedGameEnd = (gameStatus === "Completed" || gameStatus === "Draw_Ended") && !numberCallPlaying;
+  const delayedGameEnd = (gameStatus === "Completed" || gameStatus === "Draw_Ended") && !numberCallPlaying && !winOverlay;
 
   useEffect(() => {
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
-        outroPlayedRef.current = true;
-        // 4. After the last called number's audio/TTS finishes playing, wait 3 seconds before playing outro note & popping out winners list simultaneously
-        delay(() => {
-          if (!userDismissedWinnersRef.current) {
-            setShowWinnersOverlay(true);
-          }
-          if (wasLiveInSessionRef.current) {
-            playOutro();
-          }
-          playCelebration();
-          const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-          if (isSoundEnabled && !muted) {
-            soundSynthesizer.playCelebration();
+        // After card disappears / game completes, wait 3 seconds before playing outro note & popping out winners list simultaneously
+        const timer = setTimeout(() => {
+          if (!outroPlayedRef.current) {
+            outroPlayedRef.current = true;
+            if (!userDismissedWinnersRef.current) {
+              setShowWinnersOverlay(true);
+            }
+            if (wasLiveInSessionRef.current) {
+              playOutro();
+            }
+            playCelebration();
+            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+            if (isSoundEnabled && !muted) {
+              soundSynthesizer.playCelebration();
+            }
           }
         }, 3000);
+        return () => clearTimeout(timer);
       }
     } else {
-      setShowWinnersOverlay(false);
-      outroPlayedRef.current = false;
       if (gameStatus !== "Completed" && gameStatus !== "Draw_Ended") {
+        setShowWinnersOverlay(false);
+        outroPlayedRef.current = false;
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted, delay]);
+  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted]);
 
   // Track winners for audio celebration
 
@@ -444,18 +447,21 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       delay(() => revealDraw(num), 2000);
     } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number };
+      let isLastPrize = false;
       setPrizes((prev) => {
         const next = prev.map((p) =>
           p.pattern_name === w.prize
             ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
             : p
         );
-        if (next.length > 0 && next.every((p) => p.claimed) && !userDismissedWinnersRef.current) {
+        isLastPrize = next.length > 0 && next.every((p) => p.claimed);
+        if (isLastPrize && !userDismissedWinnersRef.current) {
           useGameStore.getState().setStatus("Draw_Ended");
         }
         return next;
       });
-      delay(() => {
+
+      const showWinnerCard = () => {
         playCelebration();
         const config = useConfigStore.getState().config;
         const isSoundEnabled = config?.celebration_sound_enabled !== "false";
@@ -463,10 +469,43 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           soundSynthesizer.playCelebration();
         }
         setWinOverlay(w);
+
+        // Winner card stays visible for 6 seconds, then disappears
         delay(() => {
-           setWinOverlay(null);
+          setWinOverlay(null); // Winner card disappears
+
+          // After card disappears, if this was the last prize, wait 3 seconds before popping winning list & playing outro
+          if (isLastPrize && !outroPlayedRef.current) {
+            delay(() => {
+              if (!outroPlayedRef.current) {
+                outroPlayedRef.current = true;
+                if (!userDismissedWinnersRef.current) {
+                  setShowWinnersOverlay(true);
+                }
+                if (wasLiveInSessionRef.current) {
+                  playOutro();
+                }
+                playCelebration();
+                if (isSoundEnabled && !muted) {
+                  soundSynthesizer.playCelebration();
+                }
+              }
+            }, 3000);
+          }
         }, 6000);
-      }, 1400);
+      };
+
+      // Allow call audio to finish playing FIRST before popping winner card
+      if (numberCallPlaying) {
+        const interval = setInterval(() => {
+          if (!activeCallIdRef.current || !numberCallPlaying) {
+            clearInterval(interval);
+            showWinnerCard();
+          }
+        }, 200);
+      } else {
+        delay(showWinnerCard, 600);
+      }
     } else if (data.event === "emoji_reaction") {
       const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
       setReactions((r) => [...r, next]);
@@ -476,7 +515,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       useGameStore.getState().setStatus(nextStatus);
       loadGameData();
     }
-  }, [revealDraw, playCelebration, introPlayingRef, delay, muted, game_id, loadGameData]);
+  }, [revealDraw, playCelebration, playOutro, introPlayingRef, delay, muted, numberCallPlaying, loadGameData]);
 
   useSSE(game_id, onEvent);
 
