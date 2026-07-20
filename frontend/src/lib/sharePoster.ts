@@ -554,16 +554,20 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
     amount: inr(p.prize_amount),
   }));
 
+  const rowHeight = rows.length > 6 ? 64 : rows.length > 4 ? 70 : 74;
+
   const cardBottom = paintPrizeCard(ctx, {
     top: y,
     heading: "TODAY'S PRIZE POOL",
     headingColor: PINK,
     rows,
-    rowHeight: 74,
+    rowHeight,
   });
 
-  const pillY = cardBottom + 32;
-  const pillH = 88;
+  const footerY = H - 52;
+  const subtextY = Math.min(cardBottom + 134, footerY - 44);
+  const pillY = Math.min(cardBottom + 24, subtextY - 106);
+  const pillH = 84;
   const grad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
   grad.addColorStop(0, GOLD);
   grad.addColorStop(1, GOLD_DIM);
@@ -579,7 +583,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   ctx.fillStyle = DIM;
   ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("The entire town is playing! Are you?", W / 2, pillY + pillH + 52);
+  ctx.fillText("The entire town is playing! Are you?", W / 2, subtextY);
 
   paintFooter(ctx);
 }
@@ -630,23 +634,29 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
     };
   });
 
+  const rowHeight = claimed.length > 6 ? 72 : claimed.length > 4 ? 80 : 88;
+
   const cardBottom = paintPrizeCard(ctx, {
     top: y,
     heading: "WINNING TICKETS",
     headingColor: GOLD,
     rows,
-    rowHeight: 88,
+    rowHeight,
     emptyMessage: "No prizes were claimed this round.",
   });
+
+  const footerY = H - 52;
+  const subtextY = Math.min(cardBottom + 88, footerY - 44);
+  const congratsY = subtextY - 44;
 
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
   ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("Congratulations to all our winners! 🎉", W / 2, cardBottom + 54);
+  ctx.fillText("Congratulations to all our winners! 🎉", W / 2, congratsY);
 
   ctx.fillStyle = DIM;
   ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("Ready for more? Book your next game today!", W / 2, cardBottom + 98);
+  ctx.fillText("Ready for more? Book your next game today!", W / 2, subtextY);
 
   paintFooter(ctx);
 }
