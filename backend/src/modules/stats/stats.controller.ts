@@ -429,9 +429,9 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
         [operatorId]
       ),
       pool.query(
-        `SELECT COUNT(*)::INTEGER AS total_calls
-         FROM Number_Calls nc
-         JOIN Scheduled_Games g ON g.game_id = nc.game_id
+        `SELECT COALESCE(SUM(COALESCE(gl.total_drawn, array_length(gl.drawn_numbers, 1), 0)), 0)::INTEGER AS total_calls
+         FROM Scheduled_Games g
+         LEFT JOIN Game_Logs gl ON gl.game_id = g.game_id
          WHERE g.operator_id = $1`,
         [operatorId]
       ),
@@ -456,7 +456,7 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
            g.total_tickets,
            g.ticket_price,
            (SELECT COUNT(*)::INTEGER FROM Tickets t WHERE t.game_id = g.game_id AND t.status = 'Sold') AS tickets_sold,
-           (SELECT COUNT(*)::INTEGER FROM Number_Calls nc WHERE nc.game_id = g.game_id) AS numbers_called,
+           COALESCE((SELECT COALESCE(gl.total_drawn, array_length(gl.drawn_numbers, 1), 0) FROM Game_Logs gl WHERE gl.game_id = g.game_id), 0)::INTEGER AS numbers_called,
            COALESCE((SELECT SUM(p.prize_amount) FROM Prize_Pool p WHERE p.game_id = g.game_id AND p.claimed = TRUE), 0) AS total_payout
          FROM Scheduled_Games g
          WHERE g.operator_id = $1
