@@ -1925,6 +1925,30 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-live-sticky::-webkit-scrollbar{width:5px}
 .hg-live-sticky::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
 .hg-live-sticky::-webkit-scrollbar-track{background:transparent}
+/* Spacing above the 1-90 board (kept in CSS so the mobile block below can tighten it —
+   was a 12px inline style; desktop keeps that value). */
+.hg-board-area{margin-top:12px}
+/* ====================================================================
+   Mobile live-board flow — "streamline + reorder" (see 2026-07-21 spec).
+   On mobile .hg-live-body/left/right are display:contents, so their children
+   are flex items of the already-flex .hg-screen. That lets order: surface the
+   player's own tickets right under the pinned caller — what they actually watch
+   during play — instead of leaving them dead last, all WITHOUT disturbing the
+   desktop 2-column grid (these rules are mobile-only). .hg-live-top keeps its
+   default order:0 so it stays first; the fixed emoji bar/reactions are out of
+   flow and unaffected. Paired with tighter section rhythm so the long stack
+   feels less cramped scrolling through the slot below the pinned header. */
+@media(max-width:899px){
+  .hg-live .hg-live-sticky{order:1}
+  .hg-live .hg-mytickets{order:2}
+  .hg-live .hg-board-area{order:3;margin-top:8px}
+  .hg-live .hg-prizeboard{order:4}
+  .hg-live .hg-ticket-search-box{order:5}
+  .hg-live .hg-live-spacer{order:6}
+  .hg-live .hg-prize-row{padding:8px 12px}
+  .hg-live .hg-prizeboard-grid{gap:5px}
+  .hg-live .hg-empty-tickets-placeholder{padding:16px;margin-top:8px}
+}
 .hg-recent{display:flex;align-items:center;gap:8px;padding:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
 .hg-recent::-webkit-scrollbar{display:none}
 .hg-recent-chip{flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:12px;

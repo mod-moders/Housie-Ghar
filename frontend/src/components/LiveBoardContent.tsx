@@ -676,7 +676,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-cage-area">
                 <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} compact={isNarrowViewport} />
                 
-                <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
+                <div style={{ textAlign: "center", marginTop: isNarrowViewport ? "2px" : "6px", fontSize: isNarrowViewport ? "12px" : "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"
                     ? "Game has ended"
                     : gameStatus === "Paused"
@@ -721,8 +721,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               </div>
 
               {/* Recent numbers called panel — in a separate card just below the cage & call notification */}
-              <div className="hg-numbers-area" style={{ padding: isNarrowViewport ? "10px 14px" : "16px 20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div className="hg-numbers-area" style={{ padding: isNarrowViewport ? "8px 14px" : "16px 20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isNarrowViewport ? "8px" : "12px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--accent)" }}>
                     {showAllCalled ? "Calling Sequence (Newest First)" : "Recent Calls"}
                   </span>
@@ -768,7 +768,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               </div>
 
               {/* 90 number box — shown in another box below */}
-              <div className="hg-numbers-area" style={{ marginTop: "12px" }}>
+              <div className="hg-numbers-area hg-board-area">
                 <div className="hg-board90">
                   {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
                     <span
@@ -944,7 +944,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             </div>
           </div>
 
-          <div style={{ height: 80 }} />
+          <div className="hg-live-spacer" style={{ height: 80 }} />
 
           {!isStaff && (
             <div className="hg-emoji-bar">
