@@ -675,6 +675,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         scheduled_at: formatDateForLocalInput(g.scheduled_at),
         ticket_price: String(g.ticket_price),
         total_tickets: String(g.total_tickets),
+        audio_language: (config?.audio_language as "en" | "ne") || "en",
         call_mode: g.call_mode === "TTS" ? "TTS" : "Audio",
         bg_music_enabled: g.bg_music_enabled !== false,
         intro_mode: g.intro_mode === "TTS" ? "TTS" : "Audio",
@@ -773,7 +774,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
       }
       setCreating(false);
       setEditingGameId(null);
-      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
       setPrizes(PATTERN_DEFAULTS);
       load();
     } catch (e) {
@@ -802,7 +803,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
               if (creating) {
                 setEditingGameId(null);
-                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
                 setPrizes(PATTERN_DEFAULTS);
               }
               setCreating(!creating);
