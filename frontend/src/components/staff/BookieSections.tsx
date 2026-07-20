@@ -7,6 +7,7 @@ import { money, moneyStr } from "@/lib/money";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
+import { BookieStatsSection } from "./MyStatsSections";
 import type { QueueBooking, SkipAlert, WalletLedgerEntry } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 
@@ -458,6 +459,11 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
 
         </div>
 
+      </div>
+
+      {/* Integrated My Stats & Analytics Section */}
+      <div style={{ marginTop: "16px" }}>
+        <BookieStatsSection me={me} />
       </div>
 
     </div>
