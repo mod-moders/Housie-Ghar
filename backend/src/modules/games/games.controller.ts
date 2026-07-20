@@ -1403,7 +1403,7 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
             const tks = tksStr ? (tksStr.match(/\d+/g) || []) : [];
             const ticketNums = tks.length > 0 ? tks.map((n: string) => parseInt(n, 10)) : (fallbackTk ? [fallbackTk] : []);
             const ticketCount = ticketNums.length > 0 ? ticketNums.length : 1;
-            const tkLabel = ticketNums.length > 0 ? ticketNums.map((t, i) => (i === 0 ? `${t}` : `#${t}`)).join(' & ') : (fallbackTk ? `${fallbackTk}` : '');
+            const tkLabel = ticketNums.length > 0 ? ticketNums.map((t: number, i: number) => (i === 0 ? `${t}` : `#${t}`)).join(' & ') : (fallbackTk ? `${fallbackTk}` : '');
             expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt * ticketCount, ticket_label: tkLabel });
           }
         }
@@ -1524,7 +1524,7 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
             if (tksStr) {
               const matches = tksStr.match(/\d+/g);
               if (matches && matches.length > 0) {
-                tks = matches.map(n => parseInt(n, 10));
+                tks = matches.map((n: string) => parseInt(n, 10));
               }
             }
             if (tks.length === 0 && fallbackTk) {
