@@ -230,12 +230,26 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      if (drawnNumbers.length === 0) {
-        // 2. Welcome text displays on gameplay screen (BGM plays automatically).
+      
+      let elapsedMs = 999999;
+      if (game?.started_at) {
+        elapsedMs = Date.now() - new Date(game.started_at).getTime();
+      }
+
+      // Mid-Game Joiner Check:
+      // A player is present at the fresh start if 0 numbers have drawn AND game started <= 24s ago.
+      // If numbers have drawn OR > 24s elapsed, the player joined mid-game:
+      // SKIP Welcome Text & Intro Note completely and sync directly to live feed!
+      const isFreshStart = drawnNumbers.length === 0 && (isNaN(elapsedMs) || elapsedMs <= 24000);
+
+      if (isFreshStart) {
+        // 2. Welcome text displays on gameplay screen for remaining duration of initial 15s (BGM plays automatically).
         setWelcomeTextVisible(true);
-        // After 15 seconds that the operator started the game, the Intro note will play.
+        const welcomeDuration = Math.max(1000, 15000 - (isNaN(elapsedMs) ? 0 : elapsedMs));
+
         delay(() => {
           setWelcomeTextVisible(false);
+          // 2 (cont). After 15 seconds from game start, Intro note plays.
           playGreeting().then(() => {
             // 3. After intro note finishes playing, after 3 secs, cage starts rolling & first number call is displayed and played
             delay(() => {
@@ -245,12 +259,14 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               }, 2000);
             }, 3000);
           });
-        }, 15000);
+        }, welcomeDuration);
       } else {
+        // Mid-Game Joiner: Skip past events, live feed only!
+        setWelcomeTextVisible(false);
         flushPendingDraws();
       }
     }
-  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay]);
+  }, [gameStatus, drawnNumbers.length, game?.started_at, playGreeting, flushPendingDraws, delay]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);

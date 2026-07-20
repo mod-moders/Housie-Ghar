@@ -672,7 +672,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // Send initial payload immediately
   try {
     const gameRes = await pool.query(
-      `SELECT game_status, title, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, started_at, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
     const gameLogRes = await pool.query(
@@ -711,6 +711,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
       game_status: gameRes.rows[0]?.game_status || 'Scheduled',
+      started_at: gameRes.rows[0]?.started_at ? new Date(gameRes.rows[0].started_at).toISOString() : null,
       call_mode: gameRes.rows[0]?.call_mode || 'Audio',
       bg_music_enabled: gameRes.rows[0]?.bg_music_enabled !== false,
       intro_mode: gameRes.rows[0]?.intro_mode || 'Audio',
