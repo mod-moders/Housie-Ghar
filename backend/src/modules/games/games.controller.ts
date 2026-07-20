@@ -1432,7 +1432,7 @@ Here is my UPI ID / QR Code for disbursement:`;
 /**
  * Get all pending prize claims for Financial Admin dashboard
  */
-export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): Promise<void> {
+export async function getClaimRequests(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     // Only allow Financial Admin and Superadmin
     if (req.user!.roleName !== 'Financial Admin' && req.user!.roleName !== 'Superadmin') {
@@ -1440,108 +1440,108 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    // 1. Active Claims Received (Pending Disbursal)
-    const activeRes = await pool.query(
-      `SELECT 
-        p.game_id,
-        sg.title AS game_title,
-        sg.scheduled_at AS game_date,
-        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))) AS winner_housie_name,
-        MIN(p.formatted_claim_id) AS formatted_claim_id,
-        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
-        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
-        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
-        ARRAY_AGG(COALESCE(p.amount_per_winner, p.prize_amount)::float ORDER BY p.prize_id) AS prize_amounts,
-        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
-        MAX(p.player_claimed_at) AS player_claimed_at,
-        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
-        COALESCE(MAX(bu.phone), '') AS bookie_phone
-       FROM Prize_Pool p
-       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-       WHERE p.player_claimed = TRUE
-         AND (p.disbursed = FALSE OR p.disbursed IS NULL)
-       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))
-       ORDER BY MAX(p.player_claimed_at) DESC`
-    );
+    const fetchClaims = async (isDisbursed: boolean) => {
+      const query = `
+        SELECT 
+          p.game_id,
+          sg.title AS game_title,
+          sg.scheduled_at AS game_date,
+          p.prize_id,
+          p.pattern_name,
+          p.winner_housie_name,
+          p.formatted_claim_id,
+          t.ticket_number,
+          COALESCE(p.amount_per_winner, p.prize_amount)::float AS amount,
+          p.player_claimed_at,
+          p.disbursed_at,
+          COALESCE(bu.full_name, 'System/Operator') AS bookie_name,
+          COALESCE(bu.phone, '') AS bookie_phone
+         FROM Prize_Pool p
+         LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
+         LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
+         LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
+         LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
+         WHERE p.player_claimed = TRUE
+           AND ${isDisbursed ? "p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '2 days'" : "(p.disbursed = FALSE OR p.disbursed IS NULL)"}
+         ORDER BY p.player_claimed_at DESC`;
 
-    // 2. Past Claim Request History (Disbursed in the last 2 days)
-    const historyRes = await pool.query(
-      `SELECT 
-        p.game_id,
-        sg.title AS game_title,
-        sg.scheduled_at AS game_date,
-        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))) AS winner_housie_name,
-        MIN(p.formatted_claim_id) AS formatted_claim_id,
-        ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
-        ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
-        ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
-        ARRAY_AGG(COALESCE(p.amount_per_winner, p.prize_amount)::float ORDER BY p.prize_id) AS prize_amounts,
-        SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
-        MAX(p.player_claimed_at) AS player_claimed_at,
-        MAX(p.disbursed_at) AS disbursed_at,
-        COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
-        COALESCE(MAX(bu.phone), '') AS bookie_phone
-       FROM Prize_Pool p
-       LEFT JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-       LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
-       LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
-       LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-       WHERE p.player_claimed = TRUE
-         AND p.disbursed = TRUE
-         AND p.disbursed_at >= NOW() - INTERVAL '2 days'
-       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))
-       ORDER BY MAX(p.disbursed_at) DESC`
-    );
+      const res = await pool.query(query);
 
-    const mapClaimRow = (row: any, isDisbursed: boolean) => {
-      const patterns: string[] = row.pattern_names || [];
-      const ticketNums: (number | null)[] = row.ticket_numbers || [];
-      const amounts: number[] = (row.prize_amounts || []).map((a: any) => parseFloat(a) || 0);
-      
-      const patternDetails = patterns.map((pat, idx) => {
-        const tk = ticketNums[idx];
-        return tk ? `${pat} (Tk #${tk})` : pat;
-      });
+      // Map to group by game_id + clean individual player name
+      const claimMap = new Map<string, any>();
 
-      const prizeBreakdown = patterns.map((pat, idx) => ({
-        pattern_name: pat,
-        ticket_number: ticketNums[idx] ?? null,
-        amount: amounts[idx] || 0,
-      }));
+      for (const row of res.rows) {
+        const rawName = row.winner_housie_name || "";
+        const amount = parseFloat(row.amount) || 0;
 
-      return {
-        claim_key: `${row.game_id}-${row.winner_housie_name}`,
-        game_id: row.game_id,
-        game_title: row.game_title,
-        game_date: row.game_date,
-        winner_housie_name: row.winner_housie_name,
-        formatted_claim_id: row.formatted_claim_id || 'HGCR001',
-        prize_ids: row.prize_ids || [],
-        patterns: patterns,
-        pattern_details: patternDetails,
-        prize_breakdown: prizeBreakdown,
-        ticket_numbers: ticketNums.filter(Boolean),
-        total_amount: parseFloat(row.total_amount),
-        player_claimed_at: row.player_claimed_at,
-        disbursed: isDisbursed,
-        disbursed_at: row.disbursed_at || null,
-        bookie_name: row.bookie_name || 'System/Operator',
-        bookie_phone: row.bookie_phone || '',
-      };
+        // Split multiple winners if it was a split win (e.g. "NRPS & priyankarp" -> ["NRPS", "priyankarp"])
+        const playerTokens = rawName
+          .split(/[,&]|\s+and\s+/i)
+          .map((t: string) => t.replace(/\([^)]*\)/g, "").replace(/\([^)]*/g, "").replace(/[^()]*\)/g, "").trim())
+          .filter((t: string) => t.length > 0 && !/^\d+$/.test(t) && !["and", "or", "system", "operator", "no winner"].includes(t.toLowerCase()));
+
+        // If no clean tokens found, fallback to rawName
+        const uniquePlayers = playerTokens.length > 0 ? Array.from(new Set(playerTokens)) : [rawName];
+
+        for (const player of uniquePlayers) {
+          const playerNameStr = player as string;
+          const mapKey = `${row.game_id}-${playerNameStr.toLowerCase().trim()}`;
+          let claimObj = claimMap.get(mapKey);
+
+          if (!claimObj) {
+            claimObj = {
+              claim_key: mapKey,
+              game_id: row.game_id,
+              game_title: row.game_title,
+              game_date: row.game_date,
+              winner_housie_name: playerNameStr,
+              formatted_claim_id: row.formatted_claim_id || 'HGCR001',
+              prize_ids: [],
+              patterns: [],
+              pattern_details: [],
+              prize_breakdown: [],
+              ticket_numbers: [],
+              total_amount: 0,
+              player_claimed_at: row.player_claimed_at,
+              disbursed: isDisbursed,
+              disbursed_at: row.disbursed_at || null,
+              bookie_name: row.bookie_name || 'System/Operator',
+              bookie_phone: row.bookie_phone || '',
+            };
+            claimMap.set(mapKey, claimObj);
+          }
+
+          claimObj.prize_ids.push(row.prize_id);
+          claimObj.patterns.push(row.pattern_name);
+          const tkDetail = row.ticket_number ? `${row.pattern_name} (Tk #${row.ticket_number})` : row.pattern_name;
+          claimObj.pattern_details.push(tkDetail);
+          claimObj.prize_breakdown.push({
+            pattern_name: row.pattern_name,
+            ticket_number: row.ticket_number ?? null,
+            amount: amount,
+          });
+          if (row.ticket_number) {
+            claimObj.ticket_numbers.push(row.ticket_number);
+          }
+          claimObj.total_amount += amount;
+          if (new Date(row.player_claimed_at) > new Date(claimObj.player_claimed_at)) {
+            claimObj.player_claimed_at = row.player_claimed_at;
+          }
+        }
+      }
+
+      return Array.from(claimMap.values());
     };
 
-    const active_claims = activeRes.rows.map((r) => mapClaimRow(r, false));
-    const history_claims = historyRes.rows.map((r) => mapClaimRow(r, true));
+    const active_claims = await fetchClaims(false);
+    const history_claims = await fetchClaims(true);
 
     res.json({
       active_claims,
       history_claims,
     });
   } catch (error) {
-    console.error('Error fetching consolidated prize claims:', error);
+    console.error('Error fetching claim requests:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }
