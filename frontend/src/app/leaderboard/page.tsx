@@ -66,12 +66,16 @@ export default function Leaderboard() {
     if (!entries || entries.length === 0) return null;
     const totalEarnings = entries.reduce((sum, e) => sum + e.total_won, 0);
     const maxWin = Math.max(...entries.map(e => e.biggest_win));
+    const maxWinsOverall = Math.max(...entries.map(e => e.wins));
+    const maxEarningsOverall = Math.max(...entries.map(e => e.total_won));
     const totalWins = entries.reduce((sum, e) => sum + e.wins, 0);
     const avgWinValue = totalWins > 0 ? totalEarnings / totalWins : 0;
     
     return {
       totalEarnings,
       maxWin,
+      maxWinsOverall,
+      maxEarningsOverall,
       avgWinValue,
     };
   }, [entries]);
@@ -85,7 +89,7 @@ export default function Leaderboard() {
       e.housie_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
     );
 
-    // 2. Sort by active tab
+    // 2. Sort by active tab (Default is "wins")
     if (activeTab === "wins") {
       list.sort((a, b) => b.wins - a.wins || b.total_won - a.total_won);
     } else if (activeTab === "earnings") {
@@ -110,7 +114,7 @@ export default function Leaderboard() {
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
           <div>
             <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame</h1>
-            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Check top-ranked individual player accounts, total wins, and biggest payouts.</p>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Check top-ranked individual player accounts, Master titles (Gold, Silver, Bronze & Diamond Master), and total wins.</p>
           </div>
         </div>
 
@@ -237,6 +241,22 @@ export default function Leaderboard() {
               const isHighRoller = w.total_won > HIGH_ROLLER_THRESHOLD;
               const rankGap = rank > 1 ? processedEntries[i - 1].total_won - w.total_won : 0;
 
+              // Master Title Determination
+              const isMaxWins = insights && w.wins === insights.maxWinsOverall && insights.maxWinsOverall > 0;
+              const isMaxEarnings = insights && w.total_won === insights.maxEarningsOverall && insights.maxEarningsOverall > 0;
+              const isDiamondMaster = isMaxWins && isMaxEarnings;
+
+              let masterTitle: string | null = null;
+              if (isDiamondMaster) {
+                masterTitle = "Diamond Master";
+              } else if (rank === 1) {
+                masterTitle = "Gold Master";
+              } else if (rank === 2) {
+                masterTitle = "Silver Master";
+              } else if (rank === 3) {
+                masterTitle = "Bronze Master";
+              }
+
               return (
                 <div key={w.housie_name}>
                   <div
@@ -244,14 +264,24 @@ export default function Leaderboard() {
                     onClick={() => setExpandedName(isExpanded ? null : w.housie_name)}
                     style={{
                       cursor: "pointer",
-                      border: isCurrentUser ? "2px solid var(--accent) !important" : "",
-                      boxShadow: isCurrentUser ? "0 0 15px var(--accent-soft), var(--card-shadow) !important" : "",
+                      border: isDiamondMaster
+                        ? "2px solid #38bdf8 !important"
+                        : rank === 1
+                        ? "2px solid var(--accent) !important"
+                        : isCurrentUser
+                        ? "2px solid var(--cyan) !important"
+                        : "",
+                      boxShadow: isDiamondMaster
+                        ? "0 0 20px rgba(56, 189, 248, 0.35), var(--card-shadow) !important"
+                        : isCurrentUser
+                        ? "0 0 15px var(--accent-soft), var(--card-shadow) !important"
+                        : "",
                       transform: isCurrentUser ? "scale(1.01)" : ""
                     }}
                     title={isCurrentUser ? "Your Account (Click to expand)" : "Click to expand"}
                   >
                     <span className="hg-lb-rank">
-                      {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
+                      {isDiamondMaster ? "💎" : rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
                     </span>
                     <span style={{ position: "relative", display: "inline-flex" }}>
                       <span className="hg-lb-avatar">{w.housie_name[0]?.toUpperCase()}</span>
@@ -272,8 +302,51 @@ export default function Leaderboard() {
                       )}
                     </span>
                     <div className="hg-lb-info">
-                      <strong style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "15px" }}>{w.housie_name}</span>
+                      <strong style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "15.5px", fontWeight: 800 }}>{w.housie_name}</span>
+
+                        {/* Master Rank Badge */}
+                        {masterTitle && (
+                          <span
+                            className="hg-pill"
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 800,
+                              padding: "2px 9px",
+                              borderRadius: "6px",
+                              background: isDiamondMaster
+                                ? "linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(244, 201, 93, 0.25))"
+                                : rank === 1
+                                ? "rgba(244, 201, 93, 0.18)"
+                                : rank === 2
+                                ? "rgba(148, 163, 184, 0.18)"
+                                : "rgba(217, 119, 6, 0.18)",
+                              color: isDiamondMaster
+                                ? "#38bdf8"
+                                : rank === 1
+                                ? "var(--accent)"
+                                : rank === 2
+                                ? "#cbd5e1"
+                                : "#f59e0b",
+                              border: `1px solid ${
+                                isDiamondMaster
+                                  ? "#38bdf8"
+                                  : rank === 1
+                                  ? "var(--accent)"
+                                  : rank === 2
+                                  ? "#94a3b8"
+                                  : "#d97706"
+                              }`,
+                              boxShadow: isDiamondMaster ? "0 0 12px rgba(56, 189, 248, 0.4)" : "none",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                          >
+                            {isDiamondMaster ? "💎 Diamond Master" : rank === 1 ? "🥇 Gold Master" : rank === 2 ? "🥈 Silver Master" : "🥉 Bronze Master"}
+                          </span>
+                        )}
+
                         {isCurrentUser && (
                           <span style={{ fontSize: "9px", background: "var(--accent)", color: "#000", fontWeight: 800, padding: "1px 6px", borderRadius: "999px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>
                         )}
@@ -350,6 +423,7 @@ export default function Leaderboard() {
                         }}
                       >
                         {[
+                          { label: "Master Rank", value: masterTitle || "Master Player" },
                           { label: "Total Wins", value: w.wins },
                           { label: "Total Winnings", value: money(w.total_won) },
                           { label: "Biggest Single Win", value: money(w.biggest_win) },

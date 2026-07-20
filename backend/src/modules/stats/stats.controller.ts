@@ -104,7 +104,7 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
         COALESCE(SUM(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS total_won,
         COALESCE(MAX(COALESCE(p.amount_per_winner, p.prize_amount)), 0)::float AS biggest_win
        FROM Prize_Pool p,
-       LATERAL REGEXP_SPLIT_TO_TABLE(p.winner_housie_name, ',\\s*') AS split_name
+       LATERAL REGEXP_SPLIT_TO_TABLE(p.winner_housie_name, '[,&]|\\s+and\\s+') AS split_name
        WHERE p.claimed = TRUE 
          AND p.winner_housie_name IS NOT NULL 
          AND TRIM(REGEXP_REPLACE(split_name, '\\s*\\([^)]*\\)', '', 'g')) != ''
