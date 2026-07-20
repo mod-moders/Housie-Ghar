@@ -268,27 +268,21 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
       if (drawnNumbers.length === 0) {
-        // t = 0s: Game starts, BGM plays automatically.
-        // t = 5s: Display Welcome text to all players for 3 seconds (t = 5s to 8s).
-        delay(() => {
-          setWelcomeTextVisible(true);
-          delay(() => {
-            setWelcomeTextVisible(false);
-          }, 3000);
-        }, 5000);
-
-        // t = 30s: Play Intro note (TTS or Audio).
-        delay(() => {
-          playGreeting().then(() => {
-            // After intro note finishes playing, wait 3 seconds before cage starts rolling & first number call is displayed and played
-            delay(() => {
-              setRevealed(false);
-              delay(() => {
-                flushPendingDraws();
-              }, 2000);
-            }, 3000);
-          });
-        }, 30000);
+        // Fixed-duration startup sequence (must match gameEngine.ts's initialDelay, which
+        // gates when the backend actually draws the first number — kept as flat, absolute
+        // offsets rather than chained on playGreeting()'s promise so the two never drift out
+        // of sync with each other regardless of the actual uploaded intro clip's length:
+        // t=0s: live session starts (BGM autoplays independently, see useGameAudio.ts).
+        // t=0s-10s: hold.
+        // t=10s-20s: "Welcome to Housie Ghar" banner shown for 10s.
+        // t=20s-30s: hold.
+        // t=30s-50s: intro audio plays for a fixed 20s window.
+        // t=50s-53s: hold.
+        // t=53s: game starts — cage rolls, first number reveals.
+        delay(() => setWelcomeTextVisible(true), 10000);
+        delay(() => setWelcomeTextVisible(false), 20000);
+        delay(() => playGreeting(), 30000);
+        delay(() => flushPendingDraws(), 53000);
       } else {
         // Late joiners joining mid-game skip Welcome text & Intro note completely
         flushPendingDraws();

@@ -230,8 +230,10 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
   activeGames.set(gameId, activeGame);
   console.log(`🎮 Game started: ${game.title} (ID: ${gameId}). Total tickets: ${tickets.length}`);
 
-  // Start conduction ticks (41s initial delay for fresh games: 30s intro timer + ~6s intro note + 3s post-intro + 2s cage roll)
-  const initialDelay = currentIndex === 0 ? 41000 : 3000;
+  // Start conduction ticks (53s initial delay for fresh games — must match the frontend's
+  // fixed startup sequence in LiveBoardContent.tsx: 10s hold + 10s welcome banner + 10s hold
+  // + 20s intro audio + 3s hold, then the cage rolls and this first draw is revealed).
+  const initialDelay = currentIndex === 0 ? 53000 : 3000;
   runConductorTick(gameId, initialDelay);
 }
 
