@@ -1451,6 +1451,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
         ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
         ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        ARRAY_AGG(COALESCE(p.amount_per_winner, p.prize_amount)::float ORDER BY p.prize_id) AS prize_amounts,
         SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
         MAX(p.player_claimed_at) AS player_claimed_at,
         COALESCE(MAX(bu.full_name), 'System/Operator') AS bookie_name,
@@ -1477,6 +1478,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
         ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
         ARRAY_AGG(t.ticket_number ORDER BY p.prize_id) AS ticket_numbers,
+        ARRAY_AGG(COALESCE(p.amount_per_winner, p.prize_amount)::float ORDER BY p.prize_id) AS prize_amounts,
         SUM(COALESCE(p.amount_per_winner, p.prize_amount))::float AS total_amount,
         MAX(p.player_claimed_at) AS player_claimed_at,
         MAX(p.disbursed_at) AS disbursed_at,
@@ -1497,10 +1499,18 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
     const mapClaimRow = (row: any, isDisbursed: boolean) => {
       const patterns: string[] = row.pattern_names || [];
       const ticketNums: (number | null)[] = row.ticket_numbers || [];
+      const amounts: number[] = (row.prize_amounts || []).map((a: any) => parseFloat(a) || 0);
+      
       const patternDetails = patterns.map((pat, idx) => {
         const tk = ticketNums[idx];
         return tk ? `${pat} (Tk #${tk})` : pat;
       });
+
+      const prizeBreakdown = patterns.map((pat, idx) => ({
+        pattern_name: pat,
+        ticket_number: ticketNums[idx] ?? null,
+        amount: amounts[idx] || 0,
+      }));
 
       return {
         claim_key: `${row.game_id}-${row.winner_housie_name}`,
@@ -1512,6 +1522,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         prize_ids: row.prize_ids || [],
         patterns: patterns,
         pattern_details: patternDetails,
+        prize_breakdown: prizeBreakdown,
         ticket_numbers: ticketNums.filter(Boolean),
         total_amount: parseFloat(row.total_amount),
         player_claimed_at: row.player_claimed_at,

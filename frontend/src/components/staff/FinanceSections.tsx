@@ -73,6 +73,11 @@ interface ConsolidatedClaimItem {
   patterns: string[];
   pattern_details: string[];
   ticket_numbers: (number | null)[];
+  prize_breakdown?: Array<{
+    pattern_name: string;
+    ticket_number: number | null;
+    amount: number;
+  }>;
   total_amount: number;
   player_claimed_at: string;
   disbursed: boolean;
@@ -1074,17 +1079,69 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
             </div>
 
             {/* List of Prizes Breakdown Table */}
-            <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
-              <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px", fontWeight: 700 }}>
+            <div style={{ background: "var(--surface-2)", padding: "14px 16px", borderRadius: "12px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "10px", fontWeight: 700 }}>
                 Prizes Won Breakdown
               </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {selectedClaim.pattern_details.map((detail, idx) => (
-                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "var(--text)", padding: "6px 10px", background: "var(--surface)", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                    <span>🏆 {detail}</span>
-                    <strong style={{ color: "var(--accent)" }}>Verified</strong>
-                  </div>
-                ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {selectedClaim.prize_breakdown && selectedClaim.prize_breakdown.length > 0 ? (
+                  selectedClaim.prize_breakdown.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        alignItems: "center", 
+                        fontSize: "13px", 
+                        color: "var(--text)", 
+                        padding: "10px 14px", 
+                        background: "var(--surface)", 
+                        borderRadius: "8px", 
+                        border: "1px solid var(--border-light)" 
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontWeight: 700 }}>{item.pattern_name}</span>
+                        {item.ticket_number && (
+                          <span style={{ fontSize: "11px", color: "var(--text-dim)", background: "var(--surface-2)", padding: "2px 7px", borderRadius: "4px", fontWeight: 600 }}>
+                            Tk #{item.ticket_number}
+                          </span>
+                        )}
+                      </div>
+                      <strong style={{ color: "var(--text)", fontWeight: 800, fontSize: "14px" }}>
+                        {money(item.amount)}
+                      </strong>
+                    </div>
+                  ))
+                ) : (
+                  selectedClaim.pattern_details.map((detail, idx) => (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "var(--text)", padding: "8px 12px", background: "var(--surface)", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
+                      <span>{detail}</span>
+                      <strong style={{ color: "var(--accent)" }}>Verified</strong>
+                    </div>
+                  ))
+                )}
+
+                {/* Consolidated Total Payable Amount Summary Row */}
+                <div 
+                  style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "center", 
+                    padding: "12px 14px", 
+                    marginTop: "4px", 
+                    background: "rgba(244, 201, 93, 0.08)", 
+                    border: "1.5px solid var(--accent)", 
+                    borderRadius: "8px" 
+                  }}
+                >
+                  <span style={{ fontSize: "12.5px", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Total Payable Amount
+                  </span>
+                  <strong style={{ fontSize: "18px", fontWeight: 800, color: "var(--accent)" }}>
+                    {money(selectedClaim.total_amount)}
+                  </strong>
+                </div>
               </div>
             </div>
 
