@@ -13,6 +13,20 @@ import type { PerformanceSeries, HeatmapHour, RetentionData } from "./AdminSecti
 import type { AuthUser } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
 
+function getPatternPriority(patternName: string): number {
+  const name = (patternName || "").toLowerCase();
+  if (name.includes("full house") || name.includes("fullhouse")) return 1;
+  if (name.includes("top line")) return 2;
+  if (name.includes("middle line")) return 3;
+  if (name.includes("bottom line")) return 4;
+  if (name.includes("line")) return 5;
+  if (name.includes("star")) return 6;
+  if (name.includes("box")) return 7;
+  if (name.includes("corner")) return 8;
+  if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
+  return 10;
+}
+
 interface QueueItem {
   request_id: string;
   requested_amount: number;
@@ -1085,7 +1099,15 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               </span>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {selectedClaim.prize_breakdown && selectedClaim.prize_breakdown.length > 0 ? (
-                  selectedClaim.prize_breakdown.map((item, idx) => (
+                  [...selectedClaim.prize_breakdown]
+                    .sort((a, b) => {
+                      const pA = getPatternPriority(a.pattern_name);
+                      const pB = getPatternPriority(b.pattern_name);
+                      if (pA !== pB) return pA - pB;
+                      if (b.amount !== a.amount) return b.amount - a.amount;
+                      return (a.ticket_number || 0) - (b.ticket_number || 0);
+                    })
+                    .map((item, idx) => (
                     <div 
                       key={idx} 
                       style={{ 

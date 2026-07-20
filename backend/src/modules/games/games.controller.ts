@@ -1382,7 +1382,61 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
 
     const foWhatsApp = await getFinancialOfficerWhatsApp();
 
-    const totalAmount = myWonPrizes.reduce((sum, p) => sum + parseFloat(p.amount_per_winner ?? p.prize_amount), 0);
+    // Helper for pattern priority (Full House -> Lines -> Star -> Box -> Corner -> Quick 7 / Early Five)
+    function getPatternPriority(patternName: string): number {
+      const name = (patternName || "").toLowerCase();
+      if (name.includes("full house") || name.includes("fullhouse")) return 1;
+      if (name.includes("top line")) return 2;
+      if (name.includes("middle line")) return 3;
+      if (name.includes("bottom line")) return 4;
+      if (name.includes("line")) return 5;
+      if (name.includes("star")) return 6;
+      if (name.includes("box")) return 7;
+      if (name.includes("corner")) return 8;
+      if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
+      return 10;
+    }
+
+    // Expand prizes for player when winning multiple tickets (e.g. NRPS winning Full House on Tk #4 and Tk #5)
+    const expandedPrizes: Array<{ pattern_name: string; amount: number; ticket_number?: number }> = [];
+    const lowerPlayer = playerHousieName.toLowerCase();
+
+    for (const p of myWonPrizes) {
+      const rawName = p.winner_housie_name || "";
+      const baseAmt = parseFloat(p.amount_per_winner ?? p.prize_amount);
+      const fallbackTk = p.winner_ticket_number ? parseInt(p.winner_ticket_number, 10) : undefined;
+      const segments = rawName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
+
+      let foundEntry = false;
+      for (const seg of segments) {
+        const match = seg.match(/^([^(]+)(?:\(([^)]+)\))?/);
+        if (match) {
+          const pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim().toLowerCase();
+          if (pName === lowerPlayer) {
+            foundEntry = true;
+            const tksStr = match[2];
+            const tks = tksStr ? (tksStr.match(/\d+/g) || []) : [];
+            const ticketNums = tks.length > 0 ? tks.map((n: string) => parseInt(n, 10)) : (fallbackTk ? [fallbackTk] : []);
+            for (const tk of ticketNums) {
+              expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_number: tk });
+            }
+          }
+        }
+      }
+      if (!foundEntry) {
+        expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_number: fallbackTk });
+      }
+    }
+
+    expandedPrizes.sort((a, b) => {
+      const pA = getPatternPriority(a.pattern_name);
+      const pB = getPatternPriority(b.pattern_name);
+      if (pA !== pB) return pA - pB;
+      if (b.amount !== a.amount) return b.amount - a.amount;
+      return (a.ticket_number || 0) - (b.ticket_number || 0);
+    });
+
+    const totalAmount = expandedPrizes.reduce((sum, item) => sum + item.amount, 0);
 
     const gameDateFormatted = game.scheduled_at
       ? new Date(game.scheduled_at).toLocaleString('en-IN', {
@@ -1395,17 +1449,16 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
         })
       : '';
 
-    const prizeLines = myWonPrizes.map((p, idx) => {
-      const amt = parseFloat(p.amount_per_winner ?? p.prize_amount);
-      const tk = p.winner_ticket_number ? ` (Tk #${p.winner_ticket_number})` : '';
-      return `${idx + 1}. *${p.pattern_name}* — ₹${amt.toFixed(2)}${tk}`;
+    const prizeLines = expandedPrizes.map((p, idx) => {
+      const tk = p.ticket_number ? ` (Tk #${p.ticket_number})` : '';
+      return `${idx + 1}. *${p.pattern_name}* — ₹${p.amount.toFixed(2)}${tk}`;
     }).join('\n');
 
     const whatsappMessage = `Hi, I am *${playerHousieName}* and I am claiming my prize rewards on Housie Ghar!
 
 *Consolidated Claim Details:*
 - *Game:* ${game.title || 'Housie Ghar Game'} (${gameDateFormatted})
-- *Prizes Won (${myWonPrizes.length}):*
+- *Prizes Won (${expandedPrizes.length}):*
 ${prizeLines}
 
 - *Total Prize Claim:* ₹${totalAmount.toFixed(2)}
@@ -1418,13 +1471,12 @@ Here is my UPI ID / QR Code for disbursement:`;
 
     res.json({
       message: 'All prizes claimed successfully',
-      claimed_count: myWonPrizes.length,
+      claimed_prizes_count: myWonPrizes.length,
       total_amount: totalAmount,
       whatsapp_url: whatsappUrl,
-      whatsapp_message: whatsappMessage,
     });
   } catch (error) {
-    console.error('Error claiming all prizes:', error);
+    console.error('Error in submitClaim:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -1438,6 +1490,20 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
     if (req.user!.roleName !== 'Financial Admin' && req.user!.roleName !== 'Superadmin') {
       res.status(403).json({ message: 'Forbidden: Financial Admin access required' });
       return;
+    }
+
+    function getPatternPriority(patternName: string): number {
+      const name = (patternName || "").toLowerCase();
+      if (name.includes("full house") || name.includes("fullhouse")) return 1;
+      if (name.includes("top line")) return 2;
+      if (name.includes("middle line")) return 3;
+      if (name.includes("bottom line")) return 4;
+      if (name.includes("line")) return 5;
+      if (name.includes("star")) return 6;
+      if (name.includes("box")) return 7;
+      if (name.includes("corner")) return 8;
+      if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
+      return 10;
     }
 
     const fetchClaims = async (isDisbursed: boolean) => {
@@ -1473,18 +1539,45 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
       for (const row of res.rows) {
         const rawName = row.winner_housie_name || "";
         const amount = parseFloat(row.amount) || 0;
+        const fallbackTk = row.ticket_number ? parseInt(row.ticket_number, 10) : null;
 
-        // Split multiple winners if it was a split win (e.g. "NRPS & priyankarp" -> ["NRPS", "priyankarp"])
-        const playerTokens = rawName
-          .split(/[,&]|\s+and\s+/i)
-          .map((t: string) => t.replace(/\([^)]*\)/g, "").replace(/\([^)]*/g, "").replace(/[^()]*\)/g, "").trim())
-          .filter((t: string) => t.length > 0 && !/^\d+$/.test(t) && !["and", "or", "system", "operator", "no winner"].includes(t.toLowerCase()));
+        // Split multiple winners if it was a split win (e.g. "NRPS (4 & 5) & priyankarp (26)")
+        // Split by '&', ',', 'and' outside of parentheses
+        const segments = rawName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
+        const parsedEntries: Array<{ playerName: string; tickets: number[] }> = [];
 
-        // If no clean tokens found, fallback to rawName
-        const uniquePlayers = playerTokens.length > 0 ? Array.from(new Set(playerTokens)) : [rawName];
+        for (const seg of segments) {
+          const trimmed = seg.trim();
+          if (!trimmed) continue;
 
-        for (const player of uniquePlayers) {
-          const playerNameStr = player as string;
+          // Match "PlayerName (4 & 5)" or "PlayerName (26)" or "PlayerName"
+          const match = trimmed.match(/^([^(]+)(?:\(([^)]+)\))?/);
+          if (match) {
+            let pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim();
+            if (!pName || ["and", "or", "system", "operator", "no winner"].includes(pName.toLowerCase())) continue;
+
+            const tksStr = match[2];
+            let tks: number[] = [];
+            if (tksStr) {
+              const matches = tksStr.match(/\d+/g);
+              if (matches && matches.length > 0) {
+                tks = matches.map(n => parseInt(n, 10));
+              }
+            }
+            if (tks.length === 0 && fallbackTk) {
+              tks = [fallbackTk];
+            }
+            parsedEntries.push({ playerName: pName, tickets: tks });
+          }
+        }
+
+        // Fallback if parsing produced nothing
+        if (parsedEntries.length === 0 && rawName) {
+          parsedEntries.push({ playerName: rawName.trim(), tickets: fallbackTk ? [fallbackTk] : [] });
+        }
+
+        for (const entry of parsedEntries) {
+          const playerNameStr = entry.playerName;
           const mapKey = `${row.game_id}-${playerNameStr.toLowerCase().trim()}`;
           let claimObj = claimMap.get(mapKey);
 
@@ -1511,23 +1604,51 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
             claimMap.set(mapKey, claimObj);
           }
 
-          claimObj.prize_ids.push(row.prize_id);
-          claimObj.patterns.push(row.pattern_name);
-          const tkDetail = row.ticket_number ? `${row.pattern_name} (Tk #${row.ticket_number})` : row.pattern_name;
-          claimObj.pattern_details.push(tkDetail);
-          claimObj.prize_breakdown.push({
-            pattern_name: row.pattern_name,
-            ticket_number: row.ticket_number ?? null,
-            amount: amount,
-          });
-          if (row.ticket_number) {
-            claimObj.ticket_numbers.push(row.ticket_number);
+          if (!claimObj.prize_ids.includes(row.prize_id)) {
+            claimObj.prize_ids.push(row.prize_id);
           }
-          claimObj.total_amount += amount;
+          if (!claimObj.patterns.includes(row.pattern_name)) {
+            claimObj.patterns.push(row.pattern_name);
+          }
+
+          // If entry has multiple tickets (e.g. NRPS won Full House on ticket #4 AND ticket #5),
+          // add a breakdown item for EACH winning ticket!
+          const ticketsToAdd = entry.tickets.length > 0 ? entry.tickets : (fallbackTk ? [fallbackTk] : [null]);
+
+          for (const tkNum of ticketsToAdd) {
+            const tkDetail = tkNum ? `${row.pattern_name} (Tk #${tkNum})` : row.pattern_name;
+            claimObj.pattern_details.push(tkDetail);
+            claimObj.prize_breakdown.push({
+              pattern_name: row.pattern_name,
+              ticket_number: tkNum ?? null,
+              amount: amount,
+            });
+            if (tkNum && !claimObj.ticket_numbers.includes(tkNum)) {
+              claimObj.ticket_numbers.push(tkNum);
+            }
+            claimObj.total_amount += amount;
+          }
+
           if (new Date(row.player_claimed_at) > new Date(claimObj.player_claimed_at)) {
             claimObj.player_claimed_at = row.player_claimed_at;
           }
         }
+      }
+
+      // Sort breakdown items for each claimObj in higher-to-lower priority order (Full House -> Lines -> Star -> Corner -> Quick 7)
+      for (const claimObj of claimMap.values()) {
+        claimObj.prize_breakdown.sort((a: any, b: any) => {
+          const pA = getPatternPriority(a.pattern_name);
+          const pB = getPatternPriority(b.pattern_name);
+          if (pA !== pB) return pA - pB;
+          if (b.amount !== a.amount) return b.amount - a.amount;
+          return (a.ticket_number || 0) - (b.ticket_number || 0);
+        });
+
+        // Re-generate pattern_details in sorted order
+        claimObj.pattern_details = claimObj.prize_breakdown.map((item: any) =>
+          item.ticket_number ? `${item.pattern_name} (Tk #${item.ticket_number})` : item.pattern_name
+        );
       }
 
       return Array.from(claimMap.values());
