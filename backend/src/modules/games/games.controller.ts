@@ -1382,23 +1382,8 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
 
     const foWhatsApp = await getFinancialOfficerWhatsApp();
 
-    // Helper for pattern priority (Full House -> Lines -> Star -> Box -> Corner -> Quick 7 / Early Five)
-    function getPatternPriority(patternName: string): number {
-      const name = (patternName || "").toLowerCase();
-      if (name.includes("full house") || name.includes("fullhouse")) return 1;
-      if (name.includes("top line")) return 2;
-      if (name.includes("middle line")) return 3;
-      if (name.includes("bottom line")) return 4;
-      if (name.includes("line")) return 5;
-      if (name.includes("star")) return 6;
-      if (name.includes("box")) return 7;
-      if (name.includes("corner")) return 8;
-      if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
-      return 10;
-    }
-
-    // Expand prizes for player when winning multiple tickets (e.g. NRPS winning Full House on Tk #4 and Tk #5)
-    const expandedPrizes: Array<{ pattern_name: string; amount: number; ticket_number?: number }> = [];
+    // Preserve chronological draw win order, combine multi-ticket wins for same player (e.g. NRPS winning Full House on Tk #4 & #5 -> ₹800)
+    const expandedPrizes: Array<{ pattern_name: string; amount: number; ticket_label?: string }> = [];
     const lowerPlayer = playerHousieName.toLowerCase();
 
     for (const p of myWonPrizes) {
@@ -1417,24 +1402,16 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
             const tksStr = match[2];
             const tks = tksStr ? (tksStr.match(/\d+/g) || []) : [];
             const ticketNums = tks.length > 0 ? tks.map((n: string) => parseInt(n, 10)) : (fallbackTk ? [fallbackTk] : []);
-            for (const tk of ticketNums) {
-              expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_number: tk });
-            }
+            const ticketCount = ticketNums.length > 0 ? ticketNums.length : 1;
+            const tkLabel = ticketNums.length > 0 ? ticketNums.map((t, i) => (i === 0 ? `${t}` : `#${t}`)).join(' & ') : (fallbackTk ? `${fallbackTk}` : '');
+            expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt * ticketCount, ticket_label: tkLabel });
           }
         }
       }
       if (!foundEntry) {
-        expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_number: fallbackTk });
+        expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_label: fallbackTk ? `${fallbackTk}` : '' });
       }
     }
-
-    expandedPrizes.sort((a, b) => {
-      const pA = getPatternPriority(a.pattern_name);
-      const pB = getPatternPriority(b.pattern_name);
-      if (pA !== pB) return pA - pB;
-      if (b.amount !== a.amount) return b.amount - a.amount;
-      return (a.ticket_number || 0) - (b.ticket_number || 0);
-    });
 
     const totalAmount = expandedPrizes.reduce((sum, item) => sum + item.amount, 0);
 
@@ -1450,7 +1427,7 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
       : '';
 
     const prizeLines = expandedPrizes.map((p, idx) => {
-      const tk = p.ticket_number ? ` (Tk #${p.ticket_number})` : '';
+      const tk = p.ticket_label ? ` (Tk #${p.ticket_label})` : '';
       return `${idx + 1}. *${p.pattern_name}* — ₹${p.amount.toFixed(2)}${tk}`;
     }).join('\n');
 
@@ -1492,20 +1469,6 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    function getPatternPriority(patternName: string): number {
-      const name = (patternName || "").toLowerCase();
-      if (name.includes("full house") || name.includes("fullhouse")) return 1;
-      if (name.includes("top line")) return 2;
-      if (name.includes("middle line")) return 3;
-      if (name.includes("bottom line")) return 4;
-      if (name.includes("line")) return 5;
-      if (name.includes("star")) return 6;
-      if (name.includes("box")) return 7;
-      if (name.includes("corner")) return 8;
-      if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
-      return 10;
-    }
-
     const fetchClaims = async (isDisbursed: boolean) => {
       const query = `
         SELECT 
@@ -1529,7 +1492,7 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
          LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
          WHERE p.player_claimed = TRUE
            AND ${isDisbursed ? "p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '2 days'" : "(p.disbursed = FALSE OR p.disbursed IS NULL)"}
-         ORDER BY p.player_claimed_at DESC`;
+         ORDER BY p.prize_id ASC, p.player_claimed_at DESC`;
 
       const res = await pool.query(query);
 
@@ -1538,7 +1501,7 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
 
       for (const row of res.rows) {
         const rawName = row.winner_housie_name || "";
-        const amount = parseFloat(row.amount) || 0;
+        const baseAmount = parseFloat(row.amount) || 0;
         const fallbackTk = row.ticket_number ? parseInt(row.ticket_number, 10) : null;
 
         // Split multiple winners if it was a split win (e.g. "NRPS (4 & 5) & priyankarp (26)")
@@ -1611,44 +1574,39 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
             claimObj.patterns.push(row.pattern_name);
           }
 
-          // If entry has multiple tickets (e.g. NRPS won Full House on ticket #4 AND ticket #5),
-          // add a breakdown item for EACH winning ticket!
-          const ticketsToAdd = entry.tickets.length > 0 ? entry.tickets : (fallbackTk ? [fallbackTk] : [null]);
+          const ticketCount = entry.tickets.length > 0 ? entry.tickets.length : 1;
+          const combinedAmount = baseAmount * ticketCount;
 
-          for (const tkNum of ticketsToAdd) {
-            const tkDetail = tkNum ? `${row.pattern_name} (Tk #${tkNum})` : row.pattern_name;
-            claimObj.pattern_details.push(tkDetail);
-            claimObj.prize_breakdown.push({
-              pattern_name: row.pattern_name,
-              ticket_number: tkNum ?? null,
-              amount: amount,
-            });
+          let tkLabel = "";
+          if (entry.tickets.length > 0) {
+            tkLabel = entry.tickets.map((t, i) => (i === 0 ? `${t}` : `#${t}`)).join(' & ');
+          } else if (fallbackTk) {
+            tkLabel = `${fallbackTk}`;
+          }
+
+          const tkDetail = tkLabel ? `${row.pattern_name} (Tk #${tkLabel})` : row.pattern_name;
+          claimObj.pattern_details.push(tkDetail);
+          claimObj.prize_breakdown.push({
+            pattern_name: row.pattern_name,
+            ticket_number: tkLabel || null,
+            amount: combinedAmount,
+          });
+
+          for (const tkNum of entry.tickets) {
             if (tkNum && !claimObj.ticket_numbers.includes(tkNum)) {
               claimObj.ticket_numbers.push(tkNum);
             }
-            claimObj.total_amount += amount;
           }
+          if (fallbackTk && !claimObj.ticket_numbers.includes(fallbackTk)) {
+            claimObj.ticket_numbers.push(fallbackTk);
+          }
+
+          claimObj.total_amount += combinedAmount;
 
           if (new Date(row.player_claimed_at) > new Date(claimObj.player_claimed_at)) {
             claimObj.player_claimed_at = row.player_claimed_at;
           }
         }
-      }
-
-      // Sort breakdown items for each claimObj in higher-to-lower priority order (Full House -> Lines -> Star -> Corner -> Quick 7)
-      for (const claimObj of claimMap.values()) {
-        claimObj.prize_breakdown.sort((a: any, b: any) => {
-          const pA = getPatternPriority(a.pattern_name);
-          const pB = getPatternPriority(b.pattern_name);
-          if (pA !== pB) return pA - pB;
-          if (b.amount !== a.amount) return b.amount - a.amount;
-          return (a.ticket_number || 0) - (b.ticket_number || 0);
-        });
-
-        // Re-generate pattern_details in sorted order
-        claimObj.pattern_details = claimObj.prize_breakdown.map((item: any) =>
-          item.ticket_number ? `${item.pattern_name} (Tk #${item.ticket_number})` : item.pattern_name
-        );
       }
 
       return Array.from(claimMap.values());
