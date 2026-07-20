@@ -6,7 +6,7 @@ import { Button } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { Icon } from "@/components/Icon";
-import { getRankedVoices } from "@/lib/voiceUtils";
+import { getTop5CuratedVoices } from "@/lib/voiceUtils";
 
 interface NumberCallConfig {
   number: number;
@@ -1021,6 +1021,28 @@ export function CallVoiceSettings() {
                     setSelectedVoiceName(val);
                     localStorage.setItem("preferred_caller_voice", val);
                     handleSaveConfig({ tts_voice_name: val });
+
+                    // Instant live audio preview test when admin changes TTS voice
+                    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                      window.speechSynthesis.cancel();
+                      const sampleText = val.toLowerCase().includes("hi") || val.toLowerCase().includes("hindi")
+                        ? "आवाज अपडेट की गई। हाउसी घर एआई कॉलर तैयार है।"
+                        : val.toLowerCase().includes("ne") || val.toLowerCase().includes("nepali")
+                          ? "आवाज अपडेट गरियो। हाउसी घर एआई कलर तयार छ।"
+                          : "Voice updated! Housie Ghar AI Caller is ready.";
+                      const utterance = new SpeechSynthesisUtterance(sampleText);
+                      const allVoices = window.speechSynthesis.getVoices();
+                      let matchedVoice = allVoices.find(x => x.name === val);
+                      if (!matchedVoice) {
+                        const top5 = getTop5CuratedVoices(allVoices);
+                        const m = top5.find(x => x.name === val);
+                        if (m && m.rawVoice) matchedVoice = m.rawVoice;
+                      }
+                      if (matchedVoice) utterance.voice = matchedVoice;
+                      utterance.pitch = 1.0;
+                      utterance.rate = 0.95;
+                      window.speechSynthesis.speak(utterance);
+                    }
                   }}
                   style={{
                     width: "100%",
@@ -1037,9 +1059,9 @@ export function CallVoiceSettings() {
                     marginTop: "4px"
                   }}
                 >
-                  {getRankedVoices(voices).map((fv) => (
+                  {getTop5CuratedVoices(voices).map((fv) => (
                     <option key={fv.name} value={fv.name} style={{ backgroundColor: "var(--surface)", color: "var(--text)" }}>
-                      {fv.cleanName} ({fv.lang}){fv.badge ? ` ${fv.badge}` : ""}
+                      {fv.badge} — {fv.cleanName} ({fv.lang})
                     </option>
                   ))}
                 </select>
