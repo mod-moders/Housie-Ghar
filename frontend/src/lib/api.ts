@@ -57,9 +57,10 @@ export async function apiFetch<T>(
     // dashboards in the same browser, and a stray staff token here would silently
     // 401/404 these calls (the JWT has no playerId), bouncing the player out.
     const isPlayerSelfPath =
-      /^\/api\/player\/(me|stats)(\?|$)/.test(path) ||
+      /^\/api\/player\/(me|stats|winnings)(\?|$)/.test(path) ||
       /\/my-tickets(\?|$)/.test(path) ||
       /\/claim(\?|$)/.test(path) ||
+      /\/claim-all(\?|$)/.test(path) ||
       /\/reactions(\?|$)/.test(path);
 
     if (isPlayerSelfPath && playerToken) {

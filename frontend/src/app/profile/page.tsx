@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
@@ -44,7 +44,7 @@ export default function ProfilePage() {
   // Winnings states
   const [winnings, setWinnings] = useState<WinningItem[]>([]);
   const [winningsLoading, setWinningsLoading] = useState(true);
-  const [claimingId, setClaimingId] = useState<number | null>(null);
+  const [claimingGameId, setClaimingGameId] = useState<string | null>(null);
 
   const fetchWinnings = () => {
     setWinningsLoading(true);
@@ -60,10 +60,13 @@ export default function ProfilePage() {
       });
   };
 
-  const initiateClaim = async (gameId: string, prizeId: number) => {
-    setClaimingId(prizeId);
+  // Claims every unclaimed prize the player has in a single game at once, so the
+  // Financial Officer gets one consolidated WhatsApp request per game instead of
+  // one per prize — same endpoint the live game board's "Claim All" button uses.
+  const initiateClaimAll = async (gameId: string) => {
+    setClaimingGameId(gameId);
     try {
-      const response = await apiFetch<{whatsapp_url?: string}>(`/api/games/${gameId}/prizes/${prizeId}/claim`, {
+      const response = await apiFetch<{ whatsapp_url?: string }>(`/api/games/${gameId}/claim-all`, {
         method: "POST",
       });
       fetchWinnings();
@@ -73,9 +76,26 @@ export default function ProfilePage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to initiate claim");
     } finally {
-      setClaimingId(null);
+      setClaimingGameId(null);
     }
   };
+
+  // Group prizes by game so multiple wins in the same game are claimed and
+  // requested together, rather than as separate per-prize requests.
+  const winningsByGame = useMemo(() => {
+    const groups: { game_id: string; game_title: string; game_date: string; items: WinningItem[] }[] = [];
+    const indexByGameId = new Map<string, number>();
+    for (const w of winnings) {
+      let idx = indexByGameId.get(w.game_id);
+      if (idx === undefined) {
+        idx = groups.length;
+        indexByGameId.set(w.game_id, idx);
+        groups.push({ game_id: w.game_id, game_title: w.game_title, game_date: w.game_date, items: [] });
+      }
+      groups[idx].items.push(w);
+    }
+    return groups;
+  }, [winnings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,14 +135,15 @@ export default function ProfilePage() {
       const claimPrizeId = params.get("claim_prize_id");
       const gameId = params.get("game_id");
       if (claimPrizeId && gameId) {
-        // Auto-fire a deep-linked prize claim once, after the page has loaded.
+        // Auto-fire a deep-linked prize claim once, after the page has loaded —
+        // claims every unclaimed prize for this game, not just the linked one.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        initiateClaim(gameId, parseInt(claimPrizeId, 10));
+        initiateClaimAll(gameId);
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
     }
-    // initiateClaim is intentionally excluded: this must run once when loading
+    // initiateClaimAll is intentionally excluded: this must run once when loading
     // settles, not each time the (non-memoised) callback identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, winningsLoading]);
@@ -389,83 +410,85 @@ export default function ProfilePage() {
                 You have no recorded winnings yet. Keep playing to win exciting prizes!
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {winnings.map((w) => {
-                  const isClaimed = w.player_claimed;
-                  const isDisbursed = w.disbursed;
-                  
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {winningsByGame.map((group) => {
+                  const unclaimed = group.items.filter((w) => !w.player_claimed);
+                  const allDisbursed = group.items.every((w) => w.disbursed);
+                  const unclaimedTotal = unclaimed.reduce((sum, w) => sum + w.amount, 0);
+                  const isClaiming = claimingGameId === group.game_id;
+
                   return (
-                    <div 
-                      key={w.prize_id}
+                    <div
+                      key={group.game_id}
                       style={{
                         background: "var(--surface-2)",
                         border: "1px solid var(--border-light)",
                         borderRadius: 8,
                         padding: "12px 16px",
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: 12
+                        flexDirection: "column",
+                        gap: 10
                       }}
                     >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)" }}>{w.pattern_name}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
-                          {w.game_title} • Ticket #{w.winner_ticket_number}
-                        </div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
+                        {group.game_title}
                       </div>
-                      
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        <span style={{ fontWeight: 700, fontSize: 16, color: "var(--accent)" }}>
-                          ₹{w.amount.toFixed(2)}
-                        </span>
-                        
-                        {isDisbursed ? (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                            Disbursed
-                          </span>
-                        ) : isClaimed ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                              Pending Disbursal
-                            </span>
-                            <button
-                              onClick={() => initiateClaim(w.game_id, w.prize_id)}
-                              style={{
-                                background: "none",
-                                border: "1px solid var(--border-light)",
-                                color: "var(--text)",
-                                borderRadius: 6,
-                                padding: "4px 8px",
-                                fontSize: 11,
-                                fontWeight: 500,
-                                cursor: "pointer"
-                              }}
-                            >
-                              WhatsApp FO
-                            </button>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {group.items.map((w) => (
+                          <div key={w.prize_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)" }}>{w.pattern_name}</div>
+                              <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Ticket #{w.winner_ticket_number}</div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <span style={{ fontWeight: 700, fontSize: 16, color: "var(--accent)" }}>
+                                ₹{w.amount.toFixed(2)}
+                              </span>
+                              {w.disbursed ? (
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                                  Disbursed
+                                </span>
+                              ) : w.player_claimed ? (
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                                  Pending Disbursal
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => initiateClaim(w.game_id, w.prize_id)}
-                            disabled={claimingId === w.prize_id}
-                            style={{
-                              background: "var(--accent)",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 6,
-                              padding: "6px 12px",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              opacity: claimingId === w.prize_id ? 0.6 : 1
-                            }}
-                          >
-                            {claimingId === w.prize_id ? "Claiming..." : "Claim Now"}
-                          </button>
-                        )}
+                        ))}
                       </div>
+
+                      {unclaimed.length > 0 ? (
+                        <button
+                          onClick={() => initiateClaimAll(group.game_id)}
+                          disabled={isClaiming}
+                          style={{
+                            alignSelf: "flex-start",
+                            background: "var(--accent)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "8px 14px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            opacity: isClaiming ? 0.6 : 1
+                          }}
+                        >
+                          {isClaiming
+                            ? "Claiming..."
+                            : `Claim All (${unclaimed.length} Prize${unclaimed.length > 1 ? "s" : ""} · ₹${unclaimedTotal.toFixed(2)})`}
+                        </button>
+                      ) : allDisbursed ? (
+                        <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                          All Disbursed
+                        </span>
+                      ) : (
+                        <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
+                          Claim Sent · Pending Disbursal
+                        </span>
+                      )}
                     </div>
                   );
                 })}
