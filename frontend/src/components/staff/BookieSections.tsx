@@ -7,7 +7,7 @@ import { money, moneyStr } from "@/lib/money";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
-import { BookieStatsSection } from "./MyStatsSections";
+import { BookieStatsSection, type BookieStatsData } from "./MyStatsSections";
 import type { QueueBooking, SkipAlert, WalletLedgerEntry } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 
