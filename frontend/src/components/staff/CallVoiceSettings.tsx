@@ -550,7 +550,7 @@ export function CallVoiceSettings() {
             {/* Global Language Toggle Switch: ENG vs NEP */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>🌐 Audio Call Language</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>🌐 Language Switch</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: callerEnabled ? "var(--accent)" : "var(--text-dim)" }}>
                   <input
                     type="checkbox"
@@ -566,7 +566,13 @@ export function CallVoiceSettings() {
                 <button
                   onClick={() => {
                     setAudioLang("en");
-                    handleSaveConfig({ audio_language: "en" });
+                    setWelcomeVoiceLang("en");
+                    setInstructionVoiceLang("en");
+                    handleSaveConfig({
+                      audio_language: "en",
+                      welcome_voice_lang: "en",
+                      instruction_voice_lang: "en"
+                    });
                   }}
                   className="hg-btn"
                   style={{
@@ -593,7 +599,13 @@ export function CallVoiceSettings() {
                 <button
                   onClick={() => {
                     setAudioLang("ne");
-                    handleSaveConfig({ audio_language: "ne" });
+                    setWelcomeVoiceLang("ne");
+                    setInstructionVoiceLang("ne");
+                    handleSaveConfig({
+                      audio_language: "ne",
+                      welcome_voice_lang: "ne",
+                      instruction_voice_lang: "ne"
+                    });
                   }}
                   className="hg-btn"
                   style={{

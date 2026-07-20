@@ -195,7 +195,7 @@ export function useGameAudio(
     try {
       if (!isMountedRef.current || isMuted) return;
 
-      const activeLang = platformConfig?.welcome_voice_lang || platformConfig?.audio_language || "en";
+      const activeLang = platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
       const welcomeUrl = activeLang === "ne"
         ? (platformConfig?.welcome_voice_url_ne || platformConfig?.welcome_voice_url)
         : (platformConfig?.welcome_voice_url_en || platformConfig?.welcome_voice_url);
@@ -228,7 +228,7 @@ export function useGameAudio(
     stopAllActiveAudios();
     
     try {
-      const activeLang = platformConfig?.instruction_voice_lang || platformConfig?.audio_language || "en";
+      const activeLang = platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
       const instructionUrl = activeLang === "ne"
         ? (platformConfig?.instruction_voice_url_ne || platformConfig?.instruction_voice_url)
         : (platformConfig?.instruction_voice_url_en || platformConfig?.instruction_voice_url);
