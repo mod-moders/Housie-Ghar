@@ -30,13 +30,14 @@ class SoundSynthesizer {
   startCageSpin() {
     try {
       const config = useConfigStore.getState().config;
+      const volMultiplier = config?.cage_sound_volume !== undefined ? parseFloat(config.cage_sound_volume) : 1.0;
       const customUrl = config?.cage_sound_url;
       if (customUrl) {
         this.stopCageSpin();
         const resolved = resolveAudioUrl(customUrl);
         this.customCageAudio = new Audio(resolved);
         this.customCageAudio.loop = true;
-        this.customCageAudio.volume = 1.0;
+        this.customCageAudio.volume = Math.max(0, Math.min(1, volMultiplier));
         this.customCageAudio.play().catch(() => {});
         return;
       }
@@ -344,6 +345,7 @@ class SoundSynthesizer {
   playCelebration() {
     try {
       const config = useConfigStore.getState().config;
+      const volMultiplier = config?.winner_sound_volume !== undefined ? parseFloat(config.winner_sound_volume) : 1.0;
       const customUrl = config?.celebration_sound_url;
       if (customUrl) {
         if (this.customCelebrationAudio) {
@@ -351,7 +353,7 @@ class SoundSynthesizer {
         }
         const resolved = resolveAudioUrl(customUrl);
         this.customCelebrationAudio = new Audio(resolved);
-        this.customCelebrationAudio.volume = 1.0;
+        this.customCelebrationAudio.volume = Math.max(0, Math.min(1, volMultiplier));
         this.customCelebrationAudio.play().catch(() => {});
         return;
       }

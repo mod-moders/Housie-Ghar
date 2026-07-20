@@ -297,6 +297,8 @@ export function CallVoiceSettings() {
   const [instructionVoiceMode, setInstructionVoiceMode] = useState(config?.instruction_voice_mode || "Text");
   const [welcomeVoiceVolume, setWelcomeVoiceVolume] = useState(parseFloat(config?.welcome_voice_volume || "1.0"));
   const [instructionVoiceVolume, setInstructionVoiceVolume] = useState(parseFloat(config?.instruction_voice_volume || "1.0"));
+  const [cageVolume, setCageVolume] = useState<number>(parseFloat(config?.cage_sound_volume || "1.0"));
+  const [winnerVolume, setWinnerVolume] = useState<number>(parseFloat(config?.winner_sound_volume || "1.0"));
   const [ttsVoiceName, setTtsVoiceName] = useState(config?.tts_voice_name || "");
 
   useEffect(() => {
@@ -317,6 +319,8 @@ export function CallVoiceSettings() {
       setBgMusicVolume(parseFloat(config.background_music_volume || "0.15"));
       setLobbyMusicVolume(parseFloat(config.lobby_music_volume || "0.15"));
       setMasterCallsVolume(parseFloat(config.master_calls_volume || "1.0"));
+      setCageVolume(parseFloat(config.cage_sound_volume || "1.0"));
+      setWinnerVolume(parseFloat(config.winner_sound_volume || "1.0"));
       setWelcomeText(config.welcome_voice_text || "Welcome to Housie Ghar. The game is starting now! Best of luck.");
       setInstructionText(config.instruction_voice_text || "Please check your tickets carefully. The numbers will be called out one by one. Claim your prizes instantly.");
       setWelcomeVoiceMode(config.welcome_voice_mode || "Text");
@@ -1382,6 +1386,34 @@ export function CallVoiceSettings() {
                   </div>
                 )}
 
+                {/* Real-time synchronized Volume control */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "4px 10px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+                  <Icon name="volume-2" size={13} style={{ color: "var(--accent)" }} />
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={cageVolume}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setCageVolume(val);
+                      handleSaveConfig({ cage_sound_volume: String(val) });
+                    }}
+                    style={{ 
+                      width: "60px", 
+                      accentColor: "var(--accent)", 
+                      cursor: "pointer", 
+                      height: "3px", 
+                      borderRadius: "1.5px", 
+                      background: "var(--border-2)" 
+                    }}
+                  />
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-mute)", minWidth: "26px" }}>
+                    {Math.round(cageVolume * 100)}%
+                  </span>
+                </div>
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1462,6 +1494,34 @@ export function CallVoiceSettings() {
                     <button onClick={() => handleSaveConfig({ celebration_sound_url: "" })} title="Remove custom file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={13} /></button>
                   </div>
                 )}
+
+                {/* Real-time synchronized Volume control */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "4px 10px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
+                  <Icon name="volume-2" size={13} style={{ color: "var(--accent)" }} />
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={winnerVolume}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setWinnerVolume(val);
+                      handleSaveConfig({ winner_sound_volume: String(val) });
+                    }}
+                    style={{ 
+                      width: "60px", 
+                      accentColor: "var(--accent)", 
+                      cursor: "pointer", 
+                      height: "3px", 
+                      borderRadius: "1.5px", 
+                      background: "var(--border-2)" 
+                    }}
+                  />
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-mute)", minWidth: "26px" }}>
+                    {Math.round(winnerVolume * 100)}%
+                  </span>
+                </div>
 
                 <Button
                   variant="ghost"

@@ -273,6 +273,8 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
     'welcome_voice_url',
     'instruction_voice_url',
     'background_music_url',
+    'cage_sound_url',
+    'celebration_sound_url',
     'lobby_music_url_1',
     'lobby_music_url_2',
     'lobby_music_url_3',
