@@ -97,7 +97,18 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.cookie(CONSTANTS.JWT_COOKIE_NAME, token, {
       httpOnly: true,
       secure: env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      // 'strict' never sends this cookie on the cross-site requests the
+      // production deploy actually makes (frontend on Vercel, backend on
+      // Railway) — including the Socket.io handshake, regardless of
+      // withCredentials. That silently left socket.data.user unset for every
+      // staff connection, so authorizeRoomJoin denied all agent/operator/admin
+      // room joins and realtime updates (new booking requests, top-up
+      // requests, prize claims, wallet updates) never arrived, forcing a
+      // manual refresh. 'none' (paired with the existing secure:true in
+      // production) is required for a cross-site cookie to be sent at all;
+      // 'lax' in dev since localhost:3000/4000 are same-site and SameSite=None
+      // without HTTPS is rejected by browsers there.
+      sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -127,7 +138,7 @@ export function logout(req: Request, res: Response): void {
   res.clearCookie(CONSTANTS.JWT_COOKIE_NAME, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
   res.json({ message: 'Successfully logged out' });
 }
@@ -148,7 +159,7 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
       res.clearCookie(CONSTANTS.JWT_COOKIE_NAME, {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
       });
       res.status(401).json({ message: 'Account is deactivated, deleted, or suspended.' });
       return;
