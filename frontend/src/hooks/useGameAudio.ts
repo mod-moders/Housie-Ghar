@@ -89,6 +89,8 @@ export function useGameAudio(
     }
   });
 
+  const activeBgUrlRef = useRef<string>("");
+
   // Smoothly update gameplay background music volume in realtime without restarting or stopping the track
   useEffect(() => {
     if (bgMusicRef.current) {
@@ -106,10 +108,11 @@ export function useGameAudio(
 
     if (isGameLive && bgEnabled && bgUrl && !isMuted) {
       const resolvedBgUrl = resolveAudioUrl(bgUrl);
-      if (!bgMusicRef.current || bgMusicRef.current.src !== resolvedBgUrl) {
+      if (!bgMusicRef.current || activeBgUrlRef.current !== resolvedBgUrl) {
         if (bgMusicRef.current) {
           try { bgMusicRef.current.pause(); } catch {}
         }
+        activeBgUrlRef.current = resolvedBgUrl;
         const audio = new Audio(resolvedBgUrl);
         if (!resolvedBgUrl.startsWith("data:")) {
           audio.crossOrigin = "anonymous";
@@ -135,6 +138,7 @@ export function useGameAudio(
           bgMusicRef.current.src = "";
         } catch {}
         bgMusicRef.current = null;
+        activeBgUrlRef.current = "";
       }
     }
 
@@ -145,6 +149,7 @@ export function useGameAudio(
           bgMusicRef.current.src = "";
         } catch {}
         bgMusicRef.current = null;
+        activeBgUrlRef.current = "";
       }
     };
   }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, isMuted, gameBgMusicEnabled]);

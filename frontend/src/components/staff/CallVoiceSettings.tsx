@@ -526,9 +526,7 @@ export function CallVoiceSettings() {
       audio.crossOrigin = "anonymous";
     }
     audio.id = "preview-audio-element";
-    const isLobby = [1, 2, 3, 4, 5].some((idx) => url === (config as any)?.[`lobby_music_url_${idx}`]);
-    const isBg = url === bgMusicUrl;
-    audio.volume = isLobby ? lobbyMusicVolume : isBg ? bgMusicVolume : 0.8;
+    audio.volume = key === "bg" ? bgMusicVolume : (key.startsWith("lobby") || [1, 2, 3, 4, 5].some((idx) => url === (config as any)?.[`lobby_music_url_${idx}`])) ? lobbyMusicVolume : 0.8;
 
     if (key === "welcome" || key === "instruction") {
       const volMultiplier = key === "welcome" ? welcomeVoiceVolume : instructionVoiceVolume;
