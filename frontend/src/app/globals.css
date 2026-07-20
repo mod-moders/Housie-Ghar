@@ -2230,13 +2230,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-bad-amt{color:var(--danger);font-family:var(--font-mono);font-weight:600}
 .hg-low-tag{font-family:var(--font-body);font-style:normal;font-size:8px;font-weight:700;background:var(--danger);color:#fff;
   padding:1px 4px;border-radius:4px;margin-left:6px;vertical-align:middle}
-.hg-pill{font:700 10px var(--font-head);letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;
-  border:1px solid currentColor}
-.hg-pill-scheduled{background:var(--surface-2);color:var(--text-dim)}
-.hg-pill-live{background:var(--danger-soft);color:var(--danger)}
-.hg-pill-paused{background:var(--locked-soft);color:var(--locked)}
-.hg-pill-completed{background:var(--surface-2);color:var(--text-mute)}
-.hg-pill-draw-ended{background:rgba(230,180,34,0.15);color:#f7c948;border-color:rgba(230,180,34,0.3)}
+.hg-pill{font:700 10.5px var(--font-head);letter-spacing:.05em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap !important;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.hg-pill-scheduled{background:var(--surface-2);color:var(--text-dim);border-color:var(--border-2)}
+.hg-pill-live{background:rgba(239, 68, 68, 0.15);color:#ef4444;border-color:rgba(239, 68, 68, 0.35);box-shadow:0 0 8px rgba(239, 68, 68, 0.2)}
+.hg-pill-paused{background:rgba(245, 158, 11, 0.15);color:#f59e0b;border-color:rgba(245, 158, 11, 0.35)}
+.hg-pill-completed{background:rgba(16, 185, 129, 0.12);color:#10b981;border-color:rgba(16, 185, 129, 0.3)}
+.hg-pill-draw-ended,.hg-pill-draw_ended{background:rgba(244, 201, 93, 0.16) !important;color:var(--accent) !important;border:1.5px solid rgba(244, 201, 93, 0.4) !important;box-shadow:0 0 10px rgba(244, 201, 93, 0.15) !important;white-space:nowrap !important}
 .hg-pill-active{background:var(--success-soft);color:var(--success)}
 .hg-pill-suspended{background:var(--danger-soft);color:var(--danger)}
 .hg-pill-veteran{background:var(--success-soft);color:var(--success)}

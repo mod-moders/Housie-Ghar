@@ -141,7 +141,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick, canManage }: 
               {money(expMargin)}
             </span>
             <span className="hg-dim">{playerCount}</span>
-            <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span></span>
+            <span><span className={`hg-pill hg-pill-${g.game_status.toLowerCase().replace("_", "-")}`} style={{ whiteSpace: "nowrap" }}>{g.game_status === "Draw_Ended" ? "Draw Ended" : g.game_status.replace("_", " ")}</span></span>
             {controls && (
               <span className="hg-row-ctrls" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap" }}>
                 {g.game_status === "Scheduled" && (
@@ -1090,7 +1090,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
                 <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ margin: 0 }}>
                   <div className="hg-fill-top">
                     <strong>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase().replace("_", "-")}`} style={{ whiteSpace: "nowrap" }}>{g.game_status === "Draw_Ended" ? "Draw Ended" : g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta">
                     {gameTime(g)} · {g.sold_count + g.locked_count}/{g.total_tickets} tickets
@@ -1824,7 +1824,7 @@ export function FillingSection() {
             <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`}>
               <div className="hg-fill-top">
                 <strong>{g.title}</strong>
-                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
+                <span className={`hg-pill hg-pill-${g.game_status.toLowerCase().replace("_", "-")}`} style={{ whiteSpace: "nowrap" }}>{g.game_status === "Draw_Ended" ? "Draw Ended" : g.game_status.replace("_", " ")}</span>
               </div>
               <div className="hg-fill-meta">
                 {gameTime(g)} · {g.sold_count + g.locked_count}/{g.total_tickets} tickets

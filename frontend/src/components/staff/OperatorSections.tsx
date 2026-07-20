@@ -261,7 +261,7 @@ export function OperatorHudSection() {
                 >
                   <div className="hg-fill-top">
                     <strong className="hg-card-title" style={{ fontSize: "16px" }}>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>{g.game_status.replace("_", " ")}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase().replace("_", "-")}`} style={{ whiteSpace: "nowrap" }}>{g.game_status === "Draw_Ended" ? "Draw Ended" : g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta" style={{ marginTop: "6px" }}>
                     <span className="hg-card-when">{dateStr}</span>
@@ -951,7 +951,7 @@ export function ShareGamesSection() {
                 <div>
                   <div className="hg-fill-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                     <strong style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)", fontFamily: "var(--font-head)" }}>{g.title}</strong>
-                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`} style={{ flexShrink: 0 }}>{g.game_status.replace("_", " ")}</span>
+                    <span className={`hg-pill hg-pill-${g.game_status.toLowerCase().replace("_", "-")}`} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>{g.game_status === "Draw_Ended" ? "Draw Ended" : g.game_status.replace("_", " ")}</span>
                   </div>
                   <div className="hg-fill-meta" style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "6px" }}>
                     {fmtDateTime(g.scheduled_at)}
