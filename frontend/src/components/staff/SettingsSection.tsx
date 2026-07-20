@@ -280,8 +280,8 @@ export function SettingsSection() {
           {/* Official Info Groups Card */}
           <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="chat" size={18} style={{ color: "var(--accent)" }} />
-              <div>
+              <Icon name="chat" size={18} style={{ color: "var(--accent)", flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <h3 style={{ margin: 0, fontSize: 16 }}>Official Info Groups</h3>
                 <p className="hg-dim" style={{ margin: "2px 0 0", fontSize: 11, lineHeight: 1.3 }}>Configure up to 5 WhatsApp groups for direct game &amp; winner sharing.</p>
               </div>
