@@ -110,7 +110,7 @@ export function SettingsSection() {
       <div className="hg-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
 
         {/* ── LEFT: Announcements Manager ── */}
-        <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Icon name="bell" size={18} style={{ color: "var(--accent)" }} />
@@ -233,7 +233,7 @@ export function SettingsSection() {
         </div>
 
         {/* ── RIGHT: Theme & Info Groups Column ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
           {/* Theme Gallery Card */}
           <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
