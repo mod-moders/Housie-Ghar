@@ -256,9 +256,19 @@ export function useGameAudio(
     const config = callsConfig[num];
     const activeLang = platformConfig?.audio_language || "en";
 
+    // English had NO fallback at all when a number's audio_url_en was never uploaded: the
+    // static `/audio/calls/{num}_en.mp3` guess essentially never exists (no bulk EN convention
+    // files were ever seeded, unlike the Nepali `{num}.mp4` set), so the call silently played
+    // nothing. Mirror the Nepali branch's own fallback chain (which already degrades through
+    // audio_url_ne -> the legacy shared audio_url) so a missing English upload plays whatever
+    // language IS actually uploaded for that number instead of dead air.
     const audioUrl = activeLang === "ne"
-      ? (config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_ne.mp3` || `/audio/calls/${num}.mp3`)
-      : (config?.audio_url_en || `/audio/calls/${num}_en.mp3`);
+      ? (config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_ne.mp3`)
+      : (config?.audio_url_en || config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_en.mp3`);
+
+    if (activeLang !== "ne" && !config?.audio_url_en && (config?.audio_url_ne || config?.audio_url)) {
+      console.warn(`[useGameAudio] Number ${num} has no English audio uploaded — falling back to the Nepali file. Upload an English clip in Audio Settings > 1-90 Call Audio Files to fix this.`);
+    }
 
     const vol = config?.volume !== undefined ? config.volume : 1.0;
     const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
