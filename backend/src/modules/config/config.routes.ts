@@ -6,9 +6,9 @@ const router = Router();
 
 router.get('/public', getPublicConfig);
 router.get('/share-groups', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getShareGroups);
-router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getConfig);
-router.put('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), updateConfig);
-router.post('/upload', authenticateToken, requireRole(['Superadmin']), uploadConfigAudio);
+router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getConfig);
+router.put('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), updateConfig);
+router.post('/upload', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), uploadConfigAudio);
 router.post('/reset-database', authenticateToken, requireRole(['Superadmin']), resetDatabase);
 
 export default router;

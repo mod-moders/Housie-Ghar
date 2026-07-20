@@ -271,19 +271,7 @@ export function useGameAudio(
 
   const playCelebration = () => {
     if (!englishCallerEnabled || isMuted) return;
-
-    const audio = new Audio("/audio/calls/celebration.mp3");
-    activeAudiosRef.current.push(audio);
-    audio.volume = 0.85;
-    audio.muted = isMuted;
-    audio.play()
-      .then(() => {
-        if (!isMountedRef.current || isMuted) {
-          audio.pause();
-          audio.src = "";
-        }
-      })
-      .catch(() => {});
+    soundSynthesizer.playCelebration();
   };
 
   const playAudioFile = (mp3Path: string, customVolume: number = 1.0): Promise<void> => {

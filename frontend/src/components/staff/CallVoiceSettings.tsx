@@ -177,6 +177,8 @@ export function CallVoiceSettings() {
   const [celebrationSound, setCelebrationSound] = useState(config?.celebration_sound_enabled !== "false");
   const [cageVolume, setCageVolume] = useState<number>(parseFloat(config?.cage_sound_volume || "1.0"));
   const [winnerVolume, setWinnerVolume] = useState<number>(parseFloat(config?.winner_sound_volume || "1.0"));
+  const [cageSoundUrl, setCageSoundUrl] = useState(config?.cage_sound_url || "");
+  const [celebrationSoundUrl, setCelebrationSoundUrl] = useState(config?.celebration_sound_url || "");
 
   // Background Music States
   const [bgMusicUrl, setBgMusicUrl] = useState(config?.background_music_url || "");
@@ -215,6 +217,8 @@ export function CallVoiceSettings() {
       setAudioLang((config.audio_language as "en" | "ne") || "en");
       setCageSound(config.cage_sound_enabled !== "false");
       setCelebrationSound(config.celebration_sound_enabled !== "false");
+      setCageSoundUrl(config.cage_sound_url || "");
+      setCelebrationSoundUrl(config.celebration_sound_url || "");
       
       setWelcomeVoiceEnabled(config.welcome_voice_enabled !== "false");
       setWelcomeVoiceUrlEn(config.welcome_voice_url_en || "");
@@ -420,6 +424,8 @@ export function CallVoiceSettings() {
         else if (key === "instruction_voice_url_en") setInstructionVoiceUrlEn(res.url);
         else if (key === "instruction_voice_url_ne") setInstructionVoiceUrlNe(res.url);
         else if (key === "background_music_url") setBgMusicUrl(res.url);
+        else if (key === "cage_sound_url") setCageSoundUrl(res.url);
+        else if (key === "celebration_sound_url") setCelebrationSoundUrl(res.url);
       } catch (err: any) {
         alert(err?.message || "Upload failed.");
       } finally {
@@ -465,8 +471,9 @@ export function CallVoiceSettings() {
 
   const handleDeleteNumberAudio = async (num: number, lang?: "en" | "ne") => {
     if (!window.confirm(`Delete ${lang ? lang.toUpperCase() : "custom"} audio file for number ${num}?`)) return;
+    stopAllPreviews();
     try {
-      await apiFetch(`/api/games/number-calls/${num}/audio`, {
+      await apiFetch(`/api/games/number-calls/${num}/audio?lang=${lang || "en"}`, {
         method: "DELETE",
         body: JSON.stringify({ lang }),
       });
@@ -743,10 +750,19 @@ export function CallVoiceSettings() {
                   <option value="golden_brass">Golden Brass Cage</option>
                 </select>
 
-                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
-                  <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("cage_sound_url", e)} style={{ display: "none" }} />
-                  <span>{config?.cage_sound_url ? "Replace" : "Upload MP3"}</span>
+                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                  <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("cage_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                  <span>{uploadingVoiceKey === "cage_sound_url" ? "..." : cageSoundUrl ? "Replace" : "Upload MP3"}</span>
                 </label>
+
+                {cageSoundUrl && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {cageSoundUrl.split("/").pop()}
+                    </span>
+                    <button onClick={() => { stopAllPreviews(); setCageSoundUrl(""); handleSaveConfig({ cage_sound_url: "" }); }} title="Remove custom file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "24px", height: "24px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                  </div>
+                )}
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
                   <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />
@@ -813,10 +829,19 @@ export function CallVoiceSettings() {
                   <option value="symphony_orchestra">Symphony Orchestra</option>
                 </select>
 
-                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0 }}>
-                  <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("celebration_sound_url", e)} style={{ display: "none" }} />
-                  <span>{config?.celebration_sound_url ? "Replace" : "Upload Fanfare MP3"}</span>
+                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                  <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("celebration_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                  <span>{uploadingVoiceKey === "celebration_sound_url" ? "..." : celebrationSoundUrl ? "Replace" : "Upload Fanfare MP3"}</span>
                 </label>
+
+                {celebrationSoundUrl && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {celebrationSoundUrl.split("/").pop()}
+                    </span>
+                    <button onClick={() => { stopAllPreviews(); setCelebrationSoundUrl(""); handleSaveConfig({ celebration_sound_url: "" }); }} title="Remove custom file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "24px", height: "24px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Icon name="trash" size={12} /></button>
+                  </div>
+                )}
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
                   <Icon name="volume" size={13} style={{ color: "var(--accent)" }} />

@@ -41,15 +41,15 @@ const router = Router();
 // Public static routes
 router.get('/number-calls', listNumberCalls);
 
-// Superadmin static bulk endpoints
-router.patch('/number-calls-bulk-volume', authenticateToken, requireRole(['Superadmin']), updateBulkVolume);
-router.patch('/number-calls-bulk-mode', authenticateToken, requireRole(['Superadmin']), updateBulkMode);
+// Staff static bulk endpoints
+router.patch('/number-calls-bulk-volume', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), updateBulkVolume);
+router.patch('/number-calls-bulk-mode', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), updateBulkMode);
 
-// Superadmin individual call number static endpoints
-router.patch('/number-calls/:number', authenticateToken, requireRole(['Superadmin']), updateNumberCall);
-router.post('/number-calls/:number/restore', authenticateToken, requireRole(['Superadmin']), restoreDefaultCallText);
-router.post('/number-calls/:number/upload', authenticateToken, requireRole(['Superadmin']), uploadNumberAudio);
-router.delete('/number-calls/:number/audio', authenticateToken, requireRole(['Superadmin']), deleteNumberAudio);
+// Staff individual call number static endpoints
+router.patch('/number-calls/:number', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), updateNumberCall);
+router.post('/number-calls/:number/restore', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), restoreDefaultCallText);
+router.post('/number-calls/:number/upload', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), uploadNumberAudio);
+router.delete('/number-calls/:number/audio', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), deleteNumberAudio);
 
 // Financial Admin / Superadmin static dashboard/listing endpoints
 router.get('/prize-claims/dashboard', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), getPrizeClaimsDashboard);

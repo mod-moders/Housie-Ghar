@@ -178,49 +178,54 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
  */
 export async function deleteNumberAudio(req: Request, res: Response): Promise<void> {
   const { number } = req.params;
-  const { lang } = req.body || req.query || {};
+  const targetLang = (req.query.lang || (req.body && req.body.lang) || '') as string;
 
   try {
-    const destDir = path.resolve(__dirname, '../../../../frontend/public/audio/calls');
-    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a'];
-    
-    if (lang === 'ne') {
-      possibleExts.forEach((e) => {
-        const filePath = path.join(destDir, `${number}_ne.${e}`);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch {}
+    const backendUploadDir = path.resolve(__dirname, '../../../uploads/audio/calls');
+    let rootDir = process.cwd();
+    if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
+      rootDir = path.resolve(rootDir, '..');
+    }
+    const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/calls');
+    const possibleExts = ['mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'aac', 'flac', 'opus', '3gp', 'wma'];
+
+    const unlinkFile = (prefix: string) => {
+      [backendUploadDir, frontendPublicDir].forEach((dir) => {
+        if (fs.existsSync(dir)) {
+          possibleExts.forEach((e) => {
+            const filePath = path.join(dir, `${prefix}.${e}`);
+            if (fs.existsSync(filePath)) {
+              try { fs.unlinkSync(filePath); } catch {}
+            }
+          });
         }
       });
+    };
+
+    if (targetLang === 'ne') {
+      unlinkFile(`${number}_ne`);
       await pool.query(
         `UPDATE Number_Calls 
          SET audio_url_ne = NULL,
-             audio_url = audio_url_en
+             audio_url = audio_url_en,
+             call_mode = CASE WHEN audio_url_en IS NULL THEN 'Text' ELSE 'Audio' END
          WHERE number = $1`,
         [parseInt(number as string, 10)]
       );
-    } else if (lang === 'en') {
-      possibleExts.forEach((e) => {
-        const filePath = path.join(destDir, `${number}_en.${e}`);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch {}
-        }
-      });
+    } else if (targetLang === 'en') {
+      unlinkFile(`${number}_en`);
       await pool.query(
         `UPDATE Number_Calls 
          SET audio_url_en = NULL,
-             audio_url = audio_url_ne
+             audio_url = audio_url_ne,
+             call_mode = CASE WHEN audio_url_ne IS NULL THEN 'Text' ELSE 'Audio' END
          WHERE number = $1`,
         [parseInt(number as string, 10)]
       );
     } else {
-      possibleExts.forEach((e) => {
-        [`${number}_en.${e}`, `${number}_ne.${e}`, `${number}.${e}`].forEach((f) => {
-          const filePath = path.join(destDir, f);
-          if (fs.existsSync(filePath)) {
-            try { fs.unlinkSync(filePath); } catch {}
-          }
-        });
-      });
+      unlinkFile(`${number}_en`);
+      unlinkFile(`${number}_ne`);
+      unlinkFile(`${number}`);
       await pool.query(
         `UPDATE Number_Calls 
          SET audio_url = NULL, audio_url_en = NULL, audio_url_ne = NULL, call_mode = 'Text'
