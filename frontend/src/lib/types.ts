@@ -217,6 +217,7 @@ export interface PlayerProfile {
   theme_preference: string | null;
   sound_enabled: boolean;
   has_password?: boolean;
+  avatar_url?: string | null;
 }
 
 export interface PlayerStats {

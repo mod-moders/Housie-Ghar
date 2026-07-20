@@ -15,6 +15,9 @@ export interface AuthUser {
   temp_password_required?: boolean;
   receive_overflow?: boolean;
   nationality?: string | null;
+  avatar_url?: string | null;
+  created_at?: string | null;
+  last_login?: string | null;
 }
 
 interface AuthStore {

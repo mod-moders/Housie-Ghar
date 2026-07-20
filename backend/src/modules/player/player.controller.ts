@@ -152,7 +152,7 @@ export async function getProfile(req: any, res: Response): Promise<void> {
   
   try {
     const result = await pool.query(
-      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
+      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, avatar_url, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
       [req.player.playerId]
     );
     if ((result.rowCount ?? 0) === 0) {
@@ -177,7 +177,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     return;
   }
 
-  const { full_name, phone, email, theme_preference, sound_enabled, password } = req.body;
+  const { full_name, phone, email, theme_preference, sound_enabled, password, avatar_url } = req.body;
 
   try {
     let passwordHashUpdate = null;
@@ -201,10 +201,11 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
            email = $3,
            theme_preference = $4,
            sound_enabled = COALESCE($5, sound_enabled),
-           password_hash = CASE WHEN $6 = TRUE THEN $7 ELSE password_hash END
-       WHERE player_id = $8
-       RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, (password_hash IS NOT NULL) AS has_password`,
-      [full_name, phone, email, theme_preference, sound_enabled, shouldUpdatePassword, passwordHashUpdate, req.player.playerId]
+           password_hash = CASE WHEN $6 = TRUE THEN $7 ELSE password_hash END,
+           avatar_url = COALESCE($8, avatar_url)
+       WHERE player_id = $9
+       RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password`,
+      [full_name, phone, email, theme_preference, sound_enabled, shouldUpdatePassword, passwordHashUpdate, avatar_url, req.player.playerId]
     );
 
     res.json({ player: result.rows[0], message: 'Profile updated successfully' });

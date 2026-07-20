@@ -136,7 +136,8 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
   try {
     const result = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.username, u.phone, u.upi_id, u.town, u.status,
-              u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, u.receive_overflow, u.nationality, r.role_name
+              u.role_id, u.current_balance, u.temp_password_required, u.is_cfo, u.receive_overflow,
+              u.nationality, u.avatar_url, u.created_at, u.last_login, r.role_name
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        WHERE u.user_id = $1`,
@@ -171,6 +172,9 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
         is_cfo: u.is_cfo === true,
         receive_overflow: u.receive_overflow === true,
         nationality: u.nationality,
+        avatar_url: u.avatar_url ?? null,
+        created_at: u.created_at ?? null,
+        last_login: u.last_login ?? null,
       },
     });
   } catch (error) {
@@ -186,12 +190,12 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
  * always acts on req.user.userId and cannot touch status/role.
  */
 export async function updateOwnProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { full_name, phone, upi_id, email, receive_overflow, nationality } = req.body;
+  const { full_name, phone, upi_id, email, receive_overflow, nationality, avatar_url } = req.body;
   const actor = req.user!;
 
   try {
     const currentRes = await pool.query(
-      `SELECT full_name, phone, upi_id, email, receive_overflow, nationality FROM Users WHERE user_id = $1`,
+      `SELECT full_name, phone, upi_id, email, receive_overflow, nationality, avatar_url FROM Users WHERE user_id = $1`,
       [actor.userId]
     );
 
@@ -208,6 +212,7 @@ export async function updateOwnProfile(req: AuthenticatedRequest, res: Response)
     const targetEmail = typeof email !== 'undefined' ? (email && email.trim() ? email.toLowerCase().trim() : null) : current.email;
     const targetReceiveOverflow = typeof receive_overflow !== 'undefined' ? receive_overflow : current.receive_overflow;
     const targetNationality = typeof nationality !== 'undefined' ? (nationality && nationality.trim() ? nationality.trim() : null) : current.nationality;
+    const targetAvatarUrl = typeof avatar_url !== 'undefined' ? avatar_url : current.avatar_url;
 
     if (typeof targetFullName === 'string' && !targetFullName.trim()) {
       res.status(400).json({ message: 'Full name is required' });
@@ -225,9 +230,10 @@ export async function updateOwnProfile(req: AuthenticatedRequest, res: Response)
            upi_id    = $3,
            email     = $4,
            receive_overflow = $5,
-           nationality = $6
-       WHERE user_id = $7
-       RETURNING user_id, full_name, email, username, phone, upi_id, status, role_id, receive_overflow, nationality`,
+           nationality = $6,
+           avatar_url  = $7
+       WHERE user_id = $8
+       RETURNING user_id, full_name, email, username, phone, upi_id, status, role_id, receive_overflow, nationality, avatar_url, created_at`,
       [
         typeof targetFullName === 'string' ? targetFullName.trim() : targetFullName,
         typeof targetPhone === 'string' ? targetPhone.trim() : targetPhone,
@@ -235,6 +241,7 @@ export async function updateOwnProfile(req: AuthenticatedRequest, res: Response)
         targetEmail,
         targetReceiveOverflow,
         targetNationality,
+        targetAvatarUrl,
         actor.userId
       ]
     );

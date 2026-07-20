@@ -1,4 +1,5 @@
 "use client";
+/** Staff "My Profile" Section — Redesigned & Optimized for all devices. */
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -7,15 +8,38 @@ import { Icon } from "@/components/Icon";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
 
+const AVATAR_PRESETS = [
+  { id: "crown", label: "Crown", icon: "👑" },
+  { id: "dice", label: "Dice", icon: "🎲" },
+  { id: "star", label: "Star", icon: "⭐" },
+  { id: "fire", label: "Fire", icon: "🔥" },
+  { id: "zap", label: "Spark", icon: "⚡" },
+  { id: "clover", label: "Lucky", icon: "🍀" },
+  { id: "diamond", label: "Diamond", icon: "💎" },
+  { id: "trophy", label: "Trophy", icon: "🏆" },
+  { id: "target", label: "Target", icon: "🎯" },
+];
+
 const inputStyle: React.CSSProperties = {
-  padding: "9px 12px", borderRadius: 8,
-  border: "1px solid var(--border)", background: "var(--bg)",
-  color: "var(--text)", fontSize: 13, width: "100%",
+  padding: "10px 14px",
+  borderRadius: 10,
+  border: "1px solid var(--border-2)",
+  background: "rgba(255,255,255,0.03)",
+  color: "var(--text)",
+  fontSize: 13,
+  width: "100%",
+  outline: "none",
+  transition: "all 0.2s ease"
 };
 
 const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: 11, fontWeight: 700, color: "var(--text-dim)",
-  textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6,
+  display: "block",
+  fontSize: 11,
+  fontWeight: 700,
+  color: "var(--text-dim)",
+  textTransform: "uppercase",
+  letterSpacing: ".04em",
+  marginBottom: 6,
 };
 
 export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u: AuthUser) => void }) {
@@ -24,6 +48,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [upiId, setUpiId] = useState(me.upi_id ?? "");
   const [email, setEmail] = useState(me.email ?? "");
   const [nationality, setNationality] = useState(me.nationality ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? "");
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -38,12 +64,18 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const roleLabel = me.role_name;
-  
-  const dirty = fullName.trim() !== me.full_name || 
-                phone.trim() !== (me.phone ?? "") || 
-                upiId.trim() !== (me.upi_id ?? "") || 
-                email.trim() !== (me.email ?? "") ||
-                nationality.trim() !== (me.nationality ?? "");
+
+  const memberSinceStr = me.created_at
+    ? new Date(me.created_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : "Active Member";
+
+  const dirty =
+    fullName.trim() !== me.full_name ||
+    phone.trim() !== (me.phone ?? "") ||
+    upiId.trim() !== (me.upi_id ?? "") ||
+    email.trim() !== (me.email ?? "") ||
+    nationality.trim() !== (me.nationality ?? "") ||
+    avatarUrl.trim() !== (me.avatar_url ?? "");
 
   const handleSave = async () => {
     if (!fullName.trim() || !phone.trim()) {
@@ -53,7 +85,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     setSaving(true);
     setMessage(null);
     try {
-      const res = await apiFetch<{ user: { full_name: string; phone: string; upi_id: string | null; email: string | null; nationality: string | null } }>("/api/auth/me", {
+      const res = await apiFetch<{ user: AuthUser }>("/api/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
           full_name: fullName.trim(),
@@ -61,25 +93,18 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           upi_id: upiId.trim() || null,
           email: email.trim() || null,
           nationality: nationality.trim() || null,
+          avatar_url: avatarUrl.trim() || null,
         }),
       });
-      onUpdated({ 
-        ...me, 
-        full_name: res.user.full_name, 
-        phone: res.user.phone, 
-        upi_id: res.user.upi_id, 
-        email: res.user.email,
-        nationality: res.user.nationality
-      });
-      setMessage({ text: "Profile updated successfully." });
+      onUpdated({ ...me, ...res.user });
+      setMessage({ text: "Profile details updated successfully." });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Failed to update profile.", error: true });
     }
     setSaving(false);
   };
 
-  const pwValid =
-    curPw.length > 0 && newPw.length >= 6 && confirmPw.length > 0;
+  const pwValid = curPw.length > 0 && newPw.length >= 6 && confirmPw.length > 0;
 
   const handleChangePassword = async () => {
     setPwMessage(null);
@@ -112,26 +137,151 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   };
 
   return (
-    <div className="hg-dash-section" style={{ paddingTop: 8 }}>
+    <div className="hg-sec" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
+      
+      {/* Top Banner Card */}
+      <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+          
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ relative: "relative" }}>
+              <div 
+                className="hg-avatar-sm" 
+                style={{ 
+                  width: "64px", 
+                  height: "64px", 
+                  fontSize: "24px", 
+                  borderRadius: "50%", 
+                  border: "2px solid var(--accent)", 
+                  background: "var(--surface-2)",
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  overflow: "hidden"
+                }}
+              >
+                {avatarUrl && avatarUrl.startsWith("http") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={me.full_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : avatarUrl && !avatarUrl.startsWith("http") ? (
+                  <span style={{ fontSize: "28px" }}>{avatarUrl}</span>
+                ) : (
+                  <Avatar src={roleAvatar(me)} name={me.full_name} style={{ width: "100%", height: "100%" }} />
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <h2 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text)" }}>{me.full_name}</h2>
+                <span className="hg-pill" style={{ background: "rgba(244, 201, 93, 0.15)", color: "var(--accent)", border: "1px solid rgba(244, 201, 93, 0.3)", fontWeight: "bold" }}>
+                  {roleLabel}
+                </span>
+              </div>
+              
+              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "12px", color: "var(--text-dim)", flexWrap: "wrap" }}>
+                <span>Username: <strong style={{ color: "var(--text)" }}>@{me.username}</strong></span>
+                <span>•</span>
+                <span>Member since: <strong style={{ color: "var(--accent)" }}>{memberSinceStr}</strong></span>
+                {me.phone && (
+                  <>
+                    <span>•</span>
+                    <span>WhatsApp: <strong style={{ color: "#10B981" }}>{me.phone}</strong></span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "10px",
+              border: "1px solid var(--border)",
+              background: "rgba(255,255,255,0.04)",
+              color: "var(--text)",
+              fontSize: "12px",
+              fontWeight: "600",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            <Icon name="edit" size={14} /> Change Avatar
+          </button>
+
+        </div>
+
+        {/* Avatar Preset & URL Selector Accordion */}
+        {showAvatarPicker && (
+          <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-dim)", display: "block", marginBottom: "10px" }}>
+              Select Profile Picture Badge or Custom Image URL
+            </span>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
+              {AVATAR_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setAvatarUrl(p.icon); setShowAvatarPicker(false); }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "10px",
+                    fontSize: "16px",
+                    cursor: "pointer",
+                    border: avatarUrl === p.icon ? "2px solid var(--accent)" : "1px solid var(--border-2)",
+                    background: avatarUrl === p.icon ? "rgba(244, 201, 93, 0.15)" : "rgba(255,255,255,0.02)",
+                    transition: "all 0.2s"
+                  }}
+                  title={p.label}
+                >
+                  {p.icon} <span style={{ fontSize: "11px", marginLeft: "4px", color: "var(--text-dim)" }}>{p.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <input
+                type="text"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+                placeholder="Or paste custom image URL (https://...)"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker(false)}
+                style={{ padding: "8px 16px", background: "var(--brand)", color: "var(--accent-ink)", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {message && (
         <div style={{
-          marginBottom: 16, padding: "8px 14px", borderRadius: 8,
-          background: message.error ? "var(--danger-soft)" : "var(--success-soft)",
-          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "12px 16px", borderRadius: 10,
+          background: message.error ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
+          border: message.error ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+          display: "flex", alignItems: "center", gap: 8,
         }}>
-          <Icon name={message.error ? "x" : "check"} size={14} style={{ color: message.error ? "var(--danger)" : "var(--success)" }} />
-          <span style={{ color: message.error ? "var(--danger)" : "var(--success)", fontWeight: 600, fontSize: 13 }}>{message.text}</span>
+          <Icon name={message.error ? "x" : "check"} size={16} style={{ color: message.error ? "#EF4444" : "#10B981" }} />
+          <span style={{ color: message.error ? "#EF4444" : "#10B981", fontWeight: 600, fontSize: 13 }}>{message.text}</span>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(360px, 100%), 1fr))", gap: 20, width: "100%", maxWidth: 1000 }}>
-        <div className="hg-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16, height: "fit-content" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--border-light)", paddingBottom: 14, marginBottom: 4 }}>
-            <Avatar src={roleAvatar(me)} name={me.full_name} className="hg-avatar-sm" style={{ width: 44, height: 44, fontSize: 18 }} />
-            <div>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{me.full_name}</h3>
-              <span style={{ fontSize: 12, color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 600, letterSpacing: ".02em" }}>{roleLabel}</span>
-            </div>
+      {/* Two Column Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20, width: "100%" }}>
+        
+        {/* Personal Details */}
+        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 12 }}>
+            <Icon name="user" size={18} style={{ color: "var(--accent)" }} />
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Personal Information</h3>
           </div>
 
           <div>
@@ -140,15 +290,15 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           </div>
 
           <div>
-            <label style={labelStyle}>WhatsApp Number <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label style={labelStyle}>WhatsApp Number <span style={{ color: "#EF4444" }}>*</span></label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="e.g. 9876543210" />
             <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              Used for booking coordination and account recovery.
+              Used for booking notifications and account recovery.
             </span>
           </div>
 
           <div>
-            <label style={labelStyle}>UPI ID <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label style={labelStyle}>UPI ID <span style={{ color: "#EF4444" }}>*</span></label>
             <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} style={inputStyle} placeholder="e.g. yourname@upi" />
             <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
               Required to verify booking payments directly.
@@ -158,27 +308,16 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           <div>
             <label style={labelStyle}>Nationality</label>
             <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} style={inputStyle} placeholder="e.g. Indian" />
-            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              Your home nationality context.
-            </span>
           </div>
 
           <div>
-            <label style={labelStyle}>Username</label>
-            <input type="text" value={me.username} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
-            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              {me.role_name === "Superadmin"
-                ? "Your unique login username — preset by Developer and cannot be changed."
-                : "Your unique login username — preset by Superadmin and cannot be changed."}
-            </span>
+            <label style={labelStyle}>Username (Fixed)</label>
+            <input type="text" value={me.username} disabled style={{ ...inputStyle, opacity: 0.5, cursor: "not-allowed" }} />
           </div>
 
           <div>
-            <label style={labelStyle}>Email</label>
+            <label style={labelStyle}>Email Address</label>
             <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="e.g. you@example.com" />
-            <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
-              Your login email — can be used along with username to sign in.
-            </span>
           </div>
 
           <Button onClick={handleSave} disabled={saving || !dirty} style={{ marginTop: 8 }}>
@@ -186,33 +325,34 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           </Button>
         </div>
 
-        <div className="hg-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16, height: "fit-content" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid var(--border-light)", paddingBottom: 14, marginBottom: 4 }}>
-            <Icon name="shieldCheck" size={20} style={{ color: "var(--text-dim)" }} />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Change Password</h3>
+        {/* Change Password Panel */}
+        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 12 }}>
+            <Icon name="shieldCheck" size={18} style={{ color: "var(--accent)" }} />
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Account Security</h3>
           </div>
 
           {pwMessage && (
             <div style={{
-              padding: "8px 14px", borderRadius: 8,
-              background: pwMessage.error ? "var(--danger-soft)" : "var(--success-soft)",
-              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "10px 14px", borderRadius: 8,
+              background: pwMessage.error ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)",
+              border: pwMessage.error ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+              display: "flex", alignItems: "center", gap: 6,
             }}>
-              <Icon name={pwMessage.error ? "x" : "check"} size={14} style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)" }} />
-              <span style={{ color: pwMessage.error ? "var(--danger)" : "var(--success)", fontWeight: 600, fontSize: 13 }}>{pwMessage.text}</span>
+              <Icon name={pwMessage.error ? "x" : "check"} size={14} style={{ color: pwMessage.error ? "#EF4444" : "#10B981" }} />
+              <span style={{ color: pwMessage.error ? "#EF4444" : "#10B981", fontWeight: 600, fontSize: 13 }}>{pwMessage.text}</span>
             </div>
           )}
 
           <div>
-            <label style={labelStyle}>Current Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label style={labelStyle}>Current Password <span style={{ color: "#EF4444" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showCurPw ? "text" : "password"} value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="Enter current password" />
+              <input type={showCurPw ? "text" : "password"} value={curPw} autoComplete="current-password" onChange={(e) => setCurPw(e.target.value)} style={inputStyle} placeholder="Enter current password" />
               <button
                 type="button"
                 className="hg-password-toggle"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowCurPw(!showCurPw)}
-                title={showCurPw ? "Hide Password" : "Show Password"}
               >
                 <Icon name={showCurPw ? "eye" : "eyeOff"} size={16} />
               </button>
@@ -220,15 +360,14 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           </div>
 
           <div>
-            <label style={labelStyle}>New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label style={labelStyle}>New Password <span style={{ color: "#EF4444" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showNewPw ? "text" : "password"} value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="At least 6 characters" />
+              <input type={showNewPw ? "text" : "password"} value={newPw} autoComplete="new-password" onChange={(e) => setNewPw(e.target.value)} style={inputStyle} placeholder="At least 6 characters" />
               <button
                 type="button"
                 className="hg-password-toggle"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowNewPw(!showNewPw)}
-                title={showNewPw ? "Hide Password" : "Show Password"}
               >
                 <Icon name={showNewPw ? "eye" : "eyeOff"} size={16} />
               </button>
@@ -236,15 +375,14 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           </div>
 
           <div>
-            <label style={labelStyle}>Confirm New Password <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label style={labelStyle}>Confirm New Password <span style={{ color: "#EF4444" }}>*</span></label>
             <div className="hg-password-wrapper">
-              <input type={showConfirmPw ? "text" : "password"} value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} data-lpignore="true" data-1p-ignore="true" data-bitwarden-ignore="true" style={inputStyle} placeholder="Re-enter new password" />
+              <input type={showConfirmPw ? "text" : "password"} value={confirmPw} autoComplete="new-password" onChange={(e) => setConfirmPw(e.target.value)} style={inputStyle} placeholder="Re-enter new password" />
               <button
                 type="button"
                 className="hg-password-toggle"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowConfirmPw(!showConfirmPw)}
-                title={showConfirmPw ? "Hide Password" : "Show Password"}
               >
                 <Icon name={showConfirmPw ? "eye" : "eyeOff"} size={16} />
               </button>
@@ -255,7 +393,9 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
             {pwSaving ? "Updating…" : "Update Password"}
           </Button>
         </div>
+
       </div>
+
     </div>
   );
 }

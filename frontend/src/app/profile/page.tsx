@@ -6,7 +6,8 @@ import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import type { PlayerProfile } from "@/lib/types";
+import { money } from "@/lib/money";
+import type { PlayerProfile, PlayerStats } from "@/lib/types";
 
 interface WinningItem {
   prize_id: number;
@@ -22,9 +23,22 @@ interface WinningItem {
   disbursed_at: string | null;
 }
 
+const AVATAR_PRESETS = [
+  { id: "crown", label: "Crown", icon: "👑" },
+  { id: "dice", label: "Dice", icon: "🎲" },
+  { id: "star", label: "Star", icon: "⭐" },
+  { id: "fire", label: "Fire", icon: "🔥" },
+  { id: "zap", label: "Spark", icon: "⚡" },
+  { id: "clover", label: "Lucky", icon: "🍀" },
+  { id: "diamond", label: "Diamond", icon: "💎" },
+  { id: "trophy", label: "Trophy", icon: "🏆" },
+  { id: "target", label: "Target", icon: "🎯" },
+];
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [stats, setStats] = useState<PlayerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +47,10 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  
+
   // Password states
   const [password, setPassword] = useState("");
   const [removePassword, setRemovePassword] = useState(false);
@@ -49,20 +65,11 @@ export default function ProfilePage() {
   const fetchWinnings = () => {
     setWinningsLoading(true);
     apiFetch<WinningItem[]>("/api/player/winnings")
-      .then((data) => {
-        setWinnings(data);
-      })
-      .catch((err) => {
-        console.error("Failed to load winnings:", err);
-      })
-      .finally(() => {
-        setWinningsLoading(false);
-      });
+      .then(setWinnings)
+      .catch((err) => console.error("Failed to load winnings:", err))
+      .finally(() => setWinningsLoading(false));
   };
 
-  // Claims every unclaimed prize the player has in a single game at once, so the
-  // Financial Officer gets one consolidated WhatsApp request per game instead of
-  // one per prize — same endpoint the live game board's "Claim All" button uses.
   const initiateClaimAll = async (gameId: string) => {
     setClaimingGameId(gameId);
     try {
@@ -71,7 +78,7 @@ export default function ProfilePage() {
       });
       fetchWinnings();
       if (response.whatsapp_url) {
-        window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer');
+        window.open(response.whatsapp_url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to initiate claim");
@@ -80,8 +87,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Group prizes by game so multiple wins in the same game are claimed and
-  // requested together, rather than as separate per-prize requests.
   const winningsByGame = useMemo(() => {
     const groups: { game_id: string; game_title: string; game_date: string; items: WinningItem[] }[] = [];
     const indexByGameId = new Map<string, number>();
@@ -99,7 +104,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadProfile = () => {
+    const loadData = () => {
       apiFetch<{ player: PlayerProfile }>("/api/player/me")
         .then((res) => {
           if (cancelled) return;
@@ -107,24 +112,25 @@ export default function ProfilePage() {
           setFullName(res.player.full_name || "");
           setPhone(res.player.phone || "");
           setEmail(res.player.email || "");
+          setAvatarUrl(res.player.avatar_url || "");
           setSoundEnabled(res.player.sound_enabled !== false);
           setHasPassword(!!res.player.has_password);
           setLoading(false);
         })
         .catch((err) => {
           if (cancelled) return;
-          console.error("Failed to load profile", err);
-          // Only a real 401/403 means the player isn't actually logged in —
-          // a network blip must not bounce them to /login; retry instead.
-          if (!isAuthError(err)) { setTimeout(() => { if (!cancelled) loadProfile(); }, 3000); return; }
-          router.push("/login"); // redirect to login/signup
+          if (!isAuthError(err)) {
+            setTimeout(() => { if (!cancelled) loadData(); }, 3000);
+            return;
+          }
+          router.push("/login");
         });
-    };
-    loadProfile();
 
-    // Kick off the winnings fetch on mount (flips a loading flag then resolves
-    // async — the effect fetch the set-state-in-effect rule over-flags).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+      apiFetch<PlayerStats>("/api/player/stats")
+        .then((s) => { if (!cancelled) setStats(s); })
+        .catch(() => {});
+    };
+    loadData();
     fetchWinnings();
     return () => { cancelled = true; };
   }, [router]);
@@ -132,19 +138,12 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!loading && !winningsLoading && typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const claimPrizeId = params.get("claim_prize_id");
       const gameId = params.get("game_id");
-      if (claimPrizeId && gameId) {
-        // Auto-fire a deep-linked prize claim once, after the page has loaded —
-        // claims every unclaimed prize for this game, not just the linked one.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (gameId) {
         initiateClaimAll(gameId);
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-    // initiateClaimAll is intentionally excluded: this must run once when loading
-    // settles, not each time the (non-memoised) callback identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, winningsLoading]);
 
@@ -157,35 +156,38 @@ export default function ProfilePage() {
         full_name: string;
         phone: string | null;
         email: string | null;
+        avatar_url: string | null;
         sound_enabled: boolean;
         password?: string;
       } = {
         full_name: fullName,
         phone: phone || null,
         email: email || null,
+        avatar_url: avatarUrl || null,
         sound_enabled: soundEnabled,
       };
 
       if (removePassword) {
-        updates.password = ""; // clear password
+        updates.password = "";
       } else if (password) {
-        updates.password = password; // set/change password
+        updates.password = password;
       }
 
       const res = await apiFetch<{ player: PlayerProfile }>("/api/player/me", {
         method: "PATCH",
         body: JSON.stringify(updates),
       });
-      
+
       setProfile(res.player);
       setFullName(res.player.full_name || "");
       setPhone(res.player.phone || "");
       setEmail(res.player.email || "");
+      setAvatarUrl(res.player.avatar_url || "");
       setSoundEnabled(res.player.sound_enabled !== false);
       setHasPassword(!!res.player.has_password);
-      setPassword(""); // Clear input
-      setRemovePassword(false); // Reset checkbox
-      
+      setPassword("");
+      setRemovePassword(false);
+
       alert("Profile updated successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
@@ -197,12 +199,9 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
       await apiFetch("/api/player/logout", { method: "POST" });
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("hg_player_token");
-        sessionStorage.removeItem("hg_player_token");
-      }
-      router.push("/login");
     } catch {
+      // ignore
+    } finally {
       if (typeof window !== "undefined") {
         localStorage.removeItem("hg_player_token");
         sessionStorage.removeItem("hg_player_token");
@@ -215,16 +214,20 @@ export default function ProfilePage() {
     return (
       <PublicShell>
         <div className="hg-screen flex items-center justify-center min-h-[50vh]">
-          <span style={{ color: "var(--text-dim)", fontSize: 15, fontWeight: 500 }}>Loading profile…</span>
+          <span style={{ color: "var(--text-dim)", fontSize: 15, fontWeight: 500 }}>Loading player profile…</span>
         </div>
       </PublicShell>
     );
   }
 
+  const memberSinceStr = profile?.registered_at
+    ? new Date(profile.registered_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : "Active Player";
+
   const labelStyle: React.CSSProperties = {
     display: "block",
-    fontSize: 12,
-    fontWeight: 600,
+    fontSize: 11,
+    fontWeight: 700,
     color: "var(--text-dim)",
     marginBottom: 6,
     textTransform: "uppercase",
@@ -235,267 +238,398 @@ export default function ProfilePage() {
     width: "100%",
     background: "var(--surface-2)",
     border: "1px solid var(--border-light)",
-    borderRadius: 8,
+    borderRadius: 10,
     color: "var(--text)",
     fontSize: 14,
     outline: "none",
-    transition: "border-color 0.15s"
+    padding: "10px 14px"
   };
 
   return (
     <PublicShell>
-      <div className="hg-screen hg-screen--profile" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 16px" }}>
-        <div className="hg-content-col">
-          <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 24, background: "var(--surface)", padding: "24px 28px", borderRadius: 12, border: "1px solid var(--border-light)" }}>
+      <div className="hg-screen hg-screen--profile" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 16px", width: "100%", maxWidth: "1050px", margin: "0 auto" }}>
+        
+        {/* Top Header Card */}
+        <div style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: 16, padding: "24px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: "1px solid var(--border-light)", paddingBottom: 18 }}>
-              <div className="hg-avatar-sm" style={{ width: 48, height: 48, fontSize: 20, borderRadius: "50%", background: "var(--brand)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
-                {(profile?.full_name || profile?.housie_name || "?")[0].toUpperCase()}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div 
+                style={{ 
+                  width: "60px", 
+                  height: "60px", 
+                  borderRadius: "50%", 
+                  background: "var(--brand)", 
+                  color: "var(--accent-ink)", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  fontSize: "24px", 
+                  fontWeight: "800",
+                  border: "2px solid var(--accent)",
+                  overflow: "hidden"
+                }}
+              >
+                {avatarUrl && avatarUrl.startsWith("http") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={profile?.housie_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : avatarUrl && !avatarUrl.startsWith("http") ? (
+                  <span>{avatarUrl}</span>
+                ) : (
+                  (profile?.full_name || profile?.housie_name || "?")[0].toUpperCase()
+                )}
               </div>
+
               <div>
-                <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: "var(--text)" }}>{profile?.full_name || profile?.housie_name}</h2>
-                <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Player Account Settings</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "var(--text)" }}>{profile?.housie_name}</h1>
+                  <span style={{ fontSize: "11px", fontWeight: "bold", background: "rgba(244,201,93,0.15)", color: "var(--accent)", border: "1px solid rgba(244,201,93,0.3)", padding: "2px 10px", borderRadius: "12px" }}>
+                    PLAYER
+                  </span>
+                </div>
+                
+                <div style={{ display: "flex", gap: "14px", marginTop: "4px", fontSize: "12px", color: "var(--text-dim)", flexWrap: "wrap" }}>
+                  {profile?.full_name && <span>Name: <strong style={{ color: "var(--text)" }}>{profile.full_name}</strong></span>}
+                  <span>Member since: <strong style={{ color: "var(--accent)" }}>{memberSinceStr}</strong></span>
+                </div>
               </div>
             </div>
 
-            {error && <div className="hg-sec-err" style={{ padding: 12, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8 }}>{error}</div>}
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(360px, 100%), 1fr))", gap: 24 }}>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-light)",
+                  background: "var(--surface-2)",
+                  color: "var(--text)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <Icon name="edit" size={14} /> Change Avatar
+              </button>
               
-              {/* Left Column: Personal Information */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
-                  Personal Information
-                </h3>
-                
-                <div>
-                  <label style={labelStyle}>Housie Name</label>
-                  <input type="text" value={profile?.housie_name || ""} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed", fontFamily: "var(--font-mono)", padding: "10px 14px" }} />
-                </div>
-                
-                <div>
-                  <label style={labelStyle}>Full Name (Optional)</label>
-                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" style={{ ...inputStyle, padding: "10px 14px" }} />
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Phone Number (Optional)</label>
-                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 9876543210" style={{ ...inputStyle, padding: "10px 14px" }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Email Id (Optional)</label>
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" style={{ ...inputStyle, padding: "10px 14px" }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Security & Preferences */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                
-                {/* Security */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
-                    Security
-                  </h3>
-                  
-                  <div>
-                    <label style={labelStyle}>
-                      {hasPassword ? "Change Password (Optional)" : "Set Password to Secure Account (Leave Blank if Not Required)"}
-                    </label>
-                    <div className="hg-password-wrapper">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        disabled={removePassword}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "Enter a password (at least 6 characters)"}
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        data-bitwarden-ignore="true"
-                        style={{ ...inputStyle, padding: "10px 14px", opacity: removePassword ? 0.5 : 1 }}
-                      />
-                      <button
-                        type="button"
-                        className="hg-password-toggle"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setShowPassword(!showPassword)}
-                        title={showPassword ? "Hide Password" : "Show Password"}
-                        disabled={removePassword}
-                        style={{ opacity: removePassword ? 0.5 : 1 }}
-                      >
-                        <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {hasPassword && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                      <input 
-                        type="checkbox" 
-                        checked={removePassword} 
-                        onChange={e => {
-                          setRemovePassword(e.target.checked);
-                          if (e.target.checked) setPassword("");
-                        }} 
-                        style={{ width: 16, height: 16, accentColor: "var(--accent)" }} 
-                      />
-                      <span style={{ fontSize: 13, color: "var(--danger)" }}>Remove password security (revert to passwordless login)</span>
-                    </label>
-                  )}
-                </div>
-
-                {/* Preferences */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
-                    Preferences
-                  </h3>
-                  
-                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", userSelect: "none", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-light)" }}>
-                    <input 
-                      type="checkbox" 
-                      checked={soundEnabled} 
-                      onChange={e => setSoundEnabled(e.target.checked)} 
-                      style={{ width: 18, height: 18, accentColor: "var(--accent)", cursor: "pointer" }} 
-                    />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Enable Sound Effects</span>
-                      <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Play immersive sounds for number calls and wins.</span>
-                    </div>
-                  </label>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", borderTop: "1px solid var(--border-light)", paddingTop: 18 }}>
-              <Button type="submit" variant="cta" disabled={saving}>
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={handleLogout} style={{ marginLeft: "auto", color: "var(--danger)", borderColor: "var(--danger-soft)" }}>
+              <Button type="button" variant="ghost" onClick={handleLogout} style={{ color: "var(--danger)", borderColor: "var(--danger-soft)" }}>
                 Logout
               </Button>
             </div>
 
-          </form>
-
-          {/* My Winnings & Claims Card */}
-          <div 
-            id="winnings-section"
-            style={{ 
-              marginTop: 24, 
-              background: "var(--surface)", 
-              padding: "24px 28px", 
-              borderRadius: 12, 
-              border: "1px solid var(--border-light)", 
-              display: "flex", 
-              flexDirection: "column", 
-              gap: 16 
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
-              <Icon name="award" size={18} style={{ color: "var(--accent)" }} />
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0 }}>
-                My Winnings & Claims
-              </h3>
-            </div>
-            
-            {winningsLoading ? (
-              <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>Loading winnings...</div>
-            ) : winnings.length === 0 ? (
-              <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
-                You have no recorded winnings yet. Keep playing to win exciting prizes!
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {winningsByGame.map((group) => {
-                  const unclaimed = group.items.filter((w) => !w.player_claimed);
-                  const allDisbursed = group.items.every((w) => w.disbursed);
-                  const unclaimedTotal = unclaimed.reduce((sum, w) => sum + w.amount, 0);
-                  const isClaiming = claimingGameId === group.game_id;
-
-                  return (
-                    <div
-                      key={group.game_id}
-                      style={{
-                        background: "var(--surface-2)",
-                        border: "1px solid var(--border-light)",
-                        borderRadius: 8,
-                        padding: "12px 16px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10
-                      }}
-                    >
-                      <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
-                        {group.game_title}
-                      </div>
-
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {group.items.map((w) => (
-                          <div key={w.prize_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)" }}>{w.pattern_name}</div>
-                              <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Ticket #{w.winner_ticket_number}</div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <span style={{ fontWeight: 700, fontSize: 16, color: "var(--accent)" }}>
-                                ₹{w.amount.toFixed(2)}
-                              </span>
-                              {w.disbursed ? (
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                                  Disbursed
-                                </span>
-                              ) : w.player_claimed ? (
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                                  Pending Disbursal
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {unclaimed.length > 0 ? (
-                        <button
-                          onClick={() => initiateClaimAll(group.game_id)}
-                          disabled={isClaiming}
-                          style={{
-                            alignSelf: "flex-start",
-                            background: "var(--accent)",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 6,
-                            padding: "8px 14px",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            opacity: isClaiming ? 0.6 : 1
-                          }}
-                        >
-                          {isClaiming
-                            ? "Claiming..."
-                            : `Claim All (${unclaimed.length} Prize${unclaimed.length > 1 ? "s" : ""} · ₹${unclaimedTotal.toFixed(2)})`}
-                        </button>
-                      ) : allDisbursed ? (
-                        <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 600, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                          All Disbursed
-                        </span>
-                      ) : (
-                        <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 600, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 4 }}>
-                          Claim Sent · Pending Disbursal
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
+
+          {/* Avatar Selector */}
+          {showAvatarPicker && (
+            <div style={{ marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--border-light)" }}>
+              <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-dim)", display: "block", marginBottom: "8px" }}>
+                Select Profile Avatar Badge or Custom Image URL
+              </span>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+                {AVATAR_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => { setAvatarUrl(p.icon); setShowAvatarPicker(false); }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      fontSize: "15px",
+                      cursor: "pointer",
+                      border: avatarUrl === p.icon ? "2px solid var(--accent)" : "1px solid var(--border-light)",
+                      background: avatarUrl === p.icon ? "rgba(244, 201, 93, 0.15)" : "var(--surface-2)",
+                      transition: "all 0.2s"
+                    }}
+                    title={p.label}
+                  >
+                    {p.icon} <span style={{ fontSize: "11px", marginLeft: "4px", color: "var(--text-dim)" }}>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <input
+                  type="text"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="Or paste image URL (https://...)"
+                  style={{ ...inputStyle, flex: 1, padding: "8px 12px" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarPicker(false)}
+                  style={{ padding: "8px 14px", background: "var(--brand)", color: "var(--accent-ink)", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Player Engagement Stats Highlights */}
+        <div style={{ width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+          
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Games Played</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "var(--text)" }}>{stats?.games_played ?? 0}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>Total rounds participated</span>
+          </div>
+
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Total Winnings</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "var(--accent)" }}>{money(stats?.amount_won ?? 0)}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>{stats?.total_wins ?? 0} prizes won</span>
+          </div>
+
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets Purchased</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "#3B82F6" }}>{stats?.tickets_bought ?? 0}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>Tickets locked & confirmed</span>
+          </div>
+
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Best Single Game Win</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "#10B981" }}>{money(stats?.highest_amount_single_game ?? 0)}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>Highest reward in 1 game</span>
+          </div>
+
+        </div>
+
+        {/* Profile Settings Form */}
+        <form onSubmit={handleSave} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 20, background: "var(--surface)", padding: "24px", borderRadius: 16, border: "1px solid var(--border-light)" }}>
+          
+          {error && <div className="hg-sec-err" style={{ padding: 12, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8 }}>{error}</div>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: 20 }}>
+            
+            {/* Personal Details */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                Personal Details
+              </h3>
+              
+              <div>
+                <label style={labelStyle}>Housie Name (Permanent)</label>
+                <input type="text" value={profile?.housie_name || ""} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed", fontFamily: "var(--font-mono)" }} />
+              </div>
+              
+              <div>
+                <label style={labelStyle}>Full Name (Optional)</label>
+                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" style={inputStyle} />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>WhatsApp Phone</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 9876543210" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email Address</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" style={inputStyle} />
+                </div>
+              </div>
+            </div>
+
+            {/* Security & Preferences */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                  Security & Password
+                </h3>
+                
+                <div>
+                  <label style={labelStyle}>
+                    {hasPassword ? "Change Password" : "Set Password for Secure Sign In"}
+                  </label>
+                  <div className="hg-password-wrapper">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      disabled={removePassword}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "At least 6 characters"}
+                      style={{ ...inputStyle, opacity: removePassword ? 0.5 : 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="hg-password-toggle"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={removePassword}
+                    >
+                      <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {hasPassword && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+                    <input 
+                      type="checkbox" 
+                      checked={removePassword} 
+                      onChange={e => {
+                        setRemovePassword(e.target.checked);
+                        if (e.target.checked) setPassword("");
+                      }} 
+                      style={{ width: 16, height: 16, accentColor: "var(--accent)" }} 
+                    />
+                    <span style={{ fontSize: 12, color: "var(--danger)" }}>Remove password security (revert to passwordless login)</span>
+                  </label>
+                )}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", margin: 0, borderBottom: "1px solid var(--border-light)", paddingBottom: 8 }}>
+                  Game Preferences
+                </h3>
+                
+                <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", userSelect: "none", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-light)" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={soundEnabled} 
+                    onChange={e => setSoundEnabled(e.target.checked)} 
+                    style={{ width: 18, height: 18, accentColor: "var(--accent)", cursor: "pointer" }} 
+                  />
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Enable Game Sound Effects</span>
+                    <span style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>Audio voice calls & winning claim sounds.</span>
+                  </div>
+                </label>
+              </div>
+
+            </div>
+
+          </div>
+
+          <div style={{ marginTop: 8, borderTop: "1px solid var(--border-light)", paddingTop: 16 }}>
+            <Button type="submit" variant="cta" disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+
+        </form>
+
+        {/* My Winnings & Claims Section */}
+        <div 
+          id="winnings-section"
+          style={{ 
+            marginTop: 24, 
+            width: "100%",
+            background: "var(--surface)", 
+            padding: "24px", 
+            borderRadius: 16, 
+            border: "1px solid var(--border-light)", 
+            display: "flex", 
+            flexDirection: "column", 
+            gap: 16 
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border-light)", paddingBottom: 12 }}>
+            <Icon name="award" size={18} style={{ color: "var(--accent)" }} />
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+              My Winnings & Prize Claims
+            </h3>
+          </div>
+          
+          {winningsLoading ? (
+            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>Loading winnings...</div>
+          ) : winnings.length === 0 ? (
+            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
+              You have no recorded winnings yet. Keep playing to win exciting prizes!
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {winningsByGame.map((group) => {
+                const unclaimed = group.items.filter((w) => !w.player_claimed);
+                const allDisbursed = group.items.every((w) => w.disbursed);
+                const unclaimedTotal = unclaimed.reduce((sum, w) => sum + w.amount, 0);
+                const isClaiming = claimingGameId === group.game_id;
+
+                return (
+                  <div
+                    key={group.game_id}
+                    style={{
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: 10,
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: "var(--text-dim)", fontWeight: 700 }}>
+                      {group.game_title}
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {group.items.map((w) => (
+                        <div key={w.prize_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{w.pattern_name}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>Ticket #{w.winner_ticket_number}</div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span style={{ fontWeight: 800, fontSize: 16, color: "var(--accent)" }}>
+                              {money(w.amount)}
+                            </span>
+                            {w.disbursed ? (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#10b981", background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", padding: "4px 8px", borderRadius: 6 }}>
+                                Disbursed
+                              </span>
+                            ) : w.player_claimed ? (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", padding: "4px 8px", borderRadius: 6 }}>
+                                Pending Disbursal
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {unclaimed.length > 0 ? (
+                      <button
+                        onClick={() => initiateClaimAll(group.game_id)}
+                        disabled={isClaiming}
+                        style={{
+                          alignSelf: "flex-start",
+                          background: "var(--brand)",
+                          color: "var(--accent-ink)",
+                          border: "none",
+                          borderRadius: 8,
+                          padding: "8px 16px",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          opacity: isClaiming ? 0.6 : 1
+                        }}
+                      >
+                        {isClaiming
+                          ? "Claiming..."
+                          : `Claim All (${unclaimed.length} Prize${unclaimed.length > 1 ? "s" : ""} · ${money(unclaimedTotal)})`}
+                      </button>
+                    ) : allDisbursed ? (
+                      <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 700, color: "#10b981", background: "rgba(16,185,129,0.1)", padding: "4px 8px", borderRadius: 6 }}>
+                        All Disbursed
+                      </span>
+                    ) : (
+                      <span style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 8px", borderRadius: 6 }}>
+                        Claim Sent · Pending Disbursal
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </PublicShell>
   );

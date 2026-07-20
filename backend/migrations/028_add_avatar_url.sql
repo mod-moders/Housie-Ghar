@@ -1,0 +1,5 @@
+-- Migration 028: Add avatar_url column to Users and Players tables
+
+ALTER TABLE Users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT NULL;
+ALTER TABLE Players ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT NULL;
+ALTER TABLE Users ADD COLUMN IF NOT EXISTS nationality VARCHAR(100) DEFAULT NULL;
