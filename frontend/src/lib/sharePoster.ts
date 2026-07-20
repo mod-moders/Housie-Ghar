@@ -164,6 +164,55 @@ function loadLogo(): Promise<HTMLImageElement | null> {
   });
 }
 
+function drawParticleSparkles(ctx: CanvasRenderingContext2D) {
+  ctx.save();
+  // Scattered sparkles (stars & circles) for celebration ambiance
+  const particles: [number, number, number, string, "star" | "circle" | "rect"][] = [
+    [80, 140, 6, GOLD, "star"],
+    [1000, 160, 8, PINK, "star"],
+    [140, 320, 5, CYAN, "circle"],
+    [940, 340, 7, GOLD, "rect"],
+    [65, 580, 7, GOLD, "star"],
+    [1015, 590, 6, PINK, "circle"],
+    [90, 820, 5, CYAN, "circle"],
+    [990, 840, 8, GOLD, "star"],
+    [120, 1140, 7, PINK, "rect"],
+    [960, 1120, 6, GOLD, "star"],
+    [240, 1260, 5, CYAN, "circle"],
+    [840, 1270, 7, GOLD, "circle"],
+  ];
+
+  for (const [px, py, pr, pColor, pShape] of particles) {
+    ctx.fillStyle = pColor;
+    ctx.strokeStyle = pColor;
+    ctx.globalAlpha = 0.45;
+
+    if (pShape === "circle") {
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (pShape === "rect") {
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-pr, -pr, pr * 2, pr * 2);
+      ctx.restore();
+    } else if (pShape === "star") {
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = i % 2 === 0 ? pr : pr * 0.4;
+        const a = (Math.PI / 4) * i;
+        const x = px + Math.cos(a) * r;
+        const y = py + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElement | null) {
   if (bgImage) {
     const canvasRatio = W / H;
@@ -178,85 +227,108 @@ function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElemen
     }
     ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, W, H);
 
-    // apply a linear dark overlay gradient to ensure text readability
+    // Vignette dark gradient overlay for optimal readability
     const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
-    overlayGrad.addColorStop(0, "rgba(0, 0, 0, 0.45)");
-    overlayGrad.addColorStop(0.5, "rgba(0, 0, 0, 0.7)");
-    overlayGrad.addColorStop(1, "rgba(0, 0, 0, 0.9)");
+    overlayGrad.addColorStop(0, "rgba(8, 7, 14, 0.65)");
+    overlayGrad.addColorStop(0.4, "rgba(10, 8, 18, 0.82)");
+    overlayGrad.addColorStop(1, "rgba(6, 5, 10, 0.95)");
     ctx.fillStyle = overlayGrad;
     ctx.fillRect(0, 0, W, H);
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, "#0c0a12");
-    g.addColorStop(0.5, "#140d1c");
-    g.addColorStop(1, "#0a0810");
+    g.addColorStop(0, "#0b0914");
+    g.addColorStop(0.35, "#150f24");
+    g.addColorStop(0.7, "#120c1d");
+    g.addColorStop(1, "#08060e");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
 
-  // tri-color glow: pink upper-left, cyan upper-right
-  const pinkGlow = ctx.createRadialGradient(W * 0.28, 130, 20, W * 0.28, 130, 520);
-  pinkGlow.addColorStop(0, "rgba(255,79,168,0.20)");
+  // Premium radial ambient glows: gold top-center halo, pink upper-left, cyan upper-right
+  const goldHalo = ctx.createRadialGradient(W / 2, 160, 10, W / 2, 160, 480);
+  goldHalo.addColorStop(0, "rgba(244, 201, 93, 0.22)");
+  goldHalo.addColorStop(0.6, "rgba(244, 201, 93, 0.05)");
+  goldHalo.addColorStop(1, "rgba(244, 201, 93, 0)");
+  ctx.fillStyle = goldHalo;
+  ctx.fillRect(0, 0, W, H);
+
+  const pinkGlow = ctx.createRadialGradient(W * 0.22, 220, 20, W * 0.22, 220, 520);
+  pinkGlow.addColorStop(0, "rgba(255,79,168,0.18)");
   pinkGlow.addColorStop(1, "rgba(255,79,168,0)");
   ctx.fillStyle = pinkGlow;
   ctx.fillRect(0, 0, W, H);
 
-  const cyanGlow = ctx.createRadialGradient(W * 0.78, 260, 20, W * 0.78, 260, 420);
+  const cyanGlow = ctx.createRadialGradient(W * 0.78, 320, 20, W * 0.78, 320, 480);
   cyanGlow.addColorStop(0, "rgba(95,212,232,0.14)");
   cyanGlow.addColorStop(1, "rgba(95,212,232,0)");
   ctx.fillStyle = cyanGlow;
   ctx.fillRect(0, 0, W, H);
 
-  // faint scattered "lottery ball" dots for texture
-  ctx.save();
-  ctx.globalAlpha = 0.10;
-  const dots: [number, number, number][] = [
-    [90, 260, 7], [980, 210, 5], [60, 640, 5], [1010, 610, 8],
-    [50, 980, 6], [1000, 1020, 5], [130, 1180, 5], [930, 1160, 7],
-  ];
-  for (const [dx, dy, dr] of dots) {
-    ctx.beginPath();
-    ctx.arc(dx, dy, dr, 0, Math.PI * 2);
-    ctx.fillStyle = GOLD;
-    ctx.fill();
-  }
-  ctx.restore();
+  // Sparkles texture
+  drawParticleSparkles(ctx);
 
-  // border frame
-  ctx.strokeStyle = "rgba(244,201,93,0.35)";
+  // Outer dual-line border frame with rounded corners
+  ctx.save();
+  ctx.strokeStyle = "rgba(244,201,93,0.45)";
   ctx.lineWidth = 3;
   roundRect(ctx, 24, 24, W - 48, H - 48, 28);
   ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, 32, 32, W - 64, H - 64, 22);
+  ctx.stroke();
+  ctx.restore();
 }
 
 async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
   const logo = await loadLogo();
-  const logoSize = 240;
-  const logoY = 46;
+  const logoSize = 230;
+  const logoY = 44;
   if (logo) {
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 6;
+    // Radial glowing backdrop for logo
+    const logoGlow = ctx.createRadialGradient(W / 2, logoY + logoSize / 2, 20, W / 2, logoY + logoSize / 2, 160);
+    logoGlow.addColorStop(0, "rgba(244, 201, 93, 0.25)");
+    logoGlow.addColorStop(1, "rgba(244, 201, 93, 0)");
+    ctx.fillStyle = logoGlow;
+    ctx.fillRect(W / 2 - 200, logoY - 40, 400, logoSize + 80);
+
+    ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 8;
     ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
     ctx.restore();
 
-    return logoY + logoSize + 28;
+    return logoY + logoSize + 22;
   }
 
-  // fallback if the logo fails to load: plain wordmark, still on-brand
+  // fallback wordmark
   ctx.textAlign = "center";
   ctx.fillStyle = GOLD;
-  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "700 36px 'Space Grotesk', system-ui, sans-serif";
   ctx.fillText("HOUSIE GHAR", W / 2, logoY + 40);
   return logoY + 80;
 }
 
 function paintFooter(ctx: CanvasRenderingContext2D) {
+  ctx.save();
+  const footerY = H - 68;
+  const footerW = 340;
+  const footerH = 44;
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+  ctx.strokeStyle = "rgba(244, 201, 93, 0.3)";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, W / 2 - footerW / 2, footerY - footerH / 2, footerW, footerH, 22);
+  ctx.fill();
+  ctx.stroke();
+
   ctx.textAlign = "center";
-  ctx.font = "600 24px 'DM Sans', system-ui, sans-serif";
-  ctx.fillStyle = DIM;
-  ctx.fillText(SITE_URL, W / 2, H - 56);
+  ctx.font = "700 22px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillStyle = GOLD;
+  ctx.fillText(`🌐 ${SITE_URL}`, W / 2, footerY + 7);
+  ctx.restore();
 }
 
 /* ── stroke icon set — mirrors components/Icon.tsx's line-icon language ── */
@@ -285,7 +357,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy:
   ctx.translate(cx, cy);
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(2, size * 0.1);
+  ctx.lineWidth = Math.max(2.2, size * 0.1);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   const s = size / 2;
@@ -363,9 +435,6 @@ function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy:
       break;
     }
     case "ticket": {
-      // rounded rect with a semicircular notch bitten into each side — a
-      // clearer, more universally-recognized ticket silhouette than a plain
-      // divided box.
       const hw = s, hh = s * 0.58, nr = s * 0.34, cr = s * 0.14;
       ctx.beginPath();
       ctx.moveTo(-hw + cr, -hh);
@@ -389,8 +458,6 @@ function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy:
       break;
     }
     case "medal-1": case "medal-2": case "medal-3": {
-      // Solid medallion + inner ring + small star — a ribbon reads as stray
-      // "ears" at icon scale, so it's dropped in favor of a cleaner disc.
       const fill = MEDAL_COLOR[kind];
       ctx.fillStyle = fill;
       ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
@@ -413,7 +480,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy:
   ctx.restore();
 }
 
-/* ── content-fitted prize card (no dead space, regardless of row count) ── */
+/* ── content-fitted prize card (glassmorphic aesthetic with badge icons) ── */
 
 interface PrizeRowSpec {
   kind: IconKind;
@@ -428,66 +495,129 @@ function paintPrizeCard(
   opts: { top: number; heading: string; headingColor: string; rows: PrizeRowSpec[]; rowHeight: number; emptyMessage?: string }
 ): number {
   const { top, heading, headingColor, rows, rowHeight, emptyMessage } = opts;
-  const headingH = 78;
-  const contentH = rows.length > 0 ? rows.length * rowHeight + 24 : 90;
+  const headingH = 82;
+  const contentH = rows.length > 0 ? rows.length * rowHeight + 24 : 100;
   const cardH = headingH + contentH;
-  const left = 90;
-  const cardW = W - 180;
+  const left = 80;
+  const cardW = W - 160;
 
-  ctx.fillStyle = "rgba(255,255,255,0.045)";
-  ctx.strokeStyle = "rgba(244,201,93,0.4)";
-  ctx.lineWidth = 2;
-  roundRect(ctx, left, top, cardW, cardH, 26);
+  ctx.save();
+  // Glassmorphic Card Container: Dark frosted glass fill + double golden outline
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = 32;
+  ctx.shadowOffsetY = 12;
+
+  ctx.fillStyle = "rgba(18, 15, 28, 0.85)";
+  ctx.strokeStyle = "rgba(244, 201, 93, 0.45)";
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, left, top, cardW, cardH, 28);
   ctx.fill();
   ctx.stroke();
 
+  // Inner subtle border
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, left + 4, top + 4, cardW - 8, cardH - 8, 24);
+  ctx.stroke();
+  ctx.restore();
+
+  // Header Banner
   ctx.save();
-  roundRect(ctx, left, top, cardW, headingH, 26);
+  roundRect(ctx, left, top, cardW, headingH, 28);
   ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
+  const headGrad = ctx.createLinearGradient(left, top, left + cardW, top);
+  headGrad.addColorStop(0, "rgba(244, 201, 93, 0.12)");
+  headGrad.addColorStop(0.5, "rgba(255, 79, 168, 0.12)");
+  headGrad.addColorStop(1, "rgba(244, 201, 93, 0.12)");
+  ctx.fillStyle = headGrad;
   ctx.fillRect(left, top, cardW, headingH);
   ctx.restore();
-  ctx.strokeStyle = "rgba(244,201,93,0.25)";
-  ctx.beginPath(); ctx.moveTo(left + 20, top + headingH); ctx.lineTo(left + cardW - 20, top + headingH); ctx.stroke();
+
+  ctx.strokeStyle = "rgba(244, 201, 93, 0.3)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(left + 24, top + headingH);
+  ctx.lineTo(left + cardW - 24, top + headingH);
+  ctx.stroke();
 
   ctx.textAlign = "center";
   ctx.fillStyle = headingColor;
-  ctx.font = "700 30px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(heading, W / 2, top + headingH / 2 + 11);
+  ctx.font = "800 28px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText(heading, W / 2, top + headingH / 2 + 10);
 
   if (rows.length === 0) {
     ctx.textAlign = "center";
     ctx.fillStyle = DIM;
-    ctx.font = "600 30px 'DM Sans', system-ui, sans-serif";
+    ctx.font = "600 28px 'DM Sans', system-ui, sans-serif";
     ctx.fillText(emptyMessage ?? "No prizes yet.", W / 2, top + headingH + contentH / 2 + 10);
     return top + cardH;
   }
 
-  const rowStart = top + headingH + 18;
+  const rowStart = top + headingH + 16;
   rows.forEach((row, i) => {
     const rowTop = rowStart + i * rowHeight;
     const midY = rowTop + rowHeight / 2;
 
-    drawIcon(ctx, row.kind, left + 54, midY - (row.sub ? 6 : 0), 34, row.color);
+    // Stylish Circular Icon Badge Container
+    const badgeSize = 46;
+    const badgeX = left + 48;
+    const badgeY = midY - (row.sub ? 4 : 0);
 
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.strokeStyle = row.color;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, badgeSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    drawIcon(ctx, row.kind, badgeX, badgeY, 26, row.color);
+    ctx.restore();
+
+    // Prize Pattern Name
     ctx.textAlign = "left";
     ctx.fillStyle = WHITE;
-    ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-    ctx.fillText(row.label, left + 96, midY - (row.sub ? 8 : -10));
+    ctx.font = "700 30px 'Space Grotesk', system-ui, sans-serif";
+    ctx.fillText(row.label, left + 92, midY - (row.sub ? 10 : -8));
 
+    // Winner Subtext — highlighted in rich GOLD for maximum visual impact & contrast
     if (row.sub) {
-      ctx.fillStyle = DIM;
-      ctx.font = "500 22px 'DM Sans', system-ui, sans-serif";
-      ctx.fillText(row.sub, left + 96, midY + 24);
+      ctx.fillStyle = GOLD;
+      ctx.font = "600 23px 'Space Grotesk', system-ui, sans-serif";
+      ctx.fillText(row.sub, left + 92, midY + 22);
     }
 
-    ctx.textAlign = "right";
-    ctx.fillStyle = GOLD;
-    ctx.font = "700 32px 'JetBrains Mono', ui-monospace, monospace";
-    ctx.fillText(row.amount, left + cardW - 32, midY + 10);
+    // Right-aligned Prize Amount Badge Box
+    const amtStr = row.amount;
+    ctx.font = "800 30px 'JetBrains Mono', ui-monospace, monospace";
+    const amtWidth = ctx.measureText(amtStr).width;
+    const boxPaddingH = 16;
+    const boxH = 46;
+    const boxW = amtWidth + boxPaddingH * 2;
+    const boxX = left + cardW - 32 - boxW;
+    const boxY = midY - boxH / 2;
 
+    ctx.save();
+    ctx.fillStyle = "rgba(244, 201, 93, 0.12)";
+    ctx.strokeStyle = "rgba(244, 201, 93, 0.4)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = GOLD;
+    ctx.fillText(amtStr, boxX + boxW / 2, midY + 9);
+    ctx.restore();
+
+    // Subtle fading row divider line
     if (i < rows.length - 1) {
-      ctx.strokeStyle = "rgba(255,255,255,0.07)";
+      const lineGrad = ctx.createLinearGradient(left + 24, 0, left + cardW - 24, 0);
+      lineGrad.addColorStop(0, "rgba(255,255,255,0)");
+      lineGrad.addColorStop(0.5, "rgba(255,255,255,0.1)");
+      lineGrad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.strokeStyle = lineGrad;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(left + 24, rowTop + rowHeight);
@@ -507,25 +637,39 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   const seg = timeSegment(new Date(game.scheduled_at));
 
+  // Scheduled Tag Pill
+  ctx.save();
+  const tagStr = `✨ ${seg.label.toUpperCase()} GAME DRAW ✨`;
+  ctx.font = "800 24px 'Space Grotesk', system-ui, sans-serif";
+  const tagW = ctx.measureText(tagStr).width + 36;
+  ctx.fillStyle = "rgba(255, 79, 168, 0.18)";
+  ctx.strokeStyle = PINK;
+  ctx.lineWidth = 1.8;
+  roundRect(ctx, W / 2 - tagW / 2, y - 28, tagW, 44, 22);
+  ctx.fill();
+  ctx.stroke();
+
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
-  ctx.font = "700 28px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`GET READY — ${seg.label.toUpperCase()} GAME`, W / 2, y);
+  ctx.fillText(tagStr, W / 2, y + 2);
+  ctx.restore();
   y += 48;
 
-  ctx.fillStyle = GOLD;
-  ctx.font = "700 58px 'Space Grotesk', system-ui, sans-serif";
+  // Title
+  ctx.fillStyle = WHITE;
+  ctx.font = "800 56px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
     y += 66;
   }
-  y += 6;
+  y += 8;
 
+  // Time & Tickets Badge
   ctx.fillStyle = CYAN;
-  ctx.font = "600 30px 'JetBrains Mono', ui-monospace, monospace";
-  ctx.fillText(`${fmtTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
-  y += 46;
+  ctx.font = "700 28px 'JetBrains Mono', ui-monospace, monospace";
+  ctx.fillText(`⏰ ${fmtTime(game.scheduled_at)}  ·  🎟️ ${game.total_tickets} TICKETS ONLY`, W / 2, y);
+  y += 44;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -536,268 +680,110 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   const cardBottom = paintPrizeCard(ctx, {
     top: y,
-    heading: "TODAY'S PRIZE POOL",
-    headingColor: PINK,
+    heading: "🏆 TODAY'S PRIZE POOL 🏆",
+    headingColor: GOLD,
     rows,
-    rowHeight: 74,
+    rowHeight: 78,
   });
 
-  const pillY = cardBottom + 32;
-  const pillH = 88;
+  // Ticket Price CTA Button Box
+  const pillY = cardBottom + 30;
+  const pillH = 86;
+  ctx.save();
+  ctx.shadowColor = "rgba(244, 201, 93, 0.45)";
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 6;
+
   const grad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
   grad.addColorStop(0, GOLD);
   grad.addColorStop(1, GOLD_DIM);
   ctx.fillStyle = grad;
   roundRect(ctx, 120, pillY, W - 240, pillH, pillH / 2);
   ctx.fill();
+  ctx.restore();
 
-  drawIcon(ctx, "ticket", W / 2 - 190, pillY + pillH / 2, 34, INK);
+  drawIcon(ctx, "ticket", W / 2 - 200, pillY + pillH / 2, 34, INK);
   ctx.textAlign = "center";
   ctx.fillStyle = INK;
-  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 12);
+  ctx.font = "800 34px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText(`TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 20, pillY + pillH / 2 + 11);
 
   ctx.fillStyle = DIM;
-  ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("The entire town is playing! Are you?", W / 2, pillY + pillH + 52);
+  ctx.font = "italic 600 26px 'DM Sans', system-ui, sans-serif";
+  ctx.fillText("The entire town is playing! Are you?", W / 2, pillY + pillH + 48);
 
   paintFooter(ctx);
 }
 
 /* ── winners poster ──────────────────────────────────────────────────── */
 
-function parseWinnerInfo(winnerHousieName: string | null, winnerTicketNumber?: number | null): { names: string; tickets: string } {
-  if (!winnerHousieName) return { names: "—", tickets: "—" };
-
-  if (winnerHousieName.includes("(")) {
-    const parts = winnerHousieName.split(/\s*&\s*|\s*,\s*/);
-    const nameList: string[] = [];
-    const ticketList: string[] = [];
-
-    for (const part of parts) {
-      const match = part.match(/^(.*?)(?:\s*\(([^)]+)\))?$/);
-      if (match) {
-        const namePart = (match[1] || "").trim();
-        const ticketPart = (match[2] || "").trim();
-        if (namePart) nameList.push(namePart);
-        if (ticketPart) ticketList.push(ticketPart);
-      } else {
-        nameList.push(part.trim());
-      }
-    }
-
-    const names = nameList.join(" & ").toUpperCase();
-    const tickets = ticketList.join(" & ");
-    return { names: names || "—", tickets: tickets || "—" };
-  }
-
-  const names = winnerHousieName.trim().toUpperCase();
-  const tickets = winnerTicketNumber ? String(winnerTicketNumber) : "—";
-  return { names, tickets };
-}
-
-function drawSparkleStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string = "#ffffff") {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  const rOuter = size / 2;
-  const rInner = size * 0.15;
-  for (let i = 0; i < 8; i++) {
-    const r = i % 2 === 0 ? rOuter : rInner;
-    const a = (Math.PI / 4) * i;
-    const px = Math.cos(a) * r;
-    const py = Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function fmtWinnerDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-    const dayNum = d.getDate();
-    const monthName = d.toLocaleDateString("en-US", { month: "long" });
-    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-    return `${dayName} ${dayNum} ${monthName} - at ${time}`;
-  } catch {
-    return iso;
-  }
-}
-
 async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummary, bgImage: HTMLImageElement | null) {
-  // 1. Purple Background & Corner Accent Circles
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, "#734e9e");
-  bgGrad.addColorStop(0.5, "#633d8e");
-  bgGrad.addColorStop(1, "#502d7a");
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, W, H);
+  paintBackground(ctx, bgImage);
+  let y = await paintHeader(ctx);
 
-  // Yellow corner circles
-  ctx.fillStyle = "#eab93c";
-  ctx.beginPath();
-  ctx.arc(0, 0, 200, 0, Math.PI * 2);
+  // Official Winners Badge Pill
+  ctx.save();
+  const tagStr = "🏆 OFFICIAL GAME WINNERS 🏆";
+  ctx.font = "800 26px 'Space Grotesk', system-ui, sans-serif";
+  const tagW = ctx.measureText(tagStr).width + 40;
+  ctx.fillStyle = "rgba(244, 201, 93, 0.18)";
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  roundRect(ctx, W / 2 - tagW / 2, y - 28, tagW, 46, 23);
   ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(W, H, 220, 0, Math.PI * 2);
-  ctx.fill();
-
-  // White sparkle stars
-  const sparkles: [number, number, number][] = [
-    [130, 210, 36], [970, 120, 48], [980, 240, 28],
-    [70, 820, 32], [1000, 720, 30], [980, 1020, 44], [60, 1180, 24]
-  ];
-  for (const [sx, sy, ss] of sparkles) {
-    drawSparkleStar(ctx, sx, sy, ss, "#ffffff");
-  }
-
-  // 2. Logo Header
-  const logo = await loadLogo();
-  const logoSize = 220;
-  const logoY = 40;
-  if (logo) {
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetY = 4;
-    ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
-    ctx.restore();
-  }
-
-  let y = logoY + logoSize + 15;
-
-  // 3. "WINNERS" Header Text with 3D Shadow
-  ctx.textAlign = "center";
-  ctx.font = "900 86px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillStyle = "#32155a";
-  ctx.fillText("WINNERS", W / 2 + 3, y + 5);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("WINNERS", W / 2, y);
-  y += 50;
-
-  // 4. Game Title Pill / Subheading
-  ctx.fillStyle = "#f4c95d";
-  ctx.font = "italic 800 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`●   ${game.title.toUpperCase()}   ●`, W / 2, y);
-  y += 42;
-
-  // 5. Date & Time Subtitle
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "italic 600 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText(fmtWinnerDate(game.scheduled_at), W / 2, y);
-  y += 45;
-
-  // 6. 4-Column Table
-  const prizes = game.prize_pool;
-  const claimed = prizes.filter((p) => p.claimed);
-  const displayPrizes = claimed.length > 0 ? claimed : prizes;
-
-  const tableLeft = 60;
-  const tableWidth = W - 120; // 960px
-  const colW = [260, 190, 330, 180];
-  const colX = [
-    tableLeft,
-    tableLeft + colW[0],
-    tableLeft + colW[0] + colW[1],
-    tableLeft + colW[0] + colW[1] + colW[2]
-  ];
-
-  const headerH = 60;
-  const rowH = Math.min(68, Math.max(52, Math.floor((H - y - 140 - headerH) / Math.max(1, displayPrizes.length))));
-  const tableHeight = headerH + displayPrizes.length * rowH;
-
-  // Table Background (Warm Gold)
-  ctx.fillStyle = "#e8b83c";
-  roundRect(ctx, tableLeft, y, tableWidth, tableHeight, 14);
-  ctx.fill();
-
-  // Outer Border Line
-  ctx.strokeStyle = "#1e0c38";
-  ctx.lineWidth = 3.5;
-  roundRect(ctx, tableLeft, y, tableWidth, tableHeight, 14);
   ctx.stroke();
 
-  // Header Row Content
-  ctx.fillStyle = "#48257d";
-  ctx.font = "900 21px 'Space Grotesk', system-ui, sans-serif";
-
-  // PRIZE LIST
-  ctx.textAlign = "left";
-  ctx.fillText("PRIZE LIST", colX[0] + 16, y + headerH / 2 + 7);
-
-  // AMOUNT
-  ctx.fillText("AMOUNT", colX[1] + 16, y + headerH / 2 + 7);
-
-  // HOUSIE NAME
-  ctx.fillText("HOUSIE NAME", colX[2] + 16, y + headerH / 2 + 7);
-
-  // TICKET NO.
   ctx.textAlign = "center";
-  ctx.fillText("TICKET NO.", colX[3] + colW[3] / 2, y + headerH / 2 + 7);
+  ctx.fillStyle = GOLD;
+  ctx.fillText(tagStr, W / 2, y + 3);
+  ctx.restore();
+  y += 52;
 
-  // Horizontal line under Header
-  ctx.beginPath();
-  ctx.moveTo(tableLeft, y + headerH);
-  ctx.lineTo(tableLeft + tableWidth, y + headerH);
-  ctx.stroke();
-
-  // Vertical Column Dividers
-  for (let i = 1; i < 4; i++) {
-    ctx.beginPath();
-    ctx.moveTo(colX[i], y);
-    ctx.lineTo(colX[i], y + tableHeight);
-    ctx.stroke();
+  // Title
+  ctx.fillStyle = WHITE;
+  ctx.font = "800 58px 'Space Grotesk', system-ui, sans-serif";
+  const titleLines = wrapText(ctx, game.title, W - 160);
+  for (const line of titleLines) {
+    ctx.fillText(line, W / 2, y);
+    y += 66;
   }
+  y += 20;
 
-  // Draw Body Rows
-  displayPrizes.forEach((p, idx) => {
-    const rowY = y + headerH + idx * rowH;
-    const midY = rowY + rowH / 2 + 7;
-
-    const { names, tickets } = parseWinnerInfo(p.winner_housie_name, p.winner_ticket_number);
-
-    // 1. Prize Name (Bold Purple)
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#48257d";
-    ctx.font = "800 21px 'Space Grotesk', system-ui, sans-serif";
-    ctx.fillText(p.pattern_name.toUpperCase(), colX[0] + 16, midY);
-
-    // 2. Amount (Vibrant Blue/Cyan)
-    ctx.fillStyle = "#2067d6";
-    ctx.font = "800 21px 'JetBrains Mono', ui-monospace, monospace";
-    ctx.fillText(inr(p.prize_amount), colX[1] + 16, midY);
-
-    // 3. Housie Name (Bold White)
-    ctx.fillStyle = "#ffffff";
-    let nameFontSize = 21;
-    ctx.font = `800 ${nameFontSize}px 'Space Grotesk', system-ui, sans-serif`;
-    while (ctx.measureText(names).width > colW[2] - 24 && nameFontSize > 13) {
-      nameFontSize -= 1;
-      ctx.font = `800 ${nameFontSize}px 'Space Grotesk', system-ui, sans-serif`;
-    }
-    ctx.fillText(names, colX[2] + 16, midY);
-
-    // 4. Ticket No. (Bold White, Centered)
-    ctx.textAlign = "center";
-    ctx.font = "800 21px 'Space Grotesk', system-ui, sans-serif";
-    ctx.fillText(tickets, colX[3] + colW[3] / 2, midY);
-
-    // Row divider line
-    if (idx < displayPrizes.length - 1) {
-      ctx.beginPath();
-      ctx.moveTo(tableLeft, rowY + rowH);
-      ctx.lineTo(tableLeft + tableWidth, rowY + rowH);
-      ctx.stroke();
-    }
+  const claimed = game.prize_pool.filter((p) => p.claimed);
+  const rows: PrizeRowSpec[] = claimed.map((p) => {
+    const name = p.winner_housie_name ?? "—";
+    const sub = name.includes("(") || !p.winner_ticket_number ? name : `${name} (${p.winner_ticket_number})`;
+    return {
+      kind: prizeIconKind(p.pattern_name),
+      color: p.pattern_name.toLowerCase().includes("full house") ? (MEDAL_COLOR[prizeIconKind(p.pattern_name)] ?? GOLD) : PINK,
+      label: p.pattern_name,
+      sub,
+      amount: inr(p.prize_amount),
+    };
   });
 
-  // Footer text
+  const cardBottom = paintPrizeCard(ctx, {
+    top: y,
+    heading: "✨ WINNING TICKETS & REWARDS ✨",
+    headingColor: GOLD,
+    rows,
+    rowHeight: 92,
+    emptyMessage: "No prizes were claimed this round.",
+  });
+
+  // Congratulations Badge Pill & Subtext
+  const congratsY = cardBottom + 44;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = PINK;
+  ctx.font = "800 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText("🎉 Congratulations to all our winners! 🎉", W / 2, congratsY);
+
+  ctx.fillStyle = DIM;
+  ctx.font = "italic 600 26px 'DM Sans', system-ui, sans-serif";
+  ctx.fillText("Ready for more? Book your next game today!", W / 2, congratsY + 44);
+  ctx.restore();
+
   paintFooter(ctx);
 }
 
