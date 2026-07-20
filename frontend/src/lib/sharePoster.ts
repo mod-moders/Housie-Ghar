@@ -68,6 +68,26 @@ function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function fmtDateTime(iso?: string): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const dateStr = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const timeStr = d.toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return `${dateStr} · ${timeStr}`;
+  } catch {
+    return iso;
+  }
+}
+
 /* ── captions (unchanged — this is WhatsApp text, emoji are fine there) ─ */
 
 export function buildScheduledCaption(game: GameSummary): string {
@@ -524,7 +544,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   ctx.fillStyle = CYAN;
   ctx.font = "600 30px 'JetBrains Mono', ui-monospace, monospace";
-  ctx.fillText(`${fmtTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
+  ctx.fillText(`${fmtDateTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
   y += 46;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
@@ -585,7 +605,17 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
     ctx.fillText(line, W / 2, y);
     y += 64;
   }
-  y += 24;
+  y += 6;
+
+  const gameDateStr = fmtDateTime(game.scheduled_at ?? game.completed_at);
+  if (gameDateStr) {
+    ctx.fillStyle = CYAN;
+    ctx.font = "600 28px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.fillText(gameDateStr, W / 2, y);
+    y += 44;
+  } else {
+    y += 16;
+  }
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
   const rows: PrizeRowSpec[] = claimed.map((p) => {
