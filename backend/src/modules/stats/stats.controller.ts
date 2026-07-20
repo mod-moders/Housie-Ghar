@@ -411,7 +411,7 @@ export async function getFinancialAnalysis(req: AuthenticatedRequest, res: Respo
  */
 export async function getOperatorStats(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const operatorId = req.user?.user_id;
+    const operatorId = req.user?.userId || (req.user as any)?.user_id;
     if (!operatorId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
@@ -503,7 +503,7 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
  */
 export async function getBookieStats(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const bookieId = req.user?.user_id;
+    const bookieId = req.user?.userId || (req.user as any)?.user_id;
     if (!bookieId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;

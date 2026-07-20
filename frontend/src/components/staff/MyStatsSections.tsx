@@ -95,20 +95,21 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
 
   if (loading) {
     return (
-      <div className="hg-sec" style={{ padding: "40px 0", textAlign: "center" }}>
-        <span className="hg-poll-spin" />
-        <p className="hg-dim" style={{ marginTop: "12px", fontSize: "13px" }}>Loading operator statistics...</p>
+      <div className="hg-sec" style={{ padding: "60px 0", textAlign: "center" }}>
+        <span className="hg-poll-spin" style={{ width: "32px", height: "32px" }} />
+        <p className="hg-dim" style={{ marginTop: "16px", fontSize: "14px" }}>Loading operator performance analytics...</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="hg-sec">
-        <div className="hg-panel" style={{ padding: "24px", color: "#EF4444" }}>
-          <Icon name="alert" size={18} /> {error || "Failed to load stats"}
-          <button onClick={load} style={{ marginLeft: "12px", color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }}>
-            Retry
+      <div className="hg-sec" style={{ width: "100%" }}>
+        <div className="hg-panel" style={{ padding: "28px", border: "1px solid rgba(239, 68, 68, 0.3)", background: "rgba(239, 68, 68, 0.05)", borderRadius: "16px", textAlign: "center" }}>
+          <Icon name="alert" size={24} style={{ color: "#EF4444", marginBottom: "8px" }} />
+          <p style={{ color: "#EF4444", fontWeight: "bold", fontSize: "15px", margin: "4px 0" }}>{error || "Failed to load stats"}</p>
+          <button onClick={load} className="hg-btn" style={{ marginTop: "12px", background: "var(--brand)", color: "var(--accent-ink)", fontWeight: "bold", border: "none", padding: "8px 20px", borderRadius: "8px", cursor: "pointer" }}>
+            Retry Loading
           </button>
         </div>
       </div>
@@ -118,54 +119,78 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
   return (
     <div className="hg-sec" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
       
-      {/* Top Headline KPI Grid */}
+      {/* Header Banner */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "16px" }}>
+        <div>
+          <h2 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text)", display: "flex", alignItems: "center", gap: "10px" }}>
+            <Icon name="chart" size={22} style={{ color: "var(--accent)" }} />
+            Operator Performance & Game Statistics
+          </h2>
+          <p className="hg-dim" style={{ fontSize: "13px", marginTop: "4px" }}>
+            Overview of games hosted, draw frequency, ticket counts, and prize disbursements for <strong style={{ color: "var(--accent)" }}>{me.full_name}</strong>.
+          </p>
+        </div>
+        <button onClick={load} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)", color: "var(--text)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Icon name="arrowR" size={12} style={{ transform: "rotate(-90deg)" }} /> Refresh Data
+        </button>
+      </div>
+
+      {/* KPI Cards Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
         
-        <div className="hg-kpi" style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "20px" }}>
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-kpi-label">Games Operated</span>
-            <Icon name="play" size={18} style={{ color: "var(--brand)" }} />
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Games Operated</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(244, 201, 93, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="play" size={16} style={{ color: "var(--accent)" }} />
+            </div>
           </div>
-          <b className="hg-kpi-value" style={{ fontSize: "28px", marginTop: "8px" }}>{data.total_games_operated}</b>
-          <span className="hg-kpi-sub" style={{ display: "flex", gap: "12px", marginTop: "4px" }}>
-            <span style={{ color: "#10B981" }}>✓ {data.completed_games} Done</span>
+          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_games_operated}</b>
+          <div style={{ display: "flex", gap: "10px", marginTop: "8px", fontSize: "12px" }}>
+            <span style={{ color: "#10B981", fontWeight: "600" }}>✓ {data.completed_games} Completed</span>
             {data.live_games > 0 && <span style={{ color: "var(--brand)", fontWeight: "bold" }}>● {data.live_games} Live</span>}
-          </span>
+          </div>
         </div>
 
-        <div className="hg-kpi" style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "20px" }}>
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(95, 212, 232, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-kpi-label">Numbers Called</span>
-            <Icon name="zap" size={18} style={{ color: "var(--accent)" }} />
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Numbers Drawn</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(95, 212, 232, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="zap" size={16} style={{ color: "#5FD4E8" }} />
+            </div>
           </div>
-          <b className="hg-kpi-value" style={{ fontSize: "28px", marginTop: "8px", color: "var(--accent)" }}>{data.total_numbers_called}</b>
-          <span className="hg-kpi-sub">Total number calls drawn across games</span>
+          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "#5FD4E8" }}>{data.total_numbers_called}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Total number calls called in games</span>
         </div>
 
-        <div className="hg-kpi" style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "20px" }}>
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(59, 130, 246, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-kpi-label">Tickets Sold in Games</span>
-            <Icon name="users" size={18} style={{ color: "#3B82F6" }} />
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Player Tickets Sold</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(59, 130, 246, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="users" size={16} style={{ color: "#3B82F6" }} />
+            </div>
           </div>
-          <b className="hg-kpi-value" style={{ fontSize: "28px", marginTop: "8px" }}>{data.total_tickets_sold}</b>
-          <span className="hg-kpi-sub">Player tickets sold in your rounds</span>
+          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_tickets_sold}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Tickets hosted in operated games</span>
         </div>
 
-        <div className="hg-kpi" style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "20px" }}>
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(16, 185, 129, 0.25)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-kpi-label">Prizes Disbursed</span>
-            <Icon name="wallet" size={18} style={{ color: "#10B981" }} />
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Payouts Disbursed</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="wallet" size={16} style={{ color: "#10B981" }} />
+            </div>
           </div>
-          <b className="hg-kpi-value" style={{ fontSize: "28px", marginTop: "8px", color: "#10B981" }}>{money(data.total_payouts_disbursed)}</b>
-          <span className="hg-kpi-sub">{data.total_prizes_claimed} prize claims processed</span>
+          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "#10B981" }}>{money(data.total_payouts_disbursed)}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>{data.total_prizes_claimed} claimed prizes processed</span>
         </div>
 
       </div>
 
-      {/* Operated Games History */}
-      <div className="hg-panel" style={{ padding: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border-2)", paddingBottom: "12px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+      {/* Recent Games Table */}
+      <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "14px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
             <Icon name="clock" size={16} /> Operated Games Log ({data.recent_games.length})
           </h3>
         </div>
@@ -174,13 +199,13 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           <EmptyHint icon="play" title="No games operated yet" sub="Games assigned to you will appear here once scheduled or completed." />
         ) : (
           <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
-            <div className="hg-table" style={{ minWidth: "800px" }}>
-              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1.2fr 1fr" }}>
+            <div className="hg-table" style={{ minWidth: "820px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "2fr 1.3fr 1.1fr 1fr 1.2fr 1fr" }}>
                 <span>Game Title</span>
                 <span>Date & Time</span>
                 <span>Tickets Sold</span>
                 <span>Calls Made</span>
-                <span>Prizes Disbursed</span>
+                <span>Total Disbursed</span>
                 <span style={{ textAlign: "right" }}>Status</span>
               </div>
               {data.recent_games.map((g) => {
@@ -188,20 +213,29 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
                   day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"
                 });
                 return (
-                  <div key={g.game_id} className="hg-tr" style={{ gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1.2fr 1fr" }}>
+                  <div key={g.game_id} className="hg-tr" style={{ gridTemplateColumns: "2fr 1.3fr 1.1fr 1fr 1.2fr 1fr", alignItems: "center" }}>
                     <div>
-                      <b style={{ color: "var(--text)" }}>{g.title}</b>
-                      <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>Price: {money(g.ticket_price)}</div>
+                      <b style={{ color: "var(--text)", fontSize: "14px" }}>{g.title}</b>
+                      <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>Ticket Price: {money(g.ticket_price)}</div>
                     </div>
                     <span className="hg-dim" style={{ fontSize: "12px" }}>{dateStr}</span>
-                    <span>
-                      <b>{g.tickets_sold}</b> / {g.total_tickets}
-                      <div className="hg-dim" style={{ fontSize: "10px" }}>{g.fill_rate}% fill</div>
-                    </span>
-                    <span><b>{g.numbers_called}</b> calls</span>
+                    <div>
+                      <b style={{ fontSize: "13px" }}>{g.tickets_sold}</b> <span className="hg-dim">/ {g.total_tickets}</span>
+                      <div style={{ width: "60px", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", marginTop: "4px", overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, g.fill_rate)}%`, height: "100%", background: "var(--accent)" }} />
+                      </div>
+                    </div>
+                    <span><b style={{ color: "#5FD4E8" }}>{g.numbers_called}</b> calls</span>
                     <strong style={{ color: "#10B981" }}>{money(g.total_payout)}</strong>
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <span className={`hg-pill hg-pill-${g.game_status.toLowerCase()}`}>
+                      <span
+                        className="hg-pill"
+                        style={{
+                          background: g.game_status === "Completed" ? "rgba(16, 185, 129, 0.15)" : g.game_status === "Live" ? "rgba(244, 201, 93, 0.15)" : "rgba(255,255,255,0.06)",
+                          color: g.game_status === "Completed" ? "#10B981" : g.game_status === "Live" ? "var(--accent)" : "var(--text-dim)",
+                          border: g.game_status === "Completed" ? "1px solid rgba(16, 185, 129, 0.3)" : g.game_status === "Live" ? "1px solid rgba(244, 201, 93, 0.3)" : "1px solid var(--border)"
+                        }}
+                      >
                         {g.game_status}
                       </span>
                     </div>
@@ -243,20 +277,21 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
 
   if (loading) {
     return (
-      <div className="hg-sec" style={{ padding: "40px 0", textAlign: "center" }}>
-        <span className="hg-poll-spin" />
-        <p className="hg-dim" style={{ marginTop: "12px", fontSize: "13px" }}>Loading bookie statistics...</p>
+      <div className="hg-sec" style={{ padding: "60px 0", textAlign: "center" }}>
+        <span className="hg-poll-spin" style={{ width: "32px", height: "32px" }} />
+        <p className="hg-dim" style={{ marginTop: "16px", fontSize: "14px" }}>Loading bookie sales analytics...</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="hg-sec">
-        <div className="hg-panel" style={{ padding: "24px", color: "#EF4444" }}>
-          <Icon name="alert" size={18} /> {error || "Failed to load stats"}
-          <button onClick={load} style={{ marginLeft: "12px", color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }}>
-            Retry
+      <div className="hg-sec" style={{ width: "100%" }}>
+        <div className="hg-panel" style={{ padding: "28px", border: "1px solid rgba(239, 68, 68, 0.3)", background: "rgba(239, 68, 68, 0.05)", borderRadius: "16px", textAlign: "center" }}>
+          <Icon name="alert" size={24} style={{ color: "#EF4444", marginBottom: "8px" }} />
+          <p style={{ color: "#EF4444", fontWeight: "bold", fontSize: "15px", margin: "4px 0" }}>{error || "Failed to load stats"}</p>
+          <button onClick={load} className="hg-btn" style={{ marginTop: "12px", background: "var(--brand)", color: "var(--accent-ink)", fontWeight: "bold", border: "none", padding: "8px 20px", borderRadius: "8px", cursor: "pointer" }}>
+            Retry Loading
           </button>
         </div>
       </div>
@@ -274,23 +309,38 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
   return (
     <div className="hg-sec" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
 
-      {/* Timeframe Sales Metric Selector & Cards */}
-      <div className="hg-panel" style={{ padding: "24px" }}>
+      {/* Header Banner */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "16px" }}>
+        <div>
+          <h2 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text)", display: "flex", alignItems: "center", gap: "10px" }}>
+            <Icon name="chart" size={22} style={{ color: "var(--accent)" }} />
+            Bookie Ticket Sales & Revenue Analytics
+          </h2>
+          <p className="hg-dim" style={{ fontSize: "13px", marginTop: "4px" }}>
+            Comprehensive sales performance, daily/weekly/monthly revenue, booking outcomes, and wallet recharges for <strong style={{ color: "var(--accent)" }}>{me.full_name}</strong>.
+          </p>
+        </div>
+        <button onClick={load} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)", color: "var(--text)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Icon name="arrowR" size={12} style={{ transform: "rotate(-90deg)" }} /> Refresh Stats
+        </button>
+      </div>
+
+      {/* Timeframe Selector & Metric Cards */}
+      <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
-          <div>
-            <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "var(--text)" }}>Ticket Sales & Revenue Performance</h3>
-            <p className="hg-dim" style={{ fontSize: "12px", marginTop: "2px" }}>Track your ticket booking collections across daily, weekly, and monthly timeframes.</p>
-          </div>
+          <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Sales Timeframe
+          </span>
           <div style={{ display: "flex", gap: "6px", background: "rgba(255,255,255,0.04)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border-2)" }}>
             {(["daily", "weekly", "monthly", "all"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTimeframe(t)}
                 style={{
-                  padding: "6px 14px",
-                  borderRadius: "6px",
+                  padding: "6px 16px",
+                  borderRadius: "8px",
                   fontSize: "12px",
-                  fontWeight: "bold",
+                  fontWeight: "700",
                   cursor: "pointer",
                   border: "none",
                   background: timeframe === t ? "var(--brand)" : "transparent",
@@ -304,88 +354,83 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "16px" }}>
           
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border-2)" }}>
+          <div style={{ background: "rgba(255,255,255,0.025)", padding: "18px", borderRadius: "12px", border: "1px solid rgba(244, 201, 93, 0.2)" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets Sold</span>
-            <b style={{ display: "block", fontSize: "26px", marginTop: "6px", color: "var(--accent)" }}>{activeSales.tickets_sold}</b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>{timeframe === "all" ? "Total tickets sold" : `${timeframe} tickets count`}</span>
+            <b style={{ display: "block", fontSize: "28px", fontWeight: "800", marginTop: "6px", color: "var(--accent)" }}>{activeSales.tickets_sold}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>{timeframe === "all" ? "Total tickets count" : `${timeframe} tickets count`}</span>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border-2)" }}>
+          <div style={{ background: "rgba(255,255,255,0.025)", padding: "18px", borderRadius: "12px", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Total Gross Collection</span>
-            <b style={{ display: "block", fontSize: "26px", marginTop: "6px", color: "#10B981" }}>{money(activeSales.collection)}</b>
+            <b style={{ display: "block", fontSize: "28px", fontWeight: "800", marginTop: "6px", color: "#10B981" }}>{money(activeSales.collection)}</b>
             <span className="hg-dim" style={{ fontSize: "11px" }}>Booking payments collected</span>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border-2)" }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Booking Conversion Rate</span>
-            <b style={{ display: "block", fontSize: "26px", marginTop: "6px", color: "#3B82F6" }}>{data.bookings.conversion_rate}%</b>
+          <div style={{ background: "rgba(255,255,255,0.025)", padding: "18px", borderRadius: "12px", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Conversion Rate</span>
+            <b style={{ display: "block", fontSize: "28px", fontWeight: "800", marginTop: "6px", color: "#3B82F6" }}>{data.bookings.conversion_rate}%</b>
             <span className="hg-dim" style={{ fontSize: "11px" }}>{data.bookings.confirmed_count} of {data.bookings.total_attempted} confirmed</span>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border-2)" }}>
+          <div style={{ background: "rgba(255,255,255,0.025)", padding: "18px", borderRadius: "12px", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Missed / Expired Bookings</span>
-            <b style={{ display: "block", fontSize: "26px", marginTop: "6px", color: data.bookings.expired_missed_count > 0 ? "#EF4444" : "var(--text)" }}>
+            <b style={{ display: "block", fontSize: "28px", fontWeight: "800", marginTop: "6px", color: data.bookings.expired_missed_count > 0 ? "#EF4444" : "var(--text)" }}>
               {data.bookings.expired_missed_count}
             </b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>Unconfirmed timer expirations</span>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>Timer expirations count</span>
           </div>
 
         </div>
       </div>
 
-      {/* Wallet & Recharge Summary Cards */}
+      {/* Wallet & Recharge Highlights */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px" }}>
         
-        <div className="hg-panel" style={{ padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold" }}>CURRENT WALLET BALANCE</span>
+        <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase" }}>Current Wallet Balance</span>
             <Icon name="wallet" size={18} style={{ color: "var(--accent)" }} />
           </div>
-          <b style={{ fontSize: "28px", color: "var(--accent)" }}>{money(data.wallet.current_balance)}</b>
-          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "8px" }}>
-            Active balance available to confirm ticket bookings.
-          </div>
+          <b style={{ fontSize: "28px", fontWeight: "800", color: "var(--accent)" }}>{money(data.wallet.current_balance)}</b>
+          <div className="hg-dim" style={{ fontSize: "12px", marginTop: "6px" }}>Active balance available to confirm ticket bookings.</div>
         </div>
 
-        <div className="hg-panel" style={{ padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold" }}>TOTAL RECHARGES APPROVED</span>
+        <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase" }}>Total Recharges Approved</span>
             <Icon name="check" size={18} style={{ color: "#10B981" }} />
           </div>
-          <b style={{ fontSize: "28px", color: "#10B981" }}>{money(data.wallet.total_recharged_amount)}</b>
-          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "8px" }}>
-            {data.wallet.approved_recharges_count} successful top-up requests
-            {data.wallet.pending_recharges_count > 0 && <span style={{ color: "var(--brand)", marginLeft: "6px" }}>({data.wallet.pending_recharges_count} pending)</span>}
+          <b style={{ fontSize: "28px", fontWeight: "800", color: "#10B981" }}>{money(data.wallet.total_recharged_amount)}</b>
+          <div className="hg-dim" style={{ fontSize: "12px", marginTop: "6px" }}>
+            {data.wallet.approved_recharges_count} successful top-ups
+            {data.wallet.pending_recharges_count > 0 && <span style={{ color: "var(--brand)", marginLeft: "6px", fontWeight: "bold" }}>({data.wallet.pending_recharges_count} pending)</span>}
           </div>
         </div>
 
-        <div className="hg-panel" style={{ padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold" }}>BOOKING OUTCOMES</span>
+        <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span className="hg-dim" style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase" }}>Booking Outcomes</span>
             <Icon name="bell" size={18} style={{ color: "var(--brand)" }} />
           </div>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: "11px", color: "#10B981" }}>✓ Confirmed: {data.bookings.confirmed_count}</span>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "6px" }}>
+            <div style={{ flex: 1, background: "rgba(16, 185, 129, 0.1)", padding: "6px 10px", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+              <span style={{ fontSize: "11px", color: "#10B981", fontWeight: "bold" }}>✓ {data.bookings.confirmed_count} Sold</span>
             </div>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: "11px", color: "#EF4444" }}>⏱ Expired: {data.bookings.expired_missed_count}</span>
-            </div>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>✕ Cancelled: {data.bookings.cancelled_count}</span>
+            <div style={{ flex: 1, background: "rgba(239, 68, 68, 0.1)", padding: "6px 10px", borderRadius: "6px", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+              <span style={{ fontSize: "11px", color: "#EF4444", fontWeight: "bold" }}>⏱ {data.bookings.expired_missed_count} Expired</span>
             </div>
           </div>
-          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "12px" }}>Total attempted: {data.bookings.total_attempted}</div>
+          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "8px" }}>Total attempted: {data.bookings.total_attempted}</div>
         </div>
 
       </div>
 
       {/* Recent Bookings Table */}
-      <div className="hg-panel" style={{ padding: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border-2)", paddingBottom: "12px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+      <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "14px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
             <Icon name="clock" size={16} /> Recent Ticket Bookings Log ({data.recent_bookings.length})
           </h3>
         </div>
@@ -396,7 +441,7 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
           <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
             <div className="hg-table" style={{ minWidth: "750px" }}>
               <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr" }}>
-                <span>Player & Date</span>
+                <span>Player Name</span>
                 <span>Game Title</span>
                 <span>Tickets</span>
                 <span>Amount</span>
@@ -409,9 +454,9 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
                 const isSold = b.booking_status === "Sold";
                 const isExpired = b.booking_status === "Expired";
                 return (
-                  <div key={b.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                  <div key={b.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr", alignItems: "center" }}>
                     <div>
-                      <b style={{ color: "var(--text)" }}>{b.housie_name}</b>
+                      <b style={{ color: "var(--text)", fontSize: "14px" }}>{b.housie_name}</b>
                       <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>{dateStr}</div>
                     </div>
                     <span className="hg-dim">{b.game_title}</span>
