@@ -48,7 +48,7 @@ document.addEventListener('touchend', function(e){
 }, { passive: false });
 })();` }} />
         <ConfigProvider>
-          <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+          <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1 }}>
               {children}
             </div>
