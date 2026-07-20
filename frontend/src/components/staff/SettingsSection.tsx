@@ -182,20 +182,20 @@ export function SettingsSection() {
           {announcements.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {announcements.map((ann, index) => (
-                <div 
-                  key={ann.id} 
-                  style={{ 
-                    display: "flex", alignItems: "center", gap: 10,
+                <div
+                  key={ann.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, minWidth: 0,
                     padding: "8px 12px", borderRadius: 8,
                     border: "1px solid var(--border-2)",
                     background: ann.muted ? "var(--bg)" : "var(--surface)",
                     opacity: ann.muted ? 0.6 : 1, transition: "opacity 0.2s",
                   }}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", minWidth: 18 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", minWidth: 18, flexShrink: 0 }}>
                     #{index + 1}
                   </span>
-                  <span style={{ flex: 1, fontSize: 13, color: "var(--text)" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text)", wordBreak: "break-word" }}>
                     {ann.text}
                   </span>
                   <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 11, userSelect: "none", color: "var(--text-dim)" }}>
