@@ -465,8 +465,8 @@ export function CallVoiceSettings() {
   const playCallPreview = (item: NumberCallConfig, lang: "en" | "ne" = "en") => {
     stopAllPreviews();
     const url = lang === "ne"
-      ? (item.audio_url_ne || `/audio/calls/${item.number}_ne.mp3`)
-      : (item.audio_url_en || item.audio_url || `/audio/calls/${item.number}_en.mp3` || `/audio/calls/${item.number}.mp3`);
+      ? (item.audio_url_ne || item.audio_url || `/audio/calls/${item.number}_ne.mp3` || `/audio/calls/${item.number}.mp3`)
+      : (item.audio_url_en || `/audio/calls/${item.number}_en.mp3`);
 
     if (!url) return;
 
@@ -1174,8 +1174,8 @@ export function CallVoiceSettings() {
             <div className="text-center p-8 text-mute" style={{ fontStyle: "italic", fontSize: "13px" }}>No numbers match your search query.</div>
           ) : (
             filtered.map((item) => {
-              const engAudio = item.audio_url_en || item.audio_url;
-              const nepAudio = item.audio_url_ne;
+              const engAudio = item.audio_url_en;
+              const nepAudio = item.audio_url_ne || item.audio_url;
 
               return (
                 <div

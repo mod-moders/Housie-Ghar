@@ -257,8 +257,8 @@ export function useGameAudio(
     const activeLang = platformConfig?.audio_language || "en";
 
     const audioUrl = activeLang === "ne"
-      ? (config?.audio_url_ne || `/audio/calls/${num}_ne.mp3`)
-      : (config?.audio_url_en || config?.audio_url || `/audio/calls/${num}_en.mp3` || `/audio/calls/${num}.mp3`);
+      ? (config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_ne.mp3` || `/audio/calls/${num}.mp3`)
+      : (config?.audio_url_en || `/audio/calls/${num}_en.mp3`);
 
     const vol = config?.volume !== undefined ? config.volume : 1.0;
     const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
