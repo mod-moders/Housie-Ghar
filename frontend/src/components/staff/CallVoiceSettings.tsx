@@ -1029,21 +1029,25 @@ export function CallVoiceSettings() {
                     // Instant live audio preview test when admin changes TTS voice
                     if (typeof window !== "undefined" && "speechSynthesis" in window) {
                       window.speechSynthesis.cancel();
-                      const sampleText = val.toLowerCase().includes("hi") || val.toLowerCase().includes("hindi")
-                        ? "आवाज अपडेट की गई। हाउसी घर एआई कॉलर तैयार है।"
-                        : val.toLowerCase().includes("ne") || val.toLowerCase().includes("nepali")
-                          ? "आवाज अपडेट गरियो। हाउसी घर एआई कलर तयार छ।"
-                          : "Voice updated! Housie Ghar AI Caller is ready.";
+                      const sampleText = val.toLowerCase().includes("leah")
+                        ? "Voice updated! Microsoft Leah Studio AI Caller is ready."
+                        : val.toLowerCase().includes("hi") || val.toLowerCase().includes("hindi")
+                          ? "आवाज अपडेट की गई। हाउसी घर एआई कॉलर तैयार है।"
+                          : val.toLowerCase().includes("ne") || val.toLowerCase().includes("nepali")
+                            ? "आवाज अपडेट गरियो। हाउसी घर एआई कलर तयार छ।"
+                            : "Voice updated! Housie Ghar AI Caller is ready.";
                       const utterance = new SpeechSynthesisUtterance(sampleText);
                       const allVoices = window.speechSynthesis.getVoices();
-                      let matchedVoice = allVoices.find(x => x.name === val);
+                      let matchedVoice = val.toLowerCase().includes("leah")
+                        ? allVoices.find(x => x.name.toLowerCase().includes("leah")) || allVoices.find(x => x.name === val)
+                        : allVoices.find(x => x.name === val);
                       if (!matchedVoice) {
                         const top5 = getTop5CuratedVoices(allVoices);
                         const m = top5.find(x => x.name === val);
                         if (m && m.rawVoice) matchedVoice = m.rawVoice;
                       }
                       if (matchedVoice) utterance.voice = matchedVoice;
-                      utterance.pitch = 1.0;
+                      utterance.pitch = val.toLowerCase().includes("leah") ? 1.05 : 1.0;
                       utterance.rate = 0.95;
                       window.speechSynthesis.speak(utterance);
                     }
