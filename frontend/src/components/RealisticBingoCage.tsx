@@ -245,10 +245,10 @@ export function RealisticBingoCage({
   const ballHue = lastDrawn !== null ? (lastDrawn * 37) % 360 : 0;
   const ballColor = lastDrawn !== null ? `hsl(${ballHue}, 75%, 50%)` : "transparent";
   const showBadge = !isTeasing && lastDrawn !== null;
-  const cageSize = compact ? "280px" : "420px";
-  const badgeSize = compact ? "84px" : "120px";
-  const badgeFontSize = compact ? "34px" : "48px";
-  const badgeBorder = compact ? "4px" : "6px";
+  const cageSize = compact ? "200px" : "420px";
+  const badgeSize = compact ? "60px" : "120px";
+  const badgeFontSize = compact ? "24px" : "48px";
+  const badgeBorder = compact ? "3px" : "6px";
 
   return (
     <div style={{ position: "relative", width: "100%", maxWidth: cageSize, margin: "0 auto" }}>

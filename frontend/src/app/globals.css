@@ -1917,9 +1917,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
    if a long game title wraps to 2 lines (see LiveBoardContent.tsx's ResizeObserver). */
 .hg-live-sticky{
   position:sticky;top:var(--hg-live-top-h,60px);z-index:25;background:var(--bg);
-  max-height:calc(100dvh - var(--hg-live-top-h,60px) - 16px);overflow-y:auto;
+  max-height:min(58dvh,calc(100dvh - var(--hg-live-top-h,60px) - 16px));overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;
 }
+.hg-live-sticky::-webkit-scrollbar{width:5px}
+.hg-live-sticky::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+.hg-live-sticky::-webkit-scrollbar-track{background:transparent}
 .hg-recent{display:flex;align-items:center;gap:8px;padding:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
 .hg-recent::-webkit-scrollbar{display:none}
 .hg-recent-chip{flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:12px;

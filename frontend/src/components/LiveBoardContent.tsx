@@ -246,6 +246,17 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     return () => observer.disconnect();
   }, []);
 
+  // Shrink the cage graphic itself on narrow screens — the sticky cage+recent-calls area
+  // otherwise eats too much of a phone's viewport, leaving little of the board visible below it.
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 899px)");
+    const update = () => setIsNarrowViewport(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   const gameStartedAnnouncedRef = useRef<boolean>(false);
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
@@ -663,7 +674,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-live-sticky">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
-                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} />
+                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} compact={isNarrowViewport} />
                 
                 <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"
@@ -710,7 +721,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               </div>
 
               {/* Recent numbers called panel — in a separate card just below the cage & call notification */}
-              <div className="hg-numbers-area" style={{ padding: "16px 20px" }}>
+              <div className="hg-numbers-area" style={{ padding: isNarrowViewport ? "10px 14px" : "16px 20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--accent)" }}>
                     {showAllCalled ? "Calling Sequence (Newest First)" : "Recent Calls"}
