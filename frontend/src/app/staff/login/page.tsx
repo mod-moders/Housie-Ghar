@@ -65,7 +65,7 @@ export default function StaffLogin() {
   };
 
   return (
-    <div className="hg-screen flex items-center justify-center min-h-screen bg-[#0B0B0C] px-4 py-12">
+    <div className="hg-screen flex items-center justify-center bg-[#0B0B0C] px-4 py-12">
       <div className="w-full max-w-md bg-[#121214] border border-[#27272A] rounded-2xl p-8 shadow-2xl relative">
         {/* Exit to Lobby Shortcut Icon */}
         <Link href="/" className="absolute top-4 right-4 text-[#06B6D4] hover:text-[#F43F5E] transition-colors" title="Exit to Lobby">
