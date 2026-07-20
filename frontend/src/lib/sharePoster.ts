@@ -251,8 +251,8 @@ function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElemen
 
 async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
   const logo = await loadLogo();
-  const logoSize = 190;
-  const logoY = 40;
+  const logoSize = 250;
+  const logoY = 44;
   if (logo) {
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
@@ -261,15 +261,38 @@ async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
     ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
     ctx.restore();
 
-    return logoY + logoSize + 20;
+    return logoY + logoSize + 24;
   }
 
   // fallback if the logo fails to load: plain wordmark, still on-brand
   ctx.textAlign = "center";
   ctx.fillStyle = GOLD;
-  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("HOUSIE GHAR", W / 2, logoY + 40);
-  return logoY + 70;
+  ctx.font = "700 36px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText("HOUSIE GHAR", W / 2, logoY + 44);
+  return logoY + 80;
+}
+
+function paintDateTimeBadge(ctx: CanvasRenderingContext2D, text: string, y: number): number {
+  ctx.font = "600 24px 'JetBrains Mono', ui-monospace, monospace";
+  const textWidth = ctx.measureText(text).width;
+  const pillW = textWidth + 56;
+  const pillH = 46;
+  const pillX = W / 2 - pillW / 2;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(95, 212, 232, 0.12)";
+  ctx.strokeStyle = "rgba(95, 212, 232, 0.4)";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, pillX, y, pillW, pillH, pillH / 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = CYAN;
+  ctx.fillText(text, W / 2, y + pillH / 2 + 8);
+  ctx.restore();
+
+  return y + pillH;
 }
 
 function paintFooter(ctx: CanvasRenderingContext2D) {
@@ -527,7 +550,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   const seg = timeSegment(new Date(game.scheduled_at));
 
-  y += 12;
+  y += 10;
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
   ctx.font = "700 24px 'Space Grotesk', system-ui, sans-serif";
@@ -535,18 +558,17 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   y += 44;
 
   ctx.fillStyle = GOLD;
-  ctx.font = "700 52px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "800 54px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 60;
+    y += 64;
   }
   y += 8;
 
-  ctx.fillStyle = CYAN;
-  ctx.font = "600 26px 'JetBrains Mono', ui-monospace, monospace";
-  ctx.fillText(`${fmtDateTime(game.scheduled_at)}  ·  ${game.total_tickets} TICKETS ONLY`, W / 2, y);
-  y += 40;
+  const dateText = `${fmtDateTime(game.scheduled_at)}   ·   ${game.total_tickets} TICKETS ONLY`;
+  y = paintDateTimeBadge(ctx, dateText, y);
+  y += 28;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -555,7 +577,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
     amount: inr(p.prize_amount),
   }));
 
-  const rowHeight = rows.length > 6 ? 64 : rows.length > 4 ? 70 : 74;
+  const rowHeight = rows.length > 6 ? 66 : rows.length > 4 ? 72 : 78;
 
   const cardBottom = paintPrizeCard(ctx, {
     top: y,
@@ -595,7 +617,7 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
-  y += 12;
+  y += 10;
   drawIcon(ctx, "trophy", W / 2 - 150, y - 12, 34, GOLD);
   drawIcon(ctx, "trophy", W / 2 + 150, y - 12, 34, GOLD);
   ctx.textAlign = "center";
@@ -605,22 +627,20 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   y += 48;
 
   ctx.fillStyle = WHITE;
-  ctx.font = "700 52px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "800 54px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 60;
+    y += 64;
   }
   y += 8;
 
   const gameDateStr = fmtDateTime(game.scheduled_at ?? game.completed_at);
   if (gameDateStr) {
-    ctx.fillStyle = CYAN;
-    ctx.font = "600 24px 'JetBrains Mono', ui-monospace, monospace";
-    ctx.fillText(gameDateStr, W / 2, y);
-    y += 38;
+    y = paintDateTimeBadge(ctx, gameDateStr, y);
+    y += 26;
   } else {
-    y += 10;
+    y += 14;
   }
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
@@ -657,7 +677,7 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   ctx.fillText("Congratulations to all our winners! 🎉", W / 2, congratsY);
 
   ctx.fillStyle = DIM;
-  ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
+  ctx.font = "italic 500 26px 'DM Sans', system-ui, sans-serif";
   ctx.fillText("Ready for more? Book your next game today!", W / 2, subtextY);
 
   paintFooter(ctx);
