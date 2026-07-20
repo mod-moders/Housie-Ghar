@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { Icon } from "@/components/Icon";
+import { getRankedVoices } from "@/lib/voiceUtils";
 
 interface NumberCallConfig {
   number: number;
@@ -490,10 +491,19 @@ export function CallVoiceSettings() {
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
     let voice = voices.find(v => v.name === voiceName);
+    if (!voice && voiceName) {
+      const cleanSearch = voiceName.replace(/undefined/gi, "").trim();
+      if (cleanSearch) {
+        voice = voices.find(v => v.name.includes(cleanSearch) || cleanSearch.includes(v.name));
+      }
+    }
     if (!voice) {
-      voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));
+      const ranked = getRankedVoices(voices);
+      if (ranked.length > 0) voice = ranked[0].rawVoice;
     }
     if (voice) utterance.voice = voice;
+    utterance.pitch = 1.0;
+    utterance.rate = 0.95;
 
     utterance.onend = () => {
       setActivePreviewKey(null);
@@ -663,28 +673,21 @@ export function CallVoiceSettings() {
     const updateVoices = () => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
       const all = window.speechSynthesis.getVoices();
-      // Filter primarily English and Hindi
-      const filtered = all.filter((v) => v.lang.startsWith("en") || v.lang.startsWith("hi"));
-      setVoices(filtered.length > 0 ? filtered : all);
+      setVoices(all);
 
+      const ranked = getRankedVoices(all);
+      const bestDefault = ranked.find((v) => v.isNeural) || ranked[0];
       const stored = localStorage.getItem("preferred_caller_voice");
-      const defaultVoice = all.find(
-        (v) =>
-          v.name.includes("Google") ||
-          v.name.includes("Natural") ||
-          v.name.includes("Neural") ||
-          v.default
-      );
-      
+
       if (stored) {
         setSelectedVoiceName(stored);
-      } else if (defaultVoice) {
-        setSelectedVoiceName(defaultVoice.name);
-        localStorage.setItem("preferred_caller_voice", defaultVoice.name);
+      } else if (bestDefault) {
+        setSelectedVoiceName(bestDefault.name);
+        localStorage.setItem("preferred_caller_voice", bestDefault.name);
       }
 
-      if (!config?.tts_voice_name && defaultVoice) {
-        setTtsVoiceName(defaultVoice.name);
+      if (!config?.tts_voice_name && bestDefault) {
+        setTtsVoiceName(bestDefault.name);
       }
     };
 
@@ -1034,14 +1037,11 @@ export function CallVoiceSettings() {
                     marginTop: "4px"
                   }}
                 >
-                  {voices.map((v) => {
-                    const isPremium = v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Neural");
-                    return (
-                      <option key={v.name} value={v.name} style={{ backgroundColor: "var(--surface)", color: "var(--text)" }}>
-                        {v.name} ({v.lang}){isPremium ? " ✨ Premium" : ""}
-                      </option>
-                    );
-                  })}
+                  {getRankedVoices(voices).map((fv) => (
+                    <option key={fv.name} value={fv.name} style={{ backgroundColor: "var(--surface)", color: "var(--text)" }}>
+                      {fv.cleanName} ({fv.lang}){fv.badge ? ` ${fv.badge}` : ""}
+                    </option>
+                  ))}
                 </select>
               )}
             </div>

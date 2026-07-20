@@ -396,15 +396,23 @@ export function useGameAudio(
         const voices = window.speechSynthesis.getVoices();
         const preferredName = forcedVoiceName || platformConfig?.tts_voice_name || (typeof window !== "undefined" ? localStorage.getItem("preferred_caller_voice") : null);
         let voice = voices.find(v => v.name === preferredName);
+        if (!voice && preferredName) {
+          const cleanSearch = preferredName.replace(/undefined/gi, "").trim();
+          if (cleanSearch) {
+            voice = voices.find(v => v.name.includes(cleanSearch) || cleanSearch.includes(v.name));
+          }
+        }
         if (!voice) {
-          voice = voices.find(v => v.lang.includes("en-GB") || v.lang.includes("en-US"));
+          voice = voices.find(v => (v.name.includes("Natural") || v.name.includes("Neural") || v.name.includes("Google")) && (v.lang.startsWith("en") || v.lang.startsWith("hi"))) ||
+                  voices.find(v => v.lang.includes("en-IN") || v.lang.includes("en-GB") || v.lang.includes("en-US")) ||
+                  voices[0];
         }
         if (voice) {
           utterance.voice = voice;
         }
 
         utterance.pitch = 1.0; 
-        utterance.rate = 0.9;
+        utterance.rate = 0.95;
 
         utterance.onend = () => resolve();
         utterance.onerror = () => resolve();
