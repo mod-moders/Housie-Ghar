@@ -1248,19 +1248,13 @@ export function CallVoiceSettings() {
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", borderLeft: "1px solid var(--border-2)", paddingLeft: "6px" }}>
                       <button 
                         onClick={() => {
-                          if (bgMusicVolume > 0) {
-                            setBgMusicVolume(0);
-                            handleSaveConfig({ background_music_volume: "0" });
-                            if (audioPlayerRef.current && activePreviewKey === "bg") {
-                              audioPlayerRef.current.volume = 0;
-                            }
-                          } else {
-                            setBgMusicVolume(0.15);
-                            handleSaveConfig({ background_music_volume: "0.15" });
-                            if (audioPlayerRef.current && activePreviewKey === "bg") {
-                              audioPlayerRef.current.volume = 0.15;
-                            }
+                          const nextVal = bgMusicVolume > 0 ? 0 : 0.15;
+                          setBgMusicVolume(nextVal);
+                          updateConfigLocally({ background_music_volume: String(nextVal) });
+                          if (audioPlayerRef.current && activePreviewKey === "bg") {
+                            audioPlayerRef.current.volume = nextVal;
                           }
+                          handleSaveConfig({ background_music_volume: String(nextVal) });
                         }}
                         style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: 2, display: "flex", alignItems: "center" }}
                       >
@@ -1275,10 +1269,14 @@ export function CallVoiceSettings() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value);
                           setBgMusicVolume(val);
-                          handleSaveConfig({ background_music_volume: String(val) });
+                          updateConfigLocally({ background_music_volume: String(val) });
                           if (audioPlayerRef.current && activePreviewKey === "bg") {
                             audioPlayerRef.current.volume = val;
                           }
+                          if (masterVolumeSaveTimeoutRef.current) clearTimeout(masterVolumeSaveTimeoutRef.current);
+                          masterVolumeSaveTimeoutRef.current = setTimeout(() => {
+                            handleSaveConfig({ background_music_volume: String(val) });
+                          }, 350);
                         }}
                         style={{ 
                           width: "50px", 

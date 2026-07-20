@@ -89,7 +89,15 @@ export function useGameAudio(
     }
   });
 
-  // Handle Gameplay Background Music Playback (responding to isMuted dynamically)
+  // Smoothly update gameplay background music volume in realtime without restarting or stopping the track
+  useEffect(() => {
+    if (bgMusicRef.current) {
+      const bgVol = parseFloat(platformConfig?.background_music_volume || "0.15");
+      bgMusicRef.current.volume = bgVol;
+    }
+  }, [platformConfig?.background_music_volume]);
+
+  // Handle Gameplay Background Music Playback Lifecycle
   useEffect(() => {
     const bgConfigEnabled = platformConfig?.background_music_enabled === "true";
     const bgEnabled = gameBgMusicEnabled !== undefined ? gameBgMusicEnabled : bgConfigEnabled;
@@ -139,7 +147,7 @@ export function useGameAudio(
         bgMusicRef.current = null;
       }
     };
-  }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, platformConfig?.background_music_volume, isMuted, gameBgMusicEnabled]);
+  }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, isMuted, gameBgMusicEnabled]);
 
   // Handle dynamic muting/unmuting of active audio tracks & speech synthesis
   useEffect(() => {
