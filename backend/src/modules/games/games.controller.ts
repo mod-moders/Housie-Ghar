@@ -1337,6 +1337,11 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
 
     const game = gameRes.rows[0];
 
+    if (game.game_status !== 'Completed' && game.game_status !== 'Draw_Ended') {
+      res.status(400).json({ message: 'Game is not completed/ended yet' });
+      return;
+    }
+
     // Fetch all claimed prizes for this game where the player is a winner and player_claimed is FALSE
     const prizesRes = await pool.query(
       `SELECT p.prize_id, p.pattern_name, p.claimed, p.winner_housie_name, p.amount_per_winner, p.prize_amount, p.split_count,
