@@ -147,9 +147,18 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
       }
     }
 
-    // Convert map to array and sort by wins DESC, total_won DESC
+    // Convert map to array with rating_score and sort by rating_score DESC, wins DESC, total_won DESC
     const leaderboard = Array.from(playerMap.values())
-      .sort((a, b) => b.wins - a.wins || b.total_won - a.total_won)
+      .map((p) => {
+        const avgPayout = p.wins > 0 ? p.total_won / p.wins : 0;
+        const ratingScore = (p.wins * 1000) + Math.round(p.total_won) + Math.round(p.biggest_win * 0.5) + Math.round(avgPayout * 2);
+        return {
+          ...p,
+          avg_payout: Math.round(avgPayout),
+          rating_score: ratingScore,
+        };
+      })
+      .sort((a, b) => b.rating_score - a.rating_score || b.wins - a.wins || b.total_won - a.total_won)
       .slice(0, 50);
 
     res.json(leaderboard);

@@ -8,7 +8,6 @@ import { Icon } from "@/components/Icon";
 import { Footer } from "@/components/ui";
 import type { HallOfFameEntry } from "@/lib/types";
 
-type SortTab = "wins" | "earnings" | "biggestWin";
 type Timeframe = "all-time" | "monthly" | "weekly" | "daily";
 
 const HIGH_ROLLER_THRESHOLD = 10000;
@@ -30,7 +29,6 @@ function getPlayerInsight(entry: HallOfFameEntry) {
 export default function Leaderboard() {
   const [entries, setEntries] = useState<HallOfFameEntry[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<SortTab>("wins");
   const [timeframe, setTimeframe] = useState<Timeframe>("all-time");
   const [expandedName, setExpandedName] = useState<string | null>(null);
   const [loggedInName, setLoggedInName] = useState<string | null>(null);
@@ -80,30 +78,37 @@ export default function Leaderboard() {
     };
   }, [entries]);
 
-  // Filter and sort the list of entries dynamically
+  // Filter and sort the list of entries by unified Performance Rating Score
   const processedEntries = useMemo(() => {
     if (!entries) return [];
     
-    // 1. Filter by query
-    const list = entries.filter((e) =>
+    // 1. Calculate Rating Score for each entry if not set by API
+    const scoredList = entries.map((e) => {
+      const avgPayout = e.wins > 0 ? e.total_won / e.wins : 0;
+      const calcRating = e.rating_score !== undefined
+        ? e.rating_score
+        : (e.wins * 1000) + Math.round(e.total_won) + Math.round(e.biggest_win * 0.5) + Math.round(avgPayout * 2);
+      return {
+        ...e,
+        computedRating: calcRating,
+        avgPayoutVal: Math.round(avgPayout),
+      };
+    });
+
+    // 2. Filter by query
+    const filtered = scoredList.filter((e) =>
       e.housie_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
     );
 
-    // 2. Sort by active tab (Default is "wins")
-    if (activeTab === "wins") {
-      list.sort((a, b) => b.wins - a.wins || b.total_won - a.total_won);
-    } else if (activeTab === "earnings") {
-      list.sort((a, b) => b.total_won - a.total_won || b.wins - a.wins);
-    } else if (activeTab === "biggestWin") {
-      list.sort((a, b) => b.biggest_win - a.biggest_win || b.wins - a.wins);
-    }
+    // 3. Sort strictly by Performance Rating DESC -> Wins DESC -> Earnings DESC
+    filtered.sort((a, b) => b.computedRating - a.computedRating || b.wins - a.wins || b.total_won - a.total_won);
 
-    return list;
-  }, [entries, searchQuery, activeTab]);
+    return filtered;
+  }, [entries, searchQuery]);
 
   /* ── Shared container width ── */
   const containerStyle: React.CSSProperties = {
-    maxWidth: 940, width: "100%", margin: "0 auto", padding: "0 20px",
+    maxWidth: 960, width: "100%", margin: "0 auto", padding: "0 16px",
   };
 
   return (
@@ -114,7 +119,9 @@ export default function Leaderboard() {
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
           <div>
             <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame</h1>
-            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>Check top-ranked individual player accounts, Master titles (Gold, Silver, Bronze & Diamond Master), and total wins.</p>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>
+              Official Master rankings evaluated by player performance ratings across total wins, earnings, and payouts.
+            </p>
           </div>
         </div>
 
@@ -140,17 +147,17 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* ── Filters & Controls Section ── */}
+        {/* ── Search & Filter Control Ribbon (Optimized for Mobile & Desktop) ── */}
         <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 12, paddingBottom: 20 }}>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", width: "100%" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", width: "100%", alignItems: "center" }}>
             {/* Search Input Box */}
             <div style={{
-              flex: "3 1 280px",
+              flex: "3 1 240px",
               display: "flex", background: "var(--surface)",
               border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)",
-              padding: "8px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
+              padding: "10px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
             }}>
-              <Icon name="search" size={14} style={{ color: "var(--text-dim)", marginRight: 10 }} />
+              <Icon name="search" size={15} style={{ color: "var(--text-dim)", marginRight: 10, flexShrink: 0 }} />
               <input
                 type="text"
                 value={searchQuery}
@@ -170,9 +177,9 @@ export default function Leaderboard() {
               flex: "1 1 180px",
               display: "flex", background: "var(--surface)",
               border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)",
-              padding: "8px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
+              padding: "10px 14px", alignItems: "center", boxShadow: "var(--card-shadow-sm)",
             }}>
-              <Icon name="clock" size={14} style={{ color: "var(--text-dim)", marginRight: 8 }} />
+              <Icon name="clock" size={14} style={{ color: "var(--text-dim)", marginRight: 8, flexShrink: 0 }} />
               <select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value as Timeframe)}
@@ -186,41 +193,19 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          {/* Sort Segmented tabs bar */}
+          {/* Master Performance Rating System Explanation Ribbon */}
           <div style={{
-            display: "flex", background: "var(--surface-2)",
-            padding: 4, borderRadius: "var(--radius)",
-            border: "1.5px solid var(--border-2)",
-            boxShadow: "var(--card-shadow-sm)",
-            width: "100%", gap: 4
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+            background: "rgba(244, 201, 93, 0.06)", border: "1px solid rgba(244, 201, 93, 0.2)",
+            borderRadius: "var(--radius)", padding: "10px 14px", fontSize: 12, color: "var(--text-dim)"
           }}>
-            {(["wins", "earnings", "biggestWin"] as SortTab[]).map((tab) => {
-              const isActive = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px", borderRadius: "calc(var(--radius) - 2px)",
-                    border: "none",
-                    background: isActive ? "var(--surface)" : "transparent",
-                    color: isActive ? "var(--accent)" : "var(--text-dim)",
-                    fontSize: 11.5, fontWeight: isActive ? 700 : 600, textTransform: "uppercase", letterSpacing: ".04em",
-                    cursor: "pointer", 
-                    boxShadow: isActive ? "var(--card-shadow-sm)" : "none",
-                    transition: "all 0.2s ease", whiteSpace: "nowrap",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6
-                  }}
-                >
-                  <Icon name={tab === "wins" ? "trophy" : tab === "earnings" ? "wallet" : "flame"} size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
-                  {tab === "wins" ? "Most Wins" : tab === "earnings" ? "Total Earnings" : "Biggest Win"}
-                </button>
-              );
-            })}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 14 }}>⚡</span>
+              <strong style={{ color: "var(--accent)", fontWeight: 700 }}>Unified Master Performance Rating</strong>
+            </div>
+            <span style={{ fontSize: 11.5, opacity: 0.9 }}>
+              Rating = (Wins × 1,000) + Total Winnings (₹) + Best Win & Avg Payout Bonuses
+            </span>
           </div>
         </div>
 
@@ -228,18 +213,17 @@ export default function Leaderboard() {
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
             <span className="hg-poll-spin" style={{ display: "inline-block", width: "24px", height: "24px", border: "2px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            <p style={{ marginTop: "12px", fontSize: "14px" }}>Loading leaderboard statistics…</p>
+            <p style={{ marginTop: "12px", fontSize: "14px" }}>Loading Master statistics…</p>
           </div>
         ) : processedEntries.length > 0 ? (
           <div className="hg-leaderboard" style={{ marginTop: 4 }}>
             {processedEntries.map((w, i) => {
               const rank = i + 1;
-              const avgPayout = w.wins > 0 ? w.total_won / w.wins : 0;
+              const avgPayout = w.avgPayoutVal || (w.wins > 0 ? Math.round(w.total_won / w.wins) : 0);
               const isCurrentUser = loggedInName && w.housie_name.toLowerCase().trim() === loggedInName.toLowerCase().trim();
               const isExpanded = expandedName === w.housie_name;
               const insight = getPlayerInsight(w);
               const isHighRoller = w.total_won > HIGH_ROLLER_THRESHOLD;
-              const rankGap = rank > 1 ? processedEntries[i - 1].total_won - w.total_won : 0;
 
               // Master Title Determination
               const isMaxWins = insights && w.wins === insights.maxWinsOverall && insights.maxWinsOverall > 0;
@@ -258,41 +242,54 @@ export default function Leaderboard() {
               }
 
               return (
-                <div key={w.housie_name}>
+                <div key={w.housie_name} style={{ marginBottom: 10 }}>
+                  {/* Card Main Row */}
                   <div
                     className={`hg-lb-row hg-lb-row-${rank}`}
                     onClick={() => setExpandedName(isExpanded ? null : w.housie_name)}
                     style={{
                       cursor: "pointer",
+                      padding: "14px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      flexWrap: "wrap",
+                      background: isCurrentUser ? "rgba(244, 201, 93, 0.05)" : "var(--surface)",
                       border: isDiamondMaster
-                        ? "2px solid #38bdf8 !important"
+                        ? "2px solid #38bdf8"
                         : rank === 1
-                        ? "2px solid var(--accent) !important"
+                        ? "2px solid var(--accent)"
                         : isCurrentUser
-                        ? "2px solid var(--cyan) !important"
-                        : "",
+                        ? "2px solid var(--accent)"
+                        : "1.5px solid var(--card-line)",
+                      borderRadius: "var(--radius)",
                       boxShadow: isDiamondMaster
-                        ? "0 0 20px rgba(56, 189, 248, 0.35), var(--card-shadow) !important"
+                        ? "0 0 20px rgba(56, 189, 248, 0.25)"
                         : isCurrentUser
-                        ? "0 0 15px var(--accent-soft), var(--card-shadow) !important"
-                        : "",
-                      transform: isCurrentUser ? "scale(1.01)" : ""
+                        ? "0 0 15px var(--accent-soft)"
+                        : "var(--card-shadow-sm)",
+                      transition: "transform 0.2s, box-shadow 0.2s",
                     }}
                     title={isCurrentUser ? "Your Account (Click to expand)" : "Click to expand"}
                   >
-                    <span className="hg-lb-rank">
+                    {/* Rank Badge */}
+                    <span className="hg-lb-rank" style={{ minWidth: 32, textAlign: "center", fontSize: 20, fontWeight: 800 }}>
                       {isDiamondMaster ? "💎" : rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
                     </span>
-                    <span style={{ position: "relative", display: "inline-flex" }}>
-                      <span className="hg-lb-avatar">{w.housie_name[0]?.toUpperCase()}</span>
+
+                    {/* Avatar */}
+                    <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+                      <span className="hg-lb-avatar" style={{ width: 42, height: 42, fontSize: 18, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--surface-2)", color: "var(--text)", border: "1.5px solid var(--border-2)" }}>
+                        {w.housie_name[0]?.toUpperCase()}
+                      </span>
                       {isHighRoller && (
                         <span
                           title="High Roller — over ₹10k earned"
                           style={{
-                            position: "absolute", bottom: -3, right: -3,
-                            width: 17, height: 17, borderRadius: "50%",
+                            position: "absolute", bottom: -2, right: -2,
+                            width: 18, height: 18, borderRadius: "50%",
                             background: "linear-gradient(135deg, #ffd700, #ff8c00)",
-                            display: "grid", placeItems: "center", fontSize: 9,
+                            display: "grid", placeItems: "center", fontSize: 9.5,
                             border: "2px solid var(--surface)",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
                           }}
@@ -301,18 +298,22 @@ export default function Leaderboard() {
                         </span>
                       )}
                     </span>
-                    <div className="hg-lb-info">
-                      <strong style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "15.5px", fontWeight: 800 }}>{w.housie_name}</span>
 
-                        {/* Master Rank Badge */}
+                    {/* Main Info */}
+                    <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {w.housie_name}
+                        </strong>
+
+                        {/* Master Rank Pill */}
                         {masterTitle && (
                           <span
                             className="hg-pill"
                             style={{
-                              fontSize: "11px",
+                              fontSize: 11,
                               fontWeight: 800,
-                              padding: "2px 9px",
+                              padding: "2px 8px",
                               borderRadius: "6px",
                               background: isDiamondMaster
                                 ? "linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(244, 201, 93, 0.25))"
@@ -337,10 +338,10 @@ export default function Leaderboard() {
                                   ? "#94a3b8"
                                   : "#d97706"
                               }`,
-                              boxShadow: isDiamondMaster ? "0 0 12px rgba(56, 189, 248, 0.4)" : "none",
+                              boxShadow: isDiamondMaster ? "0 0 10px rgba(56, 189, 248, 0.35)" : "none",
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: "4px"
+                              gap: 4
                             }}
                           >
                             {isDiamondMaster ? "💎 Diamond Master" : rank === 1 ? "🥇 Gold Master" : rank === 2 ? "🥈 Silver Master" : "🥉 Bronze Master"}
@@ -348,64 +349,57 @@ export default function Leaderboard() {
                         )}
 
                         {isCurrentUser && (
-                          <span style={{ fontSize: "9px", background: "var(--accent)", color: "#000", fontWeight: 800, padding: "1px 6px", borderRadius: "999px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>
-                        )}
-                      </strong>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "12px" }}>
-                          <span>Total Won: <b style={{ color: "var(--accent)" }}>{money(w.total_won)}</b></span>
-                          <span>Wins: <b>{w.wins}</b></span>
-                        </span>
-                        <span style={{ fontSize: "11px", color: "var(--text-mute)" }}>
-                          Avg payout/win: <b>{money(avgPayout)}</b> · Best win: <b>{money(w.biggest_win)}</b>
-                        </span>
-                        {rank > 1 && activeTab === "earnings" && rankGap > 0 && (
-                          <span style={{ fontSize: "10px", color: "var(--text-dim)", opacity: 0.85 }}>
-                            {money(rankGap)} to Rank {rank - 1}
+                          <span style={{ fontSize: 9, background: "var(--accent)", color: "#000", fontWeight: 800, padding: "2px 7px", borderRadius: "999px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            You
                           </span>
                         )}
                       </div>
+
+                      {/* Stat summary line */}
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4, fontSize: 12.5, color: "var(--text-dim)" }}>
+                        <span>Wins: <b style={{ color: "var(--text)" }}>{w.wins}</b></span>
+                        <span>Total Won: <b style={{ color: "var(--accent)" }}>{money(w.total_won)}</b></span>
+                        <span>Best Win: <b>{money(w.biggest_win)}</b></span>
+                        <span>Avg/Win: <b>{money(avgPayout)}</b></span>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                      <span className="hg-lb-wins">
-                        {activeTab === "earnings" ? money(w.total_won) : activeTab === "biggestWin" ? money(w.biggest_win) : `${w.wins}`}
-                        <i>{activeTab === "earnings" ? "won" : activeTab === "biggestWin" ? "best win" : "wins"}</i>
-                      </span>
+
+                    {/* Master Rating Score & Expand Indicator */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
+                      <div style={{
+                        display: "flex", flexDirection: "column", alignItems: "flex-end",
+                        background: "rgba(244, 201, 93, 0.08)", border: "1px solid rgba(244, 201, 93, 0.25)",
+                        padding: "4px 10px", borderRadius: "8px", textAlign: "right"
+                      }}>
+                        <span style={{ fontSize: 14, fontWeight: 900, color: "var(--accent)", fontFamily: "var(--font-head)" }}>
+                          ⚡ {w.computedRating.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: 9, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 700 }}>
+                          Rating PTS
+                        </span>
+                      </div>
+
                       {insight.currentStreak >= 3 && (
                         <span
                           title={`${insight.currentStreak}-game win streak`}
                           style={{
-                            display: "flex", alignItems: "center", gap: 4,
+                            display: "inline-flex", alignItems: "center", gap: 3,
                             background: "var(--surface-2)", border: "1px solid var(--border-2)",
-                            borderRadius: 999, padding: "2px 8px",
+                            borderRadius: 999, padding: "1px 7px", marginTop: 2
                           }}
                         >
-                          <Icon name="flame" size={13} style={{ color: "#ff8c00" }} />
-                          <span
-                            style={{
-                              fontSize: 13, fontWeight: 800, lineHeight: 1,
-                              background: "linear-gradient(90deg, #ffd700, #ff7a00)",
-                              WebkitBackgroundClip: "text", backgroundClip: "text",
-                              WebkitTextFillColor: "transparent", color: "transparent",
-                            }}
-                          >
-                            {insight.currentStreak}
-                          </span>
+                          <Icon name="flame" size={12} style={{ color: "#ff8c00" }} />
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "#ff7a00" }}>{insight.currentStreak} streak</span>
                         </span>
                       )}
-                      <span
-                        style={{
-                          fontSize: 11, color: "var(--text-dim)",
-                          transform: isExpanded ? "rotate(180deg)" : "none",
-                          transition: "transform 0.25s ease",
-                        }}
-                      >
+
+                      <span style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2, transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }}>
                         ▾
                       </span>
                     </div>
                   </div>
 
-                  {/* ── Expandable secondary metrics panel ── */}
+                  {/* ── Expandable Rating Breakdown Panel ── */}
                   <div
                     style={{
                       display: "grid",
@@ -423,17 +417,19 @@ export default function Leaderboard() {
                         }}
                       >
                         {[
-                          { label: "Master Rank", value: masterTitle || "Master Player" },
-                          { label: "Total Wins", value: w.wins },
-                          { label: "Total Winnings", value: money(w.total_won) },
-                          { label: "Biggest Single Win", value: money(w.biggest_win) },
-                          { label: "Avg Payout / Win", value: money(avgPayout) },
+                          { label: "Master Rating", value: `⚡ ${w.computedRating.toLocaleString()} PTS` },
+                          { label: "Total Wins Score", value: `+${(w.wins * 1000).toLocaleString()} PTS` },
+                          { label: "Winnings Score", value: `+${Math.round(w.total_won).toLocaleString()} PTS` },
+                          { label: "Best Win Bonus", value: `+${Math.round(w.biggest_win * 0.5).toLocaleString()} PTS` },
+                          { label: "Avg Payout Bonus", value: `+${Math.round(avgPayout * 2).toLocaleString()} PTS` },
                         ].map((m) => (
                           <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                             <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
                               {m.label}
                             </span>
-                            <strong style={{ fontSize: 13, color: "var(--text)" }}>{m.value}</strong>
+                            <strong style={{ fontSize: 13, color: m.label.includes("Bonus") || m.label.includes("Score") ? "var(--accent)" : "var(--text)" }}>
+                              {m.value}
+                            </strong>
                           </div>
                         ))}
                       </div>

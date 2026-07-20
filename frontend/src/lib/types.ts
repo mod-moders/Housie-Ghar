@@ -97,6 +97,8 @@ export interface HallOfFameEntry {
   wins: number;
   total_won: number;
   biggest_win: number;
+  rating_score?: number;
+  avg_payout?: number;
   points?: number;
   games_played?: number;
   tickets_bought?: number;
