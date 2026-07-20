@@ -1920,6 +1920,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   max-height:min(58dvh,calc(100dvh - var(--hg-live-top-h,60px) - 16px));overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;
+  border-bottom:1.5px solid var(--card-line);
 }
 .hg-live-sticky::-webkit-scrollbar{width:5px}
 .hg-live-sticky::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
