@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { money } from "@/lib/money";
+import { money, moneyStr } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { EmptyHint, Avatar } from "@/components/ui";
 import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
@@ -548,17 +548,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               gap: "8px"
             }}
           >
-            ⚡ Recharge Requests
-            <span style={{
-              background: activeRecharges.length > 0 ? "var(--cyan)" : "var(--surface-2)",
-              color: activeRecharges.length > 0 ? "#000" : "var(--text-dim)",
-              fontSize: "11px",
-              fontWeight: 800,
-              padding: "2px 8px",
-              borderRadius: "10px"
-            }}>
-              {activeRecharges.length}
-            </span>
+            ⚡ Recharge Requests ({activeRecharges.length})
           </button>
 
           {/* 2. Claim Requests Tab */}
@@ -581,88 +571,9 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               gap: "8px"
             }}
           >
-            🏆 Claim Requests
-            <span style={{
-              background: activeClaims.length > 0 ? "var(--accent)" : "var(--surface-2)",
-              color: activeClaims.length > 0 ? "#000" : "var(--text-dim)",
-              fontSize: "11px",
-              fontWeight: 800,
-              padding: "2px 8px",
-              borderRadius: "10px"
-            }}>
-              {activeClaims.length}
-            </span>
+            🏆 Claim Requests ({activeClaims.length})
           </button>
         </div>
-
-        {/* Sub-filter Subtab toggles */}
-        {activeTab === "requests" ? (
-          <div style={{ display: "flex", gap: "6px", background: "var(--surface-2)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-            <button
-              onClick={() => setRechargeSubTab("active")}
-              style={{
-                background: rechargeSubTab === "active" ? "var(--surface)" : "transparent",
-                color: rechargeSubTab === "active" ? "var(--cyan)" : "var(--text-dim)",
-                border: "none",
-                borderRadius: "6px",
-                padding: "6px 12px",
-                fontSize: "11.5px",
-                fontWeight: 700,
-                cursor: "pointer"
-              }}
-            >
-              Active ({activeRecharges.length})
-            </button>
-            <button
-              onClick={() => setRechargeSubTab("history")}
-              style={{
-                background: rechargeSubTab === "history" ? "var(--surface)" : "transparent",
-                color: rechargeSubTab === "history" ? "var(--text)" : "var(--text-dim)",
-                border: "none",
-                borderRadius: "6px",
-                padding: "6px 12px",
-                fontSize: "11.5px",
-                fontWeight: 700,
-                cursor: "pointer"
-              }}
-            >
-              History ({historyRecharges.length})
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: "6px", background: "var(--surface-2)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-            <button
-              onClick={() => setClaimSubTab("active")}
-              style={{
-                background: claimSubTab === "active" ? "var(--surface)" : "transparent",
-                color: claimSubTab === "active" ? "var(--accent)" : "var(--text-dim)",
-                border: "none",
-                borderRadius: "6px",
-                padding: "6px 12px",
-                fontSize: "11.5px",
-                fontWeight: 700,
-                cursor: "pointer"
-              }}
-            >
-              Active Claims ({activeClaims.length})
-            </button>
-            <button
-              onClick={() => setClaimSubTab("history")}
-              style={{
-                background: claimSubTab === "history" ? "var(--surface)" : "transparent",
-                color: claimSubTab === "history" ? "#22c55e" : "var(--text-dim)",
-                border: "none",
-                borderRadius: "6px",
-                padding: "6px 12px",
-                fontSize: "11.5px",
-                fontWeight: 700,
-                cursor: "pointer"
-              }}
-            >
-              Disbursed History ({historyClaims.length})
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ==========================================
@@ -672,88 +583,126 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
         <div style={{ display: "flex", gap: "18px", flex: 1, minHeight: 0, overflow: "hidden", flexWrap: "wrap" }}>
           {/* Left Column: Active / History Recharge List */}
           <div style={{ flex: "0 0 350px", maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--surface)", border: "1.5px solid var(--card-line)", borderRadius: "var(--radius)", padding: "16px", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid var(--border-light)" }}>
-              <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>
-                {rechargeSubTab === "active" ? "Active Recharge Requests" : "Recharge History"}
-              </h3>
-              <span className="hg-q-count" style={{ background: "var(--surface-2)", color: "var(--cyan)", fontWeight: 800, fontSize: "11px", padding: "2px 8px", borderRadius: "10px" }}>
-                {rechargeSubTab === "active" ? activeRecharges.length : historyRecharges.length}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", paddingBottom: "10px", borderBottom: "1px solid var(--border-light)" }}>
+              <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>Recharge Requests</h3>
+              <span className="hg-q-count" style={{ background: activeRecharges.length > 0 ? "var(--cyan)" : "var(--surface-2)", color: activeRecharges.length > 0 ? "#000" : "var(--text-dim)", fontWeight: 800, fontSize: "12px", padding: "2px 8px", borderRadius: "10px" }}>
+                {activeRecharges.length}
               </span>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
-              {(rechargeSubTab === "active" ? activeRecharges : historyRecharges).length === 0 ? (
-                <EmptyHint
-                  icon="check"
-                  title={rechargeSubTab === "active" ? "No Active Recharge Requests" : "No Past Recharge History"}
-                  sub={rechargeSubTab === "active" ? "Bookie wallet top-up requests will appear here immediately." : "Past approved or rejected recharges will show here."}
-                />
-              ) : (
-                (rechargeSubTab === "active" ? activeRecharges : historyRecharges).map((r) => {
-                  const isPending = (r.request_status || "Pending") === "Pending";
-                  const isApproved = r.request_status === "Approved";
-                  const isSelected = activeRecharge?.request_id === r.request_id;
-                  return (
-                    <button
-                      key={r.request_id}
-                      onClick={() => setSelId(r.request_id)}
-                      style={{
-                        width: "100%",
-                        padding: "12px 14px",
-                        background: isSelected ? "var(--surface-2)" : "transparent",
-                        border: isSelected ? "1.5px solid var(--cyan)" : "1px solid var(--border-light)",
-                        borderRadius: "12px",
-                        textAlign: "left",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        boxShadow: isSelected ? "0 4px 12px rgba(6,182,212,0.15)" : "none",
-                        opacity: isPending ? 1 : 0.85,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px"
-                      }}
-                    >
-                      {/* Top Row: Bookie Name + Recharge ID Badge */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                        <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {r.agent_name}
-                        </b>
-                        <span style={{
-                          background: isPending ? "rgba(6, 182, 212, 0.15)" : isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                          color: isPending ? "var(--cyan)" : isApproved ? "#22c55e" : "#ef4444",
-                          fontSize: "10px",
-                          fontWeight: 800,
-                          padding: "2px 7px",
-                          borderRadius: "5px",
-                          flexShrink: 0
-                        }}>
-                          {r.formatted_request_id}
-                        </span>
-                      </div>
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px", paddingRight: "4px" }}>
+              {/* SECTION 1: REQUESTS RECEIVED */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Requests Received ({activeRecharges.length})
+                  </span>
+                </div>
+                {activeRecharges.length === 0 ? (
+                  <EmptyHint icon="check" title="No Active Recharge Requests" sub="Bookie top-up requests will appear here instantly when submitted." />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {activeRecharges.map((r) => {
+                      const isSelected = activeRecharge?.request_id === r.request_id;
+                      return (
+                        <button
+                          key={r.request_id}
+                          onClick={() => setSelId(r.request_id)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            background: isSelected ? "var(--surface-2)" : "transparent",
+                            border: isSelected ? "1.5px solid var(--cyan)" : "1px solid var(--border-light)",
+                            borderRadius: "12px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            boxShadow: isSelected ? "0 4px 12px rgba(6,182,212,0.15)" : "none",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                            <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.agent_name}</b>
+                            <span style={{ background: "rgba(6, 182, 212, 0.15)", color: "var(--cyan)", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", flexShrink: 0 }}>
+                              {r.formatted_request_id}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <b style={{ color: "var(--cyan)", fontWeight: 800, fontSize: "19px" }}>{money(r.requested_amount)}</b>
+                            <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 600 }}>
+                              Payable: <strong style={{ color: "var(--accent)" }}>{money(r.payable_amount)}</strong>
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", paddingTop: "6px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "170px" }}>Ref: {r.payment_reference}</span>
+                            <span style={{ fontSize: "10px", color: "var(--text-mute)", flexShrink: 0 }}>{new Date(r.requested_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                      {/* Amounts Row: Requested Amount & Payable Amount */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <b style={{ color: "var(--cyan)", fontWeight: 800, fontSize: "19px" }}>
-                          {money(r.requested_amount)}
-                        </b>
-                        <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 600 }}>
-                          Payable: <strong style={{ color: "var(--accent)" }}>{money(r.payable_amount)}</strong>
-                        </span>
-                      </div>
-
-                      {/* Bottom Row: Reference & Date/Time */}
-                      <div style={{ fontSize: "11px", color: "var(--text-dim)", paddingTop: "6px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "170px" }}>
-                          Ref: {r.payment_reference}
-                        </span>
-                        <span style={{ fontSize: "10px", color: "var(--text-mute)", flexShrink: 0 }}>
-                          {new Date(r.requested_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
+              {/* SECTION 2: PAST HISTORY (2 DAYS) */}
+              <div style={{ paddingTop: "14px", borderTop: "1px dashed var(--border-light)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Icon name="clock" size={13} /> Past History (2 Days) ({historyRecharges.length})
+                  </span>
+                </div>
+                {historyRecharges.length === 0 ? (
+                  <EmptyHint icon="check" title="No History in 2 Days" sub="Approved or rejected recharges from the past 48 hours will show here." />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {historyRecharges.map((r) => {
+                      const isSelected = activeRecharge?.request_id === r.request_id;
+                      const isApproved = r.request_status === "Approved";
+                      return (
+                        <button
+                          key={r.request_id}
+                          onClick={() => setSelId(r.request_id)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            background: isSelected ? "var(--surface-2)" : "transparent",
+                            border: isSelected ? `1.5px solid ${isApproved ? "#22c55e" : "#ef4444"}` : "1px solid var(--border-light)",
+                            borderRadius: "12px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            opacity: 0.85,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                            <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.agent_name}</b>
+                            <span style={{ background: isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: isApproved ? "#22c55e" : "#ef4444", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", flexShrink: 0 }}>
+                              {isApproved ? "APPROVED" : "REJECTED"}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <b style={{ color: isApproved ? "#22c55e" : "#ef4444", fontWeight: 800, fontSize: "19px" }}>{money(r.requested_amount)}</b>
+                            <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 600 }}>
+                              Payable: {money(r.payable_amount)}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", paddingTop: "6px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "170px" }}>Ref: {r.payment_reference}</span>
+                            <span style={{ fontSize: "10px", color: "var(--text-mute)", flexShrink: 0 }}>
+                              {new Date(r.reviewed_at || r.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1035,7 +984,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                         }}
                       >
                         <Icon name="check" size={18} strokeWidth={2.6} />
-                        {disbursingKey === activeClaim.claim_key ? "Processing..." : `Confirm Disbursal (${money(activeClaim.total_amount)})`}
+                        {disbursingKey === activeClaim.claim_key ? "Processing..." : `Confirm Disbursal (${moneyStr(activeClaim.total_amount)})`}
                       </button>
 
                       {activeClaim.bookie_phone && (
