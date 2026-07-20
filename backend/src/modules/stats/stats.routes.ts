@@ -16,7 +16,7 @@ router.get('/overview', authenticateToken, requireRole(['Superadmin', 'Financial
 router.get('/financial-analysis', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getFinancialAnalysis);
 router.get('/finance-insights', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getFinanceInsights);
 router.get('/operator', authenticateToken, requireRole(['Operator', 'Superadmin', 'Financial Admin']), getOperatorStats);
-router.get('/bookie', authenticateToken, requireRole(['Bookie', 'Promoter', 'Superadmin', 'Financial Admin']), getBookieStats);
+router.get('/bookie', authenticateToken, requireRole(['Bookie', 'Superadmin', 'Financial Admin']), getBookieStats);
 router.get('/hall-of-fame', getHallOfFame);
 router.get('/lucky-number', getLuckyNumber);
 
