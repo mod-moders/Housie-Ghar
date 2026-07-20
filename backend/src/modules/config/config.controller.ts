@@ -350,22 +350,23 @@ export async function uploadConfigAudio(req: AuthenticatedRequest, res: Response
     // runtime. On boot, restorePersistedAudioFiles() re-writes any missing
     // file from this table back to disk before the server starts serving.
     const client = await pool.connect();
-    let result;
     try {
       await client.query('BEGIN');
-      result = await client.query(
-        `UPDATE Platform_Config
-         SET config_value = $1, updated_by = $2, updated_at = NOW()
-         WHERE config_key = $3
-         RETURNING *`,
+      // Upsert, not update-only: several allowedKeys above (e.g. welcome_voice_url_en,
+      // instruction_voice_url_ne, cage_sound_url, celebration_sound_url) have no row in
+      // Platform_Config until first uploaded here — migration 042 only backfilled the
+      // ONE language variant each of welcome/instruction_voice_url happened to already be
+      // (the other variant, and the never-seeded cage/celebration keys, were never
+      // inserted anywhere). An UPDATE-only query silently affected 0 rows for those and
+      // 404'd every time, permanently — the same class of bug already fixed for
+      // updateConfig()'s plain config saves.
+      await client.query(
+        `INSERT INTO Platform_Config (config_key, config_value, updated_by, updated_at)
+         VALUES ($3, $1, $2, NOW())
+         ON CONFLICT (config_key) DO UPDATE
+         SET config_value = EXCLUDED.config_value, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
         [audioUrl, actor.userId, key]
       );
-
-      if (result.rowCount === 0) {
-        await client.query('ROLLBACK');
-        res.status(404).json({ message: 'Config key not found' });
-        return;
-      }
 
       await client.query(
         `INSERT INTO Platform_Audio_Files (config_key, filename, mime_type, data, updated_at)

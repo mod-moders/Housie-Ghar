@@ -622,7 +622,7 @@ export function CallVoiceSettings() {
                       transition: "all 0.2s"
                     }}
                   >
-                    <span>🇬🇧 ENG (English MP3)</span>
+                    <span>🇬🇧 ENG</span>
                   </button>
 
                   <button
@@ -655,7 +655,7 @@ export function CallVoiceSettings() {
                       transition: "all 0.2s"
                     }}
                   >
-                    <span>🇳🇵 NEP (Nepali MP3)</span>
+                    <span>🇳🇵 NEP</span>
                   </button>
                 </div>
               </div>
@@ -748,28 +748,28 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <select
-                  value={config?.cage_sound_type || "steel_wooden"}
-                  onChange={(e) => handleSaveConfig({ cage_sound_type: e.target.value })}
-                  style={{
-                    flex: 1,
-                    minWidth: "160px",
-                    padding: "6px 10px",
-                    borderRadius: "999px",
-                    border: "1.5px solid var(--border-2)",
-                    background: "var(--surface)",
-                    color: "var(--text)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    outline: "none"
-                  }}
-                >
-                  <option value="steel_wooden">Steel Cage with Wooden Balls</option>
-                  <option value="steel_ceramic">Steel Cage with Ceramic Balls</option>
-                  <option value="golden_brass">Golden Brass Cage</option>
-                </select>
+              <select
+                value={config?.cage_sound_type || "steel_wooden"}
+                onChange={(e) => handleSaveConfig({ cage_sound_type: e.target.value })}
+                style={{
+                  width: "100%",
+                  marginTop: "4px",
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "1.5px solid var(--border-2)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  outline: "none"
+                }}
+              >
+                <option value="steel_wooden">Steel Cage with Wooden Balls</option>
+                <option value="steel_ceramic">Steel Cage with Ceramic Balls</option>
+                <option value="golden_brass">Golden Brass Cage</option>
+              </select>
 
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                 <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
                   <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("cage_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
                   <span>{uploadingVoiceKey === "cage_sound_url" ? "..." : cageSoundUrl ? "Replace" : "Upload MP3"}</span>
@@ -827,28 +827,28 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <select
-                  value={config?.winner_sound_type || "trumpet_cheering"}
-                  onChange={(e) => handleSaveConfig({ winner_sound_type: e.target.value })}
-                  style={{
-                    flex: 1,
-                    minWidth: "160px",
-                    padding: "6px 10px",
-                    borderRadius: "999px",
-                    border: "1.5px solid var(--border-2)",
-                    background: "var(--surface)",
-                    color: "var(--text)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    outline: "none"
-                  }}
-                >
-                  <option value="trumpet_cheering">Trumpet Fanfare with Cheering</option>
-                  <option value="cheering">Crowd Cheering</option>
-                  <option value="symphony_orchestra">Symphony Orchestra</option>
-                </select>
+              <select
+                value={config?.winner_sound_type || "trumpet_cheering"}
+                onChange={(e) => handleSaveConfig({ winner_sound_type: e.target.value })}
+                style={{
+                  width: "100%",
+                  marginTop: "4px",
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  border: "1.5px solid var(--border-2)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  outline: "none"
+                }}
+              >
+                <option value="trumpet_cheering">Trumpet Fanfare with Cheering</option>
+                <option value="cheering">Crowd Cheering</option>
+                <option value="symphony_orchestra">Symphony Orchestra</option>
+              </select>
 
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                 <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
                   <input type="file" accept="audio/*,.mp3,.wav,.m4a" onChange={(e) => handleConfigAudioUpload("celebration_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
                   <span>{uploadingVoiceKey === "celebration_sound_url" ? "..." : celebrationSoundUrl ? "Replace" : "Upload Fanfare MP3"}</span>
