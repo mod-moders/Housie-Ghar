@@ -566,58 +566,238 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
 /* ── winners poster ──────────────────────────────────────────────────── */
 
-async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummary, bgImage: HTMLImageElement | null) {
-  paintBackground(ctx, bgImage);
-  let y = await paintHeader(ctx);
+function parseWinnerInfo(winnerHousieName: string | null, winnerTicketNumber?: number | null): { names: string; tickets: string } {
+  if (!winnerHousieName) return { names: "—", tickets: "—" };
 
-  drawIcon(ctx, "trophy", W / 2 - 168, y - 16, 40, GOLD);
-  drawIcon(ctx, "trophy", W / 2 + 168, y - 16, 40, GOLD);
-  ctx.textAlign = "center";
-  ctx.fillStyle = GOLD;
-  ctx.font = "700 40px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("WINNERS", W / 2, y);
-  y += 54;
+  if (winnerHousieName.includes("(")) {
+    const parts = winnerHousieName.split(/\s*&\s*|\s*,\s*/);
+    const nameList: string[] = [];
+    const ticketList: string[] = [];
 
-  ctx.fillStyle = WHITE;
-  ctx.font = "700 56px 'Space Grotesk', system-ui, sans-serif";
-  const titleLines = wrapText(ctx, game.title, W - 160);
-  for (const line of titleLines) {
-    ctx.fillText(line, W / 2, y);
-    y += 64;
+    for (const part of parts) {
+      const match = part.match(/^(.*?)(?:\s*\(([^)]+)\))?$/);
+      if (match) {
+        const namePart = (match[1] || "").trim();
+        const ticketPart = (match[2] || "").trim();
+        if (namePart) nameList.push(namePart);
+        if (ticketPart) ticketList.push(ticketPart);
+      } else {
+        nameList.push(part.trim());
+      }
+    }
+
+    const names = nameList.join(" & ").toUpperCase();
+    const tickets = ticketList.join(" & ");
+    return { names: names || "—", tickets: tickets || "—" };
   }
-  y += 24;
 
-  const claimed = game.prize_pool.filter((p) => p.claimed);
-  const rows: PrizeRowSpec[] = claimed.map((p) => {
-    const name = p.winner_housie_name ?? "—";
-    const sub = name.includes("(") || !p.winner_ticket_number ? name : `${name} (${p.winner_ticket_number})`;
-    return {
-      kind: prizeIconKind(p.pattern_name),
-      color: p.pattern_name.toLowerCase().includes("full house") ? (MEDAL_COLOR[prizeIconKind(p.pattern_name)] ?? GOLD) : PINK,
-      label: p.pattern_name,
-      sub,
-      amount: inr(p.prize_amount),
-    };
-  });
+  const names = winnerHousieName.trim().toUpperCase();
+  const tickets = winnerTicketNumber ? String(winnerTicketNumber) : "—";
+  return { names, tickets };
+}
 
-  const cardBottom = paintPrizeCard(ctx, {
-    top: y,
-    heading: "WINNING TICKETS",
-    headingColor: GOLD,
-    rows,
-    rowHeight: 88,
-    emptyMessage: "No prizes were claimed this round.",
-  });
+function drawSparkleStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string = "#ffffff") {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const rOuter = size / 2;
+  const rInner = size * 0.15;
+  for (let i = 0; i < 8; i++) {
+    const r = i % 2 === 0 ? rOuter : rInner;
+    const a = (Math.PI / 4) * i;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
 
+function fmtWinnerDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+    const dayNum = d.getDate();
+    const monthName = d.toLocaleDateString("en-US", { month: "long" });
+    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${dayName} ${dayNum} ${monthName} - at ${time}`;
+  } catch {
+    return iso;
+  }
+}
+
+async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummary, bgImage: HTMLImageElement | null) {
+  // 1. Purple Background & Corner Accent Circles
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, "#734e9e");
+  bgGrad.addColorStop(0.5, "#633d8e");
+  bgGrad.addColorStop(1, "#502d7a");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Yellow corner circles
+  ctx.fillStyle = "#eab93c";
+  ctx.beginPath();
+  ctx.arc(0, 0, 200, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(W, H, 220, 0, Math.PI * 2);
+  ctx.fill();
+
+  // White sparkle stars
+  const sparkles: [number, number, number][] = [
+    [130, 210, 36], [970, 120, 48], [980, 240, 28],
+    [70, 820, 32], [1000, 720, 30], [980, 1020, 44], [60, 1180, 24]
+  ];
+  for (const [sx, sy, ss] of sparkles) {
+    drawSparkleStar(ctx, sx, sy, ss, "#ffffff");
+  }
+
+  // 2. Logo Header
+  const logo = await loadLogo();
+  const logoSize = 220;
+  const logoY = 40;
+  if (logo) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
+    ctx.restore();
+  }
+
+  let y = logoY + logoSize + 15;
+
+  // 3. "WINNERS" Header Text with 3D Shadow
   ctx.textAlign = "center";
-  ctx.fillStyle = PINK;
-  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("Congratulations to all our winners! 🎉", W / 2, cardBottom + 54);
+  ctx.font = "900 86px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillStyle = "#32155a";
+  ctx.fillText("WINNERS", W / 2 + 3, y + 5);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("WINNERS", W / 2, y);
+  y += 50;
 
-  ctx.fillStyle = DIM;
-  ctx.font = "italic 500 28px 'DM Sans', system-ui, sans-serif";
-  ctx.fillText("Ready for more? Book your next game today!", W / 2, cardBottom + 98);
+  // 4. Game Title Pill / Subheading
+  ctx.fillStyle = "#f4c95d";
+  ctx.font = "italic 800 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText(`●   ${game.title.toUpperCase()}   ●`, W / 2, y);
+  y += 42;
 
+  // 5. Date & Time Subtitle
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "italic 600 28px 'DM Sans', system-ui, sans-serif";
+  ctx.fillText(fmtWinnerDate(game.scheduled_at), W / 2, y);
+  y += 45;
+
+  // 6. 4-Column Table
+  const prizes = game.prize_pool;
+  const claimed = prizes.filter((p) => p.claimed);
+  const displayPrizes = claimed.length > 0 ? claimed : prizes;
+
+  const tableLeft = 60;
+  const tableWidth = W - 120; // 960px
+  const colW = [260, 190, 330, 180];
+  const colX = [
+    tableLeft,
+    tableLeft + colW[0],
+    tableLeft + colW[0] + colW[1],
+    tableLeft + colW[0] + colW[1] + colW[2]
+  ];
+
+  const headerH = 60;
+  const rowH = Math.min(68, Math.max(52, Math.floor((H - y - 140 - headerH) / Math.max(1, displayPrizes.length))));
+  const tableHeight = headerH + displayPrizes.length * rowH;
+
+  // Table Background (Warm Gold)
+  ctx.fillStyle = "#e8b83c";
+  roundRect(ctx, tableLeft, y, tableWidth, tableHeight, 14);
+  ctx.fill();
+
+  // Outer Border Line
+  ctx.strokeStyle = "#1e0c38";
+  ctx.lineWidth = 3.5;
+  roundRect(ctx, tableLeft, y, tableWidth, tableHeight, 14);
+  ctx.stroke();
+
+  // Header Row Content
+  ctx.fillStyle = "#48257d";
+  ctx.font = "900 21px 'Space Grotesk', system-ui, sans-serif";
+
+  // PRIZE LIST
+  ctx.textAlign = "left";
+  ctx.fillText("PRIZE LIST", colX[0] + 16, y + headerH / 2 + 7);
+
+  // AMOUNT
+  ctx.fillText("AMOUNT", colX[1] + 16, y + headerH / 2 + 7);
+
+  // HOUSIE NAME
+  ctx.fillText("HOUSIE NAME", colX[2] + 16, y + headerH / 2 + 7);
+
+  // TICKET NO.
+  ctx.textAlign = "center";
+  ctx.fillText("TICKET NO.", colX[3] + colW[3] / 2, y + headerH / 2 + 7);
+
+  // Horizontal line under Header
+  ctx.beginPath();
+  ctx.moveTo(tableLeft, y + headerH);
+  ctx.lineTo(tableLeft + tableWidth, y + headerH);
+  ctx.stroke();
+
+  // Vertical Column Dividers
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(colX[i], y);
+    ctx.lineTo(colX[i], y + tableHeight);
+    ctx.stroke();
+  }
+
+  // Draw Body Rows
+  displayPrizes.forEach((p, idx) => {
+    const rowY = y + headerH + idx * rowH;
+    const midY = rowY + rowH / 2 + 7;
+
+    const { names, tickets } = parseWinnerInfo(p.winner_housie_name, p.winner_ticket_number);
+
+    // 1. Prize Name (Bold Purple)
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#48257d";
+    ctx.font = "800 21px 'Space Grotesk', system-ui, sans-serif";
+    ctx.fillText(p.pattern_name.toUpperCase(), colX[0] + 16, midY);
+
+    // 2. Amount (Vibrant Blue/Cyan)
+    ctx.fillStyle = "#2067d6";
+    ctx.font = "800 21px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.fillText(inr(p.prize_amount), colX[1] + 16, midY);
+
+    // 3. Housie Name (Bold White)
+    ctx.fillStyle = "#ffffff";
+    let nameFontSize = 21;
+    ctx.font = `800 ${nameFontSize}px 'Space Grotesk', system-ui, sans-serif`;
+    while (ctx.measureText(names).width > colW[2] - 24 && nameFontSize > 13) {
+      nameFontSize -= 1;
+      ctx.font = `800 ${nameFontSize}px 'Space Grotesk', system-ui, sans-serif`;
+    }
+    ctx.fillText(names, colX[2] + 16, midY);
+
+    // 4. Ticket No. (Bold White, Centered)
+    ctx.textAlign = "center";
+    ctx.font = "800 21px 'Space Grotesk', system-ui, sans-serif";
+    ctx.fillText(tickets, colX[3] + colW[3] / 2, midY);
+
+    // Row divider line
+    if (idx < displayPrizes.length - 1) {
+      ctx.beginPath();
+      ctx.moveTo(tableLeft, rowY + rowH);
+      ctx.lineTo(tableLeft + tableWidth, rowY + rowH);
+      ctx.stroke();
+    }
+  });
+
+  // Footer text
   paintFooter(ctx);
 }
 
