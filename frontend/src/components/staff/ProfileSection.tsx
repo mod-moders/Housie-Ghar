@@ -146,19 +146,19 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
       <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
           
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ position: "relative" }}>
-              <div 
-                className="hg-avatar-sm" 
-                style={{ 
-                  width: "64px", 
-                  height: "64px", 
-                  fontSize: "24px", 
-                  borderRadius: "50%", 
-                  border: "2px solid var(--accent)", 
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", minWidth: 0 }}>
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div
+                className="hg-avatar-sm"
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  fontSize: "24px",
+                  borderRadius: "50%",
+                  border: "2px solid var(--accent)",
                   background: "var(--surface-2)",
-                  display: "flex", 
-                  alignItems: "center", 
+                  display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
                   overflow: "hidden"
                 }}
@@ -172,23 +172,19 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
               </div>
             </div>
 
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                <h2 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text)" }}>{me.full_name}</h2>
+                <h2 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text)", wordBreak: "break-word" }}>{me.full_name}</h2>
                 <span className="hg-pill" style={{ background: "rgba(244, 201, 93, 0.15)", color: "var(--accent)", border: "1px solid rgba(244, 201, 93, 0.3)", fontWeight: "bold" }}>
                   {roleLabel}
                 </span>
               </div>
-              
-              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "12px", color: "var(--text-dim)", flexWrap: "wrap" }}>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px", fontSize: "12px", color: "var(--text-dim)" }}>
                 <span>Username: <strong style={{ color: "var(--text)" }}>@{me.username}</strong></span>
-                <span>•</span>
                 <span>Member since: <strong style={{ color: "var(--accent)" }}>{memberSinceStr}</strong></span>
                 {me.phone && (
-                  <>
-                    <span>•</span>
-                    <span>WhatsApp: <strong style={{ color: "#10B981" }}>{me.phone}</strong></span>
-                  </>
+                  <span>WhatsApp: <strong style={{ color: "#10B981" }}>{me.phone}</strong></span>
                 )}
               </div>
             </div>
@@ -258,10 +254,10 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
       )}
 
       {/* Two Column Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20, width: "100%" }}>
-        
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: 20, width: "100%" }}>
+
         {/* Personal Details */}
-        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 12 }}>
             <Icon name="user" size={18} style={{ color: "var(--accent)" }} />
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Personal Information</h3>
@@ -309,7 +305,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         </div>
 
         {/* Change Password Panel */}
-        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="hg-panel" style={{ padding: "24px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 12 }}>
             <Icon name="shieldCheck" size={18} style={{ color: "var(--accent)" }} />
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Account Security</h3>
