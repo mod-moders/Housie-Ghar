@@ -32,6 +32,8 @@ export interface PublicConfig {
   master_calls_volume?: string;
   cage_sound_type?: string;
   winner_sound_type?: string;
+  cage_sound_url?: string;
+  celebration_sound_url?: string;
   lobby_music_url_1?: string;
   lobby_music_url_2?: string;
   lobby_music_url_3?: string;

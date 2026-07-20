@@ -1,4 +1,5 @@
 import { useConfigStore } from "./stores/configStore";
+import { resolveAudioUrl } from "./api";
 
 class SoundSynthesizer {
   private ctx: AudioContext | null = null;
@@ -9,6 +10,8 @@ class SoundSynthesizer {
   private spinGainNode: GainNode | null = null;
   private spinLfo: OscillatorNode | null = null;
   private spinNoiseSource: AudioBufferSourceNode | null = null;
+  private customCageAudio: HTMLAudioElement | null = null;
+  private customCelebrationAudio: HTMLAudioElement | null = null;
 
   private initCtx() {
     if (!this.ctx) {
@@ -26,10 +29,21 @@ class SoundSynthesizer {
    */
   startCageSpin() {
     try {
+      const config = useConfigStore.getState().config;
+      const customUrl = config?.cage_sound_url;
+      if (customUrl) {
+        this.stopCageSpin();
+        const resolved = resolveAudioUrl(customUrl);
+        this.customCageAudio = new Audio(resolved);
+        this.customCageAudio.loop = true;
+        this.customCageAudio.volume = 1.0;
+        this.customCageAudio.play().catch(() => {});
+        return;
+      }
+
       this.initCtx();
       if (!this.ctx) return;
 
-      const config = useConfigStore.getState().config;
       const type = config?.cage_sound_type || 'steel_wooden';
 
       // 1. Low axle rumble + friction noise (rotation hum)
@@ -297,6 +311,13 @@ class SoundSynthesizer {
 
   stopCageSpin() {
     try {
+      if (this.customCageAudio) {
+        try {
+          this.customCageAudio.pause();
+          this.customCageAudio.currentTime = 0;
+        } catch {}
+        this.customCageAudio = null;
+      }
       if (this.spinInterval) {
         clearInterval(this.spinInterval);
         this.spinInterval = null;
@@ -322,10 +343,22 @@ class SoundSynthesizer {
 
   playCelebration() {
     try {
+      const config = useConfigStore.getState().config;
+      const customUrl = config?.celebration_sound_url;
+      if (customUrl) {
+        if (this.customCelebrationAudio) {
+          try { this.customCelebrationAudio.pause(); } catch {}
+        }
+        const resolved = resolveAudioUrl(customUrl);
+        this.customCelebrationAudio = new Audio(resolved);
+        this.customCelebrationAudio.volume = 1.0;
+        this.customCelebrationAudio.play().catch(() => {});
+        return;
+      }
+
       this.initCtx();
       if (!this.ctx) return;
 
-      const config = useConfigStore.getState().config;
       const type = config?.winner_sound_type || 'trumpet_cheering';
       const now = this.ctx.currentTime;
 

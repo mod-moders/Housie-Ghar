@@ -1333,7 +1333,7 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
                 <select
                   value={config?.cage_sound_type || "steel_wooden"}
                   onChange={(e) => {
@@ -1367,6 +1367,21 @@ export function CallVoiceSettings() {
                   <option value="bamboo_basket">Bamboo Weaved Basket Cage 🌿</option>
                   <option value="electric_blower">Professional Electric Blower (Air-mix) 🌀</option>
                 </select>
+
+                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                  <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("cage_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                  <span>📁 {uploadingVoiceKey === "cage_sound_url" ? "..." : config?.cage_sound_url ? "Replace Cage Audio" : "Upload Custom Cage MP3"}</span>
+                </label>
+
+                {config?.cage_sound_url && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {config.cage_sound_url.split("/").pop()}
+                    </span>
+                    <button onClick={() => handleSaveConfig({ cage_sound_url: "" })} title="Remove custom file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={13} /></button>
+                  </div>
+                )}
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1404,7 +1419,7 @@ export function CallVoiceSettings() {
                   <span>Enabled</span>
                 </label>
               </div>
-              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
                 <select
                   value={config?.winner_sound_type || "trumpet_cheering"}
                   onChange={(e) => handleSaveConfig({ winner_sound_type: e.target.value })}
@@ -1433,6 +1448,21 @@ export function CallVoiceSettings() {
                   <option value="fireworks">Fireworks Crackle &amp; Pop Spectacular 🎆</option>
                   <option value="retro_arcade_celebration">Retro Arcade Level-Up Fanfare 👾</option>
                 </select>
+
+                <label className="hg-btn" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1.5px solid var(--ink)", padding: "6px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", gap: "4px", margin: 0, boxShadow: "0 4px 0 -1px var(--ink)" }}>
+                  <input type="file" accept="audio/*,video/mp4,video/mpeg,.mp3,.wav,.m4a,.mpeg,.mpg" onChange={(e) => handleConfigAudioUpload("celebration_sound_url", e)} style={{ display: "none" }} disabled={uploadingVoiceKey !== null} />
+                  <span>📁 {uploadingVoiceKey === "celebration_sound_url" ? "..." : config?.celebration_sound_url ? "Replace Fanfare" : "Upload Custom Fanfare MP3"}</span>
+                </label>
+
+                {config?.celebration_sound_url && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ fontSize: "11px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {config.celebration_sound_url.split("/").pop()}
+                    </span>
+                    <button onClick={() => handleSaveConfig({ celebration_sound_url: "" })} title="Remove custom file" style={{ background: "var(--danger-soft)", border: "1.5px solid var(--ink)", color: "var(--danger)", width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 0 -1px var(--ink)" }}><Icon name="trash" size={13} /></button>
+                  </div>
+                )}
+
                 <Button
                   variant="ghost"
                   size="sm"
