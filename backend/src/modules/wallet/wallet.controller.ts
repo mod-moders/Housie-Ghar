@@ -50,19 +50,24 @@ export async function getMyLedger(req: AuthenticatedRequest, res: Response): Pro
  */
 export async function listPendingTopUps(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
+    const configRes = await pool.query(
+      `SELECT config_value FROM Platform_Config WHERE config_key = 'bookie_commission_per_ticket'`
+    );
+    const commPerTicket = parseFloat(configRes.rows[0]?.config_value ?? '10');
+
     const result = await pool.query(
       `SELECT * FROM (
         (
-          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
-                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 1 AS sort_order
+          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method, t.proof_screenshot_url,
+                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, u.phone AS agent_phone, u.town AS agent_town, 1 AS sort_order
           FROM TopUp_Requests t
           JOIN Users u ON t.agent_id = u.user_id
           WHERE t.request_status = 'Pending'
          )
          UNION ALL
          (
-          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method,
-                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, 2 AS sort_order
+          SELECT t.request_id, t.formatted_request_id, t.agent_id, t.requested_amount, t.payment_reference, t.payment_method, t.proof_screenshot_url,
+                 t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, u.phone AS agent_phone, u.town AS agent_town, 2 AS sort_order
           FROM TopUp_Requests t
           JOIN Users u ON t.agent_id = u.user_id
           WHERE t.request_status IN ('Approved', 'Rejected')
@@ -74,20 +79,29 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
     );
 
     res.json(
-      result.rows.map((row) => ({
-        request_id: row.request_id,
-        formatted_request_id: row.formatted_request_id,
-        agent_id: row.agent_id,
-        agent_name: row.agent_name,
-        amount: parseFloat(row.requested_amount),
-        requested_amount: parseFloat(row.requested_amount),
-        payment_reference: row.payment_reference,
-        payment_method: row.payment_method,
-        status: row.request_status,
-        request_status: row.request_status,
-        requested_at: row.requested_at,
-        reviewed_at: row.reviewed_at,
-      }))
+      result.rows.map((row) => {
+        const reqAmt = parseFloat(row.requested_amount);
+        const payable = reqAmt - (reqAmt * (commPerTicket / 100));
+        return {
+          request_id: row.request_id,
+          formatted_request_id: row.formatted_request_id || 'HGWR001',
+          agent_id: row.agent_id,
+          agent_name: row.agent_name,
+          agent_phone: row.agent_phone || '',
+          agent_town: row.agent_town || '',
+          amount: reqAmt,
+          requested_amount: reqAmt,
+          payable_amount: parseFloat(payable.toFixed(2)),
+          commission_percentage: commPerTicket,
+          payment_reference: row.payment_reference,
+          payment_method: row.payment_method,
+          proof_screenshot_url: row.proof_screenshot_url || null,
+          status: row.request_status,
+          request_status: row.request_status,
+          requested_at: row.requested_at,
+          reviewed_at: row.reviewed_at,
+        };
+      })
     );
   } catch (error) {
     console.error('Error listing pending top-ups:', error);
@@ -100,6 +114,11 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
  */
 export async function listAgentWallets(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
+    const configRes = await pool.query(
+      `SELECT config_value FROM Platform_Config WHERE config_key = 'bookie_commission_per_ticket'`
+    );
+    const commPerTicket = parseFloat(configRes.rows[0]?.config_value ?? '10');
+
     const agentsRes = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.phone, u.town, u.current_balance, u.status,
               COUNT(b.booking_id) FILTER (WHERE b.booking_status = 'Sold')::INTEGER AS sold_count
@@ -111,7 +130,7 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
     );
 
     const pendingRes = await pool.query(
-      `SELECT request_id, formatted_request_id, agent_id, requested_amount, payment_reference, payment_method, requested_at
+      `SELECT request_id, formatted_request_id, agent_id, requested_amount, payment_reference, payment_method, proof_screenshot_url, requested_at
        FROM TopUp_Requests
        WHERE request_status = 'Pending'
        ORDER BY requested_at ASC`
@@ -119,12 +138,17 @@ export async function listAgentWallets(req: AuthenticatedRequest, res: Response)
 
     const pendingByAgent: Record<string, any[]> = {};
     for (const r of pendingRes.rows) {
+      const reqAmt = parseFloat(r.requested_amount);
+      const payable = reqAmt - (reqAmt * (commPerTicket / 100));
       (pendingByAgent[r.agent_id] ||= []).push({
         request_id: r.request_id,
-        formatted_request_id: r.formatted_request_id,
-        requested_amount: parseFloat(r.requested_amount),
+        formatted_request_id: r.formatted_request_id || 'HGWR001',
+        requested_amount: reqAmt,
+        payable_amount: parseFloat(payable.toFixed(2)),
+        commission_percentage: commPerTicket,
         payment_reference: r.payment_reference,
         payment_method: r.payment_method,
+        proof_screenshot_url: r.proof_screenshot_url || null,
         requested_at: r.requested_at,
       });
     }
