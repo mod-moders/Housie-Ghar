@@ -1446,7 +1446,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         p.game_id,
         sg.title AS game_title,
         sg.scheduled_at AS game_date,
-        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\s*\([^)]*\)', '', 'g'))) AS winner_housie_name,
+        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))) AS winner_housie_name,
         MIN(p.formatted_claim_id) AS formatted_claim_id,
         ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
         ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
@@ -1462,7 +1462,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
        LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
        WHERE (p.player_claimed = TRUE OR p.claimed = TRUE)
          AND (p.disbursed = FALSE OR p.disbursed IS NULL)
-       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\s*\([^)]*\)', '', 'g'))
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))
        ORDER BY MAX(p.player_claimed_at) DESC`
     );
 
@@ -1472,7 +1472,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
         p.game_id,
         sg.title AS game_title,
         sg.scheduled_at AS game_date,
-        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\s*\([^)]*\)', '', 'g'))) AS winner_housie_name,
+        MIN(TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))) AS winner_housie_name,
         MIN(p.formatted_claim_id) AS formatted_claim_id,
         ARRAY_AGG(p.prize_id ORDER BY p.prize_id) AS prize_ids,
         ARRAY_AGG(p.pattern_name ORDER BY p.prize_id) AS pattern_names,
@@ -1490,7 +1490,7 @@ export async function getPrizeClaims(req: AuthenticatedRequest, res: Response): 
        WHERE (p.player_claimed = TRUE OR p.claimed = TRUE)
          AND p.disbursed = TRUE
          AND p.disbursed_at >= NOW() - INTERVAL '2 days'
-       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\s*\([^)]*\)', '', 'g'))
+       GROUP BY p.game_id, sg.title, sg.scheduled_at, TRIM(REGEXP_REPLACE(p.winner_housie_name, '\\s*\\([^)]*\\)', '', 'g'))
        ORDER BY MAX(p.disbursed_at) DESC`
     );
 
