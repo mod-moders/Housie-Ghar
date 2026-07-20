@@ -1054,7 +1054,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => {
               setCreating(false);
               setEditingGameId(null);
-              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
               setPrizes(PATTERN_DEFAULTS);
             }}>Cancel</Button>
             <Button
