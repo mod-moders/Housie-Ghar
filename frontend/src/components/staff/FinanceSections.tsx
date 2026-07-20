@@ -322,7 +322,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                   <EmptyHint icon="grid" title="No completed games yet" sub="Completed game breakdowns will show here." />
                 ) : (
                   <div className="hg-table" style={{ overflowX: "auto" }}>
-                    <div className="hg-tr hg-tr-head">
+                    <div className="hg-tr hg-tr-fin-games hg-tr-head">
                       <span>Game Title</span>
                       <span>Completed Date</span>
                       <span>Tickets Sold</span>
@@ -332,7 +332,7 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
                       <span>Margin</span>
                     </div>
                     {analysis.recent_games.map((g: GameBreakdown) => (
-                      <div key={g.game_id} className="hg-tr">
+                      <div key={g.game_id} className="hg-tr hg-tr-fin-games">
                         <span className="hg-td-name"><strong>{g.title}</strong></span>
                         <span className="hg-dim">
                           {new Date(g.completed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
