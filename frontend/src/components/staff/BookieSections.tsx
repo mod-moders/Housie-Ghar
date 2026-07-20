@@ -182,12 +182,13 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
   const [balance, setBalance] = useState(me.current_balance ?? 0);
   const [ledger, setLedger] = useState<WalletLedgerEntry[]>([]);
   const [skips, setSkips] = useState<SkipAlert[]>([]);
-  const [stats, setStats] = useState<BookiePersonalStats | null>(null);
+  const [statsData, setStatsData] = useState<BookieStatsData | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [form, setForm] = useState({ amount: "", reference: "" });
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [commPerTicket, setCommPerTicket] = useState(10);
+  const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly" | "all">("all");
 
   const load = useCallback(() => {
     apiFetch<{ user: AuthUser }>("/api/auth/me")
@@ -195,7 +196,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
       .catch(() => {});
     apiFetch<WalletLedgerEntry[]>("/api/wallet/ledger").then(setLedger).catch(() => {});
     apiFetch<SkipAlert[]>("/api/bookings/agent/skip-alerts").then(setSkips).catch(() => {});
-    apiFetch<BookiePersonalStats>("/api/users/bookie/personal-stats").then(setStats).catch(() => {});
+    apiFetch<BookieStatsData>("/api/stats/bookie").then(setStatsData).catch(() => {});
     apiFetch<Record<string, string>>("/api/config/public")
       .then((cfg) => {
         if (cfg.bookie_commission_per_ticket) {
@@ -241,229 +242,293 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
 
   const low = balance < LOW_BALANCE_THRESHOLD;
 
-  return (
-    <div className="hg-sec" style={{ width: "100%" }}>
-      
-      {/* Responsive Two-Column Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "24px", width: "100%" }}>
-        
-        {/* Left Column: Wallet Balance Card, Topup Request, Activity Ledger */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          
-          {/* Digital Wallet Card */}
-          <div className="hg-wallet-card" style={{ width: "100%", maxWidth: "none" }}>
-            <span className="hg-wallet-lbl">Digital wallet balance</span>
-            <b className="hg-wallet-bal">{money(balance)}</b>
-            {low && (
-              <div className="hg-wallet-low" style={{ marginTop: "10px" }}>
-                <Icon name="bell" size={13} /> Low balance — top up to keep receiving bookings.
-              </div>
-            )}
-            <button className="hg-wallet-btn" onClick={() => setRequesting((r) => !r)}>
-              <Icon name="chat" size={17} /> {sent ? "Request sent — opening WhatsApp…" : "Request funds from Financial Officer"}
-            </button>
-          </div>
+  const activeSales = timeframe === "daily"
+    ? statsData?.sales.daily
+    : timeframe === "weekly"
+    ? statsData?.sales.weekly
+    : timeframe === "monthly"
+    ? statsData?.sales.monthly
+    : { tickets_sold: statsData?.sales.total_tickets_sold ?? 0, collection: statsData?.sales.total_gross_collection ?? 0 };
 
-          {/* Skip Alerts */}
-          {skips.length > 0 && (
-            <div className="hg-fomo" style={{ width: "100%", maxWidth: "none" }}>
-              <Icon name="zap" size={15} />
-              <div>
-                <b>You missed {skips.length} booking{skips.length > 1 ? "s" : ""} today</b>
-                <span>Your wallet was too low. Recharge to resume sales.</span>
-              </div>
+  const activeProfit = (activeSales?.collection ?? 0) * (commPerTicket / 100);
+  const lifetimeProfit = (statsData?.sales.total_gross_collection ?? 0) * (commPerTicket / 100);
+
+  return (
+    <div className="hg-sec" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
+      
+      {/* SECTION 1: Digital Wallet Hero Card & 4 Primary Non-Repetitive KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", width: "100%" }}>
+        
+        {/* Digital Wallet Card */}
+        <div className="hg-wallet-card" style={{ width: "100%", maxWidth: "none" }}>
+          <span className="hg-wallet-lbl">Digital Wallet Balance</span>
+          <b className="hg-wallet-bal">{money(balance)}</b>
+          {low && (
+            <div className="hg-wallet-low" style={{ marginTop: "10px" }}>
+              <Icon name="bell" size={13} /> Low balance — top up to keep receiving bookings.
             </div>
           )}
-
-          {/* Request Top Up Form */}
-          {requesting && (() => {
-            const walletAmount = parseFloat(form.amount || "0");
-            const commissionVal = walletAmount * (commPerTicket / 100);
-            const payableAmount = walletAmount - commissionVal;
-            return (
-              <div className="hg-form" style={{ width: "100%", maxWidth: "none", padding: "20px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "16px" }}>
-                  <div>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-dim)", display: "block", marginBottom: "8px" }}>
-                      Select Wallet Recharge Amount (₹)
-                    </span>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      {RECHARGE_AMOUNTS.map((amt) => {
-                        const isActive = form.amount === String(amt);
-                        return (
-                          <button
-                            key={amt}
-                            type="button"
-                            onClick={() => setForm({ ...form, amount: String(amt) })}
-                            style={{
-                              padding: "8px 16px",
-                              borderRadius: "20px",
-                              fontSize: "13px",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                              border: isActive ? "2px solid var(--accent)" : "1.5px solid var(--border)",
-                              background: isActive ? "var(--accent-soft)" : "rgba(255, 255, 255, 0.02)",
-                              color: isActive ? "var(--accent)" : "var(--text-dim)",
-                              boxShadow: isActive ? "0 0 10px var(--accent-soft)" : "none"
-                            }}
-                          >
-                            ₹{amt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {walletAmount > 0 && (
-                    <div style={{
-                      background: "rgba(212, 175, 55, 0.04)",
-                      border: "1px dashed var(--accent)",
-                      borderRadius: "8px",
-                      padding: "12px 16px",
-                      fontSize: "13px",
-                      color: "var(--text)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px"
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>Recharge Wallet Balance:</span>
-                        <b>₹{walletAmount}</b>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-dim)" }}>
-                        <span>Commission (₹{commPerTicket} discount per ₹100 of recharge):</span>
-                        <span style={{ color: "var(--success)" }}>-₹{commissionVal}</span>
-                      </div>
-                      <div style={{ height: "1px", background: "var(--border-2)", margin: "4px 0" }} />
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: "bold" }}>
-                        <span style={{ color: "var(--accent)" }}>Net Payable Amount:</span>
-                        <b style={{ color: "var(--accent)" }}>₹{payableAmount}</b>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-                {error && <p className="hg-sec-err">{error}</p>}
-                <div className="hg-form-actions">
-                  <Button variant="ghost" size="sm" onClick={() => setRequesting(false)}>Cancel</Button>
-                  <Button
-                    variant="cta" size="sm"
-                    disabled={!form.amount || parseFloat(form.amount) <= 0}
-                    onClick={requestFunds}
-                  >
-                    Send request
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Recent Activity Ledger */}
-          <div className="hg-panel" style={{ width: "100%", maxWidth: "none" }}>
-            <div className="hg-panel-head"><h3>Recent activity</h3></div>
-            {ledger.length === 0 ? (
-              <EmptyHint icon="wallet" title="No transactions yet" sub="Wallet credits and sale debits appear here." />
-            ) : (
-              <div className="hg-ledger-list">
-                {ledger.slice(0, 12).map((e) => (
-                  <div key={e.entry_id} className="hg-ledger-row">
-                    <span className="hg-dim">
-                      {new Date(e.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </span>
-                    <span>{e.notes ?? e.transaction_type}</span>
-                    <span className={`hg-ledger-amt ${e.transaction_type === "Credit" ? "is-credit" : "is-debit"}`}>
-                      {e.transaction_type === "Credit" ? "+" : "−"}{money(e.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {skips.length > 0 && (
+            <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#EF4444", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginTop: "10px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon name="zap" size={14} /> Missed {skips.length} booking{skips.length > 1 ? "s" : ""} today due to low balance.
+            </div>
+          )}
+          <button className="hg-wallet-btn" onClick={() => setRequesting((r) => !r)} style={{ marginTop: "14px" }}>
+            <Icon name="chat" size={17} /> {sent ? "Request sent — opening WhatsApp…" : "Request funds from Financial Officer"}
+          </button>
         </div>
 
-        {/* Right Column: Financial Insights Dashboard */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        {/* 4 Core Performance KPI Cards (No Duplicates) */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
           
-          <div className="hg-panel" style={{ padding: "24px", minHeight: "100%" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px", marginBottom: "20px", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Icon name="chart" size={16} /> Financial Insights & Earnings
-            </h3>
+          <div className="hg-panel" style={{ padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets Sold</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: "800", marginTop: "4px", color: "var(--accent)" }}>{statsData?.sales.total_tickets_sold ?? 0}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>{statsData?.bookings.conversion_rate ?? 0}% conversion</span>
+          </div>
 
-            {/* KPI grid inside the card */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "16px", marginBottom: "24px" }}>
-              
-              <div className="hg-kpi" style={{ padding: "14px 16px", minHeight: "auto", background: "var(--surface-2)" }}>
-                <span className="hg-kpi-label">Tickets Sold</span>
-                <b className="hg-kpi-value" style={{ fontSize: "20px" }}>{stats?.total_tickets_sold ?? 0}</b>
-                <span className="hg-kpi-sub">Total sales: {money(stats?.total_sales_volume ?? 0)}</span>
-              </div>
+          <div className="hg-panel" style={{ padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Estimated Profit</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: "800", marginTop: "4px", color: "#10B981" }}>{money(lifetimeProfit)}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>{commPerTicket}% wholesale margin</span>
+          </div>
 
-              <div className="hg-kpi" style={{ padding: "14px 16px", minHeight: "auto", background: "var(--surface-2)" }}>
-                <span className="hg-kpi-label">Player Wins</span>
-                <b className="hg-kpi-value" style={{ fontSize: "20px", color: "var(--accent)" }}>{stats?.total_wins ?? 0}</b>
-                <span className="hg-kpi-sub">Claims won via your shop</span>
-              </div>
+          <div className="hg-panel" style={{ padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Total Recharged</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: "800", marginTop: "4px", color: "#3B82F6" }}>{money(statsData?.wallet.total_recharged_amount ?? 0)}</b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>{statsData?.wallet.approved_recharges_count ?? 0} approved top-ups</span>
+          </div>
 
-              <div className="hg-kpi" style={{ padding: "14px 16px", minHeight: "auto", background: "var(--surface-2)" }}>
-                <span className="hg-kpi-label">Total Recharged</span>
-                <b className="hg-kpi-value" style={{ fontSize: "20px" }}>{money(stats?.total_recharged ?? 0)}</b>
-                <span className="hg-kpi-sub">
-                  {stats?.recent_recharge_amount ? `Last: ${moneyStr(stats.recent_recharge_amount)}` : "No recharges yet"}
-                </span>
-              </div>
-
-              <div className="hg-kpi" style={{ padding: "14px 16px", minHeight: "auto", background: "var(--surface-2)" }}>
-                <span className="hg-kpi-label">Estimated Profits</span>
-                <b className="hg-kpi-value" style={{ fontSize: "20px", color: "#10B981" }}>{money(stats?.profit_overall ?? 0)}</b>
-                <span className="hg-kpi-sub">Total margins kept</span>
-              </div>
-
-            </div>
-
-            {/* Profit Breakdown Section */}
-            <h4 style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "var(--text-mute)", fontWeight: "bold", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "6px", marginBottom: "16px", marginTop: "24px" }}>
-              Earnings Breakdown (10% wholesale margin)
-            </h4>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="hg-dim">Today&apos;s Profit</span>
-                <strong style={{ color: "#10B981" }}>{money(stats?.profit_today ?? 0)}</strong>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="hg-dim">Weekly Profit (7d)</span>
-                <strong style={{ color: "#10B981" }}>{money(stats?.profit_weekly ?? 0)}</strong>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="hg-dim">Monthly Profit (30d)</span>
-                <strong style={{ color: "#10B981" }}>{money(stats?.profit_monthly ?? 0)}</strong>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px", paddingTop: "6px" }}>
-                <span style={{ fontWeight: 600 }}>Lifetime Profit</span>
-                <strong style={{ color: "#10B981", fontSize: "16px" }}>{money(stats?.profit_overall ?? 0)}</strong>
-              </div>
-
-            </div>
-
-            <div style={{ background: "rgba(212, 175, 55, 0.04)", border: "1px solid rgba(212, 175, 55, 0.12)", borderRadius: "8px", padding: "12px 14px", marginTop: "28px", color: "var(--accent)", fontSize: "11.5px", display: "flex", gap: "10px", alignItems: "flex-start", lineHeight: "1.5" }}>
-              <Icon name="help" size={15} style={{ flexShrink: 0, marginTop: "1px" }} />
-              <span>Profit margins are based on the 10% discount wholesale rate applied when top-up funds are purchased from the Financial Officer.</span>
-            </div>
-
+          <div className="hg-panel" style={{ padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(239, 68, 68, 0.25)" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Missed / Expired</span>
+            <b style={{ display: "block", fontSize: "24px", fontWeight: "800", marginTop: "4px", color: (statsData?.bookings.expired_missed_count ?? 0) > 0 ? "#EF4444" : "var(--text)" }}>
+              {statsData?.bookings.expired_missed_count ?? 0}
+            </b>
+            <span className="hg-dim" style={{ fontSize: "11px" }}>Timer expirations</span>
           </div>
 
         </div>
 
       </div>
 
-      {/* Integrated My Stats & Analytics Section */}
-      <div style={{ marginTop: "16px" }}>
-        <BookieStatsSection me={me} />
+      {/* Top Up Request Form Popup */}
+      {requesting && (() => {
+        const walletAmount = parseFloat(form.amount || "0");
+        const commissionVal = walletAmount * (commPerTicket / 100);
+        const payableAmount = walletAmount - commissionVal;
+        return (
+          <div className="hg-form" style={{ width: "100%", maxWidth: "none", padding: "20px", borderRadius: "14px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "16px" }}>
+              <div>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-dim)", display: "block", marginBottom: "8px" }}>
+                  Select Wallet Recharge Amount (₹)
+                </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {RECHARGE_AMOUNTS.map((amt) => {
+                    const isActive = form.amount === String(amt);
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setForm({ ...form, amount: String(amt) })}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "20px",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          border: isActive ? "2px solid var(--accent)" : "1.5px solid var(--border)",
+                          background: isActive ? "var(--accent-soft)" : "rgba(255, 255, 255, 0.02)",
+                          color: isActive ? "var(--accent)" : "var(--text-dim)",
+                          boxShadow: isActive ? "0 0 10px var(--accent-soft)" : "none"
+                        }}
+                      >
+                        ₹{amt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {walletAmount > 0 && (
+                <div style={{
+                  background: "rgba(212, 175, 55, 0.04)",
+                  border: "1px dashed var(--accent)",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  fontSize: "13px",
+                  color: "var(--text)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Recharge Wallet Balance:</span>
+                    <b>₹{walletAmount}</b>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-dim)" }}>
+                    <span>Commission ({commPerTicket}% discount per ₹100 of recharge):</span>
+                    <span style={{ color: "var(--success)" }}>-₹{commissionVal}</span>
+                  </div>
+                  <div style={{ height: "1px", background: "var(--border-2)", margin: "4px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: "bold" }}>
+                    <span style={{ color: "var(--accent)" }}>Net Payable Amount:</span>
+                    <b style={{ color: "var(--accent)" }}>₹{payableAmount}</b>
+                  </div>
+                </div>
+              )}
+
+            </div>
+            {error && <p className="hg-sec-err">{error}</p>}
+            <div className="hg-form-actions">
+              <Button variant="ghost" size="sm" onClick={() => setRequesting(false)}>Cancel</Button>
+              <Button
+                variant="cta" size="sm"
+                disabled={!form.amount || parseFloat(form.amount) <= 0}
+                onClick={requestFunds}
+              >
+                Send request
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* SECTION 2: Responsive Two-Column Details Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px", width: "100%" }}>
+        
+        {/* Left Column: Sales Breakdown by Timeframe */}
+        <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: "bold", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon name="chart" size={16} /> Sales & Earnings Performance
+            </h3>
+            <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.04)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              {(["daily", "weekly", "monthly", "all"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeframe(t)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    border: "none",
+                    background: timeframe === t ? "var(--brand)" : "transparent",
+                    color: timeframe === t ? "var(--accent-ink)" : "var(--text-dim)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {t === "daily" ? "24h" : t === "weekly" ? "7d" : t === "monthly" ? "30d" : "All"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
+            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--text)" }}>{activeSales?.tickets_sold ?? 0}</b>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Collection</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--accent)" }}>{money(activeSales?.collection ?? 0)}</b>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Net Profit</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "#10B981" }}>{money(activeProfit)}</b>
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(212, 175, 55, 0.04)", border: "1px solid rgba(212, 175, 55, 0.12)", borderRadius: "8px", padding: "10px 12px", color: "var(--accent)", fontSize: "11px", display: "flex", gap: "8px", alignItems: "flex-start", lineHeight: "1.4" }}>
+            <Icon name="help" size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <span>Profit margin is based on the {commPerTicket}% wholesale discount rate on top-up funds.</span>
+          </div>
+        </div>
+
+        {/* Right Column: Wallet Activity Ledger */}
+        <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+          <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px", marginBottom: "14px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: "bold", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon name="wallet" size={16} /> Recent Wallet Activity
+            </h3>
+          </div>
+          {ledger.length === 0 ? (
+            <EmptyHint icon="wallet" title="No transactions yet" sub="Wallet credits and ticket sale debits will appear here." />
+          ) : (
+            <div className="hg-ledger-list" style={{ maxHeight: "220px", overflowY: "auto" }}>
+              {ledger.slice(0, 8).map((e) => (
+                <div key={e.entry_id} className="hg-ledger-row">
+                  <span className="hg-dim" style={{ fontSize: "11px" }}>
+                    {new Date(e.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  </span>
+                  <span style={{ fontSize: "12.5px" }}>{e.notes ?? e.transaction_type}</span>
+                  <span className={`hg-ledger-amt ${e.transaction_type === "Credit" ? "is-credit" : "is-debit"}`}>
+                    {e.transaction_type === "Credit" ? "+" : "−"}{money(e.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* SECTION 3: Full Width Ticket Bookings Log Table */}
+      <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" }}>
+          <h3 style={{ fontSize: "15px", fontWeight: "bold", color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Icon name="clock" size={16} /> Processed Ticket Bookings ({statsData?.recent_bookings.length ?? 0})
+          </h3>
+        </div>
+
+        {(!statsData || statsData.recent_bookings.length === 0) ? (
+          <EmptyHint icon="bell" title="No bookings processed yet" sub="Bookings routed to your shop will appear here." />
+        ) : (
+          <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
+            <div className="hg-table" style={{ minWidth: "700px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                <span>Player Name</span>
+                <span>Game Title</span>
+                <span>Tickets</span>
+                <span>Amount</span>
+                <span style={{ textAlign: "right" }}>Status</span>
+              </div>
+              {statsData.recent_bookings.map((b) => {
+                const dateStr = new Date(b.confirmed_at || b.locked_at).toLocaleString("en-IN", {
+                  day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+                });
+                const isSold = b.booking_status === "Sold";
+                const isExpired = b.booking_status === "Expired";
+                return (
+                  <div key={b.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr", alignItems: "center" }}>
+                    <div>
+                      <b style={{ color: "var(--text)", fontSize: "13.5px" }}>{b.housie_name}</b>
+                      <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>{dateStr}</div>
+                    </div>
+                    <span className="hg-dim" style={{ fontSize: "12px" }}>{b.game_title}</span>
+                    <span><b style={{ fontSize: "13px" }}>{b.ticket_count}</b> ticket{b.ticket_count > 1 ? "s" : ""}</span>
+                    <strong style={{ color: isSold ? "#10B981" : "var(--text-dim)", fontSize: "13px" }}>{money(b.total_amount)}</strong>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <span
+                        className="hg-pill"
+                        style={{
+                          background: isSold ? "rgba(16, 185, 129, 0.15)" : isExpired ? "rgba(239, 68, 68, 0.15)" : "rgba(255,255,255,0.06)",
+                          color: isSold ? "#10B981" : isExpired ? "#EF4444" : "var(--text-dim)",
+                          border: isSold ? "1px solid rgba(16, 185, 129, 0.3)" : isExpired ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid var(--border)"
+                        }}
+                      >
+                        {isSold ? "Confirmed" : isExpired ? "Expired / Missed" : b.booking_status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
     </div>
