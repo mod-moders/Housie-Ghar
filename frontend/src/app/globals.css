@@ -2226,7 +2226,14 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
   overflow:hidden}
 .hg-panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
 .hg-panel-head h3{font-size:15px;font-weight:700}
-.hg-table{display:flex;flex-direction:column}
+/* overflow-x:auto: rows below use bare fr-unit columns with no minimum-width floor, so
+   below a certain viewport width each cell's text (dates, ₹ amounts, names) was wrapping
+   independently instead of the row just running out of room — same row height per data
+   row but different wrap points per cell made the table look raggedly misaligned even
+   though the grid's column edges stayed pixel-exact. A row min-width (see .hg-tr-players)
+   plus this scroll turns "columns silently squeeze and wrap" into "table scrolls
+   horizontally as one aligned unit" once the viewport can't fit it. */
+.hg-table{display:flex;flex-direction:column;overflow-x:auto}
 .hg-tr{display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 1fr;gap:12px;align-items:center;padding:12px 16px;
   font-size:13px;border-bottom:1px solid var(--border)}
 .hg-tr:last-child{border-bottom:0}
@@ -2235,7 +2242,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-tr-6{grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr}
 .hg-tr-games{grid-template-columns:2fr 1fr 1.2fr 1fr 1.2fr 1fr 180px}
 .hg-tr-history{grid-template-columns:2fr 1fr 1.2fr 1fr 200px}
-.hg-tr-players{grid-template-columns:1.8fr 1fr .7fr .7fr 1fr 1fr .9fr 90px}
+.hg-tr-players{grid-template-columns:1.8fr 1fr .7fr .7fr 1fr 1fr .9fr 90px;min-width:860px;white-space:nowrap}
+.hg-tr-players .hg-td-name{white-space:normal}
 .hg-tr-fin-games{grid-template-columns:1.8fr 1fr .8fr 1fr 1fr 1fr .8fr}
 
 /* premium table styles */
