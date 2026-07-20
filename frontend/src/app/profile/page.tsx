@@ -398,34 +398,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Player Engagement Stats Highlights */}
-        <div style={{ width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "20px" }}>
-          
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Games Played</span>
-            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "var(--text)" }}>{stats?.games_played ?? 0}</b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>Total rounds participated</span>
-          </div>
-
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Total Winnings</span>
-            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "var(--accent)" }}>{money(stats?.amount_won ?? 0)}</b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>{stats?.total_wins ?? 0} prizes won</span>
-          </div>
-
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets Purchased</span>
-            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "#3B82F6" }}>{stats?.tickets_bought ?? 0}</b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>Tickets locked & confirmed</span>
-          </div>
-
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border-light)", padding: "16px", borderRadius: 12 }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Best Single Game Win</span>
-            <b style={{ display: "block", fontSize: "24px", fontWeight: 800, marginTop: "4px", color: "#10B981" }}>{money(stats?.highest_amount_single_game ?? 0)}</b>
-            <span className="hg-dim" style={{ fontSize: "11px" }}>Highest reward in 1 game</span>
-          </div>
-
-        </div>
 
         {/* Profile Settings Form */}
         <form onSubmit={handleSave} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 20, background: "var(--surface)", padding: "24px", borderRadius: 16, border: "1px solid var(--border-light)" }}>
