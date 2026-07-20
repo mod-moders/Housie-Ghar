@@ -406,7 +406,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
   }, []);
 
   const loadTopups = useCallback(() => {
-    apiFetch<TopUpRequestItem[]>("/api/wallet/pending-topups")
+    apiFetch<TopUpRequestItem[]>("/api/wallet/topup/pending")
       .then((res) => {
         if (Array.isArray(res)) {
           setTopups(res);
