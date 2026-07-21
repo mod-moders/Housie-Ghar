@@ -98,7 +98,7 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
     }
 
     const prizesRes = await pool.query(
-      `SELECT p.winner_housie_name, 
+      `SELECT p.game_id, p.winner_housie_name, 
               COALESCE(p.amount_per_winner, p.prize_amount)::float AS amount
        FROM Prize_Pool p
        WHERE p.claimed = TRUE AND p.winner_housie_name IS NOT NULL ${timeFilter}`
@@ -106,15 +106,33 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
 
     // Map to aggregate by clean player account name
     const playerMap = new Map<string, { housie_name: string; wins: number; total_won: number; biggest_win: number }>();
+    // Map to aggregate player earnings per game to find the single-game maximum
+    const playerGameMap = new Map<string, number>();
 
     for (const row of prizesRes.rows) {
       const rawName = row.winner_housie_name || "";
-      const prizeAmount = parseFloat(row.amount) || 0;
+      const gameId = row.game_id;
+      const basePrizeAmount = parseFloat(row.amount) || 0;
 
       // Extract individual player names using strict regex that strips ticket numbers & bracket contents
       const rawTokens = rawName.split(/[,&]|\s+and\s+/i);
 
-      for (let token of rawTokens) {
+      for (const rawToken of rawTokens) {
+        let token = rawToken.trim();
+        if (!token) continue;
+
+        // Parse ticket count to multiply for multi-ticket wins (e.g. NRPS (13 & 20))
+        const parenMatch = token.match(/\(([^)]+)\)/);
+        let ticketCount = 1;
+        if (parenMatch && parenMatch[1]) {
+          const tks = parenMatch[1].match(/\d+/g);
+          if (tks && tks.length > 0) {
+            ticketCount = tks.length;
+          }
+        }
+
+        const actualWinAmount = basePrizeAmount * ticketCount;
+
         // Remove ticket numbers in parentheses: "priyankarp (29)" -> "priyankarp"
         // Also remove unclosed/unopened parentheses fragments: "priyankarp (29" -> "priyankarp", "27)" -> ""
         token = token.replace(/\([^)]*\)/g, ""); // matched parens
@@ -140,10 +158,21 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
         }
 
         playerObj.wins += 1;
-        playerObj.total_won += prizeAmount;
-        if (prizeAmount > playerObj.biggest_win) {
-          playerObj.biggest_win = prizeAmount;
-        }
+        playerObj.total_won += actualWinAmount;
+
+        // Accumulate single game winnings
+        const gameKey = `${key}-${gameId}`;
+        const currentTotal = playerGameMap.get(gameKey) || 0;
+        playerGameMap.set(gameKey, currentTotal + actualWinAmount);
+      }
+    }
+
+    // Assign the maximum single-game winnings to biggest_win for each player
+    for (const [gameKey, gameTotal] of playerGameMap.entries()) {
+      const playerKey = gameKey.split("-")[0];
+      const playerObj = playerMap.get(playerKey);
+      if (playerObj && gameTotal > playerObj.biggest_win) {
+        playerObj.biggest_win = gameTotal;
       }
     }
 
