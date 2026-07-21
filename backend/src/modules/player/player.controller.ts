@@ -5,7 +5,7 @@ import pool from '../../db';
 import { env } from '../../config/env';
 
 export async function signup(req: Request, res: Response): Promise<void> {
-  const { full_name, housie_name, ref_promoter_id } = req.body;
+  const { full_name, housie_name, ref_promoter_id, referral_code } = req.body;
 
   if (!housie_name) {
     res.status(400).json({ message: 'Housie name is required' });
@@ -28,10 +28,25 @@ export async function signup(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // 1b. Resolve an optional referral code to the referring player.
+    // A bad or unknown code is ignored rather than rejected — a mistyped code must
+    // never block someone from creating an account.
+    let referrerId: string | null = null;
+    if (referral_code && typeof referral_code === 'string') {
+      const code = referral_code.trim().toUpperCase();
+      if (code) {
+        const ref = await pool.query(
+          `SELECT player_id FROM Players WHERE UPPER(player_code) = $1 AND status <> 'Suspended'`,
+          [code]
+        );
+        referrerId = ref.rows[0]?.player_id ?? null;
+      }
+    }
+
     // 2. Insert player
     const result = await pool.query(
-      'INSERT INTO Players (full_name, housie_name) VALUES ($1, $2) RETURNING player_id, player_code, full_name, housie_name',
-      [cleanFullName, cleanHousieName]
+      'INSERT INTO Players (full_name, housie_name, referred_by) VALUES ($1, $2, $3) RETURNING player_id, player_code, full_name, housie_name',
+      [cleanFullName, cleanHousieName, referrerId]
     );
 
     const player = result.rows[0];

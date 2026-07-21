@@ -12,6 +12,7 @@ const EVENTS = [
   "config_update", "game_list_update",
   "topup_request_received", "topup_approved", "topup_rejected", "wallet_update",
   "prize_claim_received", "prize_disbursed", "player_stats_update",
+  "referral_qualified",
 ];
 
 /**

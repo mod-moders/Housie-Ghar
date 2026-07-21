@@ -15,6 +15,7 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refId, setRefId] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState("");
   const [showBookieForm, setShowBookieForm] = useState(false);
 
   useEffect(() => {
@@ -27,13 +28,25 @@ export default function SignUp() {
         // No active session, stay on signup
       });
 
+    // Prefill a player referral code from a ?ref= share link, falling back to one
+    // captured on an earlier visit. Same client-only constraint as the promoter id
+    // below, so it is seeded from the effect rather than a useState initializer.
+    const urlRef = new URLSearchParams(window.location.search).get("ref");
+    const savedRef = localStorage.getItem("hg_referral_code");
+    const incoming = (urlRef || savedRef || "").trim().toUpperCase();
+    if (incoming) {
+      if (urlRef) localStorage.setItem("hg_referral_code", incoming);
+      // localStorage and the query string are client-only, so neither referral
+      // value can be a lazy useState initializer (that would also run during SSR).
+      // Seeding both from this effect on mount is the correct pattern; one
+      // directive covers every setState in the effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setReferralCode(incoming);
+    }
+
     // Check for promoter referral ID
     const storedRef = localStorage.getItem("hg_ref_promoter_id");
     if (storedRef) {
-      // localStorage is client-only, so this referral id can't be a lazy
-      // useState initializer (which would also run during SSR) — seeding it
-      // from an effect on mount is the correct pattern.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRefId(storedRef);
     }
   }, [router]);
@@ -54,6 +67,7 @@ export default function SignUp() {
         body: JSON.stringify({
           housie_name: housieName,
           ref_promoter_id: refId,
+          referral_code: referralCode.trim() || undefined,
         }),
       });
 
@@ -120,6 +134,23 @@ export default function SignUp() {
             />
             <p className="text-[11px] text-gray-500 mt-1">
               Your Housie Name will be used to log in on returning visits.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="referral-code">
+              Referral Code <span className="text-gray-500 font-normal">(optional)</span>
+            </label>
+            <input
+              id="referral-code"
+              type="text"
+              placeholder="e.g. HGPLA042"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm uppercase"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Got a code from a friend? Enter it here so they get credit once you book your first ticket.
             </p>
           </div>
 

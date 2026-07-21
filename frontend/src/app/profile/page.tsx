@@ -7,6 +7,7 @@ import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { money } from "@/lib/money";
+import { PlayerReferralCard } from "@/components/PlayerReferralCard";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
 
 interface WinningItem {
@@ -38,7 +39,7 @@ const AVATAR_PRESETS = [
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
-  const [stats, setStats] = useState<PlayerStats | null>(null);
+  const [, setStats] = useState<PlayerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,12 +63,19 @@ export default function ProfilePage() {
   const [winningsLoading, setWinningsLoading] = useState(true);
   const [claimingGameId, setClaimingGameId] = useState<string | null>(null);
 
-  const fetchWinnings = () => {
-    setWinningsLoading(true);
+  // Fetch only — no synchronous state reset, so the mount effect can call this
+  // directly (`winningsLoading` already starts true).
+  const loadWinnings = () => {
     apiFetch<WinningItem[]>("/api/player/winnings")
       .then(setWinnings)
       .catch((err) => console.error("Failed to load winnings:", err))
       .finally(() => setWinningsLoading(false));
+  };
+
+  // Re-fetch after an action, putting the spinner back first.
+  const fetchWinnings = () => {
+    setWinningsLoading(true);
+    loadWinnings();
   };
 
   const initiateClaimAll = async (gameId: string) => {
@@ -131,7 +139,7 @@ export default function ProfilePage() {
         .catch(() => {});
     };
     loadData();
-    fetchWinnings();
+    loadWinnings();
     return () => { cancelled = true; };
   }, [router]);
 
@@ -140,6 +148,10 @@ export default function ProfilePage() {
       const params = new URLSearchParams(window.location.search);
       const gameId = params.get("game_id");
       if (gameId) {
+        // The trigger here is the address bar, not a user event, so this auto-claim
+        // action has nowhere else to live. Syncing with an external system (the URL)
+        // is exactly what effects are for.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         initiateClaimAll(gameId);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -628,6 +640,10 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Referral programme — self-hides when the player has no code or the
+            programme is switched off. */}
+        <PlayerReferralCard />
 
       </div>
     </PublicShell>

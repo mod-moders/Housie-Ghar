@@ -21,6 +21,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import statsRoutes from './modules/stats/stats.routes';
 import playerRoutes from './modules/player/player.routes';
 import promoterRoutes from './modules/promoter/promoter.routes';
+import rewardsRoutes from './modules/rewards/rewards.routes';
 
 const app = express();
 
@@ -144,6 +145,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/player', playerRoutes);
 app.use('/api/promoter', promoterRoutes);
+app.use('/api/rewards', rewardsRoutes);
 app.use('/api', ticketsRoutes); // Exposes /api/tickets/:ticket_id and /api/games/:game_id/tickets
 
 // Default Health check

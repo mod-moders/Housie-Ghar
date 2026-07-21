@@ -58,6 +58,7 @@ export async function apiFetch<T>(
     // 401/404 these calls (the JWT has no playerId), bouncing the player out.
     const isPlayerSelfPath =
       /^\/api\/player\/(me|stats|winnings)(\?|$)/.test(path) ||
+      /^\/api\/rewards\/player(\?|$)/.test(path) ||
       /\/my-tickets(\?|$)/.test(path) ||
       /\/claim(\?|$)/.test(path) ||
       /\/claim-all(\?|$)/.test(path) ||

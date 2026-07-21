@@ -6,6 +6,7 @@
 import cron from 'node-cron';
 import pool from '../db';
 import { io } from '../server';
+import { refundPlayerCreditForBooking } from './loyalty';
 
 export function startExpirySweeper(): void {
   // Run every 30 seconds
@@ -48,7 +49,11 @@ export function startExpirySweeper(): void {
           [booking.booking_id]
         );
 
-        // 4. Send WebSocket notification to the assigned Agent
+        // 4. Return any referral credit spent on this lock. The player never got
+        // their tickets, so the reward has to go back to them.
+        await refundPlayerCreditForBooking(client, booking.booking_id);
+
+        // 5. Send WebSocket notification to the assigned Agent
         io.to(`agent-${booking.assigned_agent_id}`).emit('booking_expired', {
           booking_id: booking.booking_id,
         });

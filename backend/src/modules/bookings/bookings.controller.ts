@@ -8,6 +8,15 @@ import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
+import {
+  getLoyaltyConfig,
+  awardBookieTickets,
+  qualifyReferralOnFirstSale,
+  redeemBookieFreeTicket,
+  redeemPlayerCredit,
+  recordRedemption,
+  refundPlayerCreditForBooking,
+} from '../../services/loyalty';
 
 /**
  * Lock tickets and initiate the WhatsApp P2P workflow
@@ -72,7 +81,20 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     );
     const game = gameRes.rows[0];
     const ticketPrice = parseFloat(game.ticket_price);
-    const totalAmount = ticketPrice * ticket_ids.length;
+    const grossAmount = ticketPrice * ticket_ids.length;
+
+    // 3b. Optional referral-credit redemption. Spent HERE rather than at confirm so
+    // the amount quoted in the WhatsApp message is the amount actually collected.
+    // Released again by refundPlayerCreditForBooking if this lock expires or is rejected.
+    const loyaltyCfg = await getLoyaltyConfig(client);
+    let playerWaived = 0;
+    let redeemingPlayerId: string | null = null;
+    if (req.body?.redeem_credit === true && loyaltyCfg.enabled) {
+      const r = await redeemPlayerCredit(client, housie_name, ticketPrice, loyaltyCfg);
+      playerWaived = r.amountWaived;
+      redeemingPlayerId = r.playerId;
+    }
+    const totalAmount = Math.max(0, grossAmount - playerWaived);
 
     // 4. Liquidity-Aware Round-Robin: only route to a bookie who can fund the order.
     // Role 4 represents Agent (Bookie).
@@ -157,12 +179,25 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       const overflowRes = await client.query(
         `INSERT INTO Bookings (
            game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
-           booking_status, locked_at, locked_until, is_overflow
-         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE)
+           booking_status, locked_at, locked_until, is_overflow,
+           player_credit_applied, reward_amount_waived
+         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE, $7, $8)
          RETURNING booking_id, formatted_booking_id`,
-        [game_id, ticket_ids, housie_name, selectedStaff.user_id, totalAmount, lockedUntil]
+        [game_id, ticket_ids, housie_name, selectedStaff.user_id, totalAmount, lockedUntil,
+         playerWaived > 0, playerWaived]
       );
       const overflowBookingId = overflowRes.rows[0].booking_id;
+
+      if (playerWaived > 0) {
+        await recordRedemption(client, {
+          redeemerType: 'Player',
+          playerId: redeemingPlayerId,
+          bookingId: overflowBookingId,
+          gameId: game_id,
+          unitsSpent: 1,
+          amountWaived: playerWaived,
+        });
+      }
 
       await client.query(
         `UPDATE Tickets SET status = 'Locked', locked_by_booking = $1, locked_until = $2
@@ -201,12 +236,25 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     const bookingRes = await client.query(
       `INSERT INTO Bookings (
         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
-        booking_status, locked_at, locked_until
-      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6)
+        booking_status, locked_at, locked_until,
+        player_credit_applied, reward_amount_waived
+      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, $7, $8)
       RETURNING booking_id, formatted_booking_id`,
-      [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil]
+      [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil,
+       playerWaived > 0, playerWaived]
     );
     const bookingId = bookingRes.rows[0].booking_id;
+
+    if (playerWaived > 0) {
+      await recordRedemption(client, {
+        redeemerType: 'Player',
+        playerId: redeemingPlayerId,
+        bookingId,
+        gameId: game_id,
+        unitsSpent: 1,
+        amountWaived: playerWaived,
+      });
+    }
 
     await client.query(
       `UPDATE Tickets
@@ -365,20 +413,62 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
     const balance = parseFloat(agentRes.rows[0].current_balance);
     const amount = parseFloat(booking.total_amount);
 
-    if (balance < amount) {
+    // 2b. Optional loyalty redemption: spend 10 points for one free ticket.
+    // The house eats the waived rupees; the bookie is billed the remainder.
+    const loyaltyCfg = await getLoyaltyConfig(client);
+    const ticketCount = Array.isArray(booking.ticket_ids) ? booking.ticket_ids.length : 0;
+    const unitPrice = ticketCount > 0 ? amount / ticketCount : 0;
+    let waived = 0;
+    let pointsSpent = 0;
+
+    if (req.body?.redeem_points === true && loyaltyCfg.enabled) {
+      const r = await redeemBookieFreeTicket(client, agentId, unitPrice, loyaltyCfg);
+      waived = r.amountWaived;
+      pointsSpent = r.pointsSpent;
+    }
+
+    // Never let a redemption drive the payable below zero.
+    const payable = Math.max(0, amount - waived);
+
+    if (balance < payable) {
       await client.query('ROLLBACK');
       res.status(400).json({ message: 'Insufficient wallet balance. Please top up your wallet.' });
       return;
     }
 
     // 3. Deduct agent balance
-    const newBalance = balance - amount;
+    const newBalance = balance - payable;
     await client.query(
       `UPDATE Users SET current_balance = $1 WHERE user_id = $2`,
       [newBalance, agentId]
     );
 
-    // 4. Record wallet ledger entry
+    // 4. Record wallet ledger entries.
+    // The reward credit is written BEFORE the full-price debit so both running
+    // balances stay non-negative, and so the sale's true value and the reward's
+    // cost show up as two separate, reconcilable lines instead of one netted one.
+    if (waived > 0) {
+      await client.query(
+        `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
+         VALUES ($1, 'Credit', $2, $3, 'Reward', $4, $5, $1)`,
+        [
+          agentId,
+          waived,
+          balance + waived,
+          booking_id,
+          `Loyalty reward: ${pointsSpent} points redeemed for 1 free ticket`,
+        ]
+      );
+      await recordRedemption(client, {
+        redeemerType: 'Bookie',
+        bookieId: agentId,
+        bookingId: booking_id as string,
+        gameId: booking.game_id,
+        unitsSpent: pointsSpent,
+        amountWaived: waived,
+      });
+    }
+
     await client.query(
       `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
        VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
@@ -414,7 +504,22 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
     // 6b. Credit Promoter Referral Commission if player is referred
     await handleReferralCommission(client, booking.game_id, booking_id as string, booking.housie_name, amount);
 
+    // 6c. Loyalty accrual — the bookie funded this sale, so they earn on it.
+    let referralBump: { referrerId: string; referrerQualified: number } | null = null;
+    if (loyaltyCfg.enabled) {
+      await awardBookieTickets(client, agentId, ticketCount);
+      referralBump = await qualifyReferralOnFirstSale(client, booking.housie_name);
+    }
+
     await client.query('COMMIT');
+
+    if (referralBump) {
+      io.emit('referral_qualified', {
+        event: 'referral_qualified',
+        referrer_id: referralBump.referrerId,
+        qualified_referrals: referralBump.referrerQualified,
+      });
+    }
 
     // Notify all players of ticket status changes (SSE relay)
     for (const ticketId of booking.ticket_ids) {
@@ -488,6 +593,10 @@ export async function rejectBooking(req: any, res: Response): Promise<void> {
        WHERE locked_by_booking = $1`,
       [booking_id]
     );
+
+    // 4. Hand back any referral credit the player spent on this lock — no sale
+    // happened, so the reward must not be consumed.
+    await refundPlayerCreditForBooking(client, booking_id as string);
 
     await client.query('COMMIT');
 
@@ -587,7 +696,19 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     const balance = parseFloat(agentRes.rows[0].current_balance);
     const ticketPrice = parseFloat(game.ticket_price);
     const totalAmount = ticketPrice * ticket_ids.length;
-    if (balance < totalAmount) {
+
+    // Optional loyalty redemption, same rules as confirmBooking.
+    const loyaltyCfg = await getLoyaltyConfig(client);
+    let waived = 0;
+    let pointsSpent = 0;
+    if (req.body?.redeem_points === true && loyaltyCfg.enabled) {
+      const r = await redeemBookieFreeTicket(client, agentId, ticketPrice, loyaltyCfg);
+      waived = r.amountWaived;
+      pointsSpent = r.pointsSpent;
+    }
+    const payable = Math.max(0, totalAmount - waived);
+
+    if (balance < payable) {
       await client.query('ROLLBACK');
       res.status(400).json({ message: 'Insufficient wallet balance' });
       return;
@@ -617,12 +738,32 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
       [housie_name, now, bookingId, ticket_ids]
     );
 
-    // 6. Deduct agent balance and record ledger entry
-    const newBalance = balance - totalAmount;
+    // 6. Deduct agent balance and record ledger entries
+    const newBalance = balance - payable;
     await client.query(
       `UPDATE Users SET current_balance = $1 WHERE user_id = $2`,
       [newBalance, agentId]
     );
+    if (waived > 0) {
+      await client.query(
+        `INSERT INTO Wallet_Ledger (
+           agent_id, transaction_type, amount, balance_after,
+           reference_type, reference_id, description, performed_by
+         ) VALUES ($1, 'Credit', $2, $3, 'Reward', $4, $5, $1)`,
+        [
+          agentId, waived, balance + waived, bookingId,
+          `Loyalty reward: ${pointsSpent} points redeemed for 1 free ticket`,
+        ]
+      );
+      await recordRedemption(client, {
+        redeemerType: 'Bookie',
+        bookieId: agentId,
+        bookingId,
+        gameId: game_id,
+        unitsSpent: pointsSpent,
+        amountWaived: waived,
+      });
+    }
     await client.query(
       `INSERT INTO Wallet_Ledger (
          agent_id, transaction_type, amount, balance_after,
@@ -637,7 +778,22 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     // 6b. Credit Promoter Referral Commission if player is referred
     await handleReferralCommission(client, game_id, bookingId, housie_name, totalAmount);
 
+    // 6c. Loyalty accrual
+    let referralBump: { referrerId: string; referrerQualified: number } | null = null;
+    if (loyaltyCfg.enabled) {
+      await awardBookieTickets(client, agentId, ticket_ids.length);
+      referralBump = await qualifyReferralOnFirstSale(client, housie_name);
+    }
+
     await client.query('COMMIT');
+
+    if (referralBump) {
+      io.emit('referral_qualified', {
+        event: 'referral_qualified',
+        referrer_id: referralBump.referrerId,
+        qualified_referrals: referralBump.referrerQualified,
+      });
+    }
 
     // Notify all connected clients that these tickets are now Sold
     for (const ticketId of ticket_ids) {
@@ -805,7 +961,19 @@ export async function forceConfirmBooking(req: AuthenticatedRequest, res: Respon
     // 6b. Credit Promoter Referral Commission if player is referred
     await handleReferralCommission(client, booking.game_id, booking_id as string, booking.housie_name, parseFloat(booking.total_amount));
 
+    // 6c. The player still bought a ticket, so their referrer still qualifies.
+    // No bookie points here — this sale was funded direct-to-platform, not by a bookie.
+    const referralBump = await qualifyReferralOnFirstSale(client, booking.housie_name);
+
     await client.query('COMMIT');
+
+    if (referralBump) {
+      io.emit('referral_qualified', {
+        event: 'referral_qualified',
+        referrer_id: referralBump.referrerId,
+        qualified_referrals: referralBump.referrerQualified,
+      });
+    }
 
     for (const ticketId of booking.ticket_ids) {
       io.emit('ticket_status_change', {
@@ -1005,7 +1173,18 @@ export async function staffManualBooking(req: AuthenticatedRequest, res: Respons
     // 5. Credit Promoter Referral Commission if player is referred
     await handleReferralCommission(client, game_id, bookingId, housie_name, totalAmount);
 
+    // 5b. Referral qualification only — staff-funded, so no bookie earns points.
+    const referralBump = await qualifyReferralOnFirstSale(client, housie_name);
+
     await client.query('COMMIT');
+
+    if (referralBump) {
+      io.emit('referral_qualified', {
+        event: 'referral_qualified',
+        referrer_id: referralBump.referrerId,
+        qualified_referrals: referralBump.referrerQualified,
+      });
+    }
 
     // Notify all connected clients that these tickets are now Sold
     for (const ticketId of ticket_ids) {

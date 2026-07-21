@@ -3,11 +3,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { money, moneyStr } from "@/lib/money";
+import { money } from "@/lib/money";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
-import { BookieStatsSection, type BookieStatsData } from "./MyStatsSections";
+import type { BookieStatsData } from "./MyStatsSections";
+import type { BookieRewardsData } from "./RewardsSections";
 import type { QueueBooking, SkipAlert, WalletLedgerEntry } from "@/lib/types";
 import type { AuthUser } from "@/lib/stores/authStore";
 
@@ -37,11 +38,18 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
   const [history, setHistory] = useState<BookieHistoryItem[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Free tickets this bookie can spend, and which queued booking they've chosen to
+  // spend one on. Only ever one per booking — 10 points buys exactly one ticket.
+  const [freeTickets, setFreeTickets] = useState(0);
+  const [redeemOn, setRedeemOn] = useState<string | null>(null);
   const now = useTicker();
 
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/agent/queue").then(setQueue).catch(() => {});
     apiFetch<BookieHistoryItem[]>("/api/bookings/agent/history").then(setHistory).catch(() => {});
+    apiFetch<BookieRewardsData>("/api/rewards/bookie")
+      .then((r) => setFreeTickets(r.enabled ? r.free_tickets_available : 0))
+      .catch(() => setFreeTickets(0));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -56,7 +64,12 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
   const act = async (id: string, action: "confirm" | "reject") => {
     setError(null);
     try {
-      await apiFetch(`/api/bookings/agent/${id}/${action}`, { method: "POST" });
+      const useFreeTicket = action === "confirm" && redeemOn === id;
+      await apiFetch(`/api/bookings/agent/${id}/${action}`, {
+        method: "POST",
+        ...(useFreeTicket ? { body: JSON.stringify({ redeem_points: true }) } : {}),
+      });
+      if (redeemOn === id) setRedeemOn(null);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
@@ -90,6 +103,31 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
               <div className="hg-bq-tickets">
                 Tickets {r.ticket_numbers.map((t) => "#" + t).join(", ")} · <b>{money(r.total_amount)}</b>
               </div>
+              {/* Only rendered when a free ticket is actually available, so the card
+                  keeps its existing shape for the common case. */}
+              {freeTickets > 0 && (
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    color: "var(--text-dim)",
+                    margin: "8px 0 0",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={redeemOn === r.booking_id}
+                    onChange={(e) => setRedeemOn(e.target.checked ? r.booking_id : null)}
+                    style={{ accentColor: "var(--cta)", cursor: "pointer" }}
+                  />
+                  <span>
+                    Use 1 free ticket <span className="hg-dim">({freeTickets} left)</span>
+                  </span>
+                </label>
+              )}
               <div className="hg-bq-actions">
                 <button className="hg-bq-copy" onClick={() => copyReply(r)}>
                   <Icon name="chat" size={15} /> {copied === r.booking_id ? "Copied!" : "Copy WhatsApp reply"}
@@ -161,19 +199,6 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
       </div>
     </div>
   );
-}
-
-interface BookiePersonalStats {
-  total_recharged: number;
-  recent_recharge_amount: number;
-  recent_recharge_date: string | null;
-  total_tickets_sold: number;
-  total_sales_volume: number;
-  total_wins: number;
-  profit_overall: number;
-  profit_today: number;
-  profit_weekly: number;
-  profit_monthly: number;
 }
 
 const RECHARGE_AMOUNTS = [1000, 1500, 2000, 3000, 5000];
