@@ -11,7 +11,7 @@ const EVENTS = [
   "booking_skipped", "overflow_booking", "ticket_status_change",
   "config_update", "game_list_update",
   "topup_request_received", "topup_approved", "topup_rejected", "wallet_update",
-  "prize_claim_received", "prize_disbursed",
+  "prize_claim_received", "prize_disbursed", "player_stats_update",
 ];
 
 /**
