@@ -90,7 +90,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     return "Player";
   });
   const [showAllCalled, setShowAllCalled] = useState(false);
-  const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
 
   const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
@@ -165,6 +164,11 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       }
     } else {
       if (gameStatus !== "Completed" && gameStatus !== "Draw_Ended") {
+        // Resetting the overlay when the game leaves an ended state is the whole
+        // point of this branch, and the guard above already makes it idempotent.
+        // Deliberately NOT restructured: this is the winners-overlay logic that has
+        // regressed twice before (see CLAUDE.md, Pitfall #1).
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowWinnersOverlay(false);
         outroPlayedRef.current = false;
         userDismissedWinnersRef.current = false;
@@ -601,13 +605,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       );
     });
   }, [prizes, displayName, isStaff]);
-
-  const myUnclaimedTotalAmount = useMemo(() => {
-    return myUnclaimedPrizes.reduce(
-      (sum, p) => sum + parseFloat(String(p.prize_amount ?? 0)),
-      0
-    );
-  }, [myUnclaimedPrizes]);
 
   const handleClaimAllMyPrizes = async () => {
     if (myUnclaimedPrizes.length === 0) return;

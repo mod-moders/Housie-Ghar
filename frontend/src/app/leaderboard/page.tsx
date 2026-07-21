@@ -88,9 +88,11 @@ export default function LeaderboardAndStats() {
       });
   }, [timeframe]);
 
-  // Fetch leaderboard data filtered by active timeframe + 5s auto-refresh
+  // Fetch leaderboard data filtered by active timeframe + 5s auto-refresh.
+  // `loading` starts true and the timeframe <select> sets it back to true itself,
+  // so the effect never has to set state synchronously (which would also make the
+  // 5s auto-refresh flash a spinner over already-good data).
   useEffect(() => {
-    setLoading(true);
     loadLeaderboard();
     const interval = setInterval(loadLeaderboard, 5000);
     return () => clearInterval(interval);
@@ -347,7 +349,10 @@ export default function LeaderboardAndStats() {
               <Icon name="clock" size={14} style={{ color: "var(--text-dim)", marginRight: 8, flexShrink: 0 }} />
               <select
                 value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+                onChange={(e) => {
+                  setLoading(true);
+                  setTimeframe(e.target.value as Timeframe);
+                }}
                 style={{ border: "none", background: "transparent", color: "var(--text)", outline: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" }}
               >
                 <option value="all-time" style={{ background: "var(--surface)", color: "var(--text)" }}>All-Time Records</option>

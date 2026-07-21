@@ -8,34 +8,10 @@ import { Icon } from "@/components/Icon";
 import { EmptyHint, Avatar } from "@/components/ui";
 import { BOOKIE_AVATAR } from "@/lib/roleAvatar";
 import type { LedgerAgent } from "@/lib/types";
-import { EnhancedKpiCard, AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
+import { AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections";
 import type { PerformanceSeries, HeatmapHour, RetentionData } from "./AdminSections";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
-
-function getPatternPriority(patternName: string): number {
-  const name = (patternName || "").toLowerCase();
-  if (name.includes("full house") || name.includes("fullhouse")) return 1;
-  if (name.includes("top line")) return 2;
-  if (name.includes("middle line")) return 3;
-  if (name.includes("bottom line")) return 4;
-  if (name.includes("line")) return 5;
-  if (name.includes("star")) return 6;
-  if (name.includes("box")) return 7;
-  if (name.includes("corner")) return 8;
-  if (name.includes("quick") || name.includes("early") || name.includes("7") || name.includes("5")) return 9;
-  return 10;
-}
-
-interface QueueItem {
-  request_id: string;
-  requested_amount: number;
-  payment_reference: string;
-  requested_at: string;
-  request_status?: "Pending" | "Approved" | "Rejected";
-  reviewed_at?: string;
-  agent: LedgerAgent;
-}
 
 interface GameBreakdown {
   game_id: string;
@@ -105,7 +81,7 @@ interface PrizeClaimsResponse {
   history_claims: ConsolidatedClaimItem[];
 }
 
-export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
+export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void }) {
   const [activeTab, setActiveTab] = useState<"analysis" | "ledgers">("analysis");
 
   const [agents, setAgents] = useState<LedgerAgent[]>([]);
@@ -114,7 +90,9 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const [insights, setInsights] = useState<FinanceInsights | null>(null);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  // Seeded from the tab that is open on mount, so the effect below never has to
+  // flip it synchronously on the very first render.
+  const [loadingAnalysis, setLoadingAnalysis] = useState(true);
 
   const load = useCallback(() => {
     apiFetch<LedgerAgent[]>("/api/wallet/master-ledger").then(setAgents).catch(() => {});
@@ -125,9 +103,9 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   }, [load]);
 
   // Load financial analysis & overview stats when tab is switched or via socket
-  const loadStats = useCallback(() => {
+  const loadStats = useCallback((showSpinner = true) => {
     if (activeTab === "analysis") {
-      setLoadingAnalysis(true);
+      if (showSpinner) setLoadingAnalysis(true);
       Promise.all([
         apiFetch<FinancialAnalysis>("/api/stats/financial-analysis"),
         apiFetch<FinanceOverview>("/api/stats/overview"),
@@ -146,7 +124,11 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
   }, [activeTab]);
 
   useEffect(() => {
-    loadStats();
+    // Pass showSpinner=false: on mount loadingAnalysis is already true, and on a tab
+    // switch the tab button itself is the user-visible trigger. Either way no state
+    // is actually set here — the rule just cannot evaluate the default parameter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadStats(false);
   }, [loadStats]);
 
   // Sync real-time updates instantly via socket
@@ -172,7 +154,12 @@ export function FinanceHubSection({ me, onResolved }: { me: AuthUser; onResolved
       <div style={{ display: "flex", gap: "6px", background: "var(--surface-2)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border)", width: "fit-content", maxWidth: "100%", overflowX: "auto", marginBottom: "8px", flexShrink: 0 }}>
         {/* 1. HG Analysis */}
         <button
-          onClick={() => setActiveTab("analysis")}
+          onClick={() => {
+            // Show the spinner from the click, not from the effect, so returning to
+            // this tab looks exactly as it did before.
+            if (activeTab !== "analysis") setLoadingAnalysis(true);
+            setActiveTab("analysis");
+          }}
           style={{
             background: activeTab === "analysis" ? "var(--surface)" : "none",
             color: activeTab === "analysis" ? "var(--cyan)" : "var(--text-dim)",
@@ -402,12 +389,10 @@ interface TopUpRequestItem {
   reviewed_at?: string;
 }
 
-export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolved?: () => void }) {
+export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: () => void }) {
   const [activeTab, setActiveTab] = useState<"requests" | "claims">("requests");
-  const [rechargeSubTab, setRechargeSubTab] = useState<"active" | "history">("active");
-  const [claimSubTab, setClaimSubTab] = useState<"active" | "history">("active");
 
-  const [agents, setAgents] = useState<LedgerAgent[]>([]);
+  const [, setAgents] = useState<LedgerAgent[]>([]);
   const [topups, setTopups] = useState<TopUpRequestItem[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -441,10 +426,8 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
           setActiveClaims(res.active_claims || []);
           setHistoryClaims(res.history_claims || []);
         } else if (Array.isArray(res)) {
-          const active = res.filter((c: any) => !c.disbursed);
-          const hist = res.filter((c: any) => c.disbursed);
-          setActiveClaims(active as any);
-          setHistoryClaims(hist as any);
+          setActiveClaims(res.filter((c) => !c.disbursed));
+          setHistoryClaims(res.filter((c) => c.disbursed));
         }
       })
       .catch(() => {});
@@ -943,6 +926,10 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
               <div style={{ background: "var(--surface-2)", padding: "14px", borderRadius: "10px", border: "1px solid var(--border-light)", marginBottom: "20px" }}>
                 <span style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Deposit Proof Screenshot</span>
                 <a href={selectedRecharge.proof_screenshot_url} target="_blank" rel="noopener noreferrer">
+                  {/* Payment proof is a user upload on an arbitrary host with no known
+                      intrinsic size, so next/image would need remotePatterns plus a
+                      width we do not have. A plain img is correct here. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={selectedRecharge.proof_screenshot_url} alt="Proof" style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px", objectFit: "contain", border: "1px solid var(--border)" }} />
                 </a>
               </div>
@@ -1051,7 +1038,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
                   <span className="hg-pill hg-pill-accent" style={{ fontSize: "11px" }}>{selectedClaim.formatted_claim_id}</span>
                 </div>
                 <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
-                  Consolidated Claim in "{selectedClaim.game_title}"
+                  Consolidated Claim in &ldquo;{selectedClaim.game_title}&rdquo;
                 </span>
               </div>
             </div>
@@ -1162,7 +1149,7 @@ export function RechargeHubSection({ me, onResolved }: { me: AuthUser; onResolve
             {!selectedClaim.disbursed ? (
               <>
                 <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                  💡 Check your WhatsApp or UPI app for the player's payment QR/UPI message, send the consolidated payout of <b>{money(selectedClaim.total_amount)}</b>, then click <b>Confirm Disbursal</b> below to complete payout.
+                  💡 Check your WhatsApp or UPI app for the player&rsquo;s payment QR/UPI message, send the consolidated payout of <b>{money(selectedClaim.total_amount)}</b>, then click <b>Confirm Disbursal</b> below to complete payout.
                 </div>
 
                 {disburseError && <p className="hg-sec-err">{disburseError}</p>}

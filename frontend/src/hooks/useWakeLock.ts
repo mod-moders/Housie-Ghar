@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
  * Prevents mobile and desktop displays from dimming or sleeping during live gameplay.
  */
 export function useWakeLock(enabled: boolean) {
-  const wakeLockRef = useRef<any>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !("wakeLock" in navigator)) return;
@@ -15,7 +15,7 @@ export function useWakeLock(enabled: boolean) {
     const requestWakeLock = async () => {
       try {
         if (!wakeLockRef.current && "wakeLock" in navigator) {
-          wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+          wakeLockRef.current = await navigator.wakeLock.request("screen");
         }
       } catch {
         // Wake lock request rejected (e.g. low power mode)

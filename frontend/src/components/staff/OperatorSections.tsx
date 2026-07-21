@@ -147,7 +147,7 @@ export function OperatorHudSection() {
       );
       playCelebration();
     }
-  }, [beep, playNumberCall, playCelebration, addDrawn]);
+  }, [beep, playNumberCall, playCelebration, addDrawn, introPlayingRef]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {

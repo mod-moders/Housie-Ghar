@@ -77,9 +77,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
+  const fetchStats = useCallback(() => {
     apiFetch<OperatorStatsData>("/api/stats/operator")
       .then((res) => {
         setData(res);
@@ -91,7 +89,16 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
       });
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // User-triggered refresh/retry: put the spinner back and clear any stale error.
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetchStats();
+  }, [fetchStats]);
+
+  // On mount `loading` is already true and `error` already null, so the first
+  // fetch skips that reset — no synchronous setState in the effect body.
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   if (loading) {
     return (
@@ -233,9 +240,7 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly" | "all">("all");
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
+  const fetchStats = useCallback(() => {
     apiFetch<BookieStatsData>("/api/stats/bookie")
       .then((res) => {
         setData(res);
@@ -247,7 +252,16 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
       });
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // User-triggered refresh/retry: put the spinner back and clear any stale error.
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetchStats();
+  }, [fetchStats]);
+
+  // On mount `loading` is already true and `error` already null, so the first
+  // fetch skips that reset — no synchronous setState in the effect body.
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   if (loading) {
     return (

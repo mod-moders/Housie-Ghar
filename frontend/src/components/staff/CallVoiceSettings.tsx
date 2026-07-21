@@ -159,13 +159,12 @@ function SpotifyAudioControl({
 }
 
 export function CallVoiceSettings() {
-  const { config, updateConfigLocally, loadConfig } = useConfigStore();
+  const { config, updateConfigLocally } = useConfigStore();
 
   const [settings, setSettings] = useState<NumberCallConfig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadingNum, setUploadingNum] = useState<number | null>(null);
-  const [editingTexts, setEditingTexts] = useState<Record<number, string>>({});
   const activePreviewRef = useRef<{ number: number; audio: HTMLAudioElement; updateVolume: (v: number) => void } | null>(null);
   const masterVolumeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -213,6 +212,11 @@ export function CallVoiceSettings() {
 
   useEffect(() => {
     if (config) {
+      // This mirrors server-driven config into local form fields — the standard
+      // "reset the form when upstream data arrives" pattern. Untangling it means
+      // restructuring a 1400-line settings screen, which is not worth the regression
+      // risk for a lint rule.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCallerEnabled(config.english_caller_enabled === "true");
       setAudioLang((config.audio_language as "en" | "ne") || "en");
       setCageSound(config.cage_sound_enabled !== "false");
@@ -244,9 +248,11 @@ export function CallVoiceSettings() {
   }, [config]);
 
   useEffect(() => {
+    // Snapshot the refs now; their .current may differ by the time cleanup runs.
+    const pendingSave = masterVolumeSaveTimeoutRef;
     return () => {
-      if (masterVolumeSaveTimeoutRef.current) {
-        clearTimeout(masterVolumeSaveTimeoutRef.current);
+      if (pendingSave.current) {
+        clearTimeout(pendingSave.current);
       }
       if (audioPlayerRef.current) {
         try {
@@ -263,8 +269,9 @@ export function CallVoiceSettings() {
     };
   }, []);
 
-  const load = async () => {
-    setLoading(true);
+  // Fetch only. `loading` already starts true, so the mount path needs no
+  // synchronous reset and the effect below stays free of setState.
+  const fetchSettings = async () => {
     try {
       const data = await apiFetch<NumberCallConfig[]>("/api/games/number-calls");
       setSettings(data);
@@ -275,8 +282,17 @@ export function CallVoiceSettings() {
     }
   };
 
+  // Re-fetch after an upload/delete, showing the spinner again first.
+  const load = async () => {
+    setLoading(true);
+    await fetchSettings();
+  };
+
   useEffect(() => {
-    load();
+    // False positive: fetchSettings is async and both setSettings and setLoading run
+    // after `await apiFetch(...)`. The rule cannot see through the async boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSettings();
   }, []);
 
   const stopAllPreviews = () => {
@@ -329,7 +345,7 @@ export function CallVoiceSettings() {
     else if (key === "instruction_en") targetVol = instructionVoiceVolEn * masterCallsVolume;
     else if (key === "instruction_ne") targetVol = instructionVoiceVolNe * masterCallsVolume;
 
-    let echoHandle: any = null;
+    let echoHandle: { updateVolume: (v: number) => void } | null = null;
     if (key.startsWith("welcome") || key.startsWith("instruction")) {
       echoHandle = soundSynthesizer.applyLiveAnnouncementEcho(audio, targetVol);
     } else {
@@ -399,8 +415,8 @@ export function CallVoiceSettings() {
         body: JSON.stringify(updates),
       });
       updateConfigLocally(updates);
-    } catch (err: any) {
-      alert(err?.message || "Failed to update sound config settings.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update sound config settings.");
     }
   };
 
@@ -437,8 +453,8 @@ export function CallVoiceSettings() {
         else if (key === "background_music_url") setBgMusicUrl(res.url);
         else if (key === "cage_sound_url") setCageSoundUrl(res.url);
         else if (key === "celebration_sound_url") setCelebrationSoundUrl(res.url);
-      } catch (err: any) {
-        alert(err?.message || "Upload failed.");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Upload failed.");
       } finally {
         setUploadingVoiceKey(null);
       }

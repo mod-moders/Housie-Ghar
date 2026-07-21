@@ -109,7 +109,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   // Load game meta once; refresh the ticket grid every 5s so locks/sales appear live.
   // On the first tickets load, restore an in-flight lock for this game after a reload.
   useEffect(() => {
-    let alive = { current: true };
+    const alive = { current: true };
     apiFetch<GameSummary>(`/api/games/${game_id}`)
       .then((g) => { if (alive.current) setGame(g); })
       .catch(() => {});

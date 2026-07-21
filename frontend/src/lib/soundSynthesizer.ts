@@ -931,7 +931,7 @@ class SoundSynthesizer {
           wetGain.gain.value = 0.18 * boostedNew;
         }
       };
-    } catch (e) {
+    } catch {
       const boostFactor = 1.75;
       audio.volume = Math.min(1.0, customVolume * boostFactor);
       return null;

@@ -39,6 +39,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // False positive: checkLiveGames is async and every setState in it runs after
+    // `await apiFetch(...)`, so nothing is set synchronously in this effect body.
+    // The rule cannot see through the async function boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkLiveGames();
   }, [checkLiveGames, pathname]);
 

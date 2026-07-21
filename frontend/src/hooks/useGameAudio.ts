@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import { englishPhrases } from "@/lib/englishPhrases";
 import { apiFetch, resolveAudioUrl } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useConfigStore } from "@/lib/stores/configStore";
@@ -23,7 +22,12 @@ export function useGameAudio(
   isMuted: boolean = false,
   gameCallMode?: "TTS" | "Audio" | "Text",
   gameBgMusicEnabled?: boolean,
+  // Reserved: both callers already pass these positionally, but the per-game
+  // intro/outro override is not consumed inside this hook yet. Removing them would
+  // silently shift the argument list at both call sites.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   gameIntroMode?: "TTS" | "Audio" | "Text",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   gameOutroMode?: "TTS" | "Audio" | "Text"
 ) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
@@ -149,6 +153,10 @@ export function useGameAudio(
         activeBgUrlRef.current = "";
       }
     };
+    // background_music_volume is deliberately NOT a dependency: this effect creates
+    // and tears down the audio element, so reacting to volume would restart the music
+    // from the top every time the slider moves. Volume is applied separately below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameLive, platformConfig?.background_music_enabled, platformConfig?.background_music_url, isMuted, gameBgMusicEnabled]);
 
   // Handle dynamic muting/unmuting of active audio tracks

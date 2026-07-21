@@ -92,6 +92,9 @@ export function useLobbyAudio(active: boolean) {
         audioRef.current = null;
       }
     };
+    // lobby_music_volume deliberately omitted — see useGameAudio: this effect owns
+    // the audio element's lifecycle, so a volume dep would restart the track.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     active,
     config?.lobby_music_url_1,

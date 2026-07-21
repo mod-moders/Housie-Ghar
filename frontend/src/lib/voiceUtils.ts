@@ -9,7 +9,7 @@ export interface FormattedVoice {
 }
 
 export function formatVoiceName(v: SpeechSynthesisVoice): FormattedVoice {
-  let name = v.name || "Default AI Voice";
+  const name = v.name || "Default AI Voice";
 
   let sanitized = name.replace(/undefined/gi, "").replace(/\s+/g, " ").trim();
   sanitized = sanitized.replace(/-\s*-/g, "-").replace(/\(\s*\)/g, "").trim();
@@ -58,7 +58,7 @@ export function formatVoiceName(v: SpeechSynthesisVoice): FormattedVoice {
 
 export function getTop5CuratedVoices(voices: SpeechSynthesisVoice[]): FormattedVoice[] {
   const formatted = voices.map((v) => {
-    let name = v.name || "Default AI Voice";
+    const name = v.name || "Default AI Voice";
     let sanitized = name.replace(/undefined/gi, "").replace(/\s+/g, " ").trim();
     sanitized = sanitized.replace(/-\s*-/g, "-").replace(/\(\s*\)/g, "").trim();
 
