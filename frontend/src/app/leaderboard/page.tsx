@@ -277,11 +277,11 @@ export default function LeaderboardAndStats() {
 
                 {/* Right: Detailed Prize Pattern Breakdown */}
                 {myStats.pattern_wins && (
-                  <div style={{ background: "var(--surface-2)", borderRadius: 12, padding: "10px 14px", border: "1px solid var(--border-light)" }}>
+                  <div style={{ background: "var(--surface-2)", borderRadius: 12, padding: "12px 16px", border: "1.5px solid var(--border)" }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
                       Detailed Prize Win Breakdown
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px 16px" }}>
                       <div>
                         <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
@@ -590,7 +590,7 @@ export default function LeaderboardAndStats() {
                             { label: "Best Win Boost", value: `+${(w.biggest_win / 1000).toFixed(2)}` },
                             { label: "Average Win Boost", value: `+${(avgPayout / 1000).toFixed(2)}` },
                           ].map((m) => (
-                            <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                            <div key={m.label} style={{ textAlign: "center", background: "var(--surface-2)", padding: "8px", borderRadius: "6px", border: "1.5px solid var(--border)" }}>
                               <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
                                 {m.label}
                               </span>
@@ -608,7 +608,7 @@ export default function LeaderboardAndStats() {
                             <span style={{ fontSize: 12, color: "var(--text-dim)", marginLeft: 8 }}>Fetching detailed statistics…</span>
                           </div>
                         ) : statsObj ? (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, borderTop: "1px solid var(--border-light)", paddingTop: 12 }}>
+                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, borderTop: "1.5px solid var(--border)", paddingTop: 12 }}>
                             {/* Stats grids */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -623,11 +623,11 @@ export default function LeaderboardAndStats() {
 
                             {/* Detailed Pattern wins */}
                             {statsObj.pattern_wins && (
-                              <div style={{ background: "var(--surface)", borderRadius: 10, padding: "10px 14px", border: "1px solid var(--border-light)" }}>
-                                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
-                                  Detailed Prize Win Breakdown
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                               <div style={{ background: "var(--surface-2)", borderRadius: 10, padding: "12px 16px", border: "1.5px solid var(--border)" }}>
+                                 <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
+                                   Detailed Prize Win Breakdown
+                                 </div>
+                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px 16px" }}>
                                   <div>
                                     <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
@@ -674,9 +674,9 @@ export default function LeaderboardAndStats() {
 
 function MiniBox({ label, value, sub, color }: { label: string; value: React.ReactNode; sub?: string; color?: string }) {
   return (
-    <div style={{ background: "var(--bg)", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 2, border: "1px solid var(--border-light)" }}>
-      <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-mute)" }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "var(--font-head)", color: color || "var(--text)", lineHeight: 1.1 }}>{value}</div>
+    <div style={{ background: "var(--surface-2)", borderRadius: 8, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 2, border: "1.5px solid var(--border)" }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-dim)" }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "var(--font-head)", color: color || "var(--text)", lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 9.5, color: "var(--text-mute)", lineHeight: 1.1 }}>{sub}</div>}
     </div>
   );
