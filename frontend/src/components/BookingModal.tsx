@@ -73,7 +73,7 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
   const urgent = secondsLeft <= 120;
   const shortId = lock.booking_id.substring(0, 8).toUpperCase();
   const routedTo = lock.agent_town ? `${lock.agent_name} · ${lock.agent_town}` : lock.agent_name;
-  const waMessage = `Hi ${lock.agent_name}, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: #${shortId}. Amount: ${moneyStr(lock.total_amount)}.`;
+  const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: #${shortId}. Amount: ${moneyStr(lock.total_amount)}.`;
 
   if (phase === "confirmed") {
     return (
@@ -174,8 +174,8 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
           <div className="hg-wa-head">
             <span className="hg-wa-ic"><Icon name="chat" size={16} strokeWidth={2.2} /></span>
             <div>
-              <strong>Pay {lock.is_overflow ? "the operator" : "agent"} on WhatsApp</strong>
-              <span>Routed to {routedTo}</span>
+              <strong>Pay to your Housie Ghar Bookie</strong>
+              <span>Housie Ghar Official Channel</span>
             </div>
           </div>
           <div className="hg-wa-msg">{waMessage}</div>
@@ -186,7 +186,7 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
 
         <div className="hg-poll">
           <span className="hg-poll-spin" />
-          Waiting for {lock.is_overflow ? "the operator" : "your agent"} to confirm your payment{".".repeat((polls % 3) + 1)}
+          Waiting for your Housie Ghar Bookie to confirm your payment{".".repeat((polls % 3) + 1)}
         </div>
       </div>
     </div>

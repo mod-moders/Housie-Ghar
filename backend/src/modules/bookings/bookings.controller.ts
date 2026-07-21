@@ -150,7 +150,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
     const makeBookingWaLink = (phone: string, fullName: string, bookingId: string, formattedBookingId?: string): string => {
       const code = formattedBookingId || `#${bookingId.substring(0, 8).toUpperCase()}`;
-      const msg = `Hi ${fullName}, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: ${code}. Amount: ₹${totalAmount}.`;
+      const msg = `Hi, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: ${code}. Amount: ₹${totalAmount}.`;
       return buildWaLink(phone, msg);
     };
 
