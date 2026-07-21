@@ -40,12 +40,17 @@ export default function LeaderboardAndStats() {
   const [loadingMyStats, setLoadingMyStats] = useState(true);
 
   // Cached stats for expanded players
+  // Captured once per mount: Date.now() called during render is impure and makes
+  // output unstable across re-renders. Day-granular durations do not need live ticks.
+  const [nowTs] = useState(() => Date.now());
+
   const [expandedStats, setExpandedStats] = useState<Record<string, PlayerStats>>({});
   const [loadingExpanded, setLoadingExpanded] = useState<string | null>(null);
 
   // Load logged-in user identity & personal stats
   useEffect(() => {
-    setLoadingMyStats(true);
+    // `loadingMyStats` already starts true and this effect is mount-only, so there
+    // is nothing to reset here.
     apiFetch<{ player: { housie_name: string } }>("/api/player/me")
       .then((res) => {
         setLoggedInName(res.player.housie_name);
@@ -190,7 +195,7 @@ export default function LeaderboardAndStats() {
     if (!registeredAt) return { duration: "—", date: "Unknown" };
     const d = new Date(registeredAt);
     const dateStr = d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
-    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    const days = Math.floor((nowTs - d.getTime()) / 86400000);
     let duration = "—";
     if (days === 0) duration = "Today";
     else if (days < 30) duration = `${days}d`;
