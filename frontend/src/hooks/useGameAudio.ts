@@ -277,6 +277,16 @@ export function useGameAudio(
       ? (config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_ne.mp3`)
       : (config?.audio_url_en || config?.audio_url_ne || config?.audio_url || `/audio/calls/${num}_en.mp3`);
 
+    // Second-choice source if the primary URL exists but 404s at playback time (e.g. an
+    // uploaded file that was never persisted across a redeploy — see the
+    // Platform_Audio_Files fix in numberCalls.controller.ts). The `||` chain above only
+    // catches an EMPTY url; it can't catch a url that points at a dead file. Without this,
+    // a single missing upload plays total silence for that number instead of falling back
+    // to whatever language IS actually available.
+    const fallbackUrl = activeLang === "ne"
+      ? (config?.audio_url_en || undefined)
+      : (config?.audio_url_ne || config?.audio_url || undefined);
+
     if (activeLang !== "ne" && !config?.audio_url_en && (config?.audio_url_ne || config?.audio_url)) {
       console.warn(`[useGameAudio] Number ${num} has no English audio uploaded — falling back to the Nepali file. Upload an English clip in Audio Settings > 1-90 Call Audio Files to fix this.`);
     }
@@ -286,7 +296,7 @@ export function useGameAudio(
     const effectiveVol = vol * masterVol;
 
     if (audioUrl) {
-      await playAudioFile(audioUrl, effectiveVol);
+      await playAudioFile(audioUrl, effectiveVol, fallbackUrl);
     }
   };
 
@@ -295,12 +305,17 @@ export function useGameAudio(
     soundSynthesizer.playCelebration();
   };
 
-  const playAudioFile = (mp3Path: string, customVolume: number = 1.0): Promise<void> => {
+  const playAudioFile = (mp3Path: string, customVolume: number = 1.0, fallbackPath?: string): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current || isMuted) return resolve();
 
       if (!mp3Path) {
-        return resolve();
+        if (fallbackPath) {
+          playAudioFile(fallbackPath, customVolume).then(resolve);
+        } else {
+          resolve();
+        }
+        return;
       }
 
       const resolvedUrl = resolveAudioUrl(mp3Path);
@@ -314,22 +329,37 @@ export function useGameAudio(
       soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
 
       let hasEnded = false;
-      const cleanupAndResolve = () => {
-        if (hasEnded) return;
-        hasEnded = true;
-        audio.removeEventListener("ended", cleanupAndResolve);
-        audio.removeEventListener("error", cleanupAndResolve);
+      const cleanup = () => {
+        audio.removeEventListener("ended", onEnded);
+        audio.removeEventListener("error", onError);
         const idx = activeAudiosRef.current.indexOf(audio);
         if (idx > -1) activeAudiosRef.current.splice(idx, 1);
+      };
+      const onEnded = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        cleanup();
         resolve();
       };
+      // The primary URL existed but failed to actually load (e.g. it points at a file
+      // that no longer exists on disk — a dead-but-truthy audio_url). Try the other
+      // language once before giving up, so one missing upload plays something instead
+      // of silence for that number.
+      const onError = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        cleanup();
+        if (fallbackPath && fallbackPath !== mp3Path) {
+          playAudioFile(fallbackPath, customVolume).then(resolve);
+        } else {
+          resolve();
+        }
+      };
 
-      audio.addEventListener("ended", cleanupAndResolve);
-      audio.addEventListener("error", cleanupAndResolve);
+      audio.addEventListener("ended", onEnded);
+      audio.addEventListener("error", onError);
 
-      audio.play().catch(() => {
-        cleanupAndResolve();
-      });
+      audio.play().catch(onError);
     });
   };
 

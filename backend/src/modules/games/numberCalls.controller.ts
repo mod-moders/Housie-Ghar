@@ -169,7 +169,35 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
              call_mode = 'Audio'
          RETURNING *`;
 
-    const result = await pool.query(updateQuery, [audioUrl, numVal]);
+    // Persist the raw bytes in Postgres, not just the local disk file, so this survives
+    // a Railway redeploy — which rebuilds the container from the git image and wipes
+    // backend/uploads + frontend/public/audio/calls, since neither is git-tracked for
+    // these per-upload filenames (only the original 90 pre-dual-language .mp4 files are
+    // committed). Number_Calls.audio_url_en/audio_url_ne kept pointing at the now-missing
+    // file after every redeploy, so every uploaded English call — and any freshly
+    // re-uploaded Nepali call — 404'd in production even though the DB said it existed.
+    // This is the exact class of bug migration 037 already fixed for config audio
+    // (welcome/instruction/bgm/cage/celebration) via Platform_Audio_Files +
+    // restorePersistedAudioFiles(); this reuses the same table/mechanism for number
+    // calls instead of duplicating it, keyed by `number_call_<n>_<lang>`.
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('BEGIN');
+      result = await client.query(updateQuery, [audioUrl, numVal]);
+      await client.query(
+        `INSERT INTO Platform_Audio_Files (config_key, filename, mime_type, data, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (config_key) DO UPDATE SET filename = $2, mime_type = $3, data = $4, updated_at = NOW()`,
+        [`number_call_${numVal}_${targetLang}`, filename, mimeType || null, buffer]
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     req.app.get('io')?.emit('number_calls_update');
     res.json(result.rows[0]);
@@ -208,30 +236,37 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
       });
     };
 
+    const numVal = parseInt(number as string, 10);
+
     if (targetLang === 'ne') {
       unlinkFile(`${number}_ne`);
+      await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = $1`, [`number_call_${numVal}_ne`]);
       await pool.query(
-        `UPDATE Number_Calls 
+        `UPDATE Number_Calls
          SET audio_url_ne = NULL,
              audio_url = audio_url_en,
              call_mode = CASE WHEN audio_url_en IS NULL THEN 'Text' ELSE 'Audio' END
          WHERE number = $1`,
-        [parseInt(number as string, 10)]
+        [numVal]
       );
     } else if (targetLang === 'en') {
       unlinkFile(`${number}_en`);
+      await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = $1`, [`number_call_${numVal}_en`]);
       await pool.query(
-        `UPDATE Number_Calls 
+        `UPDATE Number_Calls
          SET audio_url_en = NULL,
              audio_url = audio_url_ne,
              call_mode = CASE WHEN audio_url_ne IS NULL THEN 'Text' ELSE 'Audio' END
          WHERE number = $1`,
-        [parseInt(number as string, 10)]
+        [numVal]
       );
     } else {
       unlinkFile(`${number}_en`);
       unlinkFile(`${number}_ne`);
       unlinkFile(`${number}`);
+      await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = ANY($1)`, [
+        [`number_call_${numVal}_en`, `number_call_${numVal}_ne`],
+      ]);
       await pool.query(
         `UPDATE Number_Calls 
          SET audio_url = NULL, audio_url_en = NULL, audio_url_ne = NULL, call_mode = 'Text'

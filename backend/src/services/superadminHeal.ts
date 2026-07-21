@@ -150,17 +150,28 @@ export async function ensurePlatformConfig(): Promise<void> {
 }
 
 /**
- * Restore uploaded audio config files (intro/outro voice notes, background
- * music, lobby music) from Postgres back onto local disk on boot.
+ * Restore uploaded audio files — config audio (intro/outro voice notes,
+ * background music, lobby music) AND 1-90 number-call audio — from Postgres
+ * back onto local disk on boot.
  *
  * Railway rebuilds the backend into a fresh container on every deploy, which
  * resets the local filesystem to whatever's in the git image — silently
- * wiping any audio file a Superadmin uploaded at runtime via
- * uploadConfigAudio(), even though Platform_Config still points at that now-
- * missing filename. uploadConfigAudio() also persists the raw bytes into
+ * wiping any audio file a Superadmin uploaded at runtime, even though the DB
+ * (Platform_Config for config audio, Number_Calls for 1-90 calls) still
+ * points at that now-missing filename. Both uploadConfigAudio() and
+ * numberCalls.controller.ts's uploadNumberAudio() persist the raw bytes into
  * Platform_Audio_Files, which lives in Postgres and survives redeploys; this
  * writes those bytes back to disk for any file that's currently missing, so
  * playback keeps working without a staff member re-uploading it every time.
+ *
+ * Number-call rows are keyed `number_call_<n>_<lang>` (see uploadNumberAudio)
+ * and route to uploads/audio/calls instead of uploads/audio/config — every
+ * other key keeps going to the config directory as before. This was the one
+ * upload path that predated Platform_Audio_Files and never got wired into
+ * it: every uploaded 1-90 call file (English calls entirely, since no
+ * English clips ever shipped as git-tracked fallback files, unlike the
+ * original 90 Nepali .mp4s) 404'd in production the moment the next deploy
+ * landed, which is essentially immediately given how often this repo ships.
  */
 export async function restorePersistedAudioFiles(): Promise<void> {
   try {
@@ -169,20 +180,25 @@ export async function restorePersistedAudioFiles(): Promise<void> {
     );
     if (result.rowCount === 0) return;
 
-    const backendUploadDir = path.resolve(__dirname, '../../uploads/audio/config');
-    fs.mkdirSync(backendUploadDir, { recursive: true });
-
     let rootDir = process.cwd();
     if (path.basename(rootDir) === 'backend' || path.basename(rootDir) === 'frontend') {
       rootDir = path.resolve(rootDir, '..');
     }
-    const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/config');
-    try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
+
+    const configBackendDir = path.resolve(__dirname, '../../uploads/audio/config');
+    const configFrontendDir = path.resolve(rootDir, 'frontend/public/audio/config');
+    const callsBackendDir = path.resolve(__dirname, '../../uploads/audio/calls');
+    const callsFrontendDir = path.resolve(rootDir, 'frontend/public/audio/calls');
+    [configBackendDir, callsBackendDir].forEach((d) => fs.mkdirSync(d, { recursive: true }));
+    [configFrontendDir, callsFrontendDir].forEach((d) => { try { fs.mkdirSync(d, { recursive: true }); } catch {} });
 
     let restored = 0;
     for (const row of result.rows) {
-      const backendPath = path.join(backendUploadDir, row.filename);
-      const frontendPath = path.join(frontendPublicDir, row.filename);
+      const isNumberCall = typeof row.config_key === 'string' && row.config_key.startsWith('number_call_');
+      const backendDir = isNumberCall ? callsBackendDir : configBackendDir;
+      const frontendDir = isNumberCall ? callsFrontendDir : configFrontendDir;
+      const backendPath = path.join(backendDir, row.filename);
+      const frontendPath = path.join(frontendDir, row.filename);
       if (!fs.existsSync(backendPath)) {
         fs.writeFileSync(backendPath, row.data);
         restored++;
