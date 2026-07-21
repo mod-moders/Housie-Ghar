@@ -102,6 +102,7 @@ export interface HallOfFameEntry {
   points?: number;
   games_played?: number;
   tickets_bought?: number;
+  avatar_url?: string | null;
 }
 
 export interface OverviewStats {
@@ -227,6 +228,8 @@ export interface PlayerProfile {
 
 export interface PlayerStats {
   member_since: string | null;
+  avatar_url?: string | null;
+  housie_name?: string | null;
   games_played: number;
   tickets_bought: number;
   total_expenditure: number;

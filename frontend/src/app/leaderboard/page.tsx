@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Footer } from "@/components/ui";
+import { Footer, Avatar } from "@/components/ui";
 import type { HallOfFameEntry, PlayerStats } from "@/lib/types";
 import { useSocket } from "@/lib/hooks/useSocket";
 
@@ -366,9 +366,12 @@ export default function LeaderboardAndStats() {
 
                     {/* Avatar */}
                     <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
-                      <span className="hg-lb-avatar" style={{ width: 42, height: 42, fontSize: 18, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--surface-2)", color: "var(--text)", border: "1.5px solid var(--border-2)" }}>
-                        {w.housie_name[0]?.toUpperCase()}
-                      </span>
+                      <Avatar
+                        src={w.avatar_url}
+                        name={w.housie_name}
+                        className="hg-lb-avatar"
+                        style={{ width: 42, height: 42, fontSize: 18, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--surface-2)", color: "var(--text)", border: "1.5px solid var(--border-2)" }}
+                      />
                       {isHighRoller && (
                         <span
                           title="High Roller — over ₹10k earned"

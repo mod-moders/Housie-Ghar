@@ -176,13 +176,26 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
       }
     }
 
+    // Fetch avatar_urls from Players table
+    const avatarsRes = await pool.query(
+      `SELECT LOWER(TRIM(housie_name)) as key_name, avatar_url 
+       FROM Players 
+       WHERE avatar_url IS NOT NULL AND avatar_url != ''`
+    );
+    const avatarMap = new Map<string, string>();
+    for (const r of avatarsRes.rows) {
+      avatarMap.set(r.key_name, r.avatar_url);
+    }
+
     // Convert map to array with rating_score and sort by rating_score DESC, wins DESC, total_won DESC
     const leaderboard = Array.from(playerMap.values())
       .map((p) => {
         const avgPayout = p.wins > 0 ? p.total_won / p.wins : 0;
         const ratingScore = +(p.wins + (p.total_won + p.biggest_win + avgPayout) / 1000).toFixed(2);
+        const keyName = p.housie_name.toLowerCase().trim();
         return {
           ...p,
+          avatar_url: avatarMap.get(keyName) || null,
           avg_payout: Math.round(avgPayout),
           rating_score: ratingScore,
         };

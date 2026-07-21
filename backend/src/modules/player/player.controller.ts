@@ -252,25 +252,28 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
   try {
     let targetHousieName = "";
     let registeredAt = null;
+    let avatarUrl = null;
 
     if (queryHousieName) {
       // 1. Fetch basic player info by query housie_name
-      const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [queryHousieName]);
+      const playerRes = await pool.query('SELECT registered_at, housie_name, avatar_url FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [queryHousieName]);
       if (playerRes.rows.length === 0) {
         res.status(404).json({ message: 'Player not found' });
         return;
       }
       registeredAt = playerRes.rows[0].registered_at;
       targetHousieName = playerRes.rows[0].housie_name;
+      avatarUrl = playerRes.rows[0].avatar_url;
     } else {
       // 1. Basic player info by playerId
-      const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE player_id = $1', [playerId]);
+      const playerRes = await pool.query('SELECT registered_at, housie_name, avatar_url FROM Players WHERE player_id = $1', [playerId]);
       if (playerRes.rows.length === 0) {
         res.status(404).json({ message: 'Player not found' });
         return;
       }
       registeredAt = playerRes.rows[0].registered_at;
       targetHousieName = playerRes.rows[0].housie_name || req.player?.housieName;
+      avatarUrl = playerRes.rows[0].avatar_url;
     }
 
     // 2. Engagement stats from Bookings
@@ -433,6 +436,8 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
 
     res.json({
       member_since: registeredAt,
+      avatar_url: avatarUrl,
+      housie_name: targetHousieName,
       games_played: parseInt(bStats.games_played, 10) || 0,
       tickets_bought: parseInt(bStats.tickets_bought, 10) || 0,
       total_expenditure: parseFloat(bStats.total_expenditure) || 0,

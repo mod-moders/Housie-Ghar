@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
-import { Footer } from "@/components/ui";
+import { Footer, Avatar } from "@/components/ui";
 import { money } from "@/lib/money";
 import type { PlayerStats, HallOfFameEntry } from "@/lib/types";
 import { useSocket } from "@/lib/hooks/useSocket";
@@ -161,13 +161,26 @@ export default function StatsPage() {
           
           {/* Header Bar */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>
-                My Statistics &amp; Performance
-              </h1>
-              <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>
-                Personal lifetime performance metrics and achievements synchronized in real-time.
-              </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar
+                src={stats.avatar_url}
+                name={stats.housie_name}
+                className="hg-avatar-lg"
+                style={{
+                  width: 48, height: 48, fontSize: 18, borderRadius: "50%",
+                  display: "grid", placeItems: "center",
+                  background: "var(--surface-2)", color: "var(--text)",
+                  border: "2px solid var(--accent)", flexShrink: 0
+                }}
+              />
+              <div>
+                <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>
+                  My Statistics &amp; Performance
+                </h1>
+                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>
+                  Personal lifetime performance metrics and achievements synchronized in real-time.
+                </p>
+              </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#10B981" }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
