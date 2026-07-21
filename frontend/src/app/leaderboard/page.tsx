@@ -220,104 +220,12 @@ export default function LeaderboardAndStats() {
         {/* ── Page Header ── */}
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
           <div>
-            <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame &amp; Stats</h1>
+            <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame Leaderboard</h1>
             <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>
-              Unified Master rankings &amp; live performance statistics counted from day one of registration.
+              Unified Master rankings counted from day one of registration.
             </p>
           </div>
         </div>
-
-        {/* ── Logged-in Player's Statistics Hero Dashboard ── */}
-        {loggedInName && !loadingMyStats && myStats && (
-          <div style={{ ...containerStyle, paddingTop: 8, paddingBottom: 12 }}>
-            <div className="hg-card hg-glass-panel" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid var(--border-2)", paddingBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Icon name="chart" size={18} style={{ color: "var(--accent)" }} />
-                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text)" }}>My Statistics &amp; Performance</h2>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: "#10B981" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
-                  Live Synced
-                </div>
-              </div>
-
-              {/* Stats Key Metric Ribbon */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Net Profit/Loss</div>
-                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: (myStats.amount_won - myStats.total_expenditure) >= 0 ? "#10B981" : "#EF4444" }}>
-                    {money(myStats.amount_won - myStats.total_expenditure)}
-                  </strong>
-                </div>
-                <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Win Rate</div>
-                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: "var(--accent)" }}>
-                    {myStats.games_played > 0 ? ((myStats.games_won / myStats.games_played) * 100).toFixed(0) : "0"}%
-                  </strong>
-                </div>
-                <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>ROI</div>
-                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: (myStats.amount_won - myStats.total_expenditure) >= 0 ? "#10B981" : "#EF4444" }}>
-                    {myStats.total_expenditure > 0 ? (((myStats.amount_won / myStats.total_expenditure) * 100) - 100).toFixed(1) : "0"}%
-                  </strong>
-                </div>
-                <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Luckiest Ticket</div>
-                  <strong style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>
-                    {myStats.luckiest_ticket_number ? `#${myStats.luckiest_ticket_number}` : "—"}
-                  </strong>
-                </div>
-              </div>
-
-              {/* Detailed Personal Stats Columns */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, borderTop: "1px solid var(--border-2)", paddingTop: 14 }}>
-                {/* Left: Financial & Volume */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <MiniBox label="Total Won" value={money(myStats.amount_won)} sub={`${myStats.total_wins} wins`} />
-                    <MiniBox label="Total Spent" value={money(myStats.total_expenditure)} sub="Tickets bought" />
-                    <MiniBox label="Games Played" value={myStats.games_played} sub="Total sessions" />
-                    <MiniBox label="Longest Win Streak" value={`${myStats.longest_winning_run} games`} sub="Consecutive" />
-                  </div>
-                </div>
-
-                {/* Right: Detailed Prize Pattern Breakdown */}
-                {myStats.pattern_wins && (
-                  <div style={{ background: "var(--surface-2)", borderRadius: 12, padding: "12px 16px", border: "1.5px solid var(--border)" }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
-                      Detailed Prize Win Breakdown
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px 16px" }}>
-                      <div>
-                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE &amp; LINES</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                          <PatternRow label="Full House" count={myStats.pattern_wins.full_house} />
-                          <PatternRow label="1st Full House" count={myStats.pattern_wins.first_full_house} />
-                          <PatternRow label="2nd Full House" count={myStats.pattern_wins.second_full_house} />
-                          <PatternRow label="3rd Full House" count={myStats.pattern_wins.third_full_house} />
-                          <PatternRow label="Top Line" count={myStats.pattern_wins.top_line} />
-                          <PatternRow label="Middle Line" count={myStats.pattern_wins.middle_line} />
-                          <PatternRow label="Bottom Line" count={myStats.pattern_wins.bottom_line} />
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>SPECIAL BONUSES</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                          <PatternRow label="Early Five" count={myStats.pattern_wins.early_five} />
-                          <PatternRow label="Quick 7" count={myStats.pattern_wins.quick_7} />
-                          <PatternRow label="Corner" count={myStats.pattern_wins.corner} />
-                          <PatternRow label="Star" count={myStats.pattern_wins.star} />
-                          <PatternRow label="Box Bonus" count={myStats.pattern_wins.box_bonus} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── Search & Filter Ribbon ── */}
         <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 12, paddingBottom: 16 }}>
