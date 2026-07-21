@@ -225,18 +225,22 @@ export async function logout(req: Request, res: Response): Promise<void> {
 }
 
 export async function getPlayerStats(req: any, res: Response): Promise<void> {
-  const housieName = req.player?.housieName;
   const playerId = req.player?.playerId;
 
-  if (!housieName || !playerId) {
+  if (!playerId) {
     res.status(401).json({ message: 'Unauthorized' });
     return;
   }
 
   try {
-    // 1. Basic player info
-    const playerRes = await pool.query('SELECT registered_at FROM Players WHERE player_id = $1', [playerId]);
-    const registeredAt = playerRes.rows[0]?.registered_at;
+    // 1. Basic player info & fresh housie_name
+    const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE player_id = $1', [playerId]);
+    if (playerRes.rows.length === 0) {
+      res.status(404).json({ message: 'Player not found' });
+      return;
+    }
+    const registeredAt = playerRes.rows[0].registered_at;
+    const housieName = playerRes.rows[0].housie_name || req.player?.housieName;
 
     // 2. Engagement stats from Bookings
     const bookingsRes = await pool.query(
