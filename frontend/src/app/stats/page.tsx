@@ -14,6 +14,7 @@ export default function StatsPage() {
   const router = useRouter();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [rankInfo, setRankInfo] = useState<{ rank: number; totalPlayers: number } | null>(null);
 
   const loadStats = useCallback(() => {
@@ -21,9 +22,12 @@ export default function StatsPage() {
       .then((res) => {
         setStats(res);
         setLoading(false);
+        setError(null);
       })
       .catch((err) => {
         console.error("Failed to load stats", err);
+        setError(err.message || "Failed to load stats");
+        setLoading(false);
         if (isAuthError(err)) {
           router.push("/login");
         }
@@ -68,11 +72,36 @@ export default function StatsPage() {
     }
   });
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <PublicShell>
         <div className="hg-screen" style={{ display: "grid", placeItems: "center" }}>
           <span className="hg-poll-spin" style={{ display: "inline-block", width: "24px", height: "24px", border: "2px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      </PublicShell>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <PublicShell>
+        <div className="hg-screen" style={{ display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
+          <div className="hg-card" style={{ maxWidth: 400, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(239, 68, 68, 0.1)", display: "grid", placeItems: "center", color: "#EF4444" }}>
+              <Icon name="help" size={24} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Stats Temporarily Unavailable</h2>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: 0 }}>
+              {error || "Could not retrieve your player statistics. Please log in and try again."}
+            </p>
+            <button 
+              className="hg-btn hg-btn-cta" 
+              onClick={() => { setLoading(true); loadStats(); }}
+              style={{ width: "100%", padding: "8px 16px", borderRadius: 6, fontWeight: 700 }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </PublicShell>
     );

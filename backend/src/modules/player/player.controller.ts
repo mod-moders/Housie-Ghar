@@ -312,13 +312,13 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
            COALESCE(p.amount_per_winner, p.prize_amount) * (
              SELECT COALESCE(
                (
-                 SELECT array_length(regexp_split_to_array(m[1], '[[:space:]]*(?:&|,|(?i:and))[[:space:]]*'), 1)
+                 SELECT array_length(regexp_split_to_array(m[1], '[[:space:]]*(?:&|,|[aA][nN][dD])[[:space:]]*'), 1)
                  FROM (SELECT regexp_match(raw_token, '\\(([^)]+)\\)') AS m) AS sub
                  WHERE m IS NOT NULL
                ),
                1
              )
-             FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+             FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
              WHERE LOWER(TRIM(regexp_replace(raw_token, '\\([^)]*\\)', '', 'g'))) = LOWER(TRIM($1))
              LIMIT 1
            )
@@ -327,7 +327,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
        WHERE p.claimed = TRUE
          AND EXISTS (
            SELECT 1
-           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
            WHERE LOWER(TRIM(regexp_replace(raw_token, '\\([^)]*\\)', '', 'g'))) = LOWER(TRIM($1))
          )`,
       [targetHousieName]
@@ -340,13 +340,13 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
          COALESCE(p.amount_per_winner, p.prize_amount) * (
            SELECT COALESCE(
              (
-               SELECT array_length(regexp_split_to_array(m[1], '[[:space:]]*(?:&|,|(?i:and))[[:space:]]*'), 1)
+               SELECT array_length(regexp_split_to_array(m[1], '[[:space:]]*(?:&|,|[aA][nN][dD])[[:space:]]*'), 1)
                FROM (SELECT regexp_match(raw_token, '\\(([^)]+)\\)') AS m) AS sub
                WHERE m IS NOT NULL
              ),
              1
            )
-           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
            WHERE LOWER(TRIM(regexp_replace(raw_token, '\\([^)]*\\)', '', 'g'))) = LOWER(TRIM($1))
            LIMIT 1
          )
@@ -355,7 +355,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
        WHERE p.claimed = TRUE
          AND EXISTS (
            SELECT 1
-           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
            WHERE LOWER(TRIM(regexp_replace(raw_token, '\\([^)]*\\)', '', 'g'))) = LOWER(TRIM($1))
          )
        GROUP BY p.game_id 
@@ -369,11 +369,11 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
     const luckiestTicketRes = await pool.query(
       `SELECT ticket_num 
        FROM (
-         SELECT TRIM(regexp_split_to_table(paren_content, '[[:space:]]*(?:&|,|(?i:and))[[:space:]]*'))::integer AS ticket_num
+         SELECT TRIM(regexp_split_to_table(paren_content, '[[:space:]]*(?:&|,|[aA][nN][dD])[[:space:]]*'))::integer AS ticket_num
          FROM (
            SELECT (regexp_match(raw_token, '\\(([^)]+)\\)'))[1] AS paren_content
            FROM (
-             SELECT regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+             SELECT regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
              FROM Prize_Pool p
              WHERE p.claimed = TRUE
            ) AS tokens
@@ -398,7 +398,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
              AND p.claimed = TRUE 
              AND EXISTS (
                SELECT 1
-               FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+(?i:and)[[:space:]]+') AS raw_token
+               FROM regexp_split_to_table(p.winner_housie_name, '[,&]|[[:space:]]+[aA][nN][dD][[:space:]]+') AS raw_token
                WHERE LOWER(TRIM(regexp_replace(raw_token, '\\([^)]*\\)', '', 'g'))) = LOWER(TRIM($1))
              )
          ) > 0 as won
