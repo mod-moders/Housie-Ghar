@@ -1251,12 +1251,29 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
       : '';
 
     // Generate WhatsApp message
-    const amount = parseFloat(prize.amount_per_winner ?? prize.prize_amount);
+    const baseAmount = parseFloat(prize.amount_per_winner ?? prize.prize_amount);
+    let calculatedAmount = baseAmount;
     let ticketDisplay = prize.winner_ticket_number ? `#${prize.winner_ticket_number}` : '';
+
     if (prize.winner_housie_name) {
-      const match = prize.winner_housie_name.match(/\(([^)]+)\)/);
-      if (match && match[1]) {
-        ticketDisplay = `#${match[1]}`;
+      const lowerPlayer = playerHousieName.toLowerCase();
+      const segments = prize.winner_housie_name.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
+      
+      for (const seg of segments) {
+        const match = seg.trim().match(/^([^(]+)(?:\(([^)]+)\))?/);
+        if (match) {
+          const pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim().toLowerCase();
+          if (pName === lowerPlayer) {
+            const tksStr = match[2];
+            const tks = tksStr ? (tksStr.match(/\d+/g) || []) : [];
+            const ticketCount = tks.length > 0 ? tks.length : 1;
+            calculatedAmount = baseAmount * ticketCount;
+            if (tks.length > 0) {
+              ticketDisplay = tks.map((t: string, i: number) => (i === 0 ? `#${t}` : `${t}`)).join(' & ');
+            }
+            break;
+          }
+        }
       }
     }
 
@@ -1266,7 +1283,7 @@ export async function claimPrize(req: Request, res: Response): Promise<void> {
 - *Game:* ${gameDetailRes.rows[0]?.title || 'Housie Ghar Game'} (${gameDateFormatted})
 - *Prize:* ${prize.pattern_name}
 - *Ticket:* ${ticketDisplay}
-${bookieInfo ? `- *Bookie:* ${bookieInfo}\n` : ''}- *Prize Amount:* ₹${amount.toFixed(2)}
+${bookieInfo ? `- *Bookie:* ${bookieInfo}\n` : ''}- *Prize Amount:* ₹${calculatedAmount.toFixed(2)}
 
 Here is my UPI ID/QR Code for disbursement:`;
 
@@ -1279,8 +1296,8 @@ Here is my UPI ID/QR Code for disbursement:`;
       prize: {
         prize_id: prize.prize_id,
         pattern_name: prize.pattern_name,
-        amount: amount,
-        winner_ticket_number: prize.winner_ticket_number,
+        amount: calculatedAmount,
+        winner_ticket_number: ticketDisplay,
         split_count: prize.split_count,
         player_claimed: true,
         player_claimed_at: new Date().toISOString(),
