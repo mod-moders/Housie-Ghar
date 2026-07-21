@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import { Footer } from "@/components/ui";
 import type { HallOfFameEntry } from "@/lib/types";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 type Timeframe = "all-time" | "monthly" | "weekly" | "daily";
 
@@ -45,9 +46,7 @@ export default function Leaderboard() {
       });
   }, []);
 
-  // Fetch leaderboard data filtered by active timeframe
-  useEffect(() => {
-    setLoading(true);
+  const loadLeaderboard = useCallback(() => {
     apiFetch<HallOfFameEntry[]>(`/api/stats/hall-of-fame?timeframe=${timeframe}`)
       .then((res) => {
         setEntries(res);
@@ -58,6 +57,27 @@ export default function Leaderboard() {
         setLoading(false);
       });
   }, [timeframe]);
+
+  // Fetch leaderboard data filtered by active timeframe + 5s auto-refresh
+  useEffect(() => {
+    setLoading(true);
+    loadLeaderboard();
+    const interval = setInterval(loadLeaderboard, 5000);
+    return () => clearInterval(interval);
+  }, [loadLeaderboard]);
+
+  useSocket((event) => {
+    if (
+      event === "player_stats_update" ||
+      event === "game_completed" ||
+      event === "draw_ended" ||
+      event === "prize_claimed" ||
+      event === "prize_disbursed" ||
+      event === "game_list_update"
+    ) {
+      loadLeaderboard();
+    }
+  });
 
   // Global insight metrics calculated from all entries
   const insights = useMemo(() => {

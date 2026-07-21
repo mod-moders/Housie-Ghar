@@ -604,6 +604,7 @@ export async function completeGame(gameId: string): Promise<void> {
 
   await publishGameEvent(gameId, completeEvent);
   activeGames.delete(gameId);
+  try { io.emit('player_stats_update'); io.emit('game_list_update'); } catch {}
 
   console.log(`🏁 Game ${gameId} Completed! leaderboard:`, leaderboard);
 }
@@ -637,6 +638,7 @@ export async function endGameDraw(gameId: string): Promise<void> {
     );
     // Broadcast list update so it shifts to past games
     io.emit('game_list_update');
+    io.emit('player_stats_update');
   } else {
     await pool.query(
       `UPDATE Scheduled_Games
@@ -644,6 +646,8 @@ export async function endGameDraw(gameId: string): Promise<void> {
        WHERE game_id = $1`,
       [gameId]
     );
+    io.emit('player_stats_update');
+    io.emit('game_list_update');
   }
 
   // Fetch final leaderboard (all claimed/won prizes)
@@ -667,6 +671,7 @@ export async function endGameDraw(gameId: string): Promise<void> {
 
   await publishGameEvent(gameId, drawEndedEvent);
   activeGames.delete(gameId);
+  try { io.emit('player_stats_update'); io.emit('game_list_update'); } catch {}
 
   console.log(`🏁 Game ${gameId} Draw Ended! leaderboard:`, leaderboard);
 }

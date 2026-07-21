@@ -245,7 +245,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
          COALESCE(SUM(array_length(ticket_ids, 1)), 0) as tickets_bought,
          COALESCE(SUM(total_amount), 0) as total_expenditure
        FROM Bookings 
-       WHERE housie_name = $1 AND booking_status = 'Sold'`,
+       WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1)) AND booking_status = 'Sold'`,
       [housieName]
     );
     const bStats = bookingsRes.rows[0];
@@ -257,19 +257,43 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
          COUNT(*) FILTER (WHERE pattern_name ILIKE '%Full House%') as full_house_wins,
          COUNT(*) FILTER (WHERE pattern_name ILIKE '%Line%') as line_wins,
          COUNT(*) FILTER (WHERE pattern_name NOT ILIKE '%Full House%' AND pattern_name NOT ILIKE '%Line%') as other_wins,
-         COALESCE(SUM(COALESCE(amount_per_winner, prize_amount)), 0) as amount_won
-       FROM Prize_Pool 
-       WHERE $1 = ANY(regexp_split_to_array(winner_housie_name, ',\\s*')) AND claimed = TRUE`,
+         COALESCE(SUM(
+           COALESCE(p.amount_per_winner, p.prize_amount) * (
+             SELECT COALESCE(array_length(regexp_split_to_array(raw_token, '&|\bAND\b'), 1), 1)
+             FROM regexp_split_to_table(p.winner_housie_name, ',\s*') AS raw_token
+             WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+             LIMIT 1
+           )
+         ), 0) as amount_won
+       FROM Prize_Pool p
+       WHERE p.claimed = TRUE
+         AND EXISTS (
+           SELECT 1
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+           WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+         )`,
       [housieName]
     );
     const wStats = winsRes.rows[0];
 
     // 4. Highest Single Game Win
     const highestGameRes = await pool.query(
-      `SELECT COALESCE(SUM(COALESCE(amount_per_winner, prize_amount)), 0) as game_total 
-       FROM Prize_Pool 
-       WHERE $1 = ANY(regexp_split_to_array(winner_housie_name, ',\\s*')) AND claimed = TRUE 
-       GROUP BY game_id 
+      `SELECT COALESCE(SUM(
+         COALESCE(p.amount_per_winner, p.prize_amount) * (
+           SELECT COALESCE(array_length(regexp_split_to_array(raw_token, '&|\bAND\b'), 1), 1)
+           FROM regexp_split_to_table(p.winner_housie_name, ',\s*') AS raw_token
+           WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+           LIMIT 1
+         )
+       ), 0) as game_total 
+       FROM Prize_Pool p
+       WHERE p.claimed = TRUE
+         AND EXISTS (
+           SELECT 1
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+           WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+         )
+       GROUP BY p.game_id 
        ORDER BY game_total DESC 
        LIMIT 1`,
       [housieName]
@@ -281,7 +305,12 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
       `SELECT t.ticket_number 
        FROM Prize_Pool p
        JOIN Tickets t ON p.winner_ticket_id = t.ticket_id
-       WHERE $1 = ANY(regexp_split_to_array(p.winner_housie_name, ',\\s*')) AND p.claimed = TRUE
+       WHERE p.claimed = TRUE
+         AND EXISTS (
+           SELECT 1
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+           WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+         )
        GROUP BY t.ticket_number 
        ORDER BY COUNT(*) DESC, t.ticket_number ASC 
        LIMIT 1`,
@@ -292,10 +321,20 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
     // 6. Streaks Calculation
     const gamesRes = await pool.query(
       `SELECT g.game_id, 
-         (SELECT COUNT(*) FROM Prize_Pool p WHERE p.game_id = g.game_id AND $1 = ANY(regexp_split_to_array(p.winner_housie_name, ',\\s*')) AND p.claimed = TRUE) > 0 as won
+         (
+           SELECT COUNT(*) 
+           FROM Prize_Pool p 
+           WHERE p.game_id = g.game_id 
+             AND p.claimed = TRUE 
+             AND EXISTS (
+               SELECT 1
+               FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+               WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+             )
+         ) > 0 as won
        FROM Bookings b
        JOIN Scheduled_Games g ON b.game_id = g.game_id
-       WHERE b.housie_name = $1 AND b.booking_status = 'Sold'
+       WHERE LOWER(TRIM(b.housie_name)) = LOWER(TRIM($1)) AND b.booking_status = 'Sold'
        GROUP BY g.game_id, g.scheduled_at
        ORDER BY g.scheduled_at ASC`,
       [housieName]
@@ -356,9 +395,21 @@ export async function getAllPlayers(req: any, res: Response): Promise<void> {
          COALESCE(SUM(array_length(b.ticket_ids, 1)), 0)::INTEGER AS tickets_bought,
          COALESCE(SUM(b.total_amount), 0)::FLOAT AS total_expenditure,
          (
-           SELECT COALESCE(SUM(COALESCE(pr.amount_per_winner, pr.prize_amount)), 0)::FLOAT
+           SELECT COALESCE(SUM(
+             COALESCE(pr.amount_per_winner, pr.prize_amount) * (
+               SELECT COALESCE(array_length(regexp_split_to_array(raw_token, '&|\bAND\b'), 1), 1)
+               FROM regexp_split_to_table(pr.winner_housie_name, ',\s*') AS raw_token
+               WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM(p.housie_name))
+               LIMIT 1
+             )
+           ), 0)::FLOAT
            FROM Prize_Pool pr
-           WHERE p.housie_name = ANY(regexp_split_to_array(pr.winner_housie_name, ',\\s*')) AND pr.claimed = TRUE
+           WHERE pr.claimed = TRUE
+             AND EXISTS (
+               SELECT 1
+               FROM regexp_split_to_table(pr.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+               WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM(p.housie_name))
+             )
          ) AS total_won
        FROM Players p
        LEFT JOIN Bookings b ON b.housie_name = p.housie_name AND b.booking_status = 'Sold'
@@ -448,7 +499,11 @@ export async function getPlayerWinnings(req: any, res: Response): Promise<void> 
        LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
        WHERE p.claimed = TRUE 
          AND sg.game_status IN ('Draw_Ended', 'Completed')
-         AND (p.winner_housie_name = $1 OR p.winner_housie_name LIKE '%' || $1 || '%')
+         AND EXISTS (
+           SELECT 1
+           FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
+           WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
+         )
        ORDER BY sg.scheduled_at DESC`,
       [playerHousieName]
     );

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import type { PlayerStats, HallOfFameEntry } from "@/lib/types";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 /* ── tiny reusable pieces ────────────────────────────────────── */
 
@@ -48,26 +49,18 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [rankInfo, setRankInfo] = useState<{ rank: number; totalPlayers: number } | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      apiFetch<PlayerStats>("/api/player/stats")
-        .then((res) => { if (!cancelled) { setStats(res); setLoading(false); } })
-        .catch((err) => {
-          if (cancelled) return;
-          console.error("Failed to load stats", err);
-          // Only a real 401/403 means the player isn't actually logged in —
-          // a network blip must not bounce them to /login; retry instead.
-          if (!isAuthError(err)) { setTimeout(() => { if (!cancelled) load(); }, 3000); return; }
+  const loadStats = useCallback(() => {
+    apiFetch<PlayerStats>("/api/player/stats")
+      .then((res) => { setStats(res); setLoading(false); })
+      .catch((err) => {
+        console.error("Failed to load stats", err);
+        if (isAuthError(err)) {
           router.push("/login");
-        });
-    };
-    load();
-    return () => { cancelled = true; };
+        }
+      });
   }, [router]);
 
-  // Percentile rank: cross-reference this player against the public leaderboard by earnings
-  useEffect(() => {
+  const loadRank = useCallback(() => {
     Promise.all([
       apiFetch<{ player: { housie_name: string } }>("/api/player/me").catch(() => null),
       apiFetch<HallOfFameEntry[]>("/api/stats/hall-of-fame?timeframe=all-time").catch(() => null),
@@ -80,6 +73,31 @@ export default function StatsPage() {
       if (idx >= 0) setRankInfo({ rank: idx + 1, totalPlayers: sorted.length });
     });
   }, []);
+
+  useEffect(() => {
+    loadStats();
+    loadRank();
+    const interval = setInterval(() => {
+      loadStats();
+      loadRank();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadStats, loadRank]);
+
+  useSocket((event) => {
+    if (
+      event === "player_stats_update" ||
+      event === "game_completed" ||
+      event === "draw_ended" ||
+      event === "prize_claimed" ||
+      event === "prize_disbursed" ||
+      event === "game_list_update" ||
+      event === "ticket_status_change"
+    ) {
+      loadStats();
+      loadRank();
+    }
+  });
 
   if (loading || !stats) {
     return (
