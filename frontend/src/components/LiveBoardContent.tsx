@@ -269,26 +269,38 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       gameStartedAnnouncedRef.current = true;
       if (drawnNumbers.length === 0) {
         // Fixed-duration startup sequence (must match gameEngine.ts's initialDelay, which
-        // gates when the backend actually draws the first number — kept as flat, absolute
-        // offsets rather than chained on playGreeting()'s promise so the two never drift out
-        // of sync with each other regardless of the actual uploaded intro clip's length:
+        // gates when the backend actually draws the first number):
         // t=0s: live session starts (BGM autoplays independently, see useGameAudio.ts).
         // t=0s-10s: hold.
         // t=10s-20s: "Welcome to Housie Ghar" banner shown for 10s.
         // t=20s-30s: hold.
-        // t=30s-50s: intro audio plays for a fixed 20s window.
-        // t=50s-53s: hold.
-        // t=53s: game starts — cage rolls, first number reveals.
+        // t=30s+: intro audio plays — actual duration depends on the uploaded clip, not a
+        // fixed budget. Draws arriving over SSE while it's still playing are queued (see the
+        // `introPlayingRef` check in the "draw" SSE handler below) rather than revealed.
+        // t=53s: earliest the game can start — cage rolls, first number reveals.
+        // The 53s floor and the intro's real completion are two independent, racing
+        // conditions — flushPendingDraws() must wait for BOTH. Firing it on the fixed 53s
+        // timer alone (the previous behavior) reveals/calls queued draws while playGreeting()'s
+        // audio is still genuinely playing whenever an uploaded clip runs longer than ~23s:
+        // the number still gets shown (revealDraw always calls addDrawn/setRevealed), but
+        // playNumberCall() silently no-ops because isIntroPlayingRef is still true — the first
+        // one or two calls play with no audio.
+        let floorReached = false;
+        const tryFlush = () => {
+          if (floorReached && !introPlayingRef.current) {
+            flushPendingDraws();
+          }
+        };
         delay(() => setWelcomeTextVisible(true), 10000);
         delay(() => setWelcomeTextVisible(false), 20000);
-        delay(() => playGreeting(), 30000);
-        delay(() => flushPendingDraws(), 53000);
+        delay(() => { playGreeting().finally(tryFlush); }, 30000);
+        delay(() => { floorReached = true; tryFlush(); }, 53000);
       } else {
         // Late joiners joining mid-game skip Welcome text & Intro note completely
         flushPendingDraws();
       }
     }
-  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay]);
+  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay, introPlayingRef]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);
