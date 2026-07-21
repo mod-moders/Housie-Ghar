@@ -593,43 +593,25 @@ export default function LeaderboardAndStats() {
                           display: "flex", flexDirection: "column", gap: 12
                         }}
                       >
-                        {/* 1. Rating formula breakdown */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
-                          {[
-                            { label: "Master Rating", value: `⚡ ${w.computedRating.toFixed(2)} PTS` },
-                            { label: "Wins Base", value: `+${w.wins.toFixed(2)}` },
-                            { label: "Total Winnings Boost", value: `+${(w.total_won / 1000).toFixed(2)}` },
-                            { label: "Best Win Boost", value: `+${(w.biggest_win / 1000).toFixed(2)}` },
-                            { label: "Average Win Boost", value: `+${(avgPayout / 1000).toFixed(2)}` },
-                          ].map((m) => (
-                            <div key={m.label} style={{ textAlign: "center", background: "var(--surface-2)", padding: "8px", borderRadius: "6px", border: "1.5px solid var(--border)" }}>
-                              <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
-                                {m.label}
-                              </span>
-                              <strong style={{ fontSize: 13, color: m.label.includes("Boost") || m.label.includes("Base") ? "var(--accent)" : "var(--text)" }}>
-                                {m.value}
-                              </strong>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* 2. Detailed statistics fetched on the fly */}
+                        {/* Detailed statistics fetched on the fly */}
                         {isLoadingStats ? (
                           <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
                             <span className="hg-poll-spin" style={{ display: "inline-block", width: "16px", height: "16px", border: "1.5px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                             <span style={{ fontSize: 12, color: "var(--text-dim)", marginLeft: 8 }}>Fetching detailed statistics…</span>
                           </div>
                         ) : statsObj ? (
-                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, borderTop: "1.5px solid var(--border)", paddingTop: 12 }}>
+                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
                             {/* Stats grids */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                <MiniBox label="Win Rate" value={`${statsObj.games_played > 0 ? ((statsObj.games_won / statsObj.games_played) * 100).toFixed(0) : "0"}%`} sub={`${statsObj.total_wins} wins`} />
+                                <MiniBox label="Total Won" value={money(statsObj.amount_won)} sub={`${statsObj.total_wins} wins`} />
+                                <MiniBox label="Total Spent" value={money(statsObj.total_expenditure)} sub="Ticket purchases" />
+                                <MiniBox label="Win Rate" value={`${statsObj.games_played > 0 ? ((statsObj.games_won / statsObj.games_played) * 100).toFixed(0) : "0"}%`} sub="Games won ratio" />
                                 <MiniBox label="ROI" value={`${statsObj.total_expenditure > 0 ? (((statsObj.amount_won / statsObj.total_expenditure) * 100) - 100).toFixed(1) : "0"}%`} sub="Return on tickets" />
                                 <MiniBox label="Games Played" value={statsObj.games_played} sub="Total sessions" />
                                 <MiniBox label="Longest Win Streak" value={`${statsObj.longest_winning_run} games`} sub="Consecutive wins" />
-                                <MiniBox label="Member Duration" value={getMemberDuration(statsObj.member_since).duration} sub={`Joined: ${getMemberDuration(statsObj.member_since).date}`} />
                                 <MiniBox label="Luckiest Ticket" value={statsObj.luckiest_ticket_number ? `#${statsObj.luckiest_ticket_number}` : "—"} sub="Wins most on" />
+                                <MiniBox label="Member Duration" value={getMemberDuration(statsObj.member_since).duration} sub={`Joined: ${getMemberDuration(statsObj.member_since).date}`} />
                               </div>
                             </div>
 
