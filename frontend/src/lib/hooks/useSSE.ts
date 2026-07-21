@@ -18,7 +18,7 @@ export function useSSE(gameId: string | null, onEvent?: (data: SSEEventData) => 
   const sourceRef = useRef<EventSource | null>(null);
   const handlerRef = useRef(onEvent);
   useLayoutEffect(() => { handlerRef.current = onEvent; });
-  const { addDrawn, setStatus } = useGameStore();
+  const { addDrawn, setStatus, setElapsed } = useGameStore();
 
   useEffect(() => {
     if (!gameId) return;
@@ -35,6 +35,9 @@ export function useSSE(gameId: string | null, onEvent?: (data: SSEEventData) => 
         return;
       }
       if (data.event === "initial_state") {
+        // Record how far into the game we are BEFORE the status flips to Live, so the
+        // board's startup choreography can pick the right branch in the same render.
+        setElapsed(typeof data.elapsed_ms === "number" ? (data.elapsed_ms as number) : null);
         setStatus(data.game_status as Parameters<typeof setStatus>[0]);
         ((data.drawn_numbers as number[]) ?? []).forEach((n) => addDrawn(n));
         // Let LiveBoard handle draw to sync with audio!

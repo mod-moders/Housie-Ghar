@@ -41,6 +41,15 @@ interface FloatingReaction {
   x: number;
 }
 
+// Startup choreography, expressed in GAME time (ms since the operator hit Start),
+// not in page time. FIRST_DRAW_AT_MS must stay in step with gameEngine.ts's
+// `initialDelay` (53000 for a fresh game) — that is when the backend actually
+// draws the first number.
+const WELCOME_IN_MS = 10000;
+const WELCOME_OUT_MS = 20000;
+const INTRO_AT_MS = 30000;
+const FIRST_DRAW_AT_MS = 53000;
+
 let reactionSeq = 0;
 function makeReaction(emoji: string, senderName: string): FloatingReaction {
   reactionSeq += 1;
@@ -91,7 +100,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   });
   const [showAllCalled, setShowAllCalled] = useState(false);
 
-  const { drawnNumbers, lastDrawn, gameStatus, reset } = useGameStore();
+  const { drawnNumbers, lastDrawn, gameStatus, reset, elapsedMsAtSync, elapsedAt } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
   const [welcomeTextVisible, setWelcomeTextVisible] = useState(false);
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
@@ -271,7 +280,20 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (gameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      if (drawnNumbers.length === 0) {
+
+      // How far into the game we actually are. elapsedMsAtSync is measured by the
+      // server (clock-skew proof); age it forward by however long ago we received it.
+      // Falls back to 0 for games with no recorded start, which reproduces the old
+      // from-the-top behaviour rather than skipping the sequence entirely.
+      const elapsed =
+        elapsedMsAtSync !== null && elapsedAt !== null
+          ? elapsedMsAtSync + (Date.now() - elapsedAt)
+          : 0;
+
+      // A viewer is "mid-flow" if numbers are already out, OR if the game is far
+      // enough along that the intro would already have played. Either way they must
+      // pick up where the game is, not restart it.
+      if (drawnNumbers.length === 0 && elapsed < INTRO_AT_MS) {
         // Fixed-duration startup sequence (must match gameEngine.ts's initialDelay, which
         // gates when the backend actually draws the first number):
         // t=0s: live session starts (BGM autoplays independently, see useGameAudio.ts).
@@ -295,16 +317,30 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             flushPendingDraws();
           }
         };
-        delay(() => setWelcomeTextVisible(true), 10000);
-        delay(() => setWelcomeTextVisible(false), 20000);
-        delay(() => { playGreeting().finally(tryFlush); }, 30000);
-        delay(() => { floorReached = true; tryFlush(); }, 53000);
+
+        // Every offset below is game-time, not page-time. `elapsed` is how far into
+        // the game we already are (server-measured, aged forward locally), so a
+        // viewer who opens the board 40s after the operator hit Start resumes the
+        // sequence at 40s instead of replaying it from their own zero.
+        const remaining = (gameTimeMs: number) => Math.max(0, gameTimeMs - elapsed);
+
+        // Welcome banner occupies game-time 10s-20s. Skip it outright once that
+        // window has passed rather than showing it late.
+        if (elapsed < WELCOME_OUT_MS) {
+          delay(() => setWelcomeTextVisible(true), remaining(WELCOME_IN_MS));
+          delay(() => setWelcomeTextVisible(false), remaining(WELCOME_OUT_MS));
+        }
+
+        delay(() => { playGreeting().finally(tryFlush); }, remaining(INTRO_AT_MS));
+        delay(() => { floorReached = true; tryFlush(); }, remaining(FIRST_DRAW_AT_MS));
       } else {
-        // Late joiners joining mid-game skip Welcome text & Intro note completely
+        // Genuinely mid-flow: numbers are already on the board, or the intro window
+        // has passed. Continue from here — never replay the welcome or intro, which
+        // would talk over a game in progress and queue live draws behind it.
         flushPendingDraws();
       }
     }
-  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay, introPlayingRef]);
+  }, [gameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay, introPlayingRef, elapsedMsAtSync, elapsedAt]);
 
   // Fresh store per game visit
   useEffect(() => { reset(); }, [game_id, reset]);
@@ -1028,12 +1064,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 }}
               >
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</div>
-                <h2 style={{ fontSize: "26px", fontWeight: "800", color: "var(--accent)", margin: "0 0 12px 0", letterSpacing: "-0.02em" }}>
-                  Welcome to Housie Ghar!
+                <h2 style={{ fontSize: "26px", fontWeight: "800", color: "var(--accent)", margin: 0, letterSpacing: "-0.02em" }}>
+                  Welcome to Housie Ghar
                 </h2>
-                <p style={{ fontSize: "14px", color: "var(--text-dim)", margin: 0, lineHeight: 1.6 }}>
-                  The game has been started by the operator. Please hold tight — background music is playing, and number calls will begin shortly!
-                </p>
               </div>
             </div>
           )}

@@ -672,7 +672,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
   // Send initial payload immediately
   try {
     const gameRes = await pool.query(
-      `SELECT game_status, title, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, call_mode, bg_music_enabled, intro_mode, outro_mode, started_at FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
     const gameLogRes = await pool.query(
@@ -715,6 +715,15 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       bg_music_enabled: gameRes.rows[0]?.bg_music_enabled !== false,
       intro_mode: gameRes.rows[0]?.intro_mode || 'Audio',
       outro_mode: gameRes.rows[0]?.outro_mode || 'TTS',
+      // How long this game has actually been running, computed server-side so a
+      // client with a skewed clock cannot get it wrong. Clients anchor their startup
+      // choreography (welcome banner, intro audio, first-draw floor) to this instead
+      // of to their own page-load time, so someone joining mid-flow continues from
+      // where the game really is rather than replaying the sequence from their zero.
+      // null when the game has not started yet.
+      elapsed_ms: gameRes.rows[0]?.started_at
+        ? Math.max(0, Date.now() - new Date(gameRes.rows[0].started_at).getTime())
+        : null,
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,
       claimed_prizes: formattedPrizes.map((row) => ({
