@@ -239,4 +239,18 @@ export interface PlayerStats {
   luckiest_ticket_number: number | null;
   longest_winning_run: number;
   unluckiest_run: number;
+  pattern_wins?: {
+    early_five: number;
+    quick_7: number;
+    corner: number;
+    star: number;
+    top_line: number;
+    middle_line: number;
+    bottom_line: number;
+    box_bonus: number;
+    full_house: number;
+    first_full_house: number;
+    second_full_house: number;
+    third_full_house: number;
+  };
 }

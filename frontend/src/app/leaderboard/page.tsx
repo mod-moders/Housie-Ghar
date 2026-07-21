@@ -6,7 +6,7 @@ import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import { Footer } from "@/components/ui";
-import type { HallOfFameEntry } from "@/lib/types";
+import type { HallOfFameEntry, PlayerStats } from "@/lib/types";
 import { useSocket } from "@/lib/hooks/useSocket";
 
 type Timeframe = "all-time" | "monthly" | "weekly" | "daily";
@@ -27,7 +27,7 @@ function getPlayerInsight(entry: HallOfFameEntry) {
   };
 }
 
-export default function Leaderboard() {
+export default function LeaderboardAndStats() {
   const [entries, setEntries] = useState<HallOfFameEntry[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [timeframe, setTimeframe] = useState<Timeframe>("all-time");
@@ -35,14 +35,44 @@ export default function Leaderboard() {
   const [loggedInName, setLoggedInName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch logged in user identity to highlight their card
+  // Logged-in player's own stats states
+  const [myStats, setMyStats] = useState<PlayerStats | null>(null);
+  const [loadingMyStats, setLoadingMyStats] = useState(true);
+
+  // Cached stats for expanded players
+  const [expandedStats, setExpandedStats] = useState<Record<string, PlayerStats>>({});
+  const [loadingExpanded, setLoadingExpanded] = useState<string | null>(null);
+
+  // Load logged-in user identity & personal stats
   useEffect(() => {
+    setLoadingMyStats(true);
     apiFetch<{ player: { housie_name: string } }>("/api/player/me")
-      .then((res) => setLoggedInName(res.player.housie_name))
+      .then((res) => {
+        setLoggedInName(res.player.housie_name);
+        // Now fetch their stats
+        apiFetch<PlayerStats>("/api/player/stats")
+          .then((stats) => {
+            setMyStats(stats);
+            setLoadingMyStats(false);
+          })
+          .catch(() => {
+            setMyStats(null);
+            setLoadingMyStats(false);
+          });
+      })
       .catch(() => {
         apiFetch<{ user: { full_name: string } }>("/api/auth/me")
-          .then((res) => setLoggedInName(res.user.full_name))
-          .catch(() => setLoggedInName(null));
+          .then((res) => {
+            setLoggedInName(res.user.full_name);
+            // Staff users do not have player stats
+            setMyStats(null);
+            setLoadingMyStats(false);
+          })
+          .catch(() => {
+            setLoggedInName(null);
+            setMyStats(null);
+            setLoadingMyStats(false);
+          });
       });
   }, []);
 
@@ -76,6 +106,12 @@ export default function Leaderboard() {
       event === "game_list_update"
     ) {
       loadLeaderboard();
+      // Reload own stats if logged in
+      if (loggedInName) {
+        apiFetch<PlayerStats>("/api/player/stats")
+          .then(setMyStats)
+          .catch(() => {});
+      }
     }
   });
 
@@ -126,7 +162,46 @@ export default function Leaderboard() {
     return filtered;
   }, [entries, searchQuery]);
 
-  /* ── Shared container width ── */
+  // Handle expanding player row & fetching their stats dynamically
+  const handleExpandRow = async (housieName: string) => {
+    if (expandedName === housieName) {
+      setExpandedName(null);
+      return;
+    }
+    setExpandedName(housieName);
+
+    if (!expandedStats[housieName]) {
+      setLoadingExpanded(housieName);
+      try {
+        const stats = await apiFetch<PlayerStats>(`/api/player/stats?housie_name=${encodeURIComponent(housieName)}`);
+        setExpandedStats(prev => ({ ...prev, [housieName]: stats }));
+      } catch (err) {
+        console.error("Failed to load expanded player stats:", err);
+      } finally {
+        setLoadingExpanded(null);
+      }
+    }
+  };
+
+  /* Helper to format dates & durations */
+  const getMemberDuration = (registeredAt: string | null) => {
+    if (!registeredAt) return { duration: "—", date: "Unknown" };
+    const d = new Date(registeredAt);
+    const dateStr = d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    let duration = "—";
+    if (days === 0) duration = "Today";
+    else if (days < 30) duration = `${days}d`;
+    else if (days < 365) duration = `${Math.floor(days / 30)}mo`;
+    else {
+      const y = Math.floor(days / 365);
+      const m = Math.floor((days % 365) / 30);
+      duration = `${y}y${m > 0 ? ` ${m}mo` : ""}`;
+    }
+    return { duration, date: dateStr };
+  };
+
+  /* Shared container width */
   const containerStyle: React.CSSProperties = {
     maxWidth: 960, width: "100%", margin: "0 auto", padding: "0 16px",
   };
@@ -138,39 +213,107 @@ export default function Leaderboard() {
         {/* ── Page Header ── */}
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
           <div>
-            <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame</h1>
+            <h1 style={{ fontSize: 28, margin: 0, fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>Hall of Fame &amp; Stats</h1>
             <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0 0" }}>
-              Official Master rankings evaluated by player performance ratings across total wins, earnings, and payouts.
+              Unified Master rankings &amp; live performance statistics counted from day one of registration.
             </p>
           </div>
         </div>
 
-        {/* ── Insight KPI Strip ── */}
-        {insights && (
-          <div style={{ ...containerStyle, display: "flex", gap: 12, flexWrap: "wrap", paddingTop: 12, paddingBottom: 16 }}>
-            {[
-              { label: "Total Payouts", value: money(insights.totalEarnings), accent: true },
-              { label: "Highest Payout", value: money(insights.maxWin), accent: false },
-              { label: "Avg Payout/Win", value: money(insights.avgWinValue), accent: false },
-            ].map((k) => (
-              <div key={k.label} className="hg-kpi-card-hover" style={{
-                flex: "1 1 200px",
-                background: "var(--surface)", border: "1.5px solid var(--card-line)",
-                borderRadius: "var(--radius)", padding: "14px 18px",
-                boxShadow: "var(--card-shadow-sm)",
-                transition: "transform 0.2s, box-shadow 0.2s",
-              }}>
-                <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", display: "block" }}>{k.label}</span>
-                <strong style={{ fontSize: 20, color: k.accent ? "var(--accent)" : "var(--text)", fontFamily: "var(--font-head)", marginTop: 4, display: "block" }}>{k.value}</strong>
+        {/* ── Logged-in Player's Statistics Hero Dashboard ── */}
+        {loggedInName && !loadingMyStats && myStats && (
+          <div style={{ ...containerStyle, paddingTop: 8, paddingBottom: 12 }}>
+            <div className="hg-card hg-glass-panel" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid var(--border-2)", paddingBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Icon name="chart" size={18} style={{ color: "var(--accent)" }} />
+                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text)" }}>My Statistics &amp; Performance</h2>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: "#10B981" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
+                  Live Synced
+                </div>
               </div>
-            ))}
+
+              {/* Stats Key Metric Ribbon */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Net Profit/Loss</div>
+                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: (myStats.amount_won - myStats.total_expenditure) >= 0 ? "#10B981" : "#EF4444" }}>
+                    {money(myStats.amount_won - myStats.total_expenditure)}
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Win Rate</div>
+                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: "var(--accent)" }}>
+                    {myStats.games_played > 0 ? ((myStats.total_wins / myStats.games_played) * 100).toFixed(0) : "0"}%
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>ROI</div>
+                  <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: (myStats.amount_won - myStats.total_expenditure) >= 0 ? "#10B981" : "#EF4444" }}>
+                    {myStats.total_expenditure > 0 ? (((myStats.amount_won / myStats.total_expenditure) * 100) - 100).toFixed(1) : "0"}%
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Luckiest Ticket</div>
+                  <strong style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>
+                    {myStats.luckiest_ticket_number ? `#${myStats.luckiest_ticket_number}` : "—"}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Detailed Personal Stats Columns */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, borderTop: "1px solid var(--border-2)", paddingTop: 14 }}>
+                {/* Left: Financial & Volume */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <MiniBox label="Total Won" value={money(myStats.amount_won)} sub={`${myStats.total_wins} wins`} />
+                    <MiniBox label="Total Spent" value={money(myStats.total_expenditure)} sub="Tickets bought" />
+                    <MiniBox label="Games Played" value={myStats.games_played} sub="Total sessions" />
+                    <MiniBox label="Longest Win Streak" value={`${myStats.longest_winning_run} games`} sub="Consecutive" />
+                  </div>
+                </div>
+
+                {/* Right: Detailed Prize Pattern Breakdown */}
+                {myStats.pattern_wins && (
+                  <div style={{ background: "var(--surface-2)", borderRadius: 12, padding: "10px 14px", border: "1px solid var(--border-light)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
+                      Detailed Prize Win Breakdown
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                      <div>
+                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                          <PatternRow label="Full House" count={myStats.pattern_wins.full_house} />
+                          <PatternRow label="1st Full House" count={myStats.pattern_wins.first_full_house} />
+                          <PatternRow label="2nd Full House" count={myStats.pattern_wins.second_full_house} />
+                          <PatternRow label="3rd Full House" count={myStats.pattern_wins.third_full_house} />
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>LINES &amp; SPECIALS</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                          <PatternRow label="Top Line" count={myStats.pattern_wins.top_line} />
+                          <PatternRow label="Middle Line" count={myStats.pattern_wins.middle_line} />
+                          <PatternRow label="Bottom Line" count={myStats.pattern_wins.bottom_line} />
+                          <PatternRow label="Star / Corner" count={myStats.pattern_wins.star + myStats.pattern_wins.corner} />
+                          <PatternRow label="Quick 7 / Early 5" count={myStats.pattern_wins.quick_7 + myStats.pattern_wins.early_five} />
+                          <PatternRow label="Box Bonus" count={myStats.pattern_wins.box_bonus} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ── Search & Filter Control Ribbon (Optimized for Mobile & Desktop) ── */}
-        <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 12, paddingBottom: 20 }}>
+        {/* ── Search & Filter Ribbon ── */}
+        <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 12, paddingBottom: 16 }}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", width: "100%", alignItems: "center" }}>
-            {/* Search Input Box */}
+            {/* Search Input */}
             <div style={{
               flex: "3 1 240px",
               display: "flex", background: "var(--surface)",
@@ -192,7 +335,7 @@ export default function Leaderboard() {
               )}
             </div>
 
-            {/* Timeframe Dropdown */}
+            {/* Timeframe Select */}
             <div style={{
               flex: "1 1 180px",
               display: "flex", background: "var(--surface)",
@@ -213,7 +356,7 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          {/* Master Performance Rating System Explanation Ribbon */}
+          {/* Unified Rating formula explanation */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
             background: "rgba(244, 201, 93, 0.06)", border: "1px solid rgba(244, 201, 93, 0.2)",
@@ -229,14 +372,14 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* ── Leaderboard List ── */}
+        {/* ── Global Rankings Leaderboard List ── */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
             <span className="hg-poll-spin" style={{ display: "inline-block", width: "24px", height: "24px", border: "2px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
             <p style={{ marginTop: "12px", fontSize: "14px" }}>Loading Master statistics…</p>
           </div>
         ) : processedEntries.length > 0 ? (
-          <div className="hg-leaderboard" style={{ marginTop: 4 }}>
+          <div className="hg-leaderboard" style={{ ...containerStyle, paddingBottom: 40 }}>
             {processedEntries.map((w, i) => {
               const rank = i + 1;
               const avgPayout = w.avgPayoutVal || (w.wins > 0 ? Math.round(w.total_won / w.wins) : 0);
@@ -261,12 +404,16 @@ export default function Leaderboard() {
                 masterTitle = "Bronze Master";
               }
 
+              // Load expanded stats details
+              const statsObj = expandedStats[w.housie_name];
+              const isLoadingStats = loadingExpanded === w.housie_name;
+
               return (
                 <div key={w.housie_name} style={{ marginBottom: 10 }}>
                   {/* Card Main Row */}
                   <div
                     className={`hg-lb-row hg-lb-row-${rank}`}
-                    onClick={() => setExpandedName(isExpanded ? null : w.housie_name)}
+                    onClick={() => handleExpandRow(w.housie_name)}
                     style={{
                       cursor: "pointer",
                       padding: "14px 16px",
@@ -290,7 +437,7 @@ export default function Leaderboard() {
                         : "var(--card-shadow-sm)",
                       transition: "transform 0.2s, box-shadow 0.2s",
                     }}
-                    title={isCurrentUser ? "Your Account (Click to expand)" : "Click to expand"}
+                    title={isCurrentUser ? "Your Account (Click to view statistics)" : "Click to view statistics"}
                   >
                     {/* Rank Badge */}
                     <span className="hg-lb-rank" style={{ minWidth: 32, textAlign: "center", fontSize: 20, fontWeight: 800 }}>
@@ -326,7 +473,6 @@ export default function Leaderboard() {
                           {w.housie_name}
                         </strong>
 
-                        {/* Master Rank Pill */}
                         {masterTitle && (
                           <span
                             className="hg-pill"
@@ -358,7 +504,6 @@ export default function Leaderboard() {
                                   ? "#94a3b8"
                                   : "#d97706"
                               }`,
-                              boxShadow: isDiamondMaster ? "0 0 10px rgba(56, 189, 248, 0.35)" : "none",
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 4
@@ -419,7 +564,7 @@ export default function Leaderboard() {
                     </div>
                   </div>
 
-                  {/* ── Expandable Rating Breakdown Panel ── */}
+                  {/* ── Expandable Statistics & Performance Card Panel ── */}
                   <div
                     style={{
                       display: "grid",
@@ -431,27 +576,83 @@ export default function Leaderboard() {
                     <div style={{ overflow: "hidden" }}>
                       <div
                         style={{
-                          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8,
                           background: "var(--surface-2)", border: "1px solid var(--border-2)",
-                          borderRadius: "var(--radius-sm)", padding: "12px 14px",
+                          borderRadius: "var(--radius-sm)", padding: "14px",
+                          display: "flex", flexDirection: "column", gap: 12
                         }}
                       >
-                        {[
-                          { label: "Master Rating", value: `⚡ ${w.computedRating.toFixed(2)} PTS` },
-                          { label: "Wins Base", value: `+${w.wins.toFixed(2)}` },
-                          { label: "Total Winnings Boost", value: `+${(w.total_won / 1000).toFixed(2)}` },
-                          { label: "Best Win Boost", value: `+${(w.biggest_win / 1000).toFixed(2)}` },
-                          { label: "Average Win Boost", value: `+${(avgPayout / 1000).toFixed(2)}` },
-                        ].map((m) => (
-                          <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                            <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
-                              {m.label}
-                            </span>
-                            <strong style={{ fontSize: 13, color: m.label.includes("Boost") || m.label.includes("Base") ? "var(--accent)" : "var(--text)" }}>
-                              {m.value}
-                            </strong>
+                        {/* 1. Rating formula breakdown */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
+                          {[
+                            { label: "Master Rating", value: `⚡ ${w.computedRating.toFixed(2)} PTS` },
+                            { label: "Wins Base", value: `+${w.wins.toFixed(2)}` },
+                            { label: "Total Winnings Boost", value: `+${(w.total_won / 1000).toFixed(2)}` },
+                            { label: "Best Win Boost", value: `+${(w.biggest_win / 1000).toFixed(2)}` },
+                            { label: "Average Win Boost", value: `+${(avgPayout / 1000).toFixed(2)}` },
+                          ].map((m) => (
+                            <div key={m.label} style={{ textAlign: "center", background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                              <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
+                                {m.label}
+                              </span>
+                              <strong style={{ fontSize: 13, color: m.label.includes("Boost") || m.label.includes("Base") ? "var(--accent)" : "var(--text)" }}>
+                                {m.value}
+                              </strong>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* 2. Detailed statistics fetched on the fly */}
+                        {isLoadingStats ? (
+                          <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                            <span className="hg-poll-spin" style={{ display: "inline-block", width: "16px", height: "16px", border: "1.5px solid var(--border-2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                            <span style={{ fontSize: 12, color: "var(--text-dim)", marginLeft: 8 }}>Fetching detailed statistics…</span>
                           </div>
-                        ))}
+                        ) : statsObj ? (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, borderTop: "1px solid var(--border-light)", paddingTop: 12 }}>
+                            {/* Stats grids */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                <MiniBox label="Win Rate" value={`${statsObj.games_played > 0 ? ((statsObj.total_wins / statsObj.games_played) * 100).toFixed(0) : "0"}%`} sub={`${statsObj.total_wins} wins`} />
+                                <MiniBox label="ROI" value={`${statsObj.total_expenditure > 0 ? (((statsObj.amount_won / statsObj.total_expenditure) * 100) - 100).toFixed(1) : "0"}%`} sub="Return on tickets" />
+                                <MiniBox label="Games Played" value={statsObj.games_played} sub="Total sessions" />
+                                <MiniBox label="Longest Win Streak" value={`${statsObj.longest_winning_run} games`} sub="Consecutive wins" />
+                                <MiniBox label="Member Duration" value={getMemberDuration(statsObj.member_since).duration} sub={`Joined: ${getMemberDuration(statsObj.member_since).date}`} />
+                                <MiniBox label="Luckiest Ticket" value={statsObj.luckiest_ticket_number ? `#${statsObj.luckiest_ticket_number}` : "—"} sub="Wins most on" />
+                              </div>
+                            </div>
+
+                            {/* Detailed Pattern wins */}
+                            {statsObj.pattern_wins && (
+                              <div style={{ background: "var(--surface)", borderRadius: 10, padding: "10px 14px", border: "1px solid var(--border-light)" }}>
+                                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", marginBottom: 10 }}>
+                                  Detailed Prize Win Breakdown
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                                  <div>
+                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                                      <PatternRow label="Full House" count={statsObj.pattern_wins.full_house} />
+                                      <PatternRow label="1st Full House" count={statsObj.pattern_wins.first_full_house} />
+                                      <PatternRow label="2nd Full House" count={statsObj.pattern_wins.second_full_house} />
+                                      <PatternRow label="3rd Full House" count={statsObj.pattern_wins.third_full_house} />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>LINES &amp; SPECIALS</div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                                      <PatternRow label="Top Line" count={statsObj.pattern_wins.top_line} />
+                                      <PatternRow label="Middle Line" count={statsObj.pattern_wins.middle_line} />
+                                      <PatternRow label="Bottom Line" count={statsObj.pattern_wins.bottom_line} />
+                                      <PatternRow label="Star / Corner" count={statsObj.pattern_wins.star + statsObj.pattern_wins.corner} />
+                                      <PatternRow label="Quick 7 / Early 5" count={statsObj.pattern_wins.quick_7 + statsObj.pattern_wins.early_five} />
+                                      <PatternRow label="Box Bonus" count={statsObj.pattern_wins.box_bonus} />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -468,5 +669,24 @@ export default function Leaderboard() {
         <Footer />
       </div>
     </PublicShell>
+  );
+}
+
+function MiniBox({ label, value, sub, color }: { label: string; value: React.ReactNode; sub?: string; color?: string }) {
+  return (
+    <div style={{ background: "var(--bg)", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 2, border: "1px solid var(--border-light)" }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-mute)" }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "var(--font-head)", color: color || "var(--text)", lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 9.5, color: "var(--text-mute)", lineHeight: 1.1 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function PatternRow({ label, count }: { label: string; count: number }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5 }}>
+      <span style={{ color: "var(--text-dim)" }}>{label}</span>
+      <strong style={{ color: count > 0 ? "var(--accent)" : "var(--text-mute)", fontWeight: 700 }}>{count}</strong>
+    </div>
   );
 }

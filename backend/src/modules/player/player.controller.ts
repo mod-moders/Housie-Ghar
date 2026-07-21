@@ -232,15 +232,31 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
     return;
   }
 
+  const queryHousieName = req.query.housie_name as string | undefined;
+
   try {
-    // 1. Basic player info & fresh housie_name
-    const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE player_id = $1', [playerId]);
-    if (playerRes.rows.length === 0) {
-      res.status(404).json({ message: 'Player not found' });
-      return;
+    let targetHousieName = "";
+    let registeredAt = null;
+
+    if (queryHousieName) {
+      // 1. Fetch basic player info by query housie_name
+      const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [queryHousieName]);
+      if (playerRes.rows.length === 0) {
+        res.status(404).json({ message: 'Player not found' });
+        return;
+      }
+      registeredAt = playerRes.rows[0].registered_at;
+      targetHousieName = playerRes.rows[0].housie_name;
+    } else {
+      // 1. Basic player info by playerId
+      const playerRes = await pool.query('SELECT registered_at, housie_name FROM Players WHERE player_id = $1', [playerId]);
+      if (playerRes.rows.length === 0) {
+        res.status(404).json({ message: 'Player not found' });
+        return;
+      }
+      registeredAt = playerRes.rows[0].registered_at;
+      targetHousieName = playerRes.rows[0].housie_name || req.player?.housieName;
     }
-    const registeredAt = playerRes.rows[0].registered_at;
-    const housieName = playerRes.rows[0].housie_name || req.player?.housieName;
 
     // 2. Engagement stats from Bookings
     const bookingsRes = await pool.query(
@@ -250,7 +266,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
          COALESCE(SUM(total_amount), 0) as total_expenditure
        FROM Bookings 
        WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1)) AND booking_status = 'Sold'`,
-      [housieName]
+      [targetHousieName]
     );
     const bStats = bookingsRes.rows[0];
 
@@ -261,6 +277,21 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
          COUNT(*) FILTER (WHERE pattern_name ILIKE '%Full House%') as full_house_wins,
          COUNT(*) FILTER (WHERE pattern_name ILIKE '%Line%') as line_wins,
          COUNT(*) FILTER (WHERE pattern_name NOT ILIKE '%Full House%' AND pattern_name NOT ILIKE '%Line%') as other_wins,
+         
+         -- Detailed patterns count
+         COUNT(*) FILTER (WHERE pattern_name = 'Early Five') as early_five,
+         COUNT(*) FILTER (WHERE pattern_name = 'Quick 7') as quick_7,
+         COUNT(*) FILTER (WHERE pattern_name = 'Corner') as corner,
+         COUNT(*) FILTER (WHERE pattern_name = 'Star') as star,
+         COUNT(*) FILTER (WHERE pattern_name = 'Top Line') as top_line,
+         COUNT(*) FILTER (WHERE pattern_name = 'Middle Line') as middle_line,
+         COUNT(*) FILTER (WHERE pattern_name = 'Bottom Line') as bottom_line,
+         COUNT(*) FILTER (WHERE pattern_name = 'Box Bonus') as box_bonus,
+         COUNT(*) FILTER (WHERE pattern_name = 'Full House') as full_house,
+         COUNT(*) FILTER (WHERE pattern_name = '1st Full House') as first_full_house,
+         COUNT(*) FILTER (WHERE pattern_name = '2nd Full House') as second_full_house,
+         COUNT(*) FILTER (WHERE pattern_name = '3rd Full House') as third_full_house,
+
          COALESCE(SUM(
            COALESCE(p.amount_per_winner, p.prize_amount) * (
              SELECT COALESCE(array_length(regexp_split_to_array(raw_token, '&|\bAND\b'), 1), 1)
@@ -276,7 +307,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
            FROM regexp_split_to_table(p.winner_housie_name, '[,&]|\s+and\s+') AS raw_token
            WHERE LOWER(TRIM(regexp_replace(raw_token, '\([^)]*\)', '', 'g'))) = LOWER(TRIM($1))
          )`,
-      [housieName]
+      [targetHousieName]
     );
     const wStats = winsRes.rows[0];
 
@@ -300,7 +331,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
        GROUP BY p.game_id 
        ORDER BY game_total DESC 
        LIMIT 1`,
-      [housieName]
+      [targetHousieName]
     );
     const highestWin = highestGameRes.rowCount && highestGameRes.rowCount > 0 ? highestGameRes.rows[0].game_total : 0;
 
@@ -318,7 +349,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
        GROUP BY t.ticket_number 
        ORDER BY COUNT(*) DESC, t.ticket_number ASC 
        LIMIT 1`,
-      [housieName]
+      [targetHousieName]
     );
     const luckiestTicket = luckiestTicketRes.rowCount && luckiestTicketRes.rowCount > 0 ? luckiestTicketRes.rows[0].ticket_number : null;
 
@@ -341,7 +372,7 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
        WHERE LOWER(TRIM(b.housie_name)) = LOWER(TRIM($1)) AND b.booking_status = 'Sold'
        GROUP BY g.game_id, g.scheduled_at
        ORDER BY g.scheduled_at ASC`,
-      [housieName]
+      [targetHousieName]
     );
 
     let currentWinStreak = 0;
@@ -374,7 +405,21 @@ export async function getPlayerStats(req: any, res: Response): Promise<void> {
       highest_amount_single_game: parseFloat(highestWin) || 0,
       luckiest_ticket_number: luckiestTicket,
       longest_winning_run: maxWinStreak,
-      unluckiest_run: maxLossStreak
+      unluckiest_run: maxLossStreak,
+      pattern_wins: {
+        early_five: parseInt(wStats.early_five, 10) || 0,
+        quick_7: parseInt(wStats.quick_7, 10) || 0,
+        corner: parseInt(wStats.corner, 10) || 0,
+        star: parseInt(wStats.star, 10) || 0,
+        top_line: parseInt(wStats.top_line, 10) || 0,
+        middle_line: parseInt(wStats.middle_line, 10) || 0,
+        bottom_line: parseInt(wStats.bottom_line, 10) || 0,
+        box_bonus: parseInt(wStats.box_bonus, 10) || 0,
+        full_house: parseInt(wStats.full_house, 10) || 0,
+        first_full_house: parseInt(wStats.first_full_house, 10) || 0,
+        second_full_house: parseInt(wStats.second_full_house, 10) || 0,
+        third_full_house: parseInt(wStats.third_full_house, 10) || 0,
+      }
     });
 
   } catch (error) {

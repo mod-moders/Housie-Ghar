@@ -53,8 +53,7 @@ export function TopNav() {
 
   const navItems = [
     ["/", "GAMES", "grid"],
-    ["/leaderboard", "LEADERBOARD", "trophy"],
-    ["/stats", "STATS", "chart"],
+    ["/leaderboard", "LEADERBOARD & STATS", "trophy"],
     ["/how-to-play", "HOW TO PLAY", "help"],
     user?.role === "staff"
       ? ["/staff", "STAFF PANEL", "shield"]
