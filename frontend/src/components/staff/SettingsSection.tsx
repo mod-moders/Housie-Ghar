@@ -10,7 +10,12 @@ import { useAuthStore } from "@/lib/stores/authStore";
 const THEMES = [
   { id: "luxury_gold", label: "Luxury Gold", icon: "star" },
   { id: "digital_neon", label: "Digital Neon", icon: "zap" },
-  { id: "playful_kids", label: "Playful Kids", icon: "users" }
+  { id: "playful_kids", label: "Playful Kids", icon: "users" },
+  { id: "kanchenjunga_dawn", label: "Kanchenjunga Dawn", icon: "spark" },
+  { id: "shillong_mist", label: "Shillong Mist", icon: "refresh" },
+  { id: "heritage_tea_trail", label: "Heritage Tea Trail", icon: "home" },
+  { id: "monastic_serenity", label: "Monastic Serenity", icon: "bell" },
+  { id: "cherry_blossom", label: "Cherry Blossom", icon: "flame" }
 ];
 
 interface WhatsAppShareGroup {
@@ -232,16 +237,16 @@ export function SettingsSection() {
           )}
         </div>
 
-        {/* ── RIGHT: Theme & Info Groups Column ── */}
+        {/* ── RIGHT: Skins & Info Groups Column ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-          {/* Theme Gallery Card */}
+          {/* Skins Gallery Card */}
           <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Icon name="spark" size={18} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: 16 }}>Theme</h3>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Skins</h3>
             </div>
             <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
-              Select a theme. Changes apply instantly.
+              Select a skin. Changes apply instantly.
             </p>
             
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
