@@ -101,7 +101,6 @@ export function SettingsSection() {
   };
 
   if (!config) return <div className="hg-poll-spin" style={{ margin: "40px auto" }} />;
-
   return (
     <div className="hg-dash-section" style={{ paddingTop: 8 }}>
       {message && (
@@ -112,174 +111,144 @@ export function SettingsSection() {
       )}
 
       {/* ── 2-Column Layout ── */}
-      <div className="hg-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
+      <div className="hg-settings-grid" style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16, alignItems: "start" }}>
 
-        {/* ── LEFT: Announcements Manager ── */}
-        <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="bell" size={18} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: 16 }}>Announcements</h3>
-            </div>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-dim)" }}>
-              <input 
-                type="checkbox" 
-                checked={isMuted} 
-                onChange={(e) => {
-                  const val = e.target.checked;
-                  setIsMuted(val);
-                  handleSave({ announcements_muted: String(val) });
-                }}
-                style={{ accentColor: "var(--accent)", width: 14, height: 14 }}
-              />
-              Mute All
-            </label>
-          </div>
-
-          {/* Add + Speed row */}
-          <div className="hg-settings-addrow" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="text"
-              className="hg-input"
-              value={newAnnouncement}
-              onChange={(e) => setNewAnnouncement(e.target.value)}
-              placeholder={announcements.length >= 5 ? "Max 5 reached" : "Enter announcement text..."}
-              disabled={announcements.length >= 5}
-              style={{ flex: 1, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13 }}
-            />
-            <Button
-              onClick={() => {
-                if (!newAnnouncement.trim()) return;
-                const next = [
-                  ...announcements,
-                  { id: Date.now(), text: newAnnouncement.trim(), muted: false }
-                ];
-                setAnnouncements(next);
-                setNewAnnouncement("");
-                handleSave({ announcements_list: JSON.stringify(next) });
-              }}
-              disabled={saving || !newAnnouncement.trim() || announcements.length >= 5}
-            >
-              Add ({announcements.length}/5)
-            </Button>
-            <select
-              value={speed}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSpeed(val);
-                handleSave({ announcement_speed: val });
-              }}
-              style={{
-                padding: "7px 10px", borderRadius: 8,
-                border: "1px solid var(--border)", background: "var(--surface)",
-                color: "var(--text)", outline: "none", fontWeight: 600,
-                cursor: "pointer", fontSize: 12, whiteSpace: "nowrap",
-              }}
-            >
-              <option value="15">Slow (15s)</option>
-              <option value="10">Medium (10s)</option>
-              <option value="6">Fast (6s)</option>
-              <option value="3">Super Fast (3s)</option>
-            </select>
-          </div>
-
-          {/* Announcements List */}
-          {announcements.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {announcements.map((ann, index) => (
-                <div
-                  key={ann.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10, minWidth: 0,
-                    padding: "8px 12px", borderRadius: 8,
-                    border: "1px solid var(--border-2)",
-                    background: ann.muted ? "var(--bg)" : "var(--surface)",
-                    opacity: ann.muted ? 0.6 : 1, transition: "opacity 0.2s",
+        {/* ── LEFT COLUMN: Announcements & Official Info Groups ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          {/* Announcements Manager */}
+          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon name="bell" size={18} style={{ color: "var(--accent)" }} />
+                <h3 style={{ margin: 0, fontSize: 16 }}>Announcements</h3>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-dim)" }}>
+                <input 
+                  type="checkbox" 
+                  checked={isMuted} 
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setIsMuted(val);
+                    handleSave({ announcements_muted: String(val) });
                   }}
-                >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", minWidth: 18, flexShrink: 0 }}>
-                    #{index + 1}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text)", wordBreak: "break-word" }}>
-                    {ann.text}
-                  </span>
-                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 11, userSelect: "none", color: "var(--text-dim)" }}>
-                    <input 
-                      type="checkbox"
-                      checked={ann.muted}
-                      onChange={(e) => {
-                        const updated = announcements.map(a => a.id === ann.id ? { ...a, muted: e.target.checked } : a);
+                  style={{ accentColor: "var(--accent)", width: 14, height: 14 }}
+                />
+                Mute All
+              </label>
+            </div>
+
+            {/* Add + Speed row */}
+            <div className="hg-settings-addrow" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                className="hg-input"
+                value={newAnnouncement}
+                onChange={(e) => setNewAnnouncement(e.target.value)}
+                placeholder={announcements.length >= 5 ? "Max 5 reached" : "Enter announcement text..."}
+                disabled={announcements.length >= 5}
+                style={{ flex: 1, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13 }}
+              />
+              <Button
+                onClick={() => {
+                  if (!newAnnouncement.trim()) return;
+                  const next = [
+                    ...announcements,
+                    { id: Date.now(), text: newAnnouncement.trim(), muted: false }
+                  ];
+                  setAnnouncements(next);
+                  setNewAnnouncement("");
+                  handleSave({ announcements_list: JSON.stringify(next) });
+                }}
+                disabled={saving || !newAnnouncement.trim() || announcements.length >= 5}
+              >
+                Add ({announcements.length}/5)
+              </Button>
+              <select
+                value={speed}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSpeed(val);
+                  handleSave({ announcement_speed: val });
+                }}
+                style={{
+                  padding: "7px 10px", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--surface)",
+                  color: "var(--text)", outline: "none", fontWeight: 600,
+                  cursor: "pointer", fontSize: 12, whiteSpace: "nowrap",
+                }}
+              >
+                <option value="15">Slow (15s)</option>
+                <option value="10">Medium (10s)</option>
+                <option value="6">Fast (6s)</option>
+                <option value="3">Super Fast (3s)</option>
+              </select>
+            </div>
+
+            {/* Announcements List */}
+            {announcements.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {announcements.map((ann, index) => (
+                  <div
+                    key={ann.id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, minWidth: 0,
+                      padding: "8px 12px", borderRadius: 8,
+                      border: "1px solid var(--border-2)",
+                      background: ann.muted ? "var(--bg)" : "var(--surface)",
+                      opacity: ann.muted ? 0.6 : 1, transition: "opacity 0.2s",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", minWidth: 18, flexShrink: 0 }}>
+                      #{index + 1}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text)", wordBreak: "break-word" }}>
+                      {ann.text}
+                    </span>
+                    <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 11, userSelect: "none", color: "var(--text-dim)" }}>
+                      <input 
+                        type="checkbox"
+                        checked={ann.muted}
+                        onChange={(e) => {
+                          const updated = announcements.map(a => a.id === ann.id ? { ...a, muted: e.target.checked } : a);
+                          setAnnouncements(updated);
+                          handleSave({ announcements_list: JSON.stringify(updated) });
+                        }}
+                        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+                      />
+                      Mute
+                    </label>
+                    <button 
+                      onClick={() => {
+                        const updated = announcements.filter(a => a.id !== ann.id);
                         setAnnouncements(updated);
                         handleSave({ announcements_list: JSON.stringify(updated) });
                       }}
-                      style={{ accentColor: "var(--accent)", cursor: "pointer" }}
-                    />
-                    Mute
-                  </label>
-                  <button 
-                    onClick={() => {
-                      const updated = announcements.filter(a => a.id !== ann.id);
-                      setAnnouncements(updated);
-                      handleSave({ announcements_list: JSON.stringify(updated) });
-                    }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2, display: "grid", placeItems: "center" }}
-                    title="Delete Announcement"
-                  >
-                    <Icon name="trash" size={15} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "14px", color: "var(--text-dim)", fontSize: 12, border: "1.5px dashed var(--border-2)", borderRadius: 8 }}>
-              No announcements added yet.
-            </div>
-          )}
-        </div>
-
-        {/* ── RIGHT: Skins & Info Groups Column ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-          {/* Skins Gallery Card */}
-          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="spark" size={18} style={{ color: "var(--accent)" }} />
-              <h3 style={{ margin: 0, fontSize: 16 }}>Skins</h3>
-            </div>
-            <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
-              Select a skin. Changes apply instantly.
-            </p>
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {THEMES.map((theme) => {
-                const isActive = activeTheme === theme.id;
-                return (
-                  <button
-                    key={theme.id}
-                    onClick={() => {
-                      setActiveTheme(theme.id);
-                      handleSave({ active_theme: theme.id });
-                    }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 14px", borderRadius: "var(--radius-sm)",
-                      border: `2px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
-                      background: isActive ? "var(--accent-soft)" : "var(--surface)",
-                      color: "var(--text)", cursor: "pointer", textAlign: "left",
-                      transition: "all 0.15s",
-                      boxShadow: isActive ? "0 0 12px var(--accent-soft)" : "none",
-                    }}
-                  >
-                    <Icon name={theme.icon} size={18} style={{ color: isActive ? "var(--accent)" : "var(--text-dim)" }} />
-                    <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{theme.label}</span>
-                    {isActive && (
-                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--accent)", background: "var(--accent-soft)", padding: "2px 8px", borderRadius: 99 }}>
-                        Active
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2, display: "grid", placeItems: "center" }}
+                      title="Delete Announcement"
+                    >
+                      <Icon name="trash" size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: "center",
+                padding: "24px 16px",
+                color: "var(--text-mute)",
+                fontSize: "13px",
+                border: "1.5px dashed var(--border-2)",
+                borderRadius: 8,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(0,0,0,0.15)"
+              }}>
+                <Icon name="bell" size={22} style={{ color: "var(--text-dim)" }} />
+                <span>No active announcements. Add one above to display on live site.</span>
+              </div>
+            )}
           </div>
 
           {/* Official Info Groups Card */}
@@ -429,6 +398,114 @@ export function SettingsSection() {
                 No groups configured yet.
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ── RIGHT COLUMN: Skins Selector & Danger Zone ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          {/* Skins Gallery Card */}
+          <div className="hg-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="spark" size={18} style={{ color: "var(--accent)" }} />
+              <h3 style={{ margin: 0, fontSize: 16 }}>Skins</h3>
+            </div>
+            <p className="hg-dim" style={{ fontSize: 12, margin: 0, lineHeight: 1.4 }}>
+              Select a skin. Changes apply instantly.
+            </p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {THEMES.map((theme) => {
+                const isActive = activeTheme === theme.id;
+                
+                // Color swatches mapping
+                const swatches: Record<string, { bg: string; pri: string; sec: string }> = {
+                  luxury_gold: { bg: "#1a1a1a", pri: "#c5a059", sec: "#e6c781" },
+                  digital_neon: { bg: "#141414", pri: "#00ffff", sec: "#ff00ff" },
+                  playful_kids: { bg: "#ffecb3", pri: "#ff4081", sec: "#00e5ff" },
+                  kanchenjunga_dawn: { bg: "#20140a", pri: "#FF7A00", sec: "#FFA852" },
+                  shillong_mist: { bg: "#122018", pri: "#2E7D32", sec: "#A3C2A5" },
+                  heritage_tea_trail: { bg: "#221c19", pri: "#8D6E63", sec: "#D7CCC8" },
+                  monastic_serenity: { bg: "#fde6c4", pri: "#F5B041", sec: "#4A154B" },
+                  cherry_blossom: { bg: "#ffe1eb", pri: "#F48FB1", sec: "#1A237E" }
+                };
+                
+                const preview = swatches[theme.id] || { bg: "#1a1a1a", pri: "var(--accent)", sec: "var(--accent-soft)" };
+
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      setActiveTheme(theme.id);
+                      handleSave({ active_theme: theme.id });
+                    }}
+                    title={theme.label}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "stretch",
+                      gap: 8,
+                      padding: "12px",
+                      borderRadius: "var(--radius-sm)",
+                      border: `2px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                      background: isActive ? "var(--accent-soft)" : "var(--surface)",
+                      color: "var(--text)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "all 0.2s ease-in-out",
+                      boxShadow: isActive ? "0 4px 12px var(--accent-soft)" : "none",
+                      position: "relative",
+                      overflow: "hidden"
+                    }}
+                  >
+                    {/* Top Row: Icon + Swatch */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Icon name={theme.icon} size={16} style={{ color: isActive ? "var(--accent)" : "var(--text-dim)" }} />
+                      <div style={{
+                        display: "flex",
+                        gap: 3,
+                        background: preview.bg,
+                        padding: "3px 5px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(255, 255, 255, 0.1)"
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: preview.pri }} />
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: preview.sec }} />
+                      </div>
+                    </div>
+
+                    {/* Label */}
+                    <span style={{
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      lineHeight: 1.25,
+                      color: "var(--text)",
+                      textAlign: "left",
+                      wordBreak: "break-word"
+                    }}>
+                      {theme.label}
+                    </span>
+
+                    {/* Active checkmark */}
+                    {isActive && (
+                      <div style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 14,
+                        height: 14,
+                        background: "var(--accent)",
+                        borderRadius: "4px 0 0 0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <Icon name="check" size={10} stroke="#fff" strokeWidth={3} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Danger Zone / Database reset for Superadmin only */}
