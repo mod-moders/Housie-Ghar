@@ -86,7 +86,7 @@ export const env = {
   // Authentication
   JWT_PRIVATE_KEY,
   JWT_PUBLIC_KEY: resolveJwtPublicKey(),
-  JWT_EXPIRY: optionalEnv('JWT_EXPIRY', '24h'),
+  JWT_EXPIRY: optionalEnv('JWT_EXPIRY', '3650d'),
 
   // Application
   NODE_ENV: optionalEnv('NODE_ENV', 'development'),

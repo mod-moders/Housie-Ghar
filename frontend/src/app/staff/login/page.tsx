@@ -45,16 +45,9 @@ export default function StaffLogin() {
         body: JSON.stringify({ email, password }),
       });
       if (typeof window !== "undefined") {
+        localStorage.setItem("hg_staff_token", res.token);
         sessionStorage.setItem("hg_staff_token", res.token);
-        // The /staff route is gated by proxy.ts (Next middleware), which can only
-        // read cookies — not this sessionStorage bearer token. The backend sets an
-        // httpOnly hg_auth_token cookie, but it lands on the API's domain and never
-        // reaches this frontend domain's middleware (cross-domain deploy), so every
-        // post-login push to /staff was redirected straight back here — the "stuck
-        // on Signing in..." loop. Mirror the token into a first-party cookie so the
-        // middleware sees an authenticated request; real validation still happens
-        // server-side via the Bearer token on /api/auth/me.
-        document.cookie = `hg_auth_token=${res.token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+        document.cookie = `hg_auth_token=${res.token}; path=/; max-age=315360000; SameSite=Lax; Secure`;
       }
       setUser(res.user);
       router.push("/staff");

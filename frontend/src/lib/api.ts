@@ -49,8 +49,8 @@ export async function apiFetch<T>(
   };
 
   if (typeof window !== "undefined") {
-    const staffToken = sessionStorage.getItem("hg_staff_token");
-    const playerToken = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
+    const staffToken = localStorage.getItem("hg_staff_token") || sessionStorage.getItem("hg_staff_token");
+    const playerToken = localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token");
 
     // Player self-service endpoints (identity comes from the token, not a URL param)
     // must always use the player token — a staff member can be signed into both

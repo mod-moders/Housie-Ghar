@@ -109,7 +109,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       // 'lax' in dev since localhost:3000/4000 are same-site and SameSite=None
       // without HTTPS is rejected by browsers there.
       sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 3650 * 24 * 60 * 60 * 1000, // 10 years (persistent session)
     });
 
     res.json({

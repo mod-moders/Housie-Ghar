@@ -57,7 +57,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
 
     const token = jwt.sign(payload, env.JWT_PRIVATE_KEY, {
       algorithm: 'RS256' as any,
-      expiresIn: '30d', // Player session duration
+      expiresIn: '3650d', // Persistent player session duration (10 years)
     });
 
     // 5. Store in HttpOnly cookie
@@ -65,7 +65,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
       httpOnly: true,
       secure: env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 3650 * 24 * 60 * 60 * 1000, // 10 years
     });
 
     res.status(201).json({ token, player });
@@ -126,7 +126,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     const token = jwt.sign(payload, env.JWT_PRIVATE_KEY, {
       algorithm: 'RS256' as any,
-      expiresIn: '30d',
+      expiresIn: '3650d',
     });
 
     // 3. Store in HttpOnly cookie
@@ -134,7 +134,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       httpOnly: true,
       secure: env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 3650 * 24 * 60 * 60 * 1000, // 10 years
     });
 
     res.json({ token, player });
