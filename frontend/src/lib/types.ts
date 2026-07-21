@@ -231,6 +231,7 @@ export interface PlayerStats {
   tickets_bought: number;
   total_expenditure: number;
   total_wins: number;
+  games_won: number;
   full_house_wins: number;
   line_wins: number;
   other_wins: number;

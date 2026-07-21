@@ -246,7 +246,7 @@ export default function LeaderboardAndStats() {
                 <div>
                   <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--text-dim)", letterSpacing: "0.05em" }}>Win Rate</div>
                   <strong style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-head)", color: "var(--accent)" }}>
-                    {myStats.games_played > 0 ? ((myStats.total_wins / myStats.games_played) * 100).toFixed(0) : "0"}%
+                    {myStats.games_played > 0 ? ((myStats.games_won / myStats.games_played) * 100).toFixed(0) : "0"}%
                   </strong>
                 </div>
                 <div>
@@ -283,22 +283,24 @@ export default function LeaderboardAndStats() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px 16px" }}>
                       <div>
-                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
+                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE &amp; LINES</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                           <PatternRow label="Full House" count={myStats.pattern_wins.full_house} />
                           <PatternRow label="1st Full House" count={myStats.pattern_wins.first_full_house} />
                           <PatternRow label="2nd Full House" count={myStats.pattern_wins.second_full_house} />
                           <PatternRow label="3rd Full House" count={myStats.pattern_wins.third_full_house} />
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>LINES &amp; SPECIALS</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                           <PatternRow label="Top Line" count={myStats.pattern_wins.top_line} />
                           <PatternRow label="Middle Line" count={myStats.pattern_wins.middle_line} />
                           <PatternRow label="Bottom Line" count={myStats.pattern_wins.bottom_line} />
-                          <PatternRow label="Star / Corner" count={myStats.pattern_wins.star + myStats.pattern_wins.corner} />
-                          <PatternRow label="Quick 7 / Early 5" count={myStats.pattern_wins.quick_7 + myStats.pattern_wins.early_five} />
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>SPECIAL BONUSES</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                          <PatternRow label="Early Five" count={myStats.pattern_wins.early_five} />
+                          <PatternRow label="Quick 7" count={myStats.pattern_wins.quick_7} />
+                          <PatternRow label="Corner" count={myStats.pattern_wins.corner} />
+                          <PatternRow label="Star" count={myStats.pattern_wins.star} />
                           <PatternRow label="Box Bonus" count={myStats.pattern_wins.box_bonus} />
                         </div>
                       </div>
@@ -612,7 +614,7 @@ export default function LeaderboardAndStats() {
                             {/* Stats grids */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                <MiniBox label="Win Rate" value={`${statsObj.games_played > 0 ? ((statsObj.total_wins / statsObj.games_played) * 100).toFixed(0) : "0"}%`} sub={`${statsObj.total_wins} wins`} />
+                                <MiniBox label="Win Rate" value={`${statsObj.games_played > 0 ? ((statsObj.games_won / statsObj.games_played) * 100).toFixed(0) : "0"}%`} sub={`${statsObj.total_wins} wins`} />
                                 <MiniBox label="ROI" value={`${statsObj.total_expenditure > 0 ? (((statsObj.amount_won / statsObj.total_expenditure) * 100) - 100).toFixed(1) : "0"}%`} sub="Return on tickets" />
                                 <MiniBox label="Games Played" value={statsObj.games_played} sub="Total sessions" />
                                 <MiniBox label="Longest Win Streak" value={`${statsObj.longest_winning_run} games`} sub="Consecutive wins" />
@@ -629,22 +631,24 @@ export default function LeaderboardAndStats() {
                                  </div>
                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px 16px" }}>
                                   <div>
-                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE WINS</div>
+                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>FULL HOUSE &amp; LINES</div>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                                       <PatternRow label="Full House" count={statsObj.pattern_wins.full_house} />
                                       <PatternRow label="1st Full House" count={statsObj.pattern_wins.first_full_house} />
                                       <PatternRow label="2nd Full House" count={statsObj.pattern_wins.second_full_house} />
                                       <PatternRow label="3rd Full House" count={statsObj.pattern_wins.third_full_house} />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>LINES &amp; SPECIALS</div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                                       <PatternRow label="Top Line" count={statsObj.pattern_wins.top_line} />
                                       <PatternRow label="Middle Line" count={statsObj.pattern_wins.middle_line} />
                                       <PatternRow label="Bottom Line" count={statsObj.pattern_wins.bottom_line} />
-                                      <PatternRow label="Star / Corner" count={statsObj.pattern_wins.star + statsObj.pattern_wins.corner} />
-                                      <PatternRow label="Quick 7 / Early 5" count={statsObj.pattern_wins.quick_7 + statsObj.pattern_wins.early_five} />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 9.5, color: "var(--text-dim)", fontWeight: 700 }}>SPECIAL BONUSES</div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                                      <PatternRow label="Early Five" count={statsObj.pattern_wins.early_five} />
+                                      <PatternRow label="Quick 7" count={statsObj.pattern_wins.quick_7} />
+                                      <PatternRow label="Corner" count={statsObj.pattern_wins.corner} />
+                                      <PatternRow label="Star" count={statsObj.pattern_wins.star} />
                                       <PatternRow label="Box Bonus" count={statsObj.pattern_wins.box_bonus} />
                                     </div>
                                   </div>
