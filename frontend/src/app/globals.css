@@ -2678,8 +2678,13 @@ select option {
      toggle, overlaying the content instead of squeezing it. */
   .hg-side.is-collapsed{position:absolute;top:0;left:0;bottom:0;width:224px;z-index:50;
     box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
-  .hg-side.is-collapsed .hg-side-link span{display:inline}
-  .hg-side.is-collapsed .hg-logo-word{display:flex}
+  /* .hg-side.is-collapsed's base rule (line ~2366, the DESKTOP narrow-rail state)
+     hides these with !important — since this block repurposes the same class for
+     mobile's "drawer open" state, the override here needs matching !important or
+     it silently loses and the drawer opens with icons but no text, per bug report. */
+  .hg-side.is-collapsed .hg-side-link span{display:inline !important}
+  .hg-side.is-collapsed .hg-side-mod{display:block !important}
+  .hg-side.is-collapsed .hg-logo-word{display:flex !important}
   .hg-side.is-collapsed .hg-side-link{justify-content:flex-start;padding:8px 10px}
   .hg-side.is-collapsed .hg-side-brand{justify-content:flex-start;padding:4px 8px 0}
   .hg-statusbar{padding:12px 14px;gap:8px}
