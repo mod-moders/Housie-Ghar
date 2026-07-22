@@ -448,10 +448,12 @@
 .hg-root[data-theme='retro_arcade'] .hg-prog-track { display: none; }
 
 /* Nav styles */
-.hg-root[data-theme='retro_arcade'] .hg-nav-links {
-  display: flex;
-  gap: 16px;
-  align-items: center;
+@media(min-width:900px){
+  .hg-root[data-theme='retro_arcade'] .hg-nav-links {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
 }
 .hg-root[data-theme='retro_arcade'] .hg-nav-link {
   font-family: var(--font-pixel, monospace);
@@ -1053,6 +1055,11 @@
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+/* Without this, mobile browsers "font-boost" text size based on the device's own
+   screen width/DPI heuristics (varies by device, invisible in any desktop viewport
+   emulation) — inflated text then busts fixed-width containers on some phones but
+   not others even though the CSS itself is unchanged. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 /* iOS Safari ignores the viewport meta's zoom restrictions (since iOS 10, for accessibility) but
    does honor touch-action, so pan-x/pan-y (no pinch-zoom) is what actually blocks pinch there. */
 html,body{touch-action:pan-x pan-y}
@@ -2487,10 +2494,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-audit-body{font-size:13px;line-height:1.4}
 .hg-audit-body span{font-size:11px}
 
-/* fill grid */
+/* fill grid — min(220px,100%) so a narrow phone viewport doesn't force a floor wider than the screen */
 .hg-fill-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 12px;
 }
 @media (min-width: 1024px) {
@@ -2694,6 +2701,11 @@ select option {
 @media(max-width:899px){
   .hg-status-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hg-status-role{max-width:112px;overflow:hidden;text-overflow:ellipsis}
+  /* .hg-status-right also holds the Bookie-only AVAILABLE/SKIPPED toggle (fixed-width,
+     un-shrinkable) ahead of the role text and avatar — on a phone-width sidebar+statusbar
+     combo that row has no room left and the avatar was silently clipped by .hg-frame-wide's
+     overflow-x:hidden. Let this cluster wrap onto its own line instead of forcing overflow. */
+  .hg-status-right{flex-wrap:wrap;justify-content:flex-end;row-gap:6px}
 }
 
 /* ============ Finance Hub statusbar — stats row wraps below, mobile + tablet ============

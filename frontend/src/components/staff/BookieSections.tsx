@@ -282,7 +282,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
     <div className="hg-sec" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
       
       {/* SECTION 1: Digital Wallet Hero Card & 4 Primary Non-Repetitive KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", width: "100%" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "20px", width: "100%" }}>
         
         {/* Digital Wallet Card */}
         <div className="hg-wallet-card" style={{ width: "100%", maxWidth: "none" }}>
@@ -304,7 +304,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
         </div>
 
         {/* 4 Core Performance KPI Cards (No Duplicates) */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))", gap: "12px" }}>
           
           <div className="hg-panel" style={{ padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets Sold</span>
@@ -421,7 +421,7 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
       })()}
 
       {/* SECTION 2: Responsive Two-Column Details Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px", width: "100%" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "20px", width: "100%" }}>
         
         {/* Left Column: Sales Breakdown by Timeframe */}
         <div className="hg-panel" style={{ padding: "20px", borderRadius: "14px" }}>
@@ -453,17 +453,17 @@ export function BookieWalletSection({ me }: { me: AuthUser }) {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
-            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
-              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Tickets</span>
-              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--text)" }}>{activeSales?.tickets_sold ?? 0}</b>
+            <div style={{ minWidth: 0, background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Tickets</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeSales?.tickets_sold ?? 0}</b>
             </div>
-            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
-              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Collection</span>
-              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--accent)" }}>{money(activeSales?.collection ?? 0)}</b>
+            <div style={{ minWidth: 0, background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Collection</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "var(--accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{money(activeSales?.collection ?? 0)}</b>
             </div>
-            <div style={{ background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
-              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>Net Profit</span>
-              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "#10B981" }}>{money(activeProfit)}</b>
+            <div style={{ minWidth: 0, background: "rgba(255,255,255,0.025)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-2)" }}>
+              <span className="hg-dim" style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Net Profit</span>
+              <b style={{ display: "block", fontSize: "18px", fontWeight: "800", marginTop: "4px", color: "#10B981", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{money(activeProfit)}</b>
             </div>
           </div>
 
