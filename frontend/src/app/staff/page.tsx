@@ -146,7 +146,7 @@ export default function StaffDashboard() {
   const { user, setUser } = useAuthStore();
   const [section, setSection] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("hg_staff_section") || null;
+      return sessionStorage.getItem("hg_staff_section") || null;
     }
     return null;
   });
@@ -159,9 +159,9 @@ export default function StaffDashboard() {
     setSection(newSec);
     if (typeof window !== "undefined") {
       if (newSec) {
-        localStorage.setItem("hg_staff_section", newSec);
+        sessionStorage.setItem("hg_staff_section", newSec);
       } else {
-        localStorage.removeItem("hg_staff_section");
+        sessionStorage.removeItem("hg_staff_section");
       }
     }
   };
@@ -193,8 +193,7 @@ export default function StaffDashboard() {
             // login signs tokens that verification then refuses). Carry the reason
             // to the login page instead of bouncing back silently — a silent loop
             // here is indistinguishable from "the login button did nothing".
-            const hadToken = !!(localStorage.getItem("hg_staff_token") || sessionStorage.getItem("hg_staff_token"));
-            localStorage.removeItem("hg_staff_token");
+            const hadToken = !!sessionStorage.getItem("hg_staff_token");
             sessionStorage.removeItem("hg_staff_token");
             // Clear the first-party middleware cookie too, so a rejected session
             // can't keep /staff "unlocked" (cookie present) while the real bearer
@@ -249,9 +248,8 @@ export default function StaffDashboard() {
   const logout = async () => {
     try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch { /* cookie may already be gone */ }
     if (typeof window !== "undefined") {
-      localStorage.removeItem("hg_staff_token");
       sessionStorage.removeItem("hg_staff_token");
-      localStorage.removeItem("hg_staff_section");
+      sessionStorage.removeItem("hg_staff_section");
       document.cookie = "hg_auth_token=; path=/; max-age=0; SameSite=Lax; Secure";
     }
     setUser(null);

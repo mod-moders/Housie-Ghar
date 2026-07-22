@@ -45,7 +45,6 @@ export default function StaffLogin() {
         body: JSON.stringify({ email, password }),
       });
       if (typeof window !== "undefined") {
-        localStorage.setItem("hg_staff_token", res.token);
         sessionStorage.setItem("hg_staff_token", res.token);
         document.cookie = `hg_auth_token=${res.token}; path=/; max-age=315360000; SameSite=Lax; Secure`;
       }

@@ -59,8 +59,11 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
  */
 export function socketAuth(socket: Socket, next: (err?: Error) => void): void {
   try {
-    const cookies = parseCookies(socket.handshake.headers.cookie);
-    const token = cookies[CONSTANTS.JWT_COOKIE_NAME];
+    let token = socket.handshake.auth?.token;
+    if (!token) {
+      const cookies = parseCookies(socket.handshake.headers.cookie);
+      token = cookies[CONSTANTS.JWT_COOKIE_NAME];
+    }
     if (token) {
       const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
       socket.data.user = {

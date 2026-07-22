@@ -245,7 +245,7 @@ export default function Lobby() {
       localStorage.setItem("hg_ref_promoter_id", ref);
     }
 
-    const token = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
+    const token = sessionStorage.getItem("hg_player_token");
     if (!token) {
       router.push("/login");
       return;

@@ -36,7 +36,14 @@ export function useSocket(
   const joinArg = join?.arg;
 
   useEffect(() => {
-    const socket = io(BASE, { withCredentials: true });
+    const staffToken = typeof window !== "undefined" ? sessionStorage.getItem("hg_staff_token") : null;
+    const playerToken = typeof window !== "undefined" ? sessionStorage.getItem("hg_player_token") : null;
+    const token = staffToken || playerToken;
+
+    const socket = io(BASE, {
+      withCredentials: true,
+      auth: token ? { token } : undefined,
+    });
     socketRef.current = socket;
 
     const doJoin = () => { if (joinEvent && joinArg) socket.emit(joinEvent, joinArg); };

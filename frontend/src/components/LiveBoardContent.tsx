@@ -73,7 +73,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [isSearching, setIsSearching] = useState(false);
   const [displayName, setDisplayName] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      const token = sessionStorage.getItem("hg_player_token") || localStorage.getItem("hg_player_token");
+      const token = sessionStorage.getItem("hg_player_token");
       if (token) {
         try {
           const base64Url = token.split('.')[1];

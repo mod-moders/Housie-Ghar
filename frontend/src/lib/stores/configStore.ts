@@ -75,7 +75,7 @@ export const useConfigStore = create<ConfigState>((set) => ({
       // storage on login/signup, so its absence is a reliable "anonymous" signal.
       const hasPlayerToken =
         typeof window !== "undefined" &&
-        !!(localStorage.getItem("hg_player_token") || sessionStorage.getItem("hg_player_token"));
+        !!sessionStorage.getItem("hg_player_token");
       if (hasPlayerToken) {
         try {
           const res = await apiFetch<{ player: { theme_preference: string | null } }>("/api/player/me");

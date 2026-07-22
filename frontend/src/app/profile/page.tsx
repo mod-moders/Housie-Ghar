@@ -232,7 +232,6 @@ export default function ProfilePage() {
       // ignore
     } finally {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("hg_player_token");
         sessionStorage.removeItem("hg_player_token");
       }
       router.push("/login");

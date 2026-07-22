@@ -54,7 +54,6 @@ export default function Login() {
       });
 
       if (typeof window !== "undefined") {
-        localStorage.setItem("hg_player_token", res.token);
         sessionStorage.setItem("hg_player_token", res.token);
       }
 
