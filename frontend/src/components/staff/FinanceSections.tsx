@@ -12,6 +12,7 @@ import { AnalyticsChart, HeatmapWidget, RetentionWidget } from "./AdminSections"
 import type { PerformanceSeries, HeatmapHour, RetentionData } from "./AdminSections";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { useSocket } from "@/lib/hooks/useSocket";
+import { RewardsCostSection } from "./RewardsSections";
 
 interface GameBreakdown {
   game_id: string;
@@ -82,7 +83,7 @@ interface PrizeClaimsResponse {
 }
 
 export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void }) {
-  const [activeTab, setActiveTab] = useState<"analysis" | "ledgers">("analysis");
+  const [activeTab, setActiveTab] = useState<"analysis" | "ledgers" | "rewards">("analysis");
 
   const [agents, setAgents] = useState<LedgerAgent[]>([]);
 
@@ -200,6 +201,28 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
         >
           Bookie Ledgers
         </button>
+
+        {/* 3. Reward Costs */}
+        <button
+          onClick={() => setActiveTab("rewards")}
+          style={{
+            background: activeTab === "rewards" ? "var(--surface)" : "none",
+            color: activeTab === "rewards" ? "var(--cyan)" : "var(--text-dim)",
+            border: "none",
+            outline: "none",
+            boxShadow: activeTab === "rewards" ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
+            borderRadius: "6px",
+            padding: "8px 18px",
+            fontSize: "12.5px",
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            margin: 0,
+            whiteSpace: "nowrap"
+          }}
+        >
+          Reward Costs
+        </button>
       </div>
 
       {activeTab === "ledgers" ? (
@@ -232,6 +255,10 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
               })}
             </div>
           )}
+        </div>
+      ) : activeTab === "rewards" ? (
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "24px", paddingBottom: "32px" }}>
+          <RewardsCostSection />
         </div>
       ) : (
         /* ── Housie Ghar Analysis Tab Content ── */
