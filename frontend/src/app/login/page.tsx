@@ -76,9 +76,9 @@ export default function Login() {
     <div className="hg-screen flex items-center justify-center min-h-screen px-4 py-12" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-md p-8 relative" style={{ background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: "16px", boxShadow: "0 20px 50px rgba(0,0,0,0.55)" }}>
         {/* Staff Shortcut Icon */}
-        <Link href="/staff/login" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Staff Login">
-          <Icon name="key" size={20} strokeWidth={2} />
-        </Link>
+        <a href="/staff/login" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Staff Login">
+          <Icon name="shieldCheck" size={20} strokeWidth={2} />
+        </a>
 
         {/* Secondary Logo */}
         <div className="flex justify-center mb-8">

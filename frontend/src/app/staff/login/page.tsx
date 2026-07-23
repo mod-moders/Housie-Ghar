@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { useAuthStore, AuthUser } from "@/lib/stores/authStore";
-import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 
@@ -60,9 +59,10 @@ export default function StaffLogin() {
     <div className="hg-screen flex items-center justify-center min-h-screen px-4 py-12" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-md p-8 relative" style={{ background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: "16px", boxShadow: "0 20px 50px rgba(0,0,0,0.55)" }}>
         {/* Exit to Lobby Shortcut Icon */}
-        <Link href="/" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Exit to Lobby">
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a href="/" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Exit to Lobby">
           <Icon name="home" size={20} strokeWidth={2} />
-        </Link>
+        </a>
 
         {/* Secondary Logo */}
         <div className="flex justify-center mb-8">
