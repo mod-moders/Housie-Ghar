@@ -158,7 +158,8 @@ export function PlayersSection() {
             {filteredPlayers.length === 0 ? (
               <EmptyHint icon="users" title="No players found" sub="No registered players match your search criteria." />
             ) : (
-              <div className="hg-table" style={{ height: "100%", overflowY: "auto" }}>
+              <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: "flex", flexDirection: "column" }}>
+                <div className="hg-table" style={{ height: "100%", overflowY: "auto", minWidth: "860px" }}>
                 <div className="hg-tr hg-tr-players hg-tr-head">
                   <span>Player</span>
                   <span>Registered</span>
@@ -220,6 +221,7 @@ export function PlayersSection() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>
