@@ -80,44 +80,13 @@ interface RewardsSummaryData {
   }[];
 }
 
-/* ── Shared progress bar ─────────────────────────────────────────────── */
-
-function RewardProgress({ pct, label }: { pct: number; label: string }) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  return (
-    <div style={{ marginTop: "10px" }}>
-      <div
-        style={{
-          height: "8px",
-          borderRadius: "999px",
-          background: "var(--surface-2)",
-          border: "1px solid var(--border-2)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${clamped}%`,
-            height: "100%",
-            borderRadius: "999px",
-            background: "var(--cta)",
-            transition: "width .35s ease",
-          }}
-        />
-      </div>
-      <div className="hg-dim" style={{ fontSize: "11px", marginTop: "6px" }}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
 /* ── Bookie rewards ──────────────────────────────────────────────────── */
 
 export function BookieRewardsSection() {
   const [data, setData] = useState<BookieRewardsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<BookieRewardsData>("/api/rewards/bookie")
@@ -132,6 +101,13 @@ export function BookieRewardsSection() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   if (loading) return <div className="hg-sec"><p className="hg-sec-sub">Loading rewards…</p></div>;
   if (error) return <div className="hg-sec"><p className="hg-sec-err">{error}</p></div>;
@@ -151,62 +127,295 @@ export function BookieRewardsSection() {
   const pct = perFree > 0 ? (intoCurrent / perFree) * 100 : 0;
 
   return (
-    <div className="hg-sec">
-      <p className="hg-sec-sub">
-        Earn 1 point for every {data.tickets_per_point} tickets you sell. {data.points_per_free_ticket} points get you a
-        free ticket, applied straight to a booking at confirm time.
-      </p>
-
-      <div className="hg-kpi-grid">
-        <KpiCard label="Free tickets ready" value={String(data.free_tickets_available)} tone={data.free_tickets_available > 0 ? "good" : undefined} />
-        <KpiCard label="Points available" value={String(data.points_available)} sub={`${data.points_earned} earned · ${data.points_redeemed} spent`} />
-        <KpiCard label="Tickets sold" value={String(data.lifetime_tickets_sold)} sub="counted since the programme started" />
+    <div className="hg-sec" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* Dynamic Program Guide Banner */}
+      <div style={{ 
+        background: "var(--surface-2)", 
+        border: "1.5px solid var(--border-light)",
+        display: "flex",
+        gap: "12px",
+        alignItems: "flex-start",
+        padding: "16px",
+        borderRadius: "16px"
+      }}>
+        <div style={{ color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginTop: "2px" }}>
+          <Icon name="star" size={20} strokeWidth={2.2} />
+        </div>
+        <p style={{ fontSize: "13px", color: "var(--text-dim)", margin: 0, lineHeight: 1.45 }}>
+          Earn <strong style={{ color: "var(--text)" }}>1 point</strong> for every <strong style={{ color: "var(--text)" }}>{data.tickets_per_point}</strong> tickets you sell. 
+          Every <strong style={{ color: "var(--text)" }}>{data.points_per_free_ticket} points</strong> unlocks a free ticket, applied directly during booking confirmation.
+        </p>
       </div>
 
-      <div className="hg-panel" style={{ marginTop: "24px" }}>
-        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-            <Icon name="star" size={16} /> Progress to your next free ticket
+      {/* Main Stats and Cockpit Area */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: isMobile ? "1fr" : "1.2fr 1fr", 
+        gap: "20px" 
+      }}>
+        {/* Left Side: Balance & Progress to Next Ticket */}
+        <div className="hg-panel" 
+             style={{ 
+               position: "relative",
+               overflow: "hidden",
+               border: "2px solid var(--accent)", 
+               background: "linear-gradient(135deg, var(--surface), var(--surface-2))",
+               boxShadow: "var(--card-shadow)",
+               borderRadius: "20px",
+               padding: "24px",
+               display: "flex",
+               flexDirection: "column",
+               justifyContent: "space-between"
+             }}>
+          {/* Subtle Accent Glow */}
+          <div style={{
+            position: "absolute",
+            top: "-40px",
+            right: "-40px",
+            width: "120px",
+            height: "120px",
+            borderRadius: "50%",
+            background: "var(--accent)",
+            filter: "blur(40px)",
+            opacity: 0.12,
+            pointerEvents: "none"
+          }} />
+
+          <div>
+            <span style={{ fontSize: "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-mute)" }}>
+              Loyalty standing
+            </span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
+              <span style={{ fontSize: "38px", fontWeight: 900, color: "var(--accent)", fontFamily: "var(--font-head)", lineHeight: 1 }}>
+                {data.points_available}
+              </span>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-dim)" }}>
+                points available
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "var(--text-mute)", marginTop: "6px" }}>
+              <span>{data.points_earned} total earned</span>
+              <span>•</span>
+              <span>{data.points_redeemed} spent</span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-light)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: 700, marginBottom: "8px" }}>
+              <span style={{ color: "var(--text-dim)" }}>Next Free Ticket Progress</span>
+              <span style={{ color: "var(--accent)" }}>{intoCurrent} / {perFree} pts</span>
+            </div>
+
+            {/* Glowing Custom Progress Bar */}
+            <div style={{ 
+              width: "100%", 
+              height: "10px", 
+              borderRadius: "999px", 
+              background: "rgba(0, 0, 0, 0.15)",
+              border: "1px solid var(--border-light)",
+              position: "relative",
+              overflow: "hidden"
+            }}>
+              <div style={{ 
+                width: `${pct}%`, 
+                height: "100%", 
+                borderRadius: "999px", 
+                background: "var(--cta)",
+                boxShadow: pct > 0 ? "0 0 12px var(--cta)" : "none",
+                transition: "width .4s cubic-bezier(0.4, 0, 0.2, 1)"
+              }} />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "var(--text-mute)", marginTop: "10px" }}>
+              <span>Next point in: <strong>{data.tickets_to_next_point} ticket{data.tickets_to_next_point === 1 ? "" : "s"}</strong></span>
+              {data.points_to_next_free_ticket > 0 && (
+                <span><strong>{data.points_to_next_free_ticket} pts</strong> to unlock</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Free Tickets & Action Prompt */}
+        <div className="hg-panel" 
+             style={{ 
+               border: "1.5px solid var(--border)", 
+               background: "var(--surface)",
+               borderRadius: "20px",
+               padding: "24px",
+               display: "flex",
+               flexDirection: "column",
+               justifyContent: "space-between"
+             }}>
+          <div>
+            <span style={{ fontSize: "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-mute)" }}>
+              Reward tickets
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "12px" }}>
+              <div style={{ 
+                width: "48px", 
+                height: "48px", 
+                borderRadius: "14px", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center",
+                background: data.free_tickets_available > 0 ? "var(--accent-soft)" : "var(--surface-2)",
+                color: data.free_tickets_available > 0 ? "var(--accent)" : "var(--text-mute)",
+                border: "1.5px solid var(--border-light)"
+              }}>
+                <Icon name="ticket" size={22} strokeWidth={2.2} />
+              </div>
+              <div>
+                <div style={{ fontSize: "32px", fontWeight: 900, color: "var(--text)", fontFamily: "var(--font-head)", lineHeight: 1 }}>
+                  {data.free_tickets_available}
+                </div>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-dim)", marginTop: "4px" }}>
+                  free ticket{data.free_tickets_available === 1 ? "" : "s"} ready
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ 
+            marginTop: "20px", 
+            padding: "14px", 
+            borderRadius: "12px", 
+            fontSize: "12px", 
+            lineHeight: 1.5,
+            background: data.free_tickets_available > 0 ? "var(--success-soft)" : "var(--surface-2)", 
+            color: data.free_tickets_available > 0 ? "var(--success)" : "var(--text-dim)",
+            border: data.free_tickets_available > 0 ? "1px solid var(--success)" : "1px solid var(--border-light)"
+          }}>
+            {data.free_tickets_available > 0 ? (
+              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                <div style={{ color: "var(--success)", flexShrink: 0, marginTop: "1px" }}>
+                  <Icon name="check" size={16} strokeWidth={2.5} />
+                </div>
+                <span>
+                  <strong>Free Ticket Ready!</strong> Toggle the <em>&ldquo;use free ticket&rdquo;</em> checkbox on your next booking queue confirmation.
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                <div style={{ color: "var(--text-mute)", flexShrink: 0, marginTop: "1px" }}>
+                  <Icon name="clock" size={16} strokeWidth={2} />
+                </div>
+                <span>
+                  Loyalty rewards are applied automatically. Sell more tickets to reach your next reward.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Row of Performance Statistics Cards */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", 
+        gap: "12px" 
+      }}>
+        <div className="hg-panel" style={{ padding: "16px", borderRadius: "16px", border: "1.5px solid var(--border-light)", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ color: "var(--accent)", background: "var(--surface-2)", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", flexShrink: 0, border: "1px solid var(--border-light)", justifyContent: "center" }}>
+            <Icon name="grid" size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-mute)" }}>Total Tickets Sold</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text)", marginTop: "2px" }}>{data.lifetime_tickets_sold}</div>
+          </div>
+        </div>
+
+        <div className="hg-panel" style={{ padding: "16px", borderRadius: "16px", border: "1.5px solid var(--border-light)", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ color: "var(--success)", background: "var(--surface-2)", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", flexShrink: 0, border: "1px solid var(--border-light)", justifyContent: "center" }}>
+            <Icon name="star" size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-mute)" }}>Lifetime Points</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text)", marginTop: "2px" }}>{data.points_earned}</div>
+          </div>
+        </div>
+
+        <div className="hg-panel" style={{ padding: "16px", borderRadius: "16px", border: "1.5px solid var(--border-light)", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ color: "var(--text-dim)", background: "var(--surface-2)", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", flexShrink: 0, border: "1px solid var(--border-light)", justifyContent: "center" }}>
+            <Icon name="check" size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-mute)" }}>Points Redeemed</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text)", marginTop: "2px" }}>{data.points_redeemed}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Redemption History Panel (Fully Responsive: Table on Desktop, Cards on Mobile) */}
+      <div className="hg-panel" style={{ borderRadius: "20px", border: "1.5px solid var(--border)", background: "var(--surface)", overflow: "hidden" }}>
+        <div className="hg-panel-head" style={{ borderBottom: "1.5px solid var(--border-light)", padding: "16px 20px" }}>
+          <h3 style={{ fontSize: "15px", fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
+            <Icon name="clock" size={15} /> Redemption history
           </h3>
         </div>
 
-        {data.free_tickets_available > 0 ? (
-          <p style={{ fontSize: "13px", color: "var(--success)", fontWeight: 600, margin: 0 }}>
-            You have {data.free_tickets_available} free ticket{data.free_tickets_available === 1 ? "" : "s"} ready. Tick
-            &ldquo;use free ticket&rdquo; on any booking in your queue to apply one.
-          </p>
-        ) : (
-          <p style={{ fontSize: "13px", color: "var(--text-dim)", margin: 0 }}>
-            {data.points_to_next_free_ticket} more point{data.points_to_next_free_ticket === 1 ? "" : "s"} to go —
-            that&rsquo;s about {data.points_to_next_free_ticket * data.tickets_per_point} more tickets sold.
-          </p>
-        )}
-
-        <RewardProgress
-          pct={pct}
-          label={`${intoCurrent} / ${perFree} points · next point in ${data.tickets_to_next_point} ticket${data.tickets_to_next_point === 1 ? "" : "s"}`}
-        />
-      </div>
-
-      <div className="hg-panel" style={{ marginTop: "24px" }}>
-        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-            <Icon name="clock" size={16} /> Redemption history
-          </h3>
-        </div>
         {data.history.length === 0 ? (
           <EmptyHint icon="star" title="Nothing redeemed yet" sub="Free tickets you claim will be listed here with the booking they were used on." />
+        ) : isMobile ? (
+          /* Mobile Card List Layout: 100% visible on small screens without side-scrolling */
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "16px" }}>
+            {data.history.map((h) => (
+              <div key={h.redemption_id} 
+                   style={{ 
+                     background: "var(--surface-2)", 
+                     border: "1px solid var(--border-light)", 
+                     borderRadius: "14px", 
+                     padding: "14px",
+                     display: "flex",
+                     flexDirection: "column",
+                     gap: "10px"
+                   }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>
+                      {h.game_title ?? "Housie Draw"}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-mute)", marginTop: "2px" }}>
+                      {new Date(h.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    </div>
+                  </div>
+                  <strong style={{ fontSize: "14px", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>
+                    {money(h.amount_waived)}
+                  </strong>
+                </div>
+
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  fontSize: "11px", 
+                  paddingTop: "8px", 
+                  borderTop: "1px dashed var(--border-light)", 
+                  color: "var(--text-dim)" 
+                }}>
+                  <span>Cost</span>
+                  <span style={{ fontWeight: 600, color: "var(--text)" }}>{h.units_spent} points spent</span>
+                </div>
+
+                {h.booking_ref && (
+                  <div style={{ fontSize: "10px", color: "var(--text-mute)" }}>
+                    Booking Ref: <code style={{ color: "var(--text-dim)" }}>{h.booking_ref}</code>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         ) : (
+          /* Desktop Table Layout */
           <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
             <div className="hg-table" style={{ minWidth: "560px" }}>
-              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr", borderBottom: "1.5px solid var(--border-light)" }}>
                 <span>When</span>
                 <span>Game</span>
                 <span>Points</span>
                 <span style={{ textAlign: "right" }}>Value</span>
               </div>
               {data.history.map((h) => (
-                <div key={h.redemption_id} className="hg-tr" style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr" }}>
+                <div key={h.redemption_id} className="hg-tr" style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr", borderBottom: "1px solid var(--border-light)" }}>
                   <div>
                     <b style={{ color: "var(--text)" }}>
                       {new Date(h.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
