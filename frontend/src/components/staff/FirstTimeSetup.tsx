@@ -127,7 +127,7 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
         {/* Split Grid Card */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))",
           background: "var(--surface)",
           border: "1.5px solid rgba(212, 175, 55, 0.25)",
           borderRadius: "16px",

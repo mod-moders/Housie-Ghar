@@ -100,7 +100,7 @@ function GamesTable({ games, controls, onAction, onCompletedClick, canManage }: 
   const rowClass = controls ? "hg-tr hg-tr-games" : "hg-tr hg-tr-6";
 
   return (
-    <div className="hg-table">
+    <div className="hg-table" style={{ minWidth: controls ? "960px" : "600px" }}>
       <div className={`${rowClass} hg-tr-head`}>
         <span>Game</span>
         <span>Time</span>
@@ -1120,7 +1120,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         </div>
       )}
 
-      <div className="hg-panel hg-table-premium">
+      <div className="hg-panel hg-table-premium" style={{ overflowX: "auto" }}>
         {games.length === 0 ? (
           <EmptyHint icon="grid" title="No games yet" sub="Create the first game to open bookings." />
         ) : (
@@ -1129,14 +1129,14 @@ export function GamesSection({ me }: { me: AuthUser }) {
       </div>
 
       {/* Past Games Panel */}
-      <div className="hg-panel hg-table-premium" style={{ marginTop: "24px" }}>
+      <div className="hg-panel hg-table-premium" style={{ marginTop: "24px", overflowX: "auto" }}>
         <div className="hg-panel-head">
           <h3>Past Games (Last 3 Days)</h3>
         </div>
         {pastGames.length === 0 ? (
           <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 3 days will show up here." />
         ) : (
-          <div className="hg-table">
+          <div className="hg-table" style={{ minWidth: "650px" }}>
             <div className="hg-tr hg-tr-history hg-tr-head">
               <span>Game Name</span><span>Date &amp; Time</span><span>Tickets Sold</span><span>Revenue</span><span>Action</span>
             </div>
@@ -2325,8 +2325,8 @@ export function HistorySection() {
       ) : games.length === 0 ? (
         <EmptyHint icon="trophy" title="No completed games" sub="Finished games will show up here with their full results." />
       ) : (
-        <div className="hg-panel">
-          <div className="hg-table">
+        <div className="hg-panel" style={{ overflowX: "auto" }}>
+          <div className="hg-table" style={{ minWidth: "650px" }}>
             <div className="hg-tr hg-tr-head">
               <span>Game Name</span><span>Date &amp; Time</span><span>Tickets Sold</span><span>Revenue</span><span>Action</span>
             </div>

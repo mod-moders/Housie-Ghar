@@ -17,7 +17,11 @@ import { HousieTicket, gridToMatrix, type TicketMatrix } from "@/components/Hous
 import { useConfigStore } from "@/lib/stores/configStore";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import dynamic from "next/dynamic";
+
+const INTRO_AT_MS = 30000;
+const FIRST_DRAW_AT_MS = 53000;
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -46,7 +50,7 @@ export function OperatorHudSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { drawnNumbers, lastDrawn, gameStatus, reset, addDrawn } = useGameStore();
+  const { drawnNumbers, lastDrawn, gameStatus, reset, addDrawn, elapsedMsAtSync, elapsedAt } = useGameStore();
   const [revealed, setRevealed] = useState(true);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,6 +78,29 @@ export function OperatorHudSection() {
   );
 
   const pendingDrawsRef = useRef<number[]>([]);
+  const gameStartedAnnouncedRef = useRef<boolean>(false);
+  const outroPlayedRef = useRef<boolean>(false);
+  const wasLiveInSessionRef = useRef<boolean>(false);
+  const activeCallIdRef = useRef<number>(0);
+  const [numberCallPlaying, setNumberCallPlaying] = useState(false);
+  const [winOverlay, setWinOverlay] = useState<{ prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number } | null>(null);
+
+  const timersRef = useRef<NodeJS.Timeout[]>([]);
+  const delay = useCallback((fn: () => void, ms: number) => {
+    const t = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((x) => x !== t);
+      fn();
+    }, ms);
+    timersRef.current.push(t);
+    return t;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current = [];
+    };
+  }, []);
 
 
   const beep = useCallback(() => {
@@ -97,19 +124,28 @@ export function OperatorHudSection() {
     }
   }, [muted]);
 
+  const revealDraw = useCallback((num: number) => {
+    beep();
+    addDrawn(num);
+    setRevealed(true);
+    
+    const currentCallId = ++activeCallIdRef.current;
+    setNumberCallPlaying(true);
+    playNumberCall(num).finally(() => {
+      if (activeCallIdRef.current === currentCallId) {
+        setNumberCallPlaying(false);
+      }
+    });
+  }, [beep, addDrawn, playNumberCall]);
+
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
     queued.forEach((num, i) => {
       const offset = i * 2500;
-      setTimeout(() => setRevealed(false), offset);
-      setTimeout(() => {
-        beep();
-        addDrawn(num);
-        setRevealed(true);
-        playNumberCall(num);
-      }, offset + 2000);
+      delay(() => setRevealed(false), offset);
+      delay(() => revealDraw(num), offset + 2000);
     });
-  }, [beep, addDrawn, playNumberCall]);
+  }, [delay, revealDraw]);
 
   const load = useCallback(() => {
     apiFetch<GameSummary[]>("/api/games")
@@ -130,13 +166,8 @@ export function OperatorHudSection() {
       }
 
       setRevealed(false);
-      setTimeout(() => {
-        beep();
-        addDrawn(num);
-        setRevealed(true);
-        playNumberCall(num);
-      }, 2000);
-    } else if (data.event === "winner") {
+      delay(() => revealDraw(num), 2000);
+    } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as { prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number };
       setPrizes((prev) =>
         prev.map((p) =>
@@ -145,9 +176,33 @@ export function OperatorHudSection() {
             : p
         )
       );
-      playCelebration();
+
+      const showWinnerCelebration = () => {
+        playCelebration();
+        const config = useConfigStore.getState().config;
+        const isSoundEnabled = config?.celebration_sound_enabled !== "false";
+        if (isSoundEnabled && !muted) {
+          soundSynthesizer.playCelebration();
+        }
+        setWinOverlay(w);
+
+        delay(() => {
+          setWinOverlay(null);
+        }, 6000);
+      };
+
+      if (numberCallPlaying) {
+        const interval = setInterval(() => {
+          if (!activeCallIdRef.current || !numberCallPlaying) {
+            clearInterval(interval);
+            showWinnerCelebration();
+          }
+        }, 200);
+      } else {
+        delay(showWinnerCelebration, 600);
+      }
     }
-  }, [beep, playNumberCall, playCelebration, addDrawn, introPlayingRef]);
+  }, [playCelebration, introPlayingRef, delay, numberCallPlaying, revealDraw, muted]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -156,6 +211,14 @@ export function OperatorHudSection() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchedTickets([]);
     setSearchQuery("");
+
+    // Reset our audio state/sequence refs
+    gameStartedAnnouncedRef.current = false;
+    outroPlayedRef.current = false;
+    wasLiveInSessionRef.current = false;
+    setWinOverlay(null);
+    setNumberCallPlaying(false);
+    activeCallIdRef.current = 0;
   }, [selectedId, reset]);
 
   useSSE(selectedId, onEvent);
@@ -169,24 +232,72 @@ export function OperatorHudSection() {
       .catch(() => {});
   }, [selectedId]);
 
-  const gameStartedAnnouncedRef = useRef<boolean>(false);
-  const outroPlayedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (activeGameStatus === "Live" || activeGameStatus === "Paused") {
+      wasLiveInSessionRef.current = true;
+    }
+  }, [activeGameStatus]);
+
+  useEffect(() => {
+    if (activeGameStatus === "Scheduled") {
+      gameStartedAnnouncedRef.current = false;
+      outroPlayedRef.current = false;
+      wasLiveInSessionRef.current = false;
+    }
+  }, [activeGameStatus]);
+
   useEffect(() => {
     if (activeGameStatus === "Live" && !gameStartedAnnouncedRef.current) {
       gameStartedAnnouncedRef.current = true;
-      playGreeting().then(flushPendingDraws);
+
+      const elapsed =
+        elapsedMsAtSync !== null && elapsedAt !== null
+          ? elapsedMsAtSync + (Date.now() - elapsedAt)
+          : 0;
+
+      if (drawnNumbers.length === 0 && elapsed < INTRO_AT_MS) {
+        let floorReached = false;
+        const tryFlush = () => {
+          if (floorReached && !introPlayingRef.current) {
+            flushPendingDraws();
+          }
+        };
+
+        const remaining = (gameTimeMs: number) => Math.max(0, gameTimeMs - elapsed);
+
+        delay(() => { playGreeting().finally(tryFlush); }, remaining(INTRO_AT_MS));
+        delay(() => { floorReached = true; tryFlush(); }, remaining(FIRST_DRAW_AT_MS));
+      } else {
+        flushPendingDraws();
+      }
     }
-    if ((activeGameStatus === "Completed" || activeGameStatus === "Draw_Ended") && !outroPlayedRef.current) {
-      outroPlayedRef.current = true;
-      playOutro();
+  }, [activeGameStatus, drawnNumbers.length, playGreeting, flushPendingDraws, delay, introPlayingRef, elapsedMsAtSync, elapsedAt]);
+
+  const delayedGameEnd = (activeGameStatus === "Completed" || activeGameStatus === "Draw_Ended") && !numberCallPlaying && !winOverlay;
+
+  useEffect(() => {
+    if (delayedGameEnd) {
+      if (!outroPlayedRef.current) {
+        delay(() => {
+          if (!outroPlayedRef.current) {
+            outroPlayedRef.current = true;
+            if (wasLiveInSessionRef.current) {
+              playOutro();
+            }
+            playCelebration();
+            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+            if (isSoundEnabled && !muted) {
+              soundSynthesizer.playCelebration();
+            }
+          }
+        }, 3000);
+      }
+    } else {
+      if (activeGameStatus !== "Completed" && activeGameStatus !== "Draw_Ended") {
+        outroPlayedRef.current = false;
+      }
     }
-    if (activeGameStatus !== "Live") {
-      gameStartedAnnouncedRef.current = false;
-    }
-    if (activeGameStatus !== "Completed" && activeGameStatus !== "Draw_Ended") {
-      outroPlayedRef.current = false;
-    }
-  }, [activeGameStatus, playGreeting, playOutro, flushPendingDraws]);
+  }, [delayedGameEnd, activeGameStatus, playOutro, playCelebration, muted, delay]);
 
   const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;

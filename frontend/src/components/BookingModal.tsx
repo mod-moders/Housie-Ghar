@@ -72,7 +72,6 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
 
   const urgent = secondsLeft <= 120;
   const shortId = lock.booking_id.substring(0, 8).toUpperCase();
-  const routedTo = lock.agent_town ? `${lock.agent_name} · ${lock.agent_town}` : lock.agent_name;
   const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: #${shortId}. Amount: ${moneyStr(lock.total_amount)}.`;
 
   if (phase === "confirmed") {

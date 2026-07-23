@@ -35,9 +35,7 @@ export default function LeaderboardAndStats() {
   const [loggedInName, setLoggedInName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Logged-in player's own stats states
-  const [myStats, setMyStats] = useState<PlayerStats | null>(null);
-  const [loadingMyStats, setLoadingMyStats] = useState(true);
+
 
   // Cached stats for expanded players
   // Captured once per mount: Date.now() called during render is impure and makes
@@ -47,36 +45,19 @@ export default function LeaderboardAndStats() {
   const [expandedStats, setExpandedStats] = useState<Record<string, PlayerStats>>({});
   const [loadingExpanded, setLoadingExpanded] = useState<string | null>(null);
 
-  // Load logged-in user identity & personal stats
+  // Load logged-in user identity
   useEffect(() => {
-    // `loadingMyStats` already starts true and this effect is mount-only, so there
-    // is nothing to reset here.
     apiFetch<{ player: { housie_name: string } }>("/api/player/me")
       .then((res) => {
         setLoggedInName(res.player.housie_name);
-        // Now fetch their stats
-        apiFetch<PlayerStats>("/api/player/stats")
-          .then((stats) => {
-            setMyStats(stats);
-            setLoadingMyStats(false);
-          })
-          .catch(() => {
-            setMyStats(null);
-            setLoadingMyStats(false);
-          });
       })
       .catch(() => {
         apiFetch<{ user: { full_name: string } }>("/api/auth/me")
           .then((res) => {
             setLoggedInName(res.user.full_name);
-            // Staff users do not have player stats
-            setMyStats(null);
-            setLoadingMyStats(false);
           })
           .catch(() => {
             setLoggedInName(null);
-            setMyStats(null);
-            setLoadingMyStats(false);
           });
       });
   }, []);
@@ -113,12 +94,7 @@ export default function LeaderboardAndStats() {
       event === "game_list_update"
     ) {
       loadLeaderboard();
-      // Reload own stats if logged in
-      if (loggedInName) {
-        apiFetch<PlayerStats>("/api/player/stats")
-          .then(setMyStats)
-          .catch(() => {});
-      }
+
     }
   });
 
@@ -215,7 +191,7 @@ export default function LeaderboardAndStats() {
 
   return (
     <PublicShell>
-      <div className="hg-screen" style={{ overflow: "auto" }}>
+      <div className="hg-screen">
 
         {/* ── Page Header ── */}
         <div style={{ ...containerStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, paddingTop: 20, paddingBottom: 8 }}>
@@ -511,7 +487,7 @@ export default function LeaderboardAndStats() {
                             <span style={{ fontSize: 12, color: "var(--text-dim)", marginLeft: 8 }}>Fetching detailed statistics…</span>
                           </div>
                         ) : statsObj ? (
-                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 14 }}>
                             {/* Stats grids */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

@@ -226,11 +226,11 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
       </div>
 
       {activeTab === "ledgers" ? (
-        <div className="hg-panel" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div className="hg-panel" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", overflowX: "auto" }}>
           {agents.length === 0 ? (
             <EmptyHint icon="users" title="No bookies yet" sub="Bookie wallets appear here once accounts are created." />
           ) : (
-            <div className="hg-table" style={{ height: "100%", overflowY: "auto" }}>
+            <div className="hg-table" style={{ height: "100%", overflowY: "auto", minWidth: "650px" }}>
               <div className="hg-tr hg-tr-head">
                 <span>Bookie</span><span>Balance</span><span>Lifetime top-ups</span><span>Last recharge</span><span>Trust</span>
               </div>
@@ -332,7 +332,7 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
 
               {/* Performance Chart & Heatmap */}
               {insights && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "20px" }}>
                   <AnalyticsChart series={insights.series} />
                   <HeatmapWidget hours={insights.heatmap} />
                 </div>
@@ -340,13 +340,13 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
 
               {/* Player Retention & Repeat Participation */}
               {insights && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "20px" }}>
                   <RetentionWidget retention={insights.retention} />
                 </div>
               )}
 
               {/* Completed Games Performance Table */}
-              <div className="hg-panel" style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div className="hg-panel" style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "12px", overflowX: "auto" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>Completed Games Performance</h3>
                   <span className="hg-pill hg-pill-completed">{analysis.recent_games.length} games</span>
@@ -354,7 +354,7 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
                 {analysis.recent_games.length === 0 ? (
                   <EmptyHint icon="grid" title="No completed games yet" sub="Completed game breakdowns will show here." />
                 ) : (
-                  <div className="hg-table" style={{ overflowX: "auto" }}>
+                  <div className="hg-table" style={{ minWidth: "750px" }}>
                     <div className="hg-tr hg-tr-fin-games hg-tr-head">
                       <span>Game Title</span>
                       <span>Completed Date</span>
@@ -619,7 +619,7 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 {activeRecharges.length === 0 ? (
                   <EmptyHint icon="check" title="No Active Recharge Requests" sub="Bookie top-up requests will appear here instantly when submitted." />
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {activeRecharges.map((r) => (
                       <button
                         key={r.request_id}
@@ -670,7 +670,7 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 {historyRecharges.length === 0 ? (
                   <EmptyHint icon="check" title="No History in 2 Days" sub="Approved or rejected recharges from the past 48 hours will show here." />
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {historyRecharges.map((r) => {
                       const isApproved = r.request_status === "Approved";
                       return (
@@ -743,7 +743,7 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 {activeClaims.length === 0 ? (
                   <EmptyHint icon="trophy" title="No Active Claims" sub="Consolidated claim requests will appear here instantly when submitted." />
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {activeClaims.map((c) => (
                       <button
                         key={c.claim_key}
@@ -794,7 +794,7 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 {historyClaims.length === 0 ? (
                   <EmptyHint icon="check" title="No History in 2 Days" sub="Disbursed claims from the past 48 hours will show here." />
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {historyClaims.map((c) => (
                       <button
                         key={c.claim_key}

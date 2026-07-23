@@ -156,7 +156,7 @@ export default function StatsPage() {
 
   return (
     <PublicShell>
-      <div className="hg-screen" style={{ overflow: "auto", paddingBottom: 24 }}>
+      <div className="hg-screen" style={{ paddingBottom: 24 }}>
         <div style={{ ...containerStyle, display: "flex", flexDirection: "column", gap: 14, paddingTop: 20 }}>
           
           {/* Header Bar */}
@@ -258,7 +258,7 @@ export default function StatsPage() {
           </div>
 
           {/* 2-Column Dashboard Body */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 14 }}>
             
             {/* Left Column: Financial & Activity */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
