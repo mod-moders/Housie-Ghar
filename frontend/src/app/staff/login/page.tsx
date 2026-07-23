@@ -57,10 +57,10 @@ export default function StaffLogin() {
   };
 
   return (
-    <div className="hg-screen flex items-center justify-center bg-[#0B0B0C] px-4 py-12">
-      <div className="w-full max-w-md bg-[#121214] border border-[#27272A] rounded-2xl p-8 shadow-2xl relative">
+    <div className="hg-screen flex items-center justify-center min-h-screen px-4 py-12" style={{ background: "var(--bg)" }}>
+      <div className="w-full max-w-md p-8 relative" style={{ background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: "16px", boxShadow: "0 20px 50px rgba(0,0,0,0.55)" }}>
         {/* Exit to Lobby Shortcut Icon */}
-        <Link href="/" className="absolute top-4 right-4 text-[#06B6D4] hover:text-[#F43F5E] transition-colors" title="Exit to Lobby">
+        <Link href="/" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Exit to Lobby">
           <Icon name="home" size={20} strokeWidth={2} />
         </Link>
 
@@ -76,11 +76,11 @@ export default function StaffLogin() {
           />
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-white mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+        <h1 className="text-2xl font-bold text-center mb-2" style={{ fontFamily: "Outfit, sans-serif", color: "var(--text)" }}>
           Staff Login
         </h1>
-        <p className="text-center text-gray-400 text-sm mb-6 flex items-center justify-center gap-1.5">
-          <Icon name="shield" size={14} className="text-[#06B6D4]" /> Secure staff portal
+        <p className="text-center text-sm mb-6 flex items-center justify-center gap-1.5" style={{ color: "var(--text-mute)" }}>
+          <Icon name="shield" size={14} style={{ color: "var(--accent)" }} /> Secure staff portal
         </p>
 
         {error && (
@@ -101,7 +101,7 @@ export default function StaffLogin() {
 
         <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-5">
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="email">
+            <label className="block text-sm font-medium mb-1.5" htmlFor="email" style={{ color: "var(--text-dim)" }}>
               Username / Email
             </label>
             <input
@@ -112,12 +112,13 @@ export default function StaffLogin() {
               placeholder="Enter your staff email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
             />
           </div>
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="password">
+            <label className="block text-sm font-medium mb-1.5" htmlFor="password" style={{ color: "var(--text-dim)" }}>
               Password
             </label>
             <div className="hg-password-wrapper">
@@ -132,7 +133,8 @@ export default function StaffLogin() {
                 data-lpignore="true"
                 data-1p-ignore="true"
                 data-bitwarden-ignore="true"
-                className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
               />
               <button
                 type="button"

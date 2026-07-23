@@ -85,10 +85,10 @@ export default function SignUp() {
   };
 
   return (
-    <div className="hg-screen flex items-center justify-center min-h-screen bg-[#0B0B0C] px-4 py-12">
-      <div className="w-full max-w-md bg-[#121214] border border-[#27272A] rounded-2xl p-8 shadow-2xl relative">
+    <div className="hg-screen flex items-center justify-center min-h-screen px-4 py-12" style={{ background: "var(--bg)" }}>
+      <div className="w-full max-w-md p-8 relative" style={{ background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: "16px", boxShadow: "0 20px 50px rgba(0,0,0,0.55)" }}>
         {/* Staff Shortcut Icon */}
-        <Link href="/staff/login" className="absolute top-4 right-4 text-[#06B6D4] hover:text-[#F43F5E] transition-colors" title="Staff Login">
+        <Link href="/staff/login" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Staff Login">
           <Icon name="key" size={20} strokeWidth={2} />
         </Link>
 
@@ -104,10 +104,10 @@ export default function SignUp() {
           />
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-white mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+        <h1 className="text-2xl font-bold text-center mb-2" style={{ fontFamily: "Outfit, sans-serif", color: "var(--text)" }}>
           Sign Up
         </h1>
-        <p className="text-center text-gray-400 text-sm mb-6">
+        <p className="text-center text-sm mb-6" style={{ color: "var(--text-mute)" }}>
           Sign up to pick tickets and join the live draws.
         </p>
 
@@ -119,7 +119,7 @@ export default function SignUp() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="housie-name">
+            <label className="block text-sm font-medium mb-1.5" htmlFor="housie-name" style={{ color: "var(--text-dim)" }}>
               Housie Name
             </label>
             <input
@@ -129,16 +129,17 @@ export default function SignUp() {
               placeholder="Choose a username/alias (3-20 chars)"
               value={housieName}
               onChange={(e) => setHousieName(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
             />
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
               Your Housie Name will be used to log in on returning visits.
             </p>
           </div>
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="referral-code">
-              Referral Code <span className="text-gray-500 font-normal">(optional)</span>
+            <label className="block text-sm font-medium mb-1.5" htmlFor="referral-code" style={{ color: "var(--text-dim)" }}>
+              Referral Code <span style={{ color: "var(--text-mute)", fontWeight: "normal" }}>(optional)</span>
             </label>
             <input
               id="referral-code"
@@ -146,9 +147,10 @@ export default function SignUp() {
               placeholder="e.g. HGPLA042"
               value={referralCode}
               onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm uppercase"
+              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm uppercase"
+              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
             />
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
               Got a code from a friend? Enter it here so they get credit once you book your first ticket.
             </p>
           </div>
@@ -158,21 +160,21 @@ export default function SignUp() {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500 flex flex-col gap-4">
+        <div className="mt-6 text-center text-sm flex flex-col gap-4" style={{ color: "var(--text-mute)" }}>
           <div>
             Already registered?{" "}
-            <Link href="/login" className="text-[#06B6D4] hover:underline font-semibold">
+            <Link href="/login" className="hover:underline font-semibold" style={{ color: "var(--accent)" }}>
               Log in with Housie Name
             </Link>
           </div>
-          <div className="pt-3 border-t border-gray-800/60">
+          <div className="pt-3 border-t" style={{ borderColor: "var(--border)" }}>
             <button 
               type="button" 
               onClick={() => setShowBookieForm(true)} 
               style={{
-                background: "linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(255, 223, 0, 0.05) 100%)",
-                border: "1px solid rgba(212, 175, 55, 0.4)",
-                color: "#D4AF37",
+                background: "linear-gradient(90deg, var(--accent-soft) 0%, rgba(255, 255, 255, 0.02) 100%)",
+                border: "1px solid var(--accent)",
+                color: "var(--accent)",
                 borderRadius: "var(--radius)",
                 width: "100%",
                 padding: "10px 16px",
@@ -184,7 +186,7 @@ export default function SignUp() {
                 gap: "8px",
                 transition: "all 0.2s"
               }}
-              className="hover:border-[#D4AF37] hover:brightness-110"
+              className="hover:brightness-110"
             >
               <Icon name="shieldCheck" size={16} />
               Apply as Bookie for Housie Ghar

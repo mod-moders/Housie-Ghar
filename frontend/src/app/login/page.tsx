@@ -73,10 +73,10 @@ export default function Login() {
   };
 
   return (
-    <div className="hg-screen flex items-center justify-center min-h-screen bg-[#0B0B0C] px-4 py-12">
-      <div className="w-full max-w-md bg-[#121214] border border-[#27272A] rounded-2xl p-8 shadow-2xl relative">
+    <div className="hg-screen flex items-center justify-center min-h-screen px-4 py-12" style={{ background: "var(--bg)" }}>
+      <div className="w-full max-w-md p-8 relative" style={{ background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: "16px", boxShadow: "0 20px 50px rgba(0,0,0,0.55)" }}>
         {/* Staff Shortcut Icon */}
-        <Link href="/staff/login" className="absolute top-4 right-4 text-[#06B6D4] hover:text-[#F43F5E] transition-colors" title="Staff Login">
+        <Link href="/staff/login" className="absolute top-4 right-4 transition-colors" style={{ color: "var(--accent)" }} title="Staff Login">
           <Icon name="key" size={20} strokeWidth={2} />
         </Link>
 
@@ -92,10 +92,10 @@ export default function Login() {
           />
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-white mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+        <h1 className="text-2xl font-bold text-center mb-2" style={{ fontFamily: "Outfit, sans-serif", color: "var(--text)" }}>
           Login
         </h1>
-        <p className="text-center text-gray-400 text-sm mb-6">
+        <p className="text-center text-sm mb-6" style={{ color: "var(--text-mute)" }}>
           {passwordRequired ? "Authenticate with password to enter lobby" : "Enter your Housie Name to continue."}
         </p>
 
@@ -107,7 +107,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1.5" htmlFor="housie-name">
+            <label className="block text-sm font-medium mb-1.5" htmlFor="housie-name" style={{ color: "var(--text-dim)" }}>
               Housie Name
             </label>
             <input
@@ -118,14 +118,15 @@ export default function Login() {
               placeholder="Enter your registered Housie Name"
               value={housieName}
               onChange={(e) => setHousieName(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
             />
           </div>
 
           {passwordRequired && (
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-gray-300 text-sm font-medium" htmlFor="password">
+                <label className="block text-sm font-medium" htmlFor="password" style={{ color: "var(--text-dim)" }}>
                   Password
                 </label>
                 <button
@@ -152,7 +153,8 @@ export default function Login() {
                   data-lpignore="true"
                   data-1p-ignore="true"
                   data-bitwarden-ignore="true"
-                  className="w-full px-4 py-3 bg-[#1E1E22] border border-[#3F3F46] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                  style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
                 />
                 <button
                   type="button"
@@ -172,21 +174,21 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500 flex flex-col gap-4">
+        <div className="mt-6 text-center text-sm flex flex-col gap-4" style={{ color: "var(--text-mute)" }}>
           <div>
             New to Housie Ghar?{" "}
-            <Link href="/signup" className="text-[#06B6D4] hover:underline font-semibold">
+            <Link href="/signup" className="hover:underline font-semibold" style={{ color: "var(--accent)" }}>
               Sign Up now!
             </Link>
           </div>
-          <div className="pt-3 border-t border-gray-800/60">
+          <div className="pt-3 border-t" style={{ borderColor: "var(--border)" }}>
             <button 
               type="button" 
               onClick={() => setShowBookieForm(true)} 
               style={{
-                background: "linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(255, 223, 0, 0.05) 100%)",
-                border: "1px solid rgba(212, 175, 55, 0.4)",
-                color: "#D4AF37",
+                background: "linear-gradient(90deg, var(--accent-soft) 0%, rgba(255, 255, 255, 0.02) 100%)",
+                border: "1px solid var(--accent)",
+                color: "var(--accent)",
                 borderRadius: "var(--radius)",
                 width: "100%",
                 padding: "10px 16px",
@@ -198,7 +200,7 @@ export default function Login() {
                 gap: "8px",
                 transition: "all 0.2s"
               }}
-              className="hover:border-[#D4AF37] hover:brightness-110"
+              className="hover:brightness-110"
             >
               <Icon name="shieldCheck" size={16} />
               Apply as Bookie for Housie Ghar
