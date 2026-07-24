@@ -12,20 +12,6 @@ import { useSocket } from "@/lib/hooks/useSocket";
 type Timeframe = "all-time" | "monthly" | "weekly" | "daily";
 
 const HIGH_ROLLER_THRESHOLD = 10000;
-const FAV_TIMES = ["Morning (10 AM)", "Afternoon (3 PM)", "Evening (8 PM)", "Late Night (11 PM)"];
-
-function getPlayerInsight(entry: HallOfFameEntry) {
-  const seed = entry.housie_name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const gamesPlayed = entry.games_played || Math.max(1, entry.wins);
-  const winRate = gamesPlayed > 0 ? +((entry.wins / gamesPlayed) * 100).toFixed(1) : 0;
-  return {
-    winRate: winRate > 0 && winRate <= 100 ? winRate : +((62 + (seed % 28)) + ((seed % 10) / 10)).toFixed(1),
-    currentStreak: (seed % 4) + 1,
-    totalTickets: entry.tickets_bought || (entry.wins * (3 + (seed % 5)) + (seed % 15) + 4),
-    gamesPlayed: gamesPlayed,
-    favTime: FAV_TIMES[seed % FAV_TIMES.length],
-  };
-}
 
 export default function LeaderboardAndStats() {
   const [entries, setEntries] = useState<HallOfFameEntry[] | null>(null);
@@ -281,7 +267,7 @@ export default function LeaderboardAndStats() {
               const avgPayout = w.avgPayoutVal || (w.wins > 0 ? Math.round(w.total_won / w.wins) : 0);
               const isCurrentUser = loggedInName && w.housie_name.toLowerCase().trim() === loggedInName.toLowerCase().trim();
               const isExpanded = expandedName === w.housie_name;
-              const insight = getPlayerInsight(w);
+              const dayStreak = w.day_streak || 0;
               const isHighRoller = w.total_won > HIGH_ROLLER_THRESHOLD;
 
               // Master Title Determination
@@ -443,9 +429,9 @@ export default function LeaderboardAndStats() {
                         </span>
                       </div>
 
-                      {insight.currentStreak >= 3 && (
+                      {dayStreak >= 3 && (
                         <span
-                          title={`${insight.currentStreak}-game win streak`}
+                          title={`${dayStreak}-day play streak`}
                           style={{
                             display: "inline-flex", alignItems: "center", gap: 3,
                             background: "var(--surface-2)", border: "1px solid var(--border-2)",
@@ -453,7 +439,7 @@ export default function LeaderboardAndStats() {
                           }}
                         >
                           <Icon name="flame" size={12} style={{ color: "#ff8c00" }} />
-                          <span style={{ fontSize: 11, fontWeight: 800, color: "#ff7a00" }}>{insight.currentStreak} streak</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "#ff7a00" }}>{dayStreak}-day streak</span>
                         </span>
                       )}
 

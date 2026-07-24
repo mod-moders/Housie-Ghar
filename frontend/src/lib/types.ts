@@ -103,6 +103,7 @@ export interface HallOfFameEntry {
   games_played?: number;
   tickets_bought?: number;
   avatar_url?: string | null;
+  day_streak?: number;
 }
 
 export interface OverviewStats {

@@ -8,6 +8,38 @@ import pool from '../../db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { CONSTANTS } from '../../config/constants';
 
+function dateStrToUtcDays(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
+/**
+ * Current consecutive-calendar-day play streak. `datesDesc` is the player's distinct
+ * play-dates ('YYYY-MM-DD', one per day regardless of how many games that day), sorted most
+ * recent first. The streak only counts as "current" if the most recent play-day is today or
+ * yesterday — a run that stopped further back than that has already broken.
+ */
+export function computeCurrentDayStreak(datesDesc: string[], todayStr: string): number {
+  if (datesDesc.length === 0) return 0;
+
+  const todayDays = dateStrToUtcDays(todayStr);
+  let currentDays = dateStrToUtcDays(datesDesc[0]);
+  if (todayDays - currentDays > 1) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < datesDesc.length; i++) {
+    const days = dateStrToUtcDays(datesDesc[i]);
+    if (days === currentDays) continue; // duplicate date — ignore rather than break the streak
+    if (days === currentDays - 1) {
+      streak++;
+      currentDays = days;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 /**
  * Platform KPIs for the staff Overview section (Superadmin/Admin).
  */
@@ -182,13 +214,38 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
 
     // Fetch avatar_urls from Players table
     const avatarsRes = await pool.query(
-      `SELECT LOWER(TRIM(housie_name)) as key_name, avatar_url 
-       FROM Players 
+      `SELECT LOWER(TRIM(housie_name)) as key_name, avatar_url
+       FROM Players
        WHERE avatar_url IS NOT NULL AND avatar_url != ''`
     );
     const avatarMap = new Map<string, string>();
     for (const r of avatarsRes.rows) {
       avatarMap.set(r.key_name, r.avatar_url);
+    }
+
+    // A "streak" is the player's current run of consecutive CALENDAR DAYS with at least one
+    // completed game played — not, as it was before, a random number seeded off the player's
+    // name (see leaderboard/page.tsx's old getPlayerInsight) and not a count of prizes won
+    // within a single game either. One distinct play-date per game day is all that matters;
+    // playing 5 games in one day still only counts as 1 day toward the streak.
+    const playDatesRes = await pool.query(
+      `SELECT LOWER(TRIM(b.housie_name)) AS key_name, TO_CHAR(g.scheduled_at, 'YYYY-MM-DD') AS play_date
+       FROM Bookings b
+       JOIN Scheduled_Games g ON b.game_id = g.game_id
+       WHERE b.booking_status = 'Sold' AND g.game_status IN ('Completed', 'Draw_Ended')
+       GROUP BY LOWER(TRIM(b.housie_name)), TO_CHAR(g.scheduled_at, 'YYYY-MM-DD')
+       ORDER BY key_name, play_date DESC`
+    );
+    const playDatesByPlayer = new Map<string, string[]>();
+    for (const r of playDatesRes.rows) {
+      const list = playDatesByPlayer.get(r.key_name) || [];
+      list.push(r.play_date);
+      playDatesByPlayer.set(r.key_name, list);
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dayStreakMap = new Map<string, number>();
+    for (const [keyName, datesDesc] of playDatesByPlayer.entries()) {
+      dayStreakMap.set(keyName, computeCurrentDayStreak(datesDesc, todayStr));
     }
 
     // Convert map to array with rating_score and sort by rating_score DESC, wins DESC, total_won DESC
@@ -202,6 +259,7 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
           avatar_url: avatarMap.get(keyName) || null,
           avg_payout: Math.round(avgPayout),
           rating_score: ratingScore,
+          day_streak: dayStreakMap.get(keyName) || 0,
         };
       })
       .sort((a, b) => b.rating_score - a.rating_score || b.wins - a.wins || b.total_won - a.total_won)
