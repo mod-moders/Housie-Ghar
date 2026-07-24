@@ -194,6 +194,24 @@ export function useGameAudio(
     activeTimersRef.current = [];
   };
 
+  // usePauseAudioOnHidden only covers the single looping bgMusicRef <audio> element.
+  // The number-call/greeting/outro clips created ad hoc in playAudioFile are NOT a fixed
+  // element — a new one is played for every drawn number for as long as the live game's
+  // SSE stream keeps delivering draws, which it does regardless of tab visibility. Without
+  // this, backgrounding the tab (e.g. pressing Home on Android) leaves the number-calling
+  // voice audibly running in the background for the rest of the game.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopAllActiveAudios();
+        isIntroPlayingRef.current = false;
+        pendingNumbersQueueRef.current = [];
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
   const playGreeting = async (): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
@@ -307,7 +325,7 @@ export function useGameAudio(
 
   const playAudioFile = (mp3Path: string, customVolume: number = 1.0, fallbackPath?: string): Promise<void> => {
     return new Promise((resolve) => {
-      if (!isMountedRef.current || isMuted) return resolve();
+      if (!isMountedRef.current || isMuted || document.hidden) return resolve();
 
       if (!mp3Path) {
         if (fallbackPath) {

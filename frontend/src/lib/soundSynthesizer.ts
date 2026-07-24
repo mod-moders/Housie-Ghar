@@ -13,6 +13,24 @@ class SoundSynthesizer {
   private customCageAudio: HTMLAudioElement | null = null;
   private customCelebrationAudio: HTMLAudioElement | null = null;
 
+  constructor() {
+    // Cage-spin/celebration sounds run on a raw AudioContext (or an ad-hoc <audio> element
+    // for custom uploads), neither of which is covered by usePauseAudioOnHidden — that hook
+    // only pauses the fixed bgMusicRef/lobby-audio elements. Without this, a game's cage-spin
+    // or celebration sound can keep sounding after the tab is backgrounded (e.g. Home button
+    // on Android) since Web Audio API contexts aren't auto-suspended on visibilitychange.
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          this.stopCageSpin();
+          if (this.customCelebrationAudio) {
+            try { this.customCelebrationAudio.pause(); } catch {}
+          }
+        }
+      });
+    }
+  }
+
   private initCtx() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext ||
@@ -28,6 +46,7 @@ class SoundSynthesizer {
    * Continuous rolling axle friction noise modulated by LFO + high-density ball-to-ball and ball-to-wire clatter
    */
   startCageSpin() {
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
       const config = useConfigStore.getState().config;
       const volMultiplier = config?.cage_sound_volume !== undefined ? parseFloat(config.cage_sound_volume) : 1.0;
@@ -343,6 +362,7 @@ class SoundSynthesizer {
   }
 
   playCelebration() {
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
       const config = useConfigStore.getState().config;
       const volMultiplier = config?.winner_sound_volume !== undefined ? parseFloat(config.winner_sound_volume) : 1.0;
