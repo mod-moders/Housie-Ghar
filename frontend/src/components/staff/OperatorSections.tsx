@@ -141,9 +141,9 @@ export function OperatorHudSection() {
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
     queued.forEach((num, i) => {
-      const offset = i * 2500;
+      const offset = i * 4500;
       delay(() => setRevealed(false), offset);
-      delay(() => revealDraw(num), offset + 2000);
+      delay(() => revealDraw(num), offset + 4000);
     });
   }, [delay, revealDraw]);
 
@@ -166,7 +166,8 @@ export function OperatorHudSection() {
       }
 
       setRevealed(false);
-      delay(() => revealDraw(num), 2000);
+      // 4 rolls (~1s/roll) before the cage stops and the number is called.
+      delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as { prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number };
       setPrizes((prev) =>
