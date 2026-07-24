@@ -36,6 +36,13 @@ export function useGameAudio(
   const activeAudiosRef = useRef<HTMLAudioElement[]>([]);
   const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
   const isMountedRef = useRef<boolean>(true);
+  // Audio elements we deliberately interrupted (stopAllActiveAudios clearing .src on a clip
+  // that was still playing/loading) rather than ones that genuinely failed. Clearing .src on
+  // an in-flight <audio> fires a real "error" event per spec — without this, playAudioFile's
+  // onError treated that as a load failure and played the OTHER language's fallback clip on
+  // top of whatever legitimately started next, e.g. a Nepali call gets cut off mid-play by the
+  // next draw and its orphaned onError then plays the English fallback over the new Nepali call.
+  const intentionallyStoppedRef = useRef<WeakSet<HTMLAudioElement>>(new WeakSet());
   
   const isIntroPlayingRef = useRef<boolean>(false);
   const pendingNumbersQueueRef = useRef<number[]>([]);
@@ -45,11 +52,13 @@ export function useGameAudio(
 
   useEffect(() => {
     isMountedRef.current = true;
+    const intentionallyStopped = intentionallyStoppedRef.current;
     return () => {
       isMountedRef.current = false;
-      
+
       activeAudiosRef.current.forEach((audio) => {
         try {
+          intentionallyStopped.add(audio);
           audio.pause();
           audio.src = "";
         } catch {}
@@ -185,6 +194,7 @@ export function useGameAudio(
   const stopAllActiveAudios = () => {
     activeAudiosRef.current.forEach((audio) => {
       try {
+        intentionallyStoppedRef.current.add(audio);
         audio.pause();
         audio.src = "";
       } catch {}
@@ -367,6 +377,13 @@ export function useGameAudio(
         if (hasEnded) return;
         hasEnded = true;
         cleanup();
+        // We interrupted this clip ourselves (stopAllActiveAudios clearing .src on a still-
+        // playing element also fires "error") — that's not a real load failure, so don't
+        // chase the cross-language fallback for a call nobody is waiting on anymore.
+        if (intentionallyStoppedRef.current.has(audio)) {
+          resolve();
+          return;
+        }
         if (fallbackPath && fallbackPath !== mp3Path) {
           playAudioFile(fallbackPath, customVolume).then(resolve);
         } else {
