@@ -235,9 +235,14 @@ export function useGameAudio(
       if (!isMountedRef.current || isMuted) return;
 
       const activeLang = platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
+      // welcome_voice_url (the pre-dual-language legacy field) is NEPALI content — migration
+      // 042 mapped the original welcome upload straight into welcome_voice_url_ne, never into
+      // _en. Falling back to it for English would silently play Nepali, so the English branch
+      // only ever uses a dedicated English upload (no intro at all if none exists yet, rather
+      // than the wrong language).
       const welcomeUrl = activeLang === "ne"
         ? (platformConfig?.welcome_voice_url_ne || platformConfig?.welcome_voice_url)
-        : (platformConfig?.welcome_voice_url_en || platformConfig?.welcome_voice_url);
+        : platformConfig?.welcome_voice_url_en;
 
       const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
       const volMultiplier = activeLang === "ne"
@@ -268,8 +273,15 @@ export function useGameAudio(
     
     try {
       const activeLang = platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
+      // instruction_voice_url (the pre-dual-language legacy field) is ENGLISH content —
+      // migration 042 mapped the original outro upload straight into instruction_voice_url_en,
+      // never into _ne. Falling back to it for Nepali would silently play English (this was the
+      // actual bug: game ends with audio_language=ne but no dedicated Nepali outro uploaded, so
+      // it fell back to the English legacy file), so the Nepali branch only ever uses a
+      // dedicated Nepali upload (no outro at all if none exists yet, rather than the wrong
+      // language).
       const instructionUrl = activeLang === "ne"
-        ? (platformConfig?.instruction_voice_url_ne || platformConfig?.instruction_voice_url)
+        ? platformConfig?.instruction_voice_url_ne
         : (platformConfig?.instruction_voice_url_en || platformConfig?.instruction_voice_url);
 
       const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
