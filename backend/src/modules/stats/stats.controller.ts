@@ -114,8 +114,12 @@ export async function getHallOfFame(req: Request, res: Response): Promise<void> 
       const gameId = row.game_id;
       const basePrizeAmount = parseFloat(row.amount) || 0;
 
-      // Extract individual player names using strict regex that strips ticket numbers & bracket contents
-      const rawTokens = rawName.split(/[,&]|\s+and\s+/i);
+      // Extract individual player names using strict regex that strips ticket numbers & bracket contents.
+      // Must not split inside a player's own "(ticket & ticket)" group — a bare [,&]|and split breaks
+      // "Alice (5 & 12)" into "Alice (5 " and " 12)", so the paren match below only ever sees one of
+      // that player's own tickets and undercounts their win amount. The lookahead refuses to split at a
+      // position still inside an open paren group (i.e. a ")" appears before the next "(").
+      const rawTokens = rawName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
 
       for (const rawToken of rawTokens) {
         let token = rawToken.trim();
