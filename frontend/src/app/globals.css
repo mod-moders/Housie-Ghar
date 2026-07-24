@@ -25,6 +25,15 @@
   --radius: 18px;
   --radius-sm: 12px;
   --radius-lg: 24px;
+  /* Motion system — eased in/out micro-interactions. Ease curves settle softly
+     (fast in, gentle out); durations kept short so buttons feel responsive, not floaty.
+     Ported from the v2 prototype. A global prefers-reduced-motion guard neutralises these. */
+  --ease-out-quart: cubic-bezier(.25,1,.5,1);
+  --ease-out-expo: cubic-bezier(.16,1,.3,1);
+  --ease-pop: cubic-bezier(.2,1.3,.4,1);
+  --dur-1: 130ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
   --font-head: var(--font-space-grotesk), "Space Grotesk", sans-serif;
   --font-body: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
@@ -33,9 +42,11 @@
 
 /* ---- Palettes ---- */
 .hg-root[data-theme='dark']{
-  --bg:#08090d; --bg2:#12141a; --surface:#1b1f2b; --surface-2:#272d3e;
-  --elevate:#30374c; --border:rgba(255,255,255,.08); --border-2:rgba(255,255,255,.16);
-  --text:#f1f3f9; --text-dim:#9fa6b8; --text-mute:#6c748c;
+  /* Warm-neutral charcoal — drops the old blue cast (surface was #1b1f2b, b>r) for a
+     cleaner, less "default-AI" dark. Lightness/contrast kept close to the originals. */
+  --bg:#0b0b0a; --bg2:#151513; --surface:#1e1d1a; --surface-2:#2a2925;
+  --elevate:#343330; --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.17);
+  --text:#f3f2ec; --text-dim:#a6a498; --text-mute:#78766a;
   --ink:#000000; --card-line:rgba(255,255,255,.14); --card-shadow:0 5px 0 -1px #000;
   --card-shadow-sm:0 3px 0 -1px #000;
   --cta:oklch(0.84 0.16 88); --cta-ink:#241a00; --cta-glow:oklch(0.84 0.16 88 / .35);
@@ -756,16 +767,19 @@
 
 .hg-root[data-theme='luxury_gold'] {
   --accent:#c5a059; --accent-ink:#000000; --accent-soft:rgba(197,160,89,0.16);
-  --bg:#0a0a0a; --bg2:#141414; --surface:#1a1a1a; --surface-2:#222222;
-  --elevate:#2b2b2b; --border:#c5a059; --border-2:#e6c781;
+  /* Warm near-black grounds (r>g>b, tiny deltas) so the gold reads as integrated light
+     rather than sitting on flat cool grey — the luxury-casino direction. */
+  --bg:#0a0906; --bg2:#141210; --surface:#1b1813; --surface-2:#241f18;
+  --elevate:#2d2820; --border:#c5a059; --border-2:#e6c781;
   --text:#f4ecd8; --text-dim:#c5a059; --text-mute:#8a713b;
   --ink:#000000; --card-line:#c5a059; --card-shadow:0 5px 0 -1px #5c471a;
   --card-shadow-sm:0 3px 0 -1px #5c471a;
-  --cta:linear-gradient(135deg, #e6c781, #c5a059); --cta-ink:#1a1a1a; --cta-glow:rgba(197,160,89,0.3);
+  /* Richer 3-stop gold gives the CTA a lit metallic sheen instead of a flat 2-stop fade. */
+  --cta:linear-gradient(135deg, #f0d89a 0%, #c5a059 55%, #a9843f 100%); --cta-ink:#1a1400; --cta-glow:rgba(197,160,89,0.4);
   --success:#5ca367; --success-soft:rgba(92,163,103,0.1);
   --danger:#c24a4a; --danger-soft:rgba(194,74,74,0.1);
   --locked:#4d4d4d; --locked-soft:rgba(77,77,77,0.2);
-  --cyan:#6fa8dc; --shadow:0 8px 24px rgba(0,0,0,0.8); --scrim:rgba(0,0,0,0.85);
+  --cyan:#6fa8dc; --shadow:0 14px 34px -12px rgba(8,5,0,0.9); --scrim:rgba(0,0,0,0.85);
 }
 
 /* 10. Playful Kids/Family */
@@ -1107,7 +1121,7 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
 @keyframes hg-ptr-spin{from{transform:translate(-50%,0) rotate(0deg)}to{transform:translate(-50%,0) rotate(360deg)}}
 
 /* ---- Headings ---- */
-h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
+h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:balance}
 .hg-section-title{font-family:var(--font-head);font-weight:700;color:var(--text);margin:0}
 .hg-dim{color:var(--text-dim)}
 
@@ -1145,7 +1159,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em}
 .hg-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
   font-family:var(--font-head);font-weight:700;white-space:nowrap;
   border-radius:999px;border:1.5px solid var(--ink);box-shadow:var(--card-shadow-sm);
-  transition:transform .12s, box-shadow .12s, filter .12s}
+  transition:transform var(--dur-1) var(--ease-out-quart), box-shadow var(--dur-1) var(--ease-out-quart), filter var(--dur-2) ease}
 .hg-btn:disabled{cursor:not-allowed;opacity:.5;box-shadow:none;transform:none}
 .hg-btn-sm{font-size:12.5px;padding:8px 12px}
 .hg-btn-md{font-size:14px;padding:11px 16px}
@@ -2839,11 +2853,11 @@ select option {
 .hg-wallet-card{background:linear-gradient(160deg,var(--accent-soft),var(--surface))}
 
 
-/* pill buttons with press physics */
+/* pill buttons with press physics — eased lift on hover-in, snappy press-down on active-out */
 .hg-btn{border-radius:999px;border:1.5px solid var(--ink);box-shadow:0 4px 0 -1px var(--ink);
-  transition:transform .08s ease, box-shadow .08s ease, filter .15s}
-.hg-btn:not(:disabled):hover{filter:brightness(1.04)}
-.hg-btn:not(:disabled):active{transform:translateY(3px);box-shadow:0 1px 0 -1px var(--ink)}
+  transition:transform var(--dur-1) var(--ease-out-quart), box-shadow var(--dur-1) var(--ease-out-quart), filter var(--dur-2) ease}
+.hg-btn:not(:disabled):hover{filter:brightness(1.06);transform:translateY(-1.5px);box-shadow:0 6px 0 -1px var(--ink)}
+.hg-btn:not(:disabled):active{transform:translateY(3px);box-shadow:0 1px 0 -1px var(--ink);transition-duration:70ms}
 .hg-btn:disabled{box-shadow:none;transform:translateY(3px)}
 .hg-btn-ghost{background:var(--surface)}
 .hg-btn-lg{padding:15px 24px}
