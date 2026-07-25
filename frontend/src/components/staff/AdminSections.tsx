@@ -397,7 +397,7 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
       </div>
 
       <div style={{ width: "100%", height: `${height}px`, position: "relative", marginTop: "10px" }}>
-        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: "visible" }}>
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: "hidden" }}>
           {[0.25, 0.5, 0.75, 1].map((p, i) => (
             <line
               key={i}
