@@ -550,6 +550,16 @@ export async function resumeGame(gameId: string, operatorId: string): Promise<vo
   await publishGameEvent(gameId, resumeEvent);
   console.log(`▶ Game ${gameId} resumed by Operator ${operatorId}`);
 
+  // Defensive: a concurrent/duplicate resume call (e.g. a double-click, or two
+  // staff members) must not spawn a second independent conductor loop for the
+  // same game — that would draw and broadcast numbers twice as fast, out of
+  // step with win detection. Clearing any existing timer first makes this
+  // function idempotent regardless of how many times it's called back to back.
+  if (game.timer) {
+    clearTimeout(game.timer);
+    game.timer = null;
+  }
+
   runConductorTick(gameId);
 }
 

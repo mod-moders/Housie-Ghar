@@ -218,6 +218,12 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const pendingDrawsRef = useRef<number[]>([]);
 
   const revealDraw = useCallback((num: number) => {
+    // Guards against any residual/late "draw" event (backend race, or a queued
+    // draw flushed after the winner event already ended the game locally) from
+    // still calling out a number once the winners dashboard is already up.
+    const status = useGameStore.getState().gameStatus;
+    if (status === "Draw_Ended" || status === "Completed") return;
+
     beep();
     addDrawn(num);       // set new number FIRST
     setRevealed(true);   // THEN reveal badge — no stale flash
@@ -511,6 +517,13 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const onEvent = useCallback((data: SSEEventData) => {
     if (data.event === "draw") {
       const num = data.draw_number as number;
+
+      // The game already ended locally (e.g. the last winner event already
+      // flipped status to Draw_Ended and the dashboard is showing) — ignore
+      // any further draw event outright, including not spinning the cage for
+      // a number that will never actually be revealed.
+      const status = useGameStore.getState().gameStatus;
+      if (status === "Draw_Ended" || status === "Completed") return;
 
       // Intro (welcome + instruction voice notes) still playing for this
       // client — queue the draw instead of revealing/calling it now, so the

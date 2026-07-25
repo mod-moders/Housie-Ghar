@@ -125,6 +125,12 @@ export function OperatorHudSection() {
   }, [muted]);
 
   const revealDraw = useCallback((num: number) => {
+    // Guards against any residual/late "draw" event (backend race, or a queued
+    // draw flushed after the winner event already ended the game locally) from
+    // still calling out a number once the winners dashboard is already up.
+    const status = useGameStore.getState().gameStatus;
+    if (status === "Draw_Ended" || status === "Completed") return;
+
     beep();
     addDrawn(num);
     setRevealed(true);
@@ -159,6 +165,11 @@ export function OperatorHudSection() {
   const onEvent = useCallback((data: SSEEventData) => {
     if (data.event === "draw") {
       const num = data.draw_number as number;
+
+      // The game already ended locally (e.g. the last winner event already
+      // flipped status to Draw_Ended) — ignore any further draw event outright.
+      const status = useGameStore.getState().gameStatus;
+      if (status === "Draw_Ended" || status === "Completed") return;
 
       if (introPlayingRef.current) {
         pendingDrawsRef.current.push(num);
