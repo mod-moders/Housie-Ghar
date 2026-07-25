@@ -60,8 +60,11 @@ export function OperatorHudSection() {
   const [showAllCalled, setShowAllCalled] = useState(false);
 
   const effectiveDrawnNumbers = useMemo(() => {
-    return numberRevealed ? drawnNumbers : drawnNumbers.slice(0, Math.max(0, drawnNumbers.length - 1));
-  }, [drawnNumbers, numberRevealed]);
+    if (revealed && !numberRevealed) {
+      return drawnNumbers.slice(0, Math.max(0, drawnNumbers.length - 1));
+    }
+    return drawnNumbers;
+  }, [drawnNumbers, revealed, numberRevealed]);
 
   const drawn = useMemo(() => new Set(effectiveDrawnNumbers), [effectiveDrawnNumbers]);
   const count = effectiveDrawnNumbers.length;
