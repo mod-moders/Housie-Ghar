@@ -1999,6 +1999,29 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
     }
   };
 
+  const changeSalaryPrompt = async (u: StaffUser) => {
+    const sal = window.prompt(
+      `Set monthly salary for ${u.full_name} (Current: ${money(u.monthly_salary || 0)}). Enter amount:`,
+      String(u.monthly_salary || "")
+    );
+    if (sal === null) return;
+    const salaryVal = parseFloat(sal);
+    if (isNaN(salaryVal) || salaryVal < 0) {
+      window.alert("Please enter a valid salary amount.");
+      return;
+    }
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${u.user_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ monthly_salary: salaryVal }),
+      });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update salary");
+    }
+  };
+
   const roleLabel = (u: StaffUser) => u.role_name;
 
   return (
@@ -2323,6 +2346,31 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                       <Icon name={isActive ? "x" : "check"} size={12} />
                       {isActive ? "Suspend" : "Activate"}
                     </button>
+
+                    {/* Set Operator Salary Button */}
+                    {isSuper && u.role_name === "Operator" && (
+                      <button 
+                        onClick={() => changeSalaryPrompt(u)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          border: "1px solid var(--border)",
+                          background: "var(--surface-2)",
+                          color: "var(--accent)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.15s ease"
+                        }}
+                        title="Set Operator Salary"
+                      >
+                        <Icon name="award" size={12} />
+                        Salary
+                      </button>
+                    )}
 
                     {/* Reset Password Button */}
                     <button 
