@@ -1220,9 +1220,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   --bn-logo-shadow:drop-shadow(0 0 20px rgba(14,13,18,.35));
 
   position:relative;overflow:hidden;
+  /* No fixed height/max-height: the hook's actual content (logo + lucky-number wizard +
+     quote + CTA) varies enough between pages/states that a fixed box clips it — this lets
+     the flex column size to whatever the hook actually needs, with min-height as a floor. */
   min-height:440px;
-  height:52dvh;
-  max-height:480px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;padding:40px 22px;
   border-bottom:1.5px solid var(--card-line);
