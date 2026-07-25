@@ -106,6 +106,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
   const [numberRevealed, setNumberRevealed] = useState(true);
   const activeCallIdRef = useRef(0);
+  const currentWinnerEventRef = useRef<(WinOverlay & { split_count: number; winner_ticket_number: number; isLastPrize: boolean }) | null>(null);
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -153,38 +154,43 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
-        // After card disappears / game completes, wait 3 seconds before playing outro note & popping out winners list simultaneously
-        const timer = setTimeout(() => {
-          if (!outroPlayedRef.current) {
-            outroPlayedRef.current = true;
-            if (!userDismissedWinnersRef.current) {
-              setShowWinnersOverlay(true);
-            }
-            if (wasLiveInSessionRef.current) {
-              playOutro();
-            }
-            playCelebration();
-            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-            if (isSoundEnabled && !muted) {
-              soundSynthesizer.playCelebration();
-            }
+        const completedAt = game?.completed_at;
+        const elapsedOutroSeconds = completedAt ? (Date.now() - new Date(completedAt).getTime()) / 1000 : 0;
+
+        const triggerEndSequence = () => {
+          outroPlayedRef.current = true;
+          if (!userDismissedWinnersRef.current) {
+            setShowWinnersOverlay(true);
           }
-        }, 3000);
-        return () => clearTimeout(timer);
+          if (completedAt) {
+            const currentElapsed = Math.max(0, (Date.now() - new Date(completedAt).getTime()) / 1000);
+            playOutro(currentElapsed);
+          } else {
+            playOutro(0);
+          }
+          playCelebration();
+          const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
+          }
+        };
+
+        if (completedAt && elapsedOutroSeconds > 5) {
+          triggerEndSequence();
+        } else {
+          const timer = setTimeout(triggerEndSequence, 3000);
+          return () => clearTimeout(timer);
+        }
       }
     } else {
       if (gameStatus !== "Completed" && gameStatus !== "Draw_Ended") {
-        // Resetting the overlay when the game leaves an ended state is the whole
-        // point of this branch, and the guard above already makes it idempotent.
-        // Deliberately NOT restructured: this is the winners-overlay logic that has
-        // regressed twice before (see CLAUDE.md, Pitfall #1).
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowWinnersOverlay(false);
         outroPlayedRef.current = false;
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, playOutro, playCelebration, muted]);
+  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted]);
 
   // Track winners for audio celebration
 
@@ -241,9 +247,43 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     delay(() => {
       if (activeCallIdRef.current === currentCallId) {
         setNumberRevealed(true);
+
+        if (currentWinnerEventRef.current) {
+          const w = currentWinnerEventRef.current;
+          currentWinnerEventRef.current = null;
+
+          playCelebration();
+          const config = useConfigStore.getState().config;
+          const isSoundEnabled = config?.celebration_sound_enabled !== "false";
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
+          }
+          setWinOverlay(w);
+
+          // Winner card stays visible for exactly 3 seconds
+          delay(() => {
+            setWinOverlay(null);
+
+            if (w.isLastPrize && !outroPlayedRef.current) {
+              delay(() => {
+                if (!outroPlayedRef.current) {
+                  outroPlayedRef.current = true;
+                  if (!userDismissedWinnersRef.current) {
+                    setShowWinnersOverlay(true);
+                  }
+                  playOutro(0);
+                  playCelebration();
+                  if (isSoundEnabled && !muted) {
+                    soundSynthesizer.playCelebration();
+                  }
+                }
+              }, 3000);
+            }
+          }, 3000);
+        }
       }
     }, 4000);
-  }, [beep, addDrawn, playNumberCall, delay]);
+  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
@@ -310,24 +350,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       // A viewer is "mid-flow" if numbers are already out, OR if the game is far
       // enough along that the intro would already have played. Either way they must
       // pick up where the game is, not restart it.
-      if (drawnNumbers.length === 0 && elapsed < INTRO_AT_MS) {
-        // Fixed-duration startup sequence (must match gameEngine.ts's initialDelay, which
-        // gates when the backend actually draws the first number):
-        // t=0s: live session starts (BGM autoplays independently, see useGameAudio.ts).
-        // t=0s-10s: hold.
-        // t=10s-20s: "Welcome to Housie Ghar" banner shown for 10s.
-        // t=20s-30s: hold.
-        // t=30s+: intro audio plays — actual duration depends on the uploaded clip, not a
-        // fixed budget. Draws arriving over SSE while it's still playing are queued (see the
-        // `introPlayingRef` check in the "draw" SSE handler below) rather than revealed.
-        // t=53s: earliest the game can start — cage rolls, first number reveals.
-        // The 53s floor and the intro's real completion are two independent, racing
-        // conditions — flushPendingDraws() must wait for BOTH. Firing it on the fixed 53s
-        // timer alone (the previous behavior) reveals/calls queued draws while playGreeting()'s
-        // audio is still genuinely playing whenever an uploaded clip runs longer than ~23s:
-        // the number still gets shown (revealDraw always calls addDrawn/setRevealed), but
-        // playNumberCall() silently no-ops because isIntroPlayingRef is still true — the first
-        // one or two calls play with no audio.
+      if (drawnNumbers.length === 0 && elapsed < FIRST_DRAW_AT_MS) {
         let floorReached = false;
         const tryFlush = () => {
           if (floorReached && !introPlayingRef.current) {
@@ -335,25 +358,17 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           }
         };
 
-        // Every offset below is game-time, not page-time. `elapsed` is how far into
-        // the game we already are (server-measured, aged forward locally), so a
-        // viewer who opens the board 40s after the operator hit Start resumes the
-        // sequence at 40s instead of replaying it from their own zero.
         const remaining = (gameTimeMs: number) => Math.max(0, gameTimeMs - elapsed);
 
-        // Welcome banner occupies game-time 10s-20s. Skip it outright once that
-        // window has passed rather than showing it late.
         if (elapsed < WELCOME_OUT_MS) {
           delay(() => setWelcomeTextVisible(true), remaining(WELCOME_IN_MS));
           delay(() => setWelcomeTextVisible(false), remaining(WELCOME_OUT_MS));
         }
 
-        delay(() => { playGreeting().finally(tryFlush); }, remaining(INTRO_AT_MS));
+        const startOffset = Math.max(0, (elapsed - INTRO_AT_MS) / 1000);
+        delay(() => { playGreeting(startOffset).finally(tryFlush); }, remaining(INTRO_AT_MS));
         delay(() => { floorReached = true; tryFlush(); }, remaining(FIRST_DRAW_AT_MS));
       } else {
-        // Genuinely mid-flow: numbers are already on the board, or the intro window
-        // has passed. Continue from here — never replay the welcome or intro, which
-        // would talk over a game in progress and queue live draws behind it.
         flushPendingDraws();
       }
     }
@@ -544,6 +559,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         return;
       }
 
+      currentWinnerEventRef.current = null;
       // Step 1 — Cage spins, badge hidden
       setRevealed(false);
       setNumberRevealed(false);
@@ -566,51 +582,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         return next;
       });
 
-      const showWinnerCard = () => {
-        playCelebration();
-        const config = useConfigStore.getState().config;
-        const isSoundEnabled = config?.celebration_sound_enabled !== "false";
-        if (isSoundEnabled && !muted) {
-          soundSynthesizer.playCelebration();
-        }
-        setWinOverlay(w);
-
-        // Winner card stays visible for 6 seconds, then disappears
-        delay(() => {
-          setWinOverlay(null); // Winner card disappears
-
-          // After card disappears, if this was the last prize, wait 3 seconds before popping winning list & playing outro
-          if (isLastPrize && !outroPlayedRef.current) {
-            delay(() => {
-              if (!outroPlayedRef.current) {
-                outroPlayedRef.current = true;
-                if (!userDismissedWinnersRef.current) {
-                  setShowWinnersOverlay(true);
-                }
-                if (wasLiveInSessionRef.current) {
-                  playOutro();
-                }
-                playCelebration();
-                if (isSoundEnabled && !muted) {
-                  soundSynthesizer.playCelebration();
-                }
-              }
-            }, 3000);
-          }
-        }, 6000);
+      currentWinnerEventRef.current = {
+        ...w,
+        isLastPrize
       };
-
-      // Allow call audio to finish playing FIRST before popping winner card
-      if (numberCallPlaying) {
-        const interval = setInterval(() => {
-          if (!activeCallIdRef.current || !numberCallPlaying) {
-            clearInterval(interval);
-            showWinnerCard();
-          }
-        }, 200);
-      } else {
-        delay(showWinnerCard, 600);
-      }
     } else if (data.event === "emoji_reaction") {
       const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
       setReactions((r) => [...r, next]);
@@ -752,7 +727,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-live-sticky">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
-                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} numberRevealed={numberRevealed} muted={muted} compact={isNarrowViewport} />
+                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed && (gameStatus === "Live" || gameStatus === "Paused" || !numberRevealed)} numberRevealed={numberRevealed} muted={muted} compact={isNarrowViewport} />
                 
                 <div style={{ textAlign: "center", marginTop: isNarrowViewport ? "2px" : "6px", fontSize: isNarrowViewport ? "12px" : "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"

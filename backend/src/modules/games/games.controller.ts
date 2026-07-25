@@ -313,7 +313,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     }
 
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
+      `SELECT game_id, title, scheduled_at, completed_at, started_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
        FROM Scheduled_Games
        WHERE game_id = $1`,
       [game_id]
@@ -378,6 +378,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       title: game.title,
       scheduled_at: game.scheduled_at,
       completed_at: game.completed_at,
+      started_at: game.started_at,
       ticket_price: parseFloat(game.ticket_price),
       total_tickets: totalCount,
       sold_count: soldCount,

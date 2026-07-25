@@ -222,7 +222,7 @@ export function useGameAudio(
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
-  const playGreeting = async (): Promise<void> => {
+  const playGreeting = async (startOffsetSeconds: number = 0): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
     const introEnabled = platformConfig?.welcome_voice_enabled !== "false";
@@ -250,7 +250,7 @@ export function useGameAudio(
         : parseFloat(platformConfig?.welcome_voice_volume_en || platformConfig?.welcome_voice_volume || "1.0");
 
       if (welcomeUrl) {
-        await playAudioFile(welcomeUrl, masterVol * volMultiplier);
+        await playAudioFile(welcomeUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
       }
     } finally {
       isIntroPlayingRef.current = false;
@@ -263,7 +263,7 @@ export function useGameAudio(
     }
   };
 
-  const playOutro = async (): Promise<void> => {
+  const playOutro = async (startOffsetSeconds: number = 0): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
     
     const outroEnabled = platformConfig?.instruction_voice_enabled !== "false";
@@ -290,7 +290,7 @@ export function useGameAudio(
         : parseFloat(platformConfig?.instruction_voice_volume_en || platformConfig?.instruction_voice_volume || "1.0");
 
       if (instructionUrl) {
-        await playAudioFile(instructionUrl, masterVol * volMultiplier);
+        await playAudioFile(instructionUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
       }
     } catch {}
   };
@@ -345,13 +345,13 @@ export function useGameAudio(
     soundSynthesizer.playCelebration();
   };
 
-  const playAudioFile = (mp3Path: string, customVolume: number = 1.0, fallbackPath?: string): Promise<void> => {
+  const playAudioFile = (mp3Path: string, customVolume: number = 1.0, fallbackPath?: string, startOffsetSeconds: number = 0): Promise<void> => {
     return new Promise((resolve) => {
       if (!isMountedRef.current || isMuted || document.hidden) return resolve();
 
       if (!mp3Path) {
         if (fallbackPath) {
-          playAudioFile(fallbackPath, customVolume).then(resolve);
+          playAudioFile(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
         } else {
           resolve();
         }
@@ -372,9 +372,25 @@ export function useGameAudio(
       const cleanup = () => {
         audio.removeEventListener("ended", onEnded);
         audio.removeEventListener("error", onError);
+        audio.removeEventListener("loadedmetadata", onMetadata);
         const idx = activeAudiosRef.current.indexOf(audio);
         if (idx > -1) activeAudiosRef.current.splice(idx, 1);
       };
+
+      const onMetadata = () => {
+        if (hasEnded) return;
+        if (startOffsetSeconds > 0) {
+          if (startOffsetSeconds < audio.duration) {
+            audio.currentTime = startOffsetSeconds;
+          } else {
+            hasEnded = true;
+            cleanup();
+            resolve();
+            try { audio.pause(); } catch {}
+          }
+        }
+      };
+
       const onEnded = () => {
         if (hasEnded) return;
         hasEnded = true;
@@ -397,12 +413,13 @@ export function useGameAudio(
           return;
         }
         if (fallbackPath && fallbackPath !== mp3Path) {
-          playAudioFile(fallbackPath, customVolume).then(resolve);
+          playAudioFile(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
         } else {
           resolve();
         }
       };
 
+      audio.addEventListener("loadedmetadata", onMetadata);
       audio.addEventListener("ended", onEnded);
       audio.addEventListener("error", onError);
 

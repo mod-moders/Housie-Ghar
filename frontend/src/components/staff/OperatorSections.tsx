@@ -95,6 +95,7 @@ export function OperatorHudSection() {
   const activeCallIdRef = useRef<number>(0);
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
   const [winOverlay, setWinOverlay] = useState<{ prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number } | null>(null);
+  const currentWinnerEventRef = useRef<{ prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number; isLastPrize: boolean } | null>(null);
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
   const delay = useCallback((fn: () => void, ms: number) => {
@@ -158,9 +159,40 @@ export function OperatorHudSection() {
     delay(() => {
       if (activeCallIdRef.current === currentCallId) {
         setNumberRevealed(true);
+
+        if (currentWinnerEventRef.current) {
+          const w = currentWinnerEventRef.current;
+          currentWinnerEventRef.current = null;
+
+          playCelebration();
+          const config = useConfigStore.getState().config;
+          const isSoundEnabled = config?.celebration_sound_enabled !== "false";
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
+          }
+          setWinOverlay(w);
+
+          // Winner card stays visible for exactly 3 seconds
+          delay(() => {
+            setWinOverlay(null);
+
+            if (w.isLastPrize && !outroPlayedRef.current) {
+              delay(() => {
+                if (!outroPlayedRef.current) {
+                  outroPlayedRef.current = true;
+                  playOutro(0);
+                  playCelebration();
+                  if (isSoundEnabled && !muted) {
+                    soundSynthesizer.playCelebration();
+                  }
+                }
+              }, 3000);
+            }
+          }, 3000);
+        }
       }
     }, 4000);
-  }, [beep, addDrawn, playNumberCall, delay]);
+  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
@@ -197,44 +229,31 @@ export function OperatorHudSection() {
         return;
       }
 
+      currentWinnerEventRef.current = null;
       setRevealed(false);
       setNumberRevealed(false);
       // 4 rolls (~1s/roll) before the cage stops and the number is called.
       delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as { prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number };
-      setPrizes((prev) =>
-        prev.map((p) =>
+      let isLastPrize = false;
+      setPrizes((prev) => {
+        const next = prev.map((p) =>
           p.pattern_name === w.prize
             ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
             : p
-        )
-      );
-
-      const showWinnerCelebration = () => {
-        playCelebration();
-        const config = useConfigStore.getState().config;
-        const isSoundEnabled = config?.celebration_sound_enabled !== "false";
-        if (isSoundEnabled && !muted) {
-          soundSynthesizer.playCelebration();
+        );
+        isLastPrize = next.length > 0 && next.every((p) => p.claimed);
+        if (isLastPrize) {
+          useGameStore.getState().setStatus("Draw_Ended");
         }
-        setWinOverlay(w);
+        return next;
+      });
 
-        delay(() => {
-          setWinOverlay(null);
-        }, 6000);
+      currentWinnerEventRef.current = {
+        ...w,
+        isLastPrize
       };
-
-      if (numberCallPlaying) {
-        const interval = setInterval(() => {
-          if (!activeCallIdRef.current || !numberCallPlaying) {
-            clearInterval(interval);
-            showWinnerCelebration();
-          }
-        }, 200);
-      } else {
-        delay(showWinnerCelebration, 600);
-      }
     }
   }, [playCelebration, introPlayingRef, delay, numberCallPlaying, revealDraw, muted]);
 
@@ -289,7 +308,7 @@ export function OperatorHudSection() {
           ? elapsedMsAtSync + (Date.now() - elapsedAt)
           : 0;
 
-      if (drawnNumbers.length === 0 && elapsed < INTRO_AT_MS) {
+      if (drawnNumbers.length === 0 && elapsed < FIRST_DRAW_AT_MS) {
         let floorReached = false;
         const tryFlush = () => {
           if (floorReached && !introPlayingRef.current) {
@@ -299,7 +318,8 @@ export function OperatorHudSection() {
 
         const remaining = (gameTimeMs: number) => Math.max(0, gameTimeMs - elapsed);
 
-        delay(() => { playGreeting().finally(tryFlush); }, remaining(INTRO_AT_MS));
+        const startOffset = Math.max(0, (elapsed - INTRO_AT_MS) / 1000);
+        delay(() => { playGreeting(startOffset).finally(tryFlush); }, remaining(INTRO_AT_MS));
         delay(() => { floorReached = true; tryFlush(); }, remaining(FIRST_DRAW_AT_MS));
       } else {
         flushPendingDraws();
@@ -312,26 +332,37 @@ export function OperatorHudSection() {
   useEffect(() => {
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
-        delay(() => {
-          if (!outroPlayedRef.current) {
-            outroPlayedRef.current = true;
-            if (wasLiveInSessionRef.current) {
-              playOutro();
-            }
-            playCelebration();
-            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-            if (isSoundEnabled && !muted) {
-              soundSynthesizer.playCelebration();
-            }
+        const completedAt = game?.completed_at;
+        const elapsedOutroSeconds = completedAt ? (Date.now() - new Date(completedAt).getTime()) / 1000 : 0;
+
+        const triggerEndSequence = () => {
+          outroPlayedRef.current = true;
+          if (completedAt) {
+            const currentElapsed = Math.max(0, (Date.now() - new Date(completedAt).getTime()) / 1000);
+            playOutro(currentElapsed);
+          } else {
+            playOutro(0);
           }
-        }, 3000);
+          playCelebration();
+          const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
+          }
+        };
+
+        if (completedAt && elapsedOutroSeconds > 5) {
+          triggerEndSequence();
+        } else {
+          const timer = setTimeout(triggerEndSequence, 3000);
+          return () => clearTimeout(timer);
+        }
       }
     } else {
       if (activeGameStatus !== "Completed" && activeGameStatus !== "Draw_Ended") {
         outroPlayedRef.current = false;
       }
     }
-  }, [delayedGameEnd, activeGameStatus, playOutro, playCelebration, muted, delay]);
+  }, [delayedGameEnd, activeGameStatus, game?.completed_at, playOutro, playCelebration, muted]);
 
   const act = async (action: "start" | "pause" | "resume" | "stop") => {
     if (!selectedId || busy) return;
@@ -526,7 +557,7 @@ export function OperatorHudSection() {
         <div className="hg-live-left">
           {/* Cage + status */}
           <div className="hg-cage-area">
-            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} numberRevealed={numberRevealed} muted={muted} />
+            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed && (status === "Live" || status === "Paused" || !numberRevealed)} numberRevealed={numberRevealed} muted={muted} />
             
             <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
               {status === "Completed" || status === "Draw_Ended"
