@@ -2583,6 +2583,16 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
     grid-template-columns: repeat(4, 1fr);
   }
 }
+.hg-analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+@media (min-width: 1024px) {
+  .hg-analytics-grid {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
 .hg-fill-card {
   padding: 16px;
   border-radius: var(--radius);

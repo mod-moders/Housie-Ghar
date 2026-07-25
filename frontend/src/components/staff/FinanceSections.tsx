@@ -330,18 +330,16 @@ export function FinanceHubSection({}: { me: AuthUser; onResolved?: () => void })
                 </div>
               </div>
 
-              {/* Performance Chart & Heatmap */}
+              {/* Performance Chart, Heatmap & Retention */}
               {insights && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "20px" }}>
-                  <AnalyticsChart series={insights.series} />
-                  <HeatmapWidget hours={insights.heatmap} />
-                </div>
-              )}
-
-              {/* Player Retention & Repeat Participation */}
-              {insights && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "20px" }}>
-                  <RetentionWidget retention={insights.retention} />
+                <div className="hg-analytics-grid">
+                  <div>
+                    <AnalyticsChart series={insights.series} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                    <HeatmapWidget hours={insights.heatmap} />
+                    <RetentionWidget retention={insights.retention} />
+                  </div>
                 </div>
               )}
 
