@@ -421,7 +421,7 @@ export default function StaffDashboard() {
                     </button>
                   </div>
                 )}
-                <span className="hg-status-role">{user.full_name} · {roleLabel}</span>
+                <span className="hg-status-role">{roleLabel}</span>
                 <Avatar src={roleAvatar(user)} name={user.full_name} />
               </div>
             </header>
