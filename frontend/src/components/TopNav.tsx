@@ -57,7 +57,7 @@ export function TopNav() {
     ["/stats", "STATS", "chart"],
     ["/how-to-play", "HOW TO PLAY", "help"],
     user?.role === "staff"
-      ? ["/staff", "STAFF PANEL", "shield"]
+      ? ["/staff/login", "STAFF LOGIN", "shield"]
       : ["/profile", "PROFILE", "user"],
   ];
 
@@ -97,7 +97,7 @@ export function TopNav() {
             ))}
             {user?.role === "staff" ? (
               <button className="hg-sheet-link" onClick={() => go("/staff")}>
-                <Icon name="shield" size={18} /> Staff Panel ({user.name})
+                <Icon name="shieldCheck" size={18} /> My Dashboard ({user.name})
               </button>
             ) : (
               <button className="hg-sheet-link" onClick={() => go("/staff/login")}>
