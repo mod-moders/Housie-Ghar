@@ -9,6 +9,7 @@ import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
 import { Icon } from "@/components/Icon";
 import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
+import { PlayerReferralCard } from "@/components/PlayerReferralCard";
 import { useConfigStore } from "@/lib/stores/configStore";
 import type { GameSummary, LuckyNumberResponse } from "@/lib/types";
 
@@ -482,6 +483,8 @@ export default function Lobby() {
               </div>
             </section>
           )}
+
+          <PlayerReferralCard />
         </div>
 
         <Footer />

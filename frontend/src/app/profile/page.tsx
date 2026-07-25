@@ -7,7 +7,6 @@ import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { money } from "@/lib/money";
-import { PlayerReferralCard } from "@/components/PlayerReferralCard";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
 
 interface WinningItem {
@@ -639,11 +638,6 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-
-        {/* Referral programme — self-hides when the player has no code or the
-            programme is switched off. */}
-        <PlayerReferralCard />
-
       </div>
     </PublicShell>
   );

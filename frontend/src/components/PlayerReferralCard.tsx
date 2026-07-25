@@ -1,10 +1,6 @@
 "use client";
 /**
- * Player referral card — shown on the profile page.
- *
- * Mirrors the surrounding "My Winnings & Prize Claims" card exactly (same surface,
- * border, radius, header treatment) so it reads as part of the same page rather
- * than a bolted-on panel.
+ * Player referral card — shown at the bottom of the home page, below Past Games.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -46,10 +42,11 @@ export function PlayerReferralCard() {
   // page that has to keep working for players who aren't in the programme.
   if (loading || !data || !data.enabled || !data.referral_code) return null;
 
-  const shareText = `Play Housie Ghar with me! Use my referral code ${data.referral_code} when you sign up.`;
+  const referralLink = `${window.location.origin}/signup?ref=${data.referral_code}`;
+  const shareText = `Play Housie Ghar with me! Sign up here: ${referralLink}`;
 
-  const copyCode = () => {
-    navigator.clipboard?.writeText(data.referral_code ?? "").catch(() => {});
+  const copyLink = () => {
+    navigator.clipboard?.writeText(referralLink).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -73,7 +70,6 @@ export function PlayerReferralCard() {
   return (
     <div
       style={{
-        marginTop: 24,
         width: "100%",
         background: "var(--surface)",
         padding: "24px",
@@ -91,30 +87,35 @@ export function PlayerReferralCard() {
         </h3>
       </div>
 
-      {/* Code + share */}
-      <div>
-        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>Your referral code</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <code
+      {/* Link + share */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Your personal invite link</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div
             style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
               fontFamily: "var(--font-mono)",
-              fontSize: 18,
-              fontWeight: 700,
-              letterSpacing: "1px",
+              fontSize: 13,
               color: "var(--accent)",
               background: "var(--surface-2)",
               border: "1px solid var(--border-light)",
               borderRadius: 10,
-              padding: "10px 16px",
+              padding: "12px 16px",
             }}
           >
-            {data.referral_code}
-          </code>
+            {referralLink}
+          </div>
           <button
-            onClick={copyCode}
+            onClick={copyLink}
+            aria-label="Copy invite link"
             style={{
-              borderRadius: 999,
-              padding: "10px 16px",
+              flexShrink: 0,
+              borderRadius: 10,
+              padding: "12px 16px",
               fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
@@ -128,25 +129,27 @@ export function PlayerReferralCard() {
           >
             <Icon name="copy" size={14} /> {copied ? "Copied!" : "Copy"}
           </button>
-          <button
-            onClick={shareWhatsApp}
-            style={{
-              borderRadius: 999,
-              padding: "10px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              color: "var(--cta-ink)",
-              background: "var(--cta)",
-              border: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Icon name="chat" size={14} /> Share
-          </button>
         </div>
+        <button
+          onClick={shareWhatsApp}
+          style={{
+            width: "100%",
+            borderRadius: 10,
+            padding: "12px 16px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            color: "var(--cta-ink)",
+            background: "var(--cta)",
+            border: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <Icon name="chat" size={14} /> Share on WhatsApp
+        </button>
       </div>
 
       {/* Standing */}
@@ -181,14 +184,9 @@ export function PlayerReferralCard() {
           <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "var(--cta)", transition: "width .35s ease" }} />
         </div>
         <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 8, lineHeight: 1.5 }}>
-          {next === null ? (
-            <>You&rsquo;ve reached the top of the reward ladder. Nice work.</>
-          ) : (
-            <>
-              {data.referrals_to_next_rung} more friend{data.referrals_to_next_rung === 1 ? "" : "s"} to buy a ticket and
-              you earn another free one. A friend counts once they book their first ticket.
-            </>
-          )}
+          {next === null
+            ? <>You&rsquo;ve reached the top of the reward ladder.</>
+            : <>{data.referrals_to_next_rung} more friend{data.referrals_to_next_rung === 1 ? "" : "s"} to earn your next free ticket.</>}
         </div>
       </div>
 
