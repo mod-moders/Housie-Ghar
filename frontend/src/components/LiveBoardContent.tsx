@@ -158,7 +158,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         const completedAt = game?.completed_at;
         if (completedAt) {
           const completedMs = new Date(completedAt).getTime();
-          const targetStartMs = completedMs + 7000;
+          const outroDelay = (config?.audio_language || "en") === "ne" ? 7000 : 5500;
+          const targetStartMs = completedMs + outroDelay;
           const now = Date.now();
           const elapsedSinceTarget = (now - targetStartMs) / 1000;
 
@@ -202,7 +203,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted]);
+  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted, config?.audio_language]);
 
   // Track winners for audio celebration
 
@@ -256,6 +257,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       }
     });
 
+    const revealDelay = config?.audio_language === "ne" ? 4000 : 2500;
+
     delay(() => {
       if (activeCallIdRef.current === currentCallId) {
         setNumberRevealed(true);
@@ -264,8 +267,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           const w = currentWinnerEventRef.current;
           currentWinnerEventRef.current = null;
 
-          const config = useConfigStore.getState().config;
-          const isSoundEnabled = config?.celebration_sound_enabled !== "false";
+          const configObj = useConfigStore.getState().config;
+          const isSoundEnabled = configObj?.celebration_sound_enabled !== "false";
 
           if (w.isLastPrize) {
             // For the last remaining prize:
@@ -299,8 +302,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           }
         }
       }
-    }, 4000);
-  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted]);
+    }, revealDelay);
+  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted, config?.audio_language]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
