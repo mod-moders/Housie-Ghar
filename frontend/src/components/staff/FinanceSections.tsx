@@ -1226,7 +1226,7 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                         gap: "8px"
                       }}
                     >
-                      <Icon name="phone" size={16} /> WhatsApp Agent
+                      <Icon name="chat" size={16} /> WhatsApp Agent
                     </a>
                   )}
                 </div>

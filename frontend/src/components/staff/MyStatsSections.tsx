@@ -150,7 +150,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           </p>
         </div>
         <button onClick={load} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)", color: "var(--text)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
-          <Icon name="arrowR" size={12} style={{ transform: "rotate(-90deg)" }} /> Refresh Data
+          <Icon name="refresh" size={12} /> Refresh Data
         </button>
       </div>
 
@@ -425,7 +425,7 @@ export function BookieStatsSection({ me }: { me: AuthUser }) {
           </p>
         </div>
         <button onClick={load} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-2)", color: "var(--text)", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
-          <Icon name="arrowR" size={12} style={{ transform: "rotate(-90deg)" }} /> Refresh Stats
+          <Icon name="refresh" size={12} /> Refresh Stats
         </button>
       </div>
 

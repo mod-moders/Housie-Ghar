@@ -540,7 +540,7 @@ export default function ProfilePage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border-light)", paddingBottom: 12 }}>
-            <Icon name="award" size={18} style={{ color: "var(--accent)" }} />
+            <Icon name="trophy" size={18} style={{ color: "var(--accent)" }} />
             <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>
               My Winnings & Prize Claims
             </h3>
