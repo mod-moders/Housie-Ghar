@@ -41,7 +41,28 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const restoredLock = useRef(false);
   const [myBoughtTickets, setMyBoughtTickets] = useState<TicketDetail[]>([]);
 
+  // Referral reward — a player who has reached a referral rung (10/15/20…) can
+  // claim one ticket free. The backend only discounts one ticket's price off
+  // whatever ticket_ids are locked (it never adds a ticket on its own), so the
+  // extra ticket has to be picked and appended client-side before locking.
+  const [rewardsEnabled, setRewardsEnabled] = useState(false);
+  const [creditsAvailable, setCreditsAvailable] = useState(0);
+  const [claimReferralTicket, setClaimReferralTicket] = useState(false);
+  const [freeTicketNumber, setFreeTicketNumber] = useState<number | null>(null);
+
   const booking = useBookingStore();
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ enabled: boolean; credits_available: number }>("/api/rewards/player")
+      .then((res) => {
+        if (cancelled) return;
+        setRewardsEnabled(res.enabled);
+        setCreditsAvailable(res.credits_available);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Prefill player's registered Housie Name from session. Only a real 401/403
   // means the player isn't actually logged in — a network blip or mid-deploy
@@ -148,6 +169,10 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const total = selected.length * price;
   const canBook = selected.length > 0 && nameState.ok && !locking;
 
+  const canClaimReferralTicket = rewardsEnabled && creditsAvailable >= 1;
+  const availableCount = tickets.filter((t) => t.status === "Available").length;
+  const hasFreeTicketRoom = availableCount - selected.length >= 1;
+
   const bookNow = async () => {
     if (!game) return;
     setLocking(true);
@@ -155,11 +180,45 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     const ticketIds = selected
       .map((n) => tickets.find((t) => t.ticket_number === n)?.ticket_id)
       .filter((x): x is number => x != null);
+
+    // Re-check credits right before locking (rather than trusting the mount-time
+    // fetch) — sending redeem_credit without an actual credit doesn't error, it
+    // just silently charges full price, so a stale "yes" here would quietly
+    // overcharge the player for the ticket they thought was free.
+    let freeTicketId: number | null = null;
+    let freeTicketNum: number | null = null;
+    if (claimReferralTicket && canClaimReferralTicket && hasFreeTicketRoom) {
+      try {
+        const fresh = await apiFetch<{ credits_available: number }>("/api/rewards/player");
+        if (fresh.credits_available >= 1) {
+          const freeTicket = tickets.find((t) => t.status === "Available" && !selected.includes(t.ticket_number));
+          if (freeTicket) {
+            freeTicketId = freeTicket.ticket_id;
+            freeTicketNum = freeTicket.ticket_number;
+            ticketIds.push(freeTicket.ticket_id);
+            fetchMatrix(freeTicket.ticket_id, freeTicket.ticket_number);
+          }
+        }
+      } catch {
+        // couldn't re-verify — proceed without the free ticket rather than risk an overcharge
+      }
+    }
+
     try {
       const res = await apiFetch<LockResponse>("/api/bookings/lock", {
         method: "POST",
-        body: JSON.stringify({ game_id, ticket_ids: ticketIds, housie_name: (name || "").trim() }),
+        body: JSON.stringify({
+          game_id,
+          ticket_ids: ticketIds,
+          housie_name: (name || "").trim(),
+          redeem_credit: freeTicketId !== null,
+        }),
       });
+      if (freeTicketNum !== null) {
+        setSelected((prev) => [...prev, freeTicketNum as number].sort((a, b) => a - b));
+        setFreeTicketNumber(freeTicketNum);
+        setCreditsAvailable((c) => Math.max(0, c - 1));
+      }
       booking.setBooking({
         bookingId: res.booking_id,
         housieName: (name || "").trim(),
@@ -297,9 +356,37 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                     </span>
                   </div>
                   {lockError && <p className="hg-sec-err">{lockError}</p>}
+                  {canClaimReferralTicket && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "12px 16px",
+                        borderRadius: 10,
+                        border: "1px solid var(--border-light)",
+                        background: "var(--surface-2)",
+                        cursor: hasFreeTicketRoom ? "pointer" : "not-allowed",
+                        opacity: hasFreeTicketRoom ? 1 : 0.55,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={claimReferralTicket}
+                        disabled={!hasFreeTicketRoom}
+                        onChange={(e) => setClaimReferralTicket(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13, color: "var(--text)" }}>
+                        🎁 Claim 1 free referral ticket{!hasFreeTicketRoom ? " (no tickets left to give)" : ""}
+                      </span>
+                    </label>
+                  )}
                   <div className="hg-action-row">
                     <div className="hg-total">
-                      <span className="hg-dim">{selected.length} × {money(price)}</span>
+                      <span className="hg-dim">
+                        {selected.length} × {money(price)}
+                        {claimReferralTicket && hasFreeTicketRoom ? " + 1 free" : ""}
+                      </span>
                       <strong>{money(total)}</strong>
                     </div>
                     <Button variant="cta" size="lg" disabled={!canBook} icon="ticket" onClick={bookNow}>
@@ -356,7 +443,14 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             gameTitle={game.title}
             ticketNumbers={selected}
             matrices={matrices}
-            onClose={() => { setLock(null); setSelected([]); loadTicketsAndBought(); }}
+            freeTicketNumber={freeTicketNumber}
+            onClose={() => {
+              setLock(null);
+              setSelected([]);
+              setClaimReferralTicket(false);
+              setFreeTicketNumber(null);
+              loadTicketsAndBought();
+            }}
             goLive={() => router.push(`/game/${game_id}/live`)}
           />
         )}

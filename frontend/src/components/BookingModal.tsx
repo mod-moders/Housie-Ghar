@@ -17,11 +17,12 @@ interface BookingModalProps {
   gameTitle: string;
   ticketNumbers: number[];
   matrices: Record<number, TicketMatrix>;
+  freeTicketNumber?: number | null;
   onClose: () => void;
   goLive: () => void;
 }
 
-export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matrices, onClose, goLive }: BookingModalProps) {
+export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matrices, freeTicketNumber, onClose, goLive }: BookingModalProps) {
   const [phase, setPhase] = useState<"lock" | "confirmed">("lock");
   const [polls, setPolls] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +118,7 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
                 <div key={n} className="hg-live-ticket-card" style={{ marginBottom: "12px", textAlign: "left", width: "100%", boxSizing: "border-box" }}>
                   <div className="hg-live-ticket-header">
                     <span className="hg-live-ticket-game-name">{gameTitle || "Housie Ghar"}</span>
-                    <span className="hg-live-ticket-datetime">CONFIRMED</span>
+                    <span className="hg-live-ticket-datetime">{n === freeTicketNumber ? "FREE 🎁" : "CONFIRMED"}</span>
                   </div>
                   <HousieTicket matrix={matrices[n]} compact />
                   <div className="hg-live-ticket-footer">
@@ -164,7 +165,13 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
 
         <div className="hg-lock-summary">
           <div className="hg-ls-row"><span>Game</span><b>{gameTitle}</b></div>
-          <div className="hg-ls-row"><span>Tickets</span><b>{ticketNumbers.map((t) => "#" + t).join(", ")}</b></div>
+          <div className="hg-ls-row">
+            <span>Tickets</span>
+            <b>
+              {ticketNumbers.map((t) => "#" + t).join(", ")}
+              {freeTicketNumber != null && <span style={{ color: "var(--success)" }}> (incl. 1 free)</span>}
+            </b>
+          </div>
           <div className="hg-ls-row"><span>Total payable</span><b className="hg-ls-amt">{money(lock.total_amount)}</b></div>
           <div className="hg-ls-row"><span>Booking ID</span><b>{bookingRef}</b></div>
         </div>
