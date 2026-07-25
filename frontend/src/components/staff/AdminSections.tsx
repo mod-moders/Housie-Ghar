@@ -2346,6 +2346,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                     {/* Set Operator Salary Button */}
                     {isSuper && u.role_name === "Operator" && (
                       <button 
+                        className="hg-desktop-only"
                         onClick={() => changeSalaryPrompt(u)}
                         style={{
                           padding: "6px 10px",

@@ -4241,3 +4241,11 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   color: var(--text);
   transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* Hide on mobile viewports (e.g. max-width: 640px) */
+@media (max-width: 640px) {
+  .hg-desktop-only {
+    display: none !important;
+  }
+}
+
