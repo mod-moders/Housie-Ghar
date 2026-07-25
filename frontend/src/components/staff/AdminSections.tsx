@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import Link from "next/link";
-import { money } from "@/lib/money";
+import { money, moneyStr } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
@@ -1883,6 +1883,15 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "", monthly_salary: "" });
+  const [modalConfig, setModalConfig] = useState<{
+    type: "confirm" | "prompt";
+    title: string;
+    message: string;
+    defaultValue?: string;
+    placeholder?: string;
+    inputType?: string;
+    onConfirm: (value?: string) => void | Promise<void>;
+  } | null>(null);
 
   const load = useCallback(() => {
     apiFetch<StaffUser[]>("/api/users").then(setUsers).catch(() => {});
@@ -1952,58 +1961,80 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
 
 
   const deleteUser = async (u: StaffUser) => {
-    if (!window.confirm(`Delete ${u.full_name} (${roleLabel(u)})? This action cannot be undone.`)) return;
-    setError(null);
-    try {
-      await apiFetch(`/api/users/${u.user_id}`, { method: "DELETE" });
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Delete failed");
-    }
+    setModalConfig({
+      type: "confirm",
+      title: "Delete Staff User",
+      message: `Are you sure you want to delete ${u.full_name} (${roleLabel(u)})? This action cannot be undone.`,
+      onConfirm: async () => {
+        setError(null);
+        try {
+          await apiFetch(`/api/users/${u.user_id}`, { method: "DELETE" });
+          load();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Delete failed");
+        }
+        setModalConfig(null);
+      }
+    });
   };
 
   const resetPassword = async (u: StaffUser) => {
-    const pw = window.prompt(
-      `Set a new password for ${u.full_name} (${roleLabel(u)}). Minimum 6 characters — they can change it themselves after signing in.`
-    );
-    if (pw === null) return; // cancelled
-    if (pw.length < 6) {
-      setError("New password must be at least 6 characters");
-      return;
-    }
-    setError(null);
-    try {
-      await apiFetch(`/api/users/${u.user_id}/reset-password`, {
-        method: "POST",
-        body: JSON.stringify({ new_password: pw }),
-      });
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Password reset failed");
-    }
+    setModalConfig({
+      type: "prompt",
+      title: "Reset Password",
+      message: `Set a new password for ${u.full_name} (${roleLabel(u)}). Minimum 6 characters — they can change it themselves after signing in.`,
+      defaultValue: "",
+      placeholder: "New Password",
+      inputType: "password",
+      onConfirm: async (pw) => {
+        if (pw === undefined) return;
+        if (pw.length < 6) {
+          setError("New password must be at least 6 characters");
+          return;
+        }
+        setError(null);
+        try {
+          await apiFetch(`/api/users/${u.user_id}/reset-password`, {
+            method: "POST",
+            body: JSON.stringify({ new_password: pw }),
+          });
+          load();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Password reset failed");
+        }
+        setModalConfig(null);
+      }
+    });
   };
 
   const changeSalaryPrompt = async (u: StaffUser) => {
-    const sal = window.prompt(
-      `Set monthly salary for ${u.full_name} (Current: ${money(u.monthly_salary || 0)}). Enter amount:`,
-      String(u.monthly_salary || "")
-    );
-    if (sal === null) return;
-    const salaryVal = parseFloat(sal);
-    if (isNaN(salaryVal) || salaryVal < 0) {
-      window.alert("Please enter a valid salary amount.");
-      return;
-    }
-    setError(null);
-    try {
-      await apiFetch(`/api/users/${u.user_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ monthly_salary: salaryVal }),
-      });
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update salary");
-    }
+    setModalConfig({
+      type: "prompt",
+      title: "Set Monthly Salary",
+      message: `Set monthly salary for ${u.full_name} (Current: ${moneyStr(u.monthly_salary || 0)}). Enter amount:`,
+      defaultValue: String(u.monthly_salary || ""),
+      placeholder: "Salary Amount",
+      inputType: "number",
+      onConfirm: async (sal) => {
+        if (sal === undefined) return;
+        const salaryVal = parseFloat(sal);
+        if (isNaN(salaryVal) || salaryVal < 0) {
+          setError("Please enter a valid salary amount.");
+          return;
+        }
+        setError(null);
+        try {
+          await apiFetch(`/api/users/${u.user_id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ monthly_salary: salaryVal }),
+          });
+          load();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Failed to update salary");
+        }
+        setModalConfig(null);
+      }
+    });
   };
 
   const roleLabel = (u: StaffUser) => u.role_name;
@@ -2338,6 +2369,129 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
           );
         })}
       </div>
+
+      {modalConfig && (
+        <div 
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px"
+          }}
+          onClick={() => setModalConfig(null)}
+        >
+          <div 
+            className="hg-panel" 
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-2)",
+              borderRadius: "16px",
+              padding: "24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)",
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text)" }}>
+                {modalConfig.title}
+              </h3>
+              <button 
+                onClick={() => setModalConfig(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  fontSize: "18px"
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <p style={{ fontSize: "14px", color: "var(--text-dim)", lineHeight: "1.5", margin: 0 }}>
+              {modalConfig.message}
+            </p>
+
+            {modalConfig.type === "prompt" && (
+              <input
+                id="custom-modal-input"
+                type={modalConfig.inputType || "text"}
+                defaultValue={modalConfig.defaultValue}
+                placeholder={modalConfig.placeholder}
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  fontSize: "14px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-2)",
+                  background: "var(--surface-2)",
+                  color: "var(--text)",
+                  outline: "none"
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const val = (document.getElementById("custom-modal-input") as HTMLInputElement)?.value;
+                    modalConfig.onConfirm(val);
+                  }
+                }}
+              />
+            )}
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
+              <button 
+                className="hg-btn"
+                onClick={() => setModalConfig(null)}
+                style={{
+                  background: "var(--surface-2)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border)",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="hg-btn"
+                onClick={() => {
+                  const val = modalConfig.type === "prompt" 
+                    ? (document.getElementById("custom-modal-input") as HTMLInputElement)?.value 
+                    : undefined;
+                  modalConfig.onConfirm(val);
+                }}
+                style={{
+                  background: "var(--brand)",
+                  color: "var(--accent-ink)",
+                  border: "none",
+                  padding: "8px 20px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer"
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
