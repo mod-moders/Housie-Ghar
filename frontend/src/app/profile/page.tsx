@@ -309,7 +309,9 @@ export default function ProfilePage() {
 
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "var(--text)" }}>{profile?.housie_name}</h1>
+                  <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "var(--text)" }}>
+                    {profile?.full_name ? profile.full_name.trim().split(/\s+/)[0] : profile?.housie_name}
+                  </h1>
                   <span style={{ fontSize: "11px", fontWeight: "bold", background: "rgba(244,201,93,0.15)", color: "var(--accent)", border: "1px solid rgba(244,201,93,0.3)", padding: "2px 10px", borderRadius: "12px" }}>
                     PLAYER
                   </span>

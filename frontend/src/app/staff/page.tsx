@@ -283,7 +283,6 @@ export default function StaffDashboard() {
     return <FirstTimeSetup user={user} onCompleted={(u) => setUser(u)} onLogout={logout} />;
   }
 
-  const roleLabel = user.role_name;
   const showFinanceBar = isFo && hud && (active === "finance" || active === "overview");
 
   const renderSection = () => {
@@ -391,7 +390,7 @@ export default function StaffDashboard() {
                 <div className="hg-status-title">{(nav.find((n) => n[0] === active) ?? nav[0])[1]}</div>
               )}
               <div className="hg-status-right">
-                <span className="hg-status-role">{roleLabel}</span>
+                <span className="hg-status-role">{user.full_name ? user.full_name.trim().split(/\s+/)[0] : ""}</span>
                 <Avatar src={roleAvatar(user)} name={user.full_name} />
               </div>
             </header>
