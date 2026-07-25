@@ -1295,11 +1295,11 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   border-top:3px solid var(--accent);
   border-radius:var(--radius-lg);
   padding:20px;
-  /* No max-width cap: a fixed 320px card left a huge gap of bare banner around it on
-     desktop, showing its border as a visibly smaller box floating inside the section
-     instead of filling it. Sizing purely off the banner's own content width now, so the
-     hook always fits the section it's in. */
-  width:calc(100% - 48px);
+  /* No max-width cap and no extra -48px margin subtraction: either one alone still left
+     a visible gap between the hook's own border and the banner's edge (the cap was the
+     visible culprit on desktop, the -48px was still shrinking it on mobile even with the
+     cap gone). Plain 100% matches the banner's content box exactly, at every breakpoint. */
+  width:100%;
   box-shadow:0 15px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(244, 63, 94, 0.25);
 }
 .hg-banner-logo img{display:block;width:90px;height:90px;object-fit:contain;filter:var(--bn-logo-shadow);
