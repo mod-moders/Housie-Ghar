@@ -188,6 +188,7 @@ export interface FinancialHud {
   today_profit: number;
   monthly_profit: number;
   pending_topups: number;
+  pending_claims?: number;
 }
 
 export interface QueueBooking {

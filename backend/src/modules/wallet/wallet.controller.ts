@@ -425,7 +425,7 @@ export async function manualAdjust(req: AuthenticatedRequest, res: Response): Pr
  */
 export async function getFinancialHud(_req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const [overallCol, overallPay, todayCol, todayPay, monthCol, monthPay, pendingRes] = await Promise.all([
+    const [overallCol, overallPay, todayCol, todayPay, monthCol, monthPay, pendingRes, pendingClaimsRes] = await Promise.all([
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold'`),
       pool.query(`SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE claimed = TRUE`),
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('day', NOW())`),
@@ -433,6 +433,7 @@ export async function getFinancialHud(_req: AuthenticatedRequest, res: Response)
       pool.query(`SELECT COALESCE(SUM(total_amount), 0) AS total FROM Bookings WHERE booking_status = 'Sold' AND confirmed_at >= date_trunc('month', NOW())`),
       pool.query(`SELECT COALESCE(SUM(prize_amount), 0) AS total FROM Prize_Pool WHERE claimed = TRUE AND claimed_at >= date_trunc('month', NOW())`),
       pool.query(`SELECT COUNT(*)::INTEGER AS count FROM TopUp_Requests WHERE request_status = 'Pending'`),
+      pool.query(`SELECT COUNT(*)::INTEGER AS count FROM Prize_Pool WHERE player_claimed = TRUE AND (disbursed = FALSE OR disbursed IS NULL)`),
     ]);
 
     const overallProfit = parseFloat(overallCol.rows[0].total) - parseFloat(overallPay.rows[0].total);
@@ -446,6 +447,7 @@ export async function getFinancialHud(_req: AuthenticatedRequest, res: Response)
       today_profit: Math.max(0, todayProfit),
       monthly_profit: Math.max(0, monthlyProfit),
       pending_topups: pendingRes.rows[0].count,
+      pending_claims: pendingClaimsRes.rows[0].count,
     });
   } catch (error) {
     console.error('Error building financial HUD:', error);

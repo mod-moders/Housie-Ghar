@@ -238,7 +238,20 @@ export default function StaffDashboard() {
   }, [checked, isFo, loadHud]);
 
   useSocket((event) => {
-    if (isFo && (event === "topup_request_received" || event === "wallet_credited" || event === "wallet_debited" || event === "wallet_adjusted")) {
+    if (
+      isFo && (
+        event === "topup_request_received" ||
+        event === "topup_requested" ||
+        event === "topup_approved" ||
+        event === "topup_rejected" ||
+        event === "prize_claim_received" ||
+        event === "prize_disbursed" ||
+        event === "wallet_credited" ||
+        event === "wallet_debited" ||
+        event === "wallet_adjusted" ||
+        event === "wallet_update"
+      )
+    ) {
       loadHud();
     }
   });
@@ -313,10 +326,11 @@ export default function StaffDashboard() {
           {collapsed && <div className="hg-side-backdrop" onClick={() => setCollapsed(false)} />}
           <aside className={`hg-side${collapsed ? " is-collapsed" : ""}`}>
             <div className="hg-side-brand"><Logo size={38} onClick={() => window.location.reload()} /></div>
-             <nav className="hg-side-nav" style={{ gap: "4px" }}>
+            <nav className="hg-side-nav" style={{ gap: "4px" }}>
               {nav.map(([key, lbl, ic]) => {
                 const isRecharge = key === "recharge";
-                const showBadge = isRecharge && user.role_name === "Financial Admin" && hud && hud.pending_topups > 0;
+                const pendingRequests = (hud?.pending_topups || 0) + (hud?.pending_claims || 0);
+                const showBadge = isRecharge && user.role_name === "Financial Admin" && hud && pendingRequests > 0;
                 return (
                   <button
                     key={key}
@@ -344,7 +358,7 @@ export default function StaffDashboard() {
                           boxShadow: "0 0 8px var(--accent-soft)"
                         }}
                       >
-                        {hud.pending_topups}
+                        {pendingRequests}
                       </span>
                     )}
                   </button>
