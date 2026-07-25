@@ -1302,6 +1302,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-banner-logo img{display:block;width:90px;height:90px;object-fit:contain;filter:var(--bn-logo-shadow);
   transition:transform 0.3s ease}
 .hg-banner-logo img:hover{transform:scale(1.08) rotate(3deg)}
+/* The responsive logo sizes below (130/160/200px) assume the logo sits alone. Paired with
+   the (also shrunk) lucky-number wizard, that blows past the hook's ~211px content width
+   (320px max-width card minus its own padding minus the hook's calc() margin) at every
+   breakpoint — pin it to one size, matching the wizard, that always fits two-up regardless
+   of viewport. Higher specificity than the plain media-scoped rules below wins outright,
+   no !important needed. */
+.hg-banner-hook .hg-banner-logo img{width:92px;height:92px}
 .hg-banner-quote{margin:0;max-width:28ch;min-height:auto;
   font-family:var(--font-head);font-style:normal;font-weight:700;
   font-size:13.5px;line-height:1.45;color:var(--text-dim);text-wrap:balance;
@@ -1443,6 +1450,11 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   margin-bottom: 8px;
   width: 100%;
 }
+/* Tighter gap inside the narrow banner hook card so logo + (shrunk) wizard fit on one
+   row instead of wrapping and doubling the row's height. */
+.hg-banner-hook .hg-lobby-header-row {
+  gap: 14px;
+}
 
 .hg-lucky-wizard {
   display: flex;
@@ -1463,6 +1475,19 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   align-items: center;
   justify-content: center;
   will-change: transform;
+}
+
+/* Inside the banner hook, the wizard sits beside the logo instead of on its own — scaled
+   down (as one unit, so the glow/number-overlay children stay proportional) and given a
+   matching smaller box so the row doesn't wrap onto its own line and blow out the hook's
+   (and therefore the whole banner's) height. */
+.hg-banner-hook .hg-lucky-wizard {
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+}
+.hg-banner-hook .hg-lucky-wizard-scene {
+  transform: scale(0.575);
 }
 
 .hg-wizard-img {
