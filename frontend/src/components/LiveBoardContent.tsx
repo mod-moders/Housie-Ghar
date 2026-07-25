@@ -156,31 +156,42 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
         const completedAt = game?.completed_at;
-        const elapsedOutroSeconds = completedAt ? (Date.now() - new Date(completedAt).getTime()) / 1000 : 0;
+        if (completedAt) {
+          const completedMs = new Date(completedAt).getTime();
+          const targetStartMs = completedMs + 7000;
+          const now = Date.now();
+          const elapsedSinceTarget = (now - targetStartMs) / 1000;
 
-        const triggerEndSequence = () => {
+          const triggerEndSequence = (startOffset: number) => {
+            if (outroPlayedRef.current) return;
+            outroPlayedRef.current = true;
+            if (!userDismissedWinnersRef.current) {
+              setShowWinnersOverlay(true);
+            }
+            playOutro(startOffset);
+            playCelebration();
+            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+            if (isSoundEnabled && !muted) {
+              soundSynthesizer.playCelebration();
+            }
+          };
+
+          if (elapsedSinceTarget >= 0) {
+            triggerEndSequence(elapsedSinceTarget);
+          } else {
+            const delayMs = Math.abs(elapsedSinceTarget) * 1000;
+            const timer = setTimeout(() => {
+              triggerEndSequence(0);
+            }, delayMs);
+            return () => clearTimeout(timer);
+          }
+        } else {
           outroPlayedRef.current = true;
           if (!userDismissedWinnersRef.current) {
             setShowWinnersOverlay(true);
           }
-          if (completedAt) {
-            const currentElapsed = Math.max(0, (Date.now() - new Date(completedAt).getTime()) / 1000);
-            playOutro(currentElapsed);
-          } else {
-            playOutro(0);
-          }
+          playOutro(0);
           playCelebration();
-          const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-          if (isSoundEnabled && !muted) {
-            soundSynthesizer.playCelebration();
-          }
-        };
-
-        if (completedAt && elapsedOutroSeconds > 5) {
-          triggerEndSequence();
-        } else {
-          const timer = setTimeout(triggerEndSequence, 3000);
-          return () => clearTimeout(timer);
         }
       }
     } else {
@@ -253,34 +264,39 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           const w = currentWinnerEventRef.current;
           currentWinnerEventRef.current = null;
 
-          playCelebration();
           const config = useConfigStore.getState().config;
           const isSoundEnabled = config?.celebration_sound_enabled !== "false";
-          if (isSoundEnabled && !muted) {
-            soundSynthesizer.playCelebration();
-          }
-          setWinOverlay(w);
 
-          // Winner card stays visible for exactly 3 seconds
-          delay(() => {
-            setWinOverlay(null);
-
-            if (w.isLastPrize && !outroPlayedRef.current) {
-              delay(() => {
-                if (!outroPlayedRef.current) {
-                  outroPlayedRef.current = true;
-                  if (!userDismissedWinnersRef.current) {
-                    setShowWinnersOverlay(true);
-                  }
-                  playOutro(0);
-                  playCelebration();
-                  if (isSoundEnabled && !muted) {
-                    soundSynthesizer.playCelebration();
-                  }
+          if (w.isLastPrize) {
+            // For the last remaining prize:
+            // Do NOT show the winner card.
+            // Wait 3 seconds, then show winners list and play outro.
+            delay(() => {
+              if (!outroPlayedRef.current) {
+                outroPlayedRef.current = true;
+                if (!userDismissedWinnersRef.current) {
+                  setShowWinnersOverlay(true);
                 }
-              }, 3000);
+                playOutro(0);
+                playCelebration();
+                if (isSoundEnabled && !muted) {
+                  soundSynthesizer.playCelebration();
+                }
+              }
+            }, 3000);
+          } else {
+            // For normal prizes:
+            playCelebration();
+            if (isSoundEnabled && !muted) {
+              soundSynthesizer.playCelebration();
             }
-          }, 3000);
+            setWinOverlay(w);
+
+            // Winner card stays visible for exactly 3 seconds
+            delay(() => {
+              setWinOverlay(null);
+            }, 3000);
+          }
         }
       }
     }, 4000);
