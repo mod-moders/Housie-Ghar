@@ -108,7 +108,7 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: "32px" }}>
             
             {/* Left Column: Form */}
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
               <div>
                 <h2 style={{ fontSize: "22px", fontWeight: 700, color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px" }}>
                   <Icon name="users" size={20} />
@@ -219,7 +219,7 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
             </form>
 
             {/* Right Column: Bookie Guide */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "rgba(212, 175, 55, 0.02)", border: "1px solid rgba(212, 175, 55, 0.15)", borderRadius: "var(--radius)", padding: "20px 24px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0, background: "rgba(212, 175, 55, 0.02)", border: "1px solid rgba(212, 175, 55, 0.15)", borderRadius: "var(--radius)", padding: "20px 24px" }}>
               <h3 style={{ fontSize: "15px", fontWeight: 700, color: "var(--accent)", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                 <Icon name="shieldCheck" size={16} />
                 Bookie Guide: Your Role & Earnings
