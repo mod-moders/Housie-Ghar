@@ -1882,7 +1882,9 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "" });
+  const [form, setForm] = useState({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "", monthly_salary: "" });
+  const [editingSalaryUserId, setEditingSalaryUserId] = useState<string | null>(null);
+  const [salaryInputValue, setSalaryInputValue] = useState<string>("");
 
   const load = useCallback(() => {
     apiFetch<StaffUser[]>("/api/users").then(setUsers).catch(() => {});
@@ -1905,7 +1907,8 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
             phone: data.phone || "",
             town: data.town || "",
             role_id: "4",
-            password: data.password || ""
+            password: data.password || "",
+            monthly_salary: ""
           });
           setAdding(true);
         } catch {}
@@ -1927,10 +1930,11 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
           town: form.town.trim() || null,
           role_id: parseInt(form.role_id, 10),
           password: form.password,
+          monthly_salary: form.role_id === "3" && form.monthly_salary ? parseFloat(form.monthly_salary) : 0,
         }),
       });
       setAdding(false);
-      setForm({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "" });
+      setForm({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "", monthly_salary: "" });
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create user");
@@ -1944,6 +1948,20 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    }
+  };
+
+  const saveSalary = async (u: StaffUser) => {
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${u.user_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ monthly_salary: parseFloat(salaryInputValue) || 0 }),
+      });
+      setEditingSalaryUserId(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update salary");
     }
   };
 
@@ -2015,7 +2033,7 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                   if (roleId === "2") defaultUsername = "admin";
                   else if (roleId === "3") defaultUsername = "operator";
                   else if (roleId === "4") defaultUsername = "bookie";
-                  setForm({ ...form, role_id: roleId, username: defaultUsername });
+                  setForm({ ...form, role_id: roleId, username: defaultUsername, monthly_salary: "" });
                 }}
               >
                 {ROLE_OPTIONS.filter(([id]) => me.role_name === "Superadmin" || id > 2).map(([id, lbl]) => (
@@ -2027,6 +2045,12 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
               <span>Temp password (min 6)</span>
               <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </label>
+            {form.role_id === "3" && (
+              <label className="hg-form-field">
+                <span>Monthly Salary (₹)</span>
+                <input type="number" placeholder="e.g. 25000" value={form.monthly_salary} onChange={(e) => setForm({ ...form, monthly_salary: e.target.value })} />
+              </label>
+            )}
           </div>
           <div className="hg-form-actions">
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>
@@ -2155,6 +2179,111 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                   <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, wordBreak: "break-all" }}>
                     {u.username}
                   </span>
+                </div>
+              )}
+
+              {/* Operator details: created_at and monthly_salary */}
+              {u.role_name === "Operator" && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    background: "rgba(212, 175, 55, 0.03)",
+                    border: "1px solid rgba(212, 175, 55, 0.12)",
+                    borderRadius: "8px",
+                    padding: "10px 14px",
+                    fontSize: "13px"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Icon name="calendar" size={13} /> Operator since:
+                    </span>
+                    <span style={{ fontWeight: 600, color: "var(--text)" }}>
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="hg-dim" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Icon name="award" size={13} /> Monthly Salary:
+                    </span>
+                    
+                    {editingSalaryUserId === u.user_id ? (
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <input
+                          type="number"
+                          value={salaryInputValue}
+                          onChange={(e) => setSalaryInputValue(e.target.value)}
+                          style={{
+                            width: "80px",
+                            padding: "2px 6px",
+                            fontSize: "12px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border)",
+                            background: "var(--surface)",
+                            color: "var(--text)"
+                          }}
+                        />
+                        <button
+                          onClick={() => saveSalary(u)}
+                          style={{
+                            padding: "2px 6px",
+                            background: "var(--success)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingSalaryUserId(null)}
+                          style={{
+                            padding: "2px 6px",
+                            background: "var(--surface-2)",
+                            color: "var(--text-dim)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          X
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                          {money(u.monthly_salary || 0)}
+                        </span>
+                        {isSuper && (
+                          <button
+                            onClick={() => {
+                              setEditingSalaryUserId(u.user_id);
+                              setSalaryInputValue(String(u.monthly_salary || ""));
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "var(--text-mute)",
+                              padding: "2px",
+                              display: "flex",
+                              alignItems: "center"
+                            }}
+                            title="Edit Salary"
+                          >
+                            <Icon name="edit" size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

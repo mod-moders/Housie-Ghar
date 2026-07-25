@@ -565,7 +565,7 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    const [gamesSummary, numbersCalled, ticketsAndPayout, recentGames] = await Promise.all([
+    const [gamesSummary, numbersCalled, ticketsAndPayout, recentGames, overallGamesRes, overflowTicketsRes, profileRes] = await Promise.all([
       pool.query(
         `SELECT
            COUNT(*)::INTEGER AS total_games,
@@ -612,10 +612,29 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
          LIMIT 20`,
         [operatorId]
       ),
+      pool.query(`SELECT COUNT(*)::INTEGER AS overall_games FROM Scheduled_Games`),
+      pool.query(
+        `SELECT COALESCE(SUM(cardinality(ticket_ids)), 0)::INTEGER AS overflow_tickets_sold
+         FROM Bookings
+         WHERE confirmed_by = $1 AND is_overflow = TRUE AND booking_status = 'Sold'`,
+        [operatorId]
+      ),
+      pool.query(`SELECT created_at, monthly_salary FROM Users WHERE user_id = $1`, [operatorId]),
     ]);
 
     const summary = gamesSummary.rows[0];
     const tickets = ticketsAndPayout.rows[0];
+    const overallGames = overallGamesRes.rows[0]?.overall_games || 0;
+    const overflowTicketsSold = overflowTicketsRes.rows[0]?.overflow_tickets_sold || 0;
+    const profile = profileRes.rows[0];
+    const operatorSince = profile?.created_at || new Date();
+    const monthlySalary = parseFloat(profile?.monthly_salary || '0');
+
+    // Calculate elapsed time in fractional months (pro-rata daily)
+    const diffMs = Date.now() - new Date(operatorSince).getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    const diffMonths = diffDays / 30.4375;
+    const overallSalaryEarned = parseFloat((diffMonths * monthlySalary).toFixed(2));
 
     res.json({
       total_games_operated: summary.total_games || 0,
@@ -626,6 +645,11 @@ export async function getOperatorStats(req: AuthenticatedRequest, res: Response)
       total_tickets_sold: tickets.total_tickets_sold || 0,
       total_payouts_disbursed: parseFloat(tickets.total_payouts_disbursed || '0'),
       total_prizes_claimed: tickets.total_prizes_claimed || 0,
+      overall_games: overallGames,
+      overflow_tickets_sold: overflowTicketsSold,
+      operator_since: operatorSince,
+      monthly_salary: monthlySalary,
+      overall_salary_earned: overallSalaryEarned,
       recent_games: recentGames.rows.map((row: any) => ({
         game_id: row.game_id,
         title: row.title,

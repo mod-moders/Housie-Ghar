@@ -143,6 +143,8 @@ export interface StaffUser {
   assigned_games_count: number;
   trust: TrustTier | null;
   last_login: string | null;
+  created_at?: string;
+  monthly_salary?: number;
 }
 
 export interface AuditEntry {

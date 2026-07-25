@@ -19,6 +19,11 @@ export interface OperatorStatsData {
   total_tickets_sold: number;
   total_payouts_disbursed: number;
   total_prizes_claimed: number;
+  overall_games: number;
+  overflow_tickets_sold: number;
+  operator_since: string;
+  monthly_salary: number;
+  overall_salary_earned: number;
   recent_games: {
     game_id: string;
     title: string;
@@ -143,33 +148,137 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
       </div>
 
       {/* KPI Cards Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
         
-        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(244, 201, 93, 0.25)", borderRadius: "14px" }}>
+        {/* Card 1: Overall Games */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.01) 100%)", border: "1px solid rgba(6, 182, 212, 0.18)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Games Operated</span>
-            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(244, 201, 93, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Overall Platform Games</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(6, 182, 212, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="chart" size={16} style={{ color: "#06B6D4" }} />
+            </div>
+          </div>
+          <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.overall_games}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Hosted by all Housie Ghar staff</span>
+        </div>
+
+        {/* Card 2: Games Hosted */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(212, 175, 55, 0.06) 0%, rgba(212, 175, 55, 0.01) 100%)", border: "1px solid rgba(212, 175, 55, 0.2)", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Games Operated By Me</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(212, 175, 55, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="play" size={16} style={{ color: "var(--accent)" }} />
             </div>
           </div>
-          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_games_operated}</b>
+          <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_games_operated}</b>
           <div style={{ display: "flex", gap: "10px", marginTop: "8px", fontSize: "12px" }}>
             <span style={{ color: "#10B981", fontWeight: "600" }}>✓ {data.completed_games} Completed</span>
             {data.live_games > 0 && <span style={{ color: "var(--brand)", fontWeight: "bold" }}>● {data.live_games} Live</span>}
           </div>
         </div>
 
-        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)", border: "1px solid rgba(59, 130, 246, 0.25)", borderRadius: "14px" }}>
+        {/* Card 3: Overflow Tickets */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.01) 100%)", border: "1px solid rgba(59, 130, 246, 0.18)", borderRadius: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Player Tickets Sold</span>
-            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(59, 130, 246, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Overflow Tickets Sold</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(59, 130, 246, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="users" size={16} style={{ color: "#3B82F6" }} />
             </div>
           </div>
-          <b style={{ display: "block", fontSize: "32px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.total_tickets_sold}</b>
-          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Tickets hosted in operated games</span>
+          <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--text)" }}>{data.overflow_tickets_sold}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Confirmed from Overflow Queue</span>
         </div>
 
+        {/* Card 4: Operator Since */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(168, 85, 247, 0.01) 100%)", border: "1px solid rgba(168, 85, 247, 0.18)", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Operator Since</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(168, 85, 247, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="calendar" size={16} style={{ color: "#A855F7" }} />
+            </div>
+          </div>
+          <b style={{ display: "block", fontSize: "20px", fontWeight: "800", marginTop: "20px", color: "var(--text)" }}>
+            {data.operator_since ? new Date(data.operator_since).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
+          </b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "10px", display: "block" }}>Platform signup registration date</span>
+        </div>
+
+        {/* Card 5: Monthly Salary */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.01) 100%)", border: "1px solid rgba(16, 185, 129, 0.18)", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Monthly Salary</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="award" size={16} style={{ color: "#10B981" }} />
+            </div>
+          </div>
+          <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--accent)" }}>{money(data.monthly_salary)}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Set by Superadmin from Workforce</span>
+        </div>
+
+        {/* Card 6: Overall Salary Earned */}
+        <div className="hg-panel" style={{ padding: "20px", background: "linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.01) 100%)", border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Overall Salary Earned</span>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="award" size={16} style={{ color: "#F59E0B" }} />
+            </div>
+          </div>
+          <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--accent)" }}>{money(data.overall_salary_earned)}</b>
+          <span className="hg-dim" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>Cumulative earnings (pro-rata daily)</span>
+        </div>
+
+      </div>
+
+      {/* Secondary Stats Cockpit */}
+      <div 
+        className="hg-panel"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "20px",
+          padding: "24px",
+          borderRadius: "16px"
+        }}
+      >
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="play" size={14} style={{ color: "var(--accent)" }} />
+          </div>
+          <div>
+            <span style={{ fontSize: "11px", color: "var(--text-mute)", textTransform: "uppercase", fontWeight: "bold" }}>Total Calls Made</span>
+            <strong style={{ display: "block", fontSize: "18px", color: "var(--text)" }}>{data.total_numbers_called} calls</strong>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="users" size={14} style={{ color: "var(--cyan)" }} />
+          </div>
+          <div>
+            <span style={{ fontSize: "11px", color: "var(--text-mute)", textTransform: "uppercase", fontWeight: "bold" }}>Operated Game Tickets</span>
+            <strong style={{ display: "block", fontSize: "18px", color: "var(--text)" }}>{data.total_tickets_sold} sold</strong>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="check" size={14} style={{ color: "var(--success)" }} />
+          </div>
+          <div>
+            <span style={{ fontSize: "11px", color: "var(--text-mute)", textTransform: "uppercase", fontWeight: "bold" }}>Claims Facilitated</span>
+            <strong style={{ display: "block", fontSize: "18px", color: "var(--text)" }}>{data.total_prizes_claimed} prizes</strong>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="award" size={14} style={{ color: "var(--accent)" }} />
+          </div>
+          <div>
+            <span style={{ fontSize: "11px", color: "var(--text-mute)", textTransform: "uppercase", fontWeight: "bold" }}>Payout Disbursed</span>
+            <strong style={{ display: "block", fontSize: "18px", color: "var(--text)" }}>{money(data.total_payouts_disbursed)}</strong>
+          </div>
+        </div>
       </div>
 
       {/* Recent Games Table */}
