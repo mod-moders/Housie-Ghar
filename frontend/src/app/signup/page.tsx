@@ -19,14 +19,15 @@ export default function SignUp() {
   const [showBookieForm, setShowBookieForm] = useState(false);
 
   useEffect(() => {
-    // Check if there is an active session
-    apiFetch<{ player: { housieName: string } }>("/api/player/me")
-      .then(() => {
-        router.push("/");
-      })
-      .catch(() => {
-        // No active session, stay on signup
-      });
+    // Redirect only if THIS tab actually holds a session token — see the same
+    // guard in login/page.tsx. A live /api/player/me check here would also
+    // succeed off a leftover hg_player_token cookie even with an empty
+    // sessionStorage, silently bouncing a visitor who followed someone's
+    // referral link away from the signup form before they could ever create
+    // the new, referred account.
+    if (typeof window !== "undefined" && sessionStorage.getItem("hg_player_token")) {
+      router.push("/");
+    }
 
     // Prefill a player referral code from a ?ref= share link, falling back to one
     // captured on an earlier visit. Same client-only constraint as the promoter id

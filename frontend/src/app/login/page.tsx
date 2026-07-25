@@ -20,14 +20,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Check if there is an active session
-    apiFetch<{ player: { housie_name: string } }>("/api/player/me")
-      .then(() => {
-        router.push("/");
-      })
-      .catch(() => {
-        // No active session
-      });
+    // Redirect only if THIS tab actually holds a session token. A live
+    // /api/player/me check would also succeed off a leftover hg_player_token
+    // cookie (still set server-side, 10-year expiry) even after sessionStorage
+    // has been cleared or the browser restarted — bouncing to "/" in that case
+    // just sends the visitor straight back here (page.tsx gates on the same
+    // sessionStorage token), an infinite redirect loop between "/" and "/login".
+    if (typeof window !== "undefined" && sessionStorage.getItem("hg_player_token")) {
+      router.push("/");
+    }
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {

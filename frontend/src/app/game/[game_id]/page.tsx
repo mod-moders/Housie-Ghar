@@ -77,6 +77,11 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
         .catch((e) => {
           if (cancelled) return;
           if (!isAuthError(e)) { setTimeout(() => { if (!cancelled) checkAuth(); }, 3000); return; }
+          // Clear the stale token — see the matching note in app/page.tsx's
+          // auth-check effect: leaving it would make /login bounce straight
+          // back to "/" (it gates on sessionStorage presence), reproducing
+          // the same redirect loop this pattern is meant to prevent.
+          sessionStorage.removeItem("hg_player_token");
           router.push("/login");
         });
     };

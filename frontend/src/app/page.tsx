@@ -266,6 +266,10 @@ export default function Lobby() {
             setTimeout(() => { if (!cancelled) checkAuth(); }, 3000);
             return;
           }
+          // A genuinely invalid token must be cleared here — otherwise /login's
+          // sessionStorage-presence check (see login/page.tsx) would still see
+          // it, redirect straight back to "/", and reproduce the same loop.
+          sessionStorage.removeItem("hg_player_token");
           router.push("/login");
         });
     };
