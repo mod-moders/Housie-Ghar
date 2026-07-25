@@ -2223,7 +2223,8 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
               <div 
                 style={{ 
                   display: "flex", 
-                  gap: "8px", 
+                  gap: "6px", 
+                  flexWrap: "wrap",
                   marginTop: "auto", 
                   paddingTop: "12px", 
                   borderTop: "1px solid var(--border-2)",
