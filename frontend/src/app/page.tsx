@@ -395,27 +395,28 @@ export default function Lobby() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--lobby">
-        {/* Decorative background layers — bloom + grid + coins drifting in background */}
-        <div className="hg-banner-bloom" aria-hidden="true" />
-        <div className="hg-banner-grid" aria-hidden="true">
-          {GRID_CELLS.map((c, i) => (
-            <span key={i} className="hg-banner-cell">
-              {c && (
-                <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
-                  {c.n}
-                  {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
-                </span>
-              )}
-            </span>
-          ))}
-        </div>
-        {COINS.map((n, i) => (
-          <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
-        ))}
-
         <div className="hg-lobby-v2" ref={lobbyRef}>
-          {/* Brand Welcome Header with Logo — covered by the games panel as it rises on scroll (mobile) */}
+          {/* Brand Welcome Header with Logo — covered by the games panel as it rises on scroll (mobile).
+              The decorative bloom/grid/coins live inside the hero so they pin and get covered together
+              with it, instead of scrolling past it at the normal (uncovered) rate. */}
           <div className="hg-lobby-hero" ref={heroRef}>
+            <div className="hg-banner-bloom" aria-hidden="true" />
+            <div className="hg-banner-grid" aria-hidden="true">
+              {GRID_CELLS.map((c, i) => (
+                <span key={i} className="hg-banner-cell">
+                  {c && (
+                    <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
+                      {c.n}
+                      {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+            {COINS.map((n, i) => (
+              <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
+            ))}
+
             <div className="hg-lobby-header">
               <div className="hg-lobby-header-row">
                 <Image
