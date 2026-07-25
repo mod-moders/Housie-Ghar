@@ -104,6 +104,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
   const [welcomeTextVisible, setWelcomeTextVisible] = useState(false);
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
+  const [numberRevealed, setNumberRevealed] = useState(true);
   const activeCallIdRef = useRef(0);
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
@@ -227,6 +228,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     beep();
     addDrawn(num);       // set new number FIRST
     setRevealed(true);   // THEN reveal badge — no stale flash
+    setNumberRevealed(false);
     
     const currentCallId = ++activeCallIdRef.current;
     setNumberCallPlaying(true);
@@ -235,13 +237,22 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         setNumberCallPlaying(false);
       }
     });
-  }, [beep, addDrawn, playNumberCall]);
+
+    delay(() => {
+      if (activeCallIdRef.current === currentCallId) {
+        setNumberRevealed(true);
+      }
+    }, 6000);
+  }, [beep, addDrawn, playNumberCall, delay]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
     queued.forEach((num, i) => {
       const offset = i * 4500;
-      delay(() => setRevealed(false), offset);
+      delay(() => {
+        setRevealed(false);
+        setNumberRevealed(false);
+      }, offset);
       delay(() => revealDraw(num), offset + 4000);
     });
   }, [delay, revealDraw]);
@@ -535,6 +546,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
 
       // Step 1 — Cage spins, badge hidden
       setRevealed(false);
+      setNumberRevealed(false);
 
       // Step 2 — After 4 rolls (4s, ~1s/roll), show badge + play audio together (number set in same tick)
       delay(() => revealDraw(num), 4000);
@@ -691,9 +703,16 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }
   };
 
-  const drawn = new Set(drawnNumbers);
-  const count = drawnNumbers.length;
-  const recent = drawnNumbers.slice(Math.max(0, count - 9)).reverse();
+  const effectiveDrawnNumbers = useMemo(() => {
+    return numberRevealed ? drawnNumbers : drawnNumbers.slice(0, Math.max(0, drawnNumbers.length - 1));
+  }, [drawnNumbers, numberRevealed]);
+
+  const drawn = useMemo(() => new Set(effectiveDrawnNumbers), [effectiveDrawnNumbers]);
+  const count = effectiveDrawnNumbers.length;
+  const recent = useMemo(() => {
+    // If not revealed, exclude the last drawn from the recent list
+    return effectiveDrawnNumbers.slice(Math.max(0, count - 9)).reverse();
+  }, [effectiveDrawnNumbers, count]);
 
   return (
     <div className="hg-stage">
@@ -733,7 +752,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-live-sticky">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
-                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} compact={isNarrowViewport} />
+                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} numberRevealed={numberRevealed} muted={muted} compact={isNarrowViewport} />
                 
                 <div style={{ textAlign: "center", marginTop: isNarrowViewport ? "2px" : "6px", fontSize: isNarrowViewport ? "12px" : "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"
@@ -742,7 +761,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                       ? "Draw paused…"
                       : !revealed
                         ? "Spinning…"
-                        : count > 0 ? `Number ${lastDrawn} called` : "Waiting for the first call…"}
+                        : drawnNumbers.length > 0 ? (numberRevealed ? `Number ${lastDrawn} called` : `Drawing next number…`) : "Waiting for the first call…"}
                 </div>
                 {(gameStatus === "Completed" || gameStatus === "Draw_Ended") && !showWinnersOverlay && (
                   <button
@@ -803,7 +822,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 </div>
 
                 <div style={{ display: "flex", flexWrap: showAllCalled ? "wrap" : "nowrap", gap: "6px", justifyContent: "flex-start", alignItems: "center" }}>
-                  {(showAllCalled ? [...drawnNumbers].reverse() : recent).map((n, i) => {
+                  {(showAllCalled ? [...effectiveDrawnNumbers].reverse() : recent).map((n, i) => {
                     const isCurrent = i === 0 && !showAllCalled;
                     return (
                       <span 
@@ -832,7 +851,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                   {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
                     <span
                       key={n}
-                      className={`hg-b90${drawn.has(n) ? " is-called" : ""}${n === lastDrawn && revealed ? " is-current" : ""}`}
+                      className={`hg-b90${drawn.has(n) ? " is-called" : ""}${n === lastDrawn && revealed && numberRevealed ? " is-current" : ""}`}
                     >
                       {n}
                     </span>

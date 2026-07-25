@@ -1,7 +1,7 @@
 "use client";
 /** Operator sections: live HUD with draw controls + overflow failsafe queue. */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { useSSE, type SSEEventData } from "@/lib/hooks/useSSE";
@@ -52,11 +52,22 @@ export function OperatorHudSection() {
   
   const { drawnNumbers, lastDrawn, gameStatus, reset, addDrawn, elapsedMsAtSync, elapsedAt } = useGameStore();
   const [revealed, setRevealed] = useState(true);
+  const [numberRevealed, setNumberRevealed] = useState(true);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchedTickets, setSearchedTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showAllCalled, setShowAllCalled] = useState(false);
+
+  const effectiveDrawnNumbers = useMemo(() => {
+    return numberRevealed ? drawnNumbers : drawnNumbers.slice(0, Math.max(0, drawnNumbers.length - 1));
+  }, [drawnNumbers, numberRevealed]);
+
+  const drawn = useMemo(() => new Set(effectiveDrawnNumbers), [effectiveDrawnNumbers]);
+  const count = effectiveDrawnNumbers.length;
+  const recent = useMemo(() => {
+    return effectiveDrawnNumbers.slice(Math.max(0, count - 9)).reverse();
+  }, [effectiveDrawnNumbers, count]);
 
   const [muted, setMuted] = useState(false);
   const audioCtx = useRef<AudioContext | null>(null);
@@ -134,6 +145,7 @@ export function OperatorHudSection() {
     beep();
     addDrawn(num);
     setRevealed(true);
+    setNumberRevealed(false);
     
     const currentCallId = ++activeCallIdRef.current;
     setNumberCallPlaying(true);
@@ -142,13 +154,22 @@ export function OperatorHudSection() {
         setNumberCallPlaying(false);
       }
     });
-  }, [beep, addDrawn, playNumberCall]);
+
+    delay(() => {
+      if (activeCallIdRef.current === currentCallId) {
+        setNumberRevealed(true);
+      }
+    }, 6000);
+  }, [beep, addDrawn, playNumberCall, delay]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
     queued.forEach((num, i) => {
       const offset = i * 4500;
-      delay(() => setRevealed(false), offset);
+      delay(() => {
+        setRevealed(false);
+        setNumberRevealed(false);
+      }, offset);
       delay(() => revealDraw(num), offset + 4000);
     });
   }, [delay, revealDraw]);
@@ -177,6 +198,7 @@ export function OperatorHudSection() {
       }
 
       setRevealed(false);
+      setNumberRevealed(false);
       // 4 rolls (~1s/roll) before the cage stops and the number is called.
       delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
@@ -407,9 +429,6 @@ export function OperatorHudSection() {
   if (!game) return null;
 
   const status = gameStatus === "Scheduled" ? game.game_status : gameStatus;
-  const drawn = new Set(drawnNumbers);
-  const count = drawnNumbers.length;
-  const recent = drawnNumbers.slice(Math.max(0, count - 9)).reverse();
 
   return (
     <div className="hg-sec">
@@ -507,7 +526,7 @@ export function OperatorHudSection() {
         <div className="hg-live-left">
           {/* Cage + status */}
           <div className="hg-cage-area">
-            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} muted={muted} />
+            <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed} numberRevealed={numberRevealed} muted={muted} />
             
             <div style={{ textAlign: "center", marginTop: "6px", fontSize: "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
               {status === "Completed" || status === "Draw_Ended"
@@ -516,7 +535,7 @@ export function OperatorHudSection() {
                   ? "Draw paused…"
                   : !revealed
                     ? "Spinning…"
-                    : count > 0 ? `Number ${lastDrawn} called` : "Waiting for the first call…"}
+                    : drawnNumbers.length > 0 ? (numberRevealed ? `Number ${lastDrawn} called` : `Drawing next number…`) : "Waiting for the first call…"}
             </div>
           </div>
 
@@ -544,7 +563,7 @@ export function OperatorHudSection() {
             </div>
 
             <div style={{ display: "flex", flexWrap: showAllCalled ? "wrap" : "nowrap", gap: "6px", justifyContent: "flex-start", alignItems: "center" }}>
-              {(showAllCalled ? [...drawnNumbers].reverse() : recent).map((n, i) => {
+              {(showAllCalled ? [...effectiveDrawnNumbers].reverse() : recent).map((n, i) => {
                 const isCurrent = i === 0 && !showAllCalled;
                 return (
                   <span 
@@ -572,7 +591,7 @@ export function OperatorHudSection() {
               {Array.from({ length: 90 }, (_, i) => i + 1).map((n) => (
                 <span
                   key={n}
-                  className={`hg-b90${drawn.has(n) ? " is-called" : ""}${n === lastDrawn && revealed ? " is-current" : ""}`}
+                  className={`hg-b90${drawn.has(n) ? " is-called" : ""}${n === lastDrawn && revealed && numberRevealed ? " is-current" : ""}`}
                 >
                   {n}
                 </span>

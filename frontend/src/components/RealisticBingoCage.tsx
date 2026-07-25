@@ -217,12 +217,14 @@ function InnerBalls({ isSpinning, drawn }: { isSpinning: boolean; drawn: Set<num
 export function RealisticBingoCage({
   lastDrawn,
   isTeasing,
+  numberRevealed = true,
   drawn = new Set<number>(),
   compact = false,
   muted = false,
 }: {
   lastDrawn: number | null;
   isTeasing: boolean;
+  numberRevealed?: boolean;
   drawn?: Set<number>;
   compact?: boolean;
   muted?: boolean;
@@ -311,7 +313,7 @@ export function RealisticBingoCage({
             transition: "opacity 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.175,.885,.32,1.275)",
           }}
         >
-          {lastDrawn}
+          {numberRevealed ? lastDrawn : ""}
         </div>
       </div>
     </div>
