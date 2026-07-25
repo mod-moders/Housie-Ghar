@@ -242,7 +242,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       if (activeCallIdRef.current === currentCallId) {
         setNumberRevealed(true);
       }
-    }, 6000);
+    }, 4000);
   }, [beep, addDrawn, playNumberCall, delay]);
 
   const flushPendingDraws = useCallback(() => {

@@ -313,7 +313,16 @@ export function RealisticBingoCage({
             transition: "opacity 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.175,.885,.32,1.275)",
           }}
         >
-          {numberRevealed ? lastDrawn : ""}
+          <span
+            style={{
+              opacity: numberRevealed ? 1 : 0,
+              transform: numberRevealed ? "scale(1)" : "scale(0.8)",
+              transition: "opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)",
+              display: "inline-block",
+            }}
+          >
+            {lastDrawn}
+          </span>
         </div>
       </div>
     </div>
