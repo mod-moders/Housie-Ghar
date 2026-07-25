@@ -1,7 +1,7 @@
 "use client";
 /** Public lobby — full-screen banner with a rotating hook, then Live Now + Upcoming. */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import gsap from "gsap";
@@ -25,15 +25,6 @@ const GRID_CELLS: BannerCell[] = [
 
 // Scattered sticker coins (size/colour/position come from .hg-banner-coin--N in CSS).
 const COINS = [33, 7, 62, 88];
-
-// Rotated on the banner every 5s, starting from a random hook each page load.
-const HOOKS = [
-  "The whole town's playing — don't miss your number.",
-  "Mark your numbers. Match the call. Win the house.",
-  "Tambola night, every night — straight from the hills.",
-];
-
-const emptySubscribe = () => () => {};
 
 function formatWhen(iso: string): { date: string; time: string } {
   const d = new Date(iso);
@@ -194,22 +185,6 @@ export default function Lobby() {
   const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // The banner quote rotates through HOOKS every 5s. A client-only random start (via
-  // useSyncExternalStore: null on the server → no hydration mismatch) keeps the first
-  // quote fresh each visit; `step` advances on a timer; `key={step}` on the <p> replays
-  // the fade-in.
-  const startRef = useRef<number | null>(null);
-  const hookStart = useSyncExternalStore(
-    emptySubscribe,
-    () => (startRef.current ??= Math.floor(Math.random() * HOOKS.length)),
-    (): number | null => null,
-  );
-  const [hookStep, setHookStep] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setHookStep((s) => s + 1), 5000);
-    return () => clearInterval(id);
-  }, []);
-  const quote = hookStart === null ? "" : HOOKS[(hookStart + hookStep) % HOOKS.length];
 
   // Announcement ticker text, derived from config (muted/list/legacy single text).
   const textToScroll = useMemo(() => {
@@ -335,21 +310,6 @@ export default function Lobby() {
   const heroRef = useRef<HTMLDivElement>(null);
   const gamesPanelRef = useRef<HTMLDivElement>(null);
 
-  // A native `scrollIntoView({behavior:"smooth"})` gets fought (and cut short) by the
-  // hero's active ScrollTrigger pin listening on the same scroller — tweening scrollTop
-  // through GSAP itself keeps this in sync with that pin instead of racing it. Below
-  // 900px `.hg-frame` is the real scroller; at/above it, the document is (see globals.css).
-  const scrollToGames = () => {
-    const panel = gamesPanelRef.current;
-    if (!panel) return;
-    const frame = panel.closest(".hg-frame") as HTMLElement | null;
-    const frameScrolls = !!frame && frame.scrollHeight > frame.clientHeight;
-    const scroller: HTMLElement = frameScrolls ? frame! : (document.scrollingElement as HTMLElement);
-    const nav = (frame ?? document).querySelector(".hg-nav") as HTMLElement | null;
-    const navHeight = nav?.getBoundingClientRect().height ?? 0;
-    const target = scroller.scrollTop + panel.getBoundingClientRect().top - navHeight;
-    gsap.to(scroller, { scrollTop: Math.max(0, target), duration: 0.6, ease: "power2.out" });
-  };
 
   // Mobile-only "curtain" reveal: the games panel rises and covers the hero banner as the
   // user scrolls, then releases into normal scrolling once it fully covers it. The public
@@ -437,41 +397,38 @@ export default function Lobby() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--lobby">
-        <div className="hg-lobby-v2" ref={lobbyRef}>
-          {/* Game-night hero banner — bloom + ticket grid + fade + coins behind a logo/quote/CTA hook.
-              Covered by the games panel as it rises on scroll (mobile); the decorative layers live
-              inside the hero so they pin and get covered together with it, instead of scrolling past
-              it at the normal (uncovered) rate. */}
-          <section className="hg-lobby-hero hg-banner" ref={heroRef}>
-            <div className="hg-banner-bloom" aria-hidden="true" />
-            <div className="hg-banner-grid" aria-hidden="true">
-              {GRID_CELLS.map((c, i) => (
-                <span key={i} className="hg-banner-cell">
-                  {c && (
-                    <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
-                      {c.n}
-                      {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
-                    </span>
-                  )}
+        {/* Decorative background layers — bloom + grid + coins drifting in background */}
+        <div className="hg-banner-bloom" aria-hidden="true" />
+        <div className="hg-banner-grid" aria-hidden="true">
+          {GRID_CELLS.map((c, i) => (
+            <span key={i} className="hg-banner-cell">
+              {c && (
+                <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
+                  {c.n}
+                  {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
                 </span>
-              ))}
-            </div>
-            <div className="hg-banner-fade" aria-hidden="true" />
-            {COINS.map((n, i) => (
-              <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
-            ))}
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="hg-banner-fade" aria-hidden="true" />
+        {COINS.map((n, i) => (
+          <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
+        ))}
 
-            <div className="hg-banner-hook">
+        <div className="hg-lobby-v2" ref={lobbyRef}>
+          {/* Brand Welcome Header with Logo — covered by the games panel as it rises on scroll (mobile) */}
+          <div className="hg-lobby-hero" ref={heroRef}>
+            <div className="hg-lobby-header">
               <div className="hg-lobby-header-row">
-                <div className="hg-banner-logo">
-                  <Image
-                    src="/HG Secondary.png"
-                    alt="Housie Ghar"
-                    width={160}
-                    height={160}
-                    priority
-                  />
-                </div>
+                <Image
+                  src="/HG Secondary.png"
+                  alt="Housie Ghar"
+                  width={160}
+                  height={160}
+                  priority
+                  className="hg-lobby-logo"
+                />
                 {lucky && lucky.lucky_number !== null && (
                   <section
                     className="hg-lucky-wizard"
@@ -490,14 +447,9 @@ export default function Lobby() {
                   </section>
                 )}
               </div>
-              <p className="hg-banner-quote" key={hookStep}>{quote || " "}</p>
-              <div className="hg-banner-actions">
-                <button className="hg-banner-btn hg-banner-btn--primary" onClick={scrollToGames}>
-                  Browse games
-                </button>
-              </div>
+              <p className="hg-lobby-tagline">The entire town is playing! Are you?</p>
             </div>
-          </section>
+          </div>
 
           <div className="hg-games-panel" ref={gamesPanelRef}>
           {textToScroll && (

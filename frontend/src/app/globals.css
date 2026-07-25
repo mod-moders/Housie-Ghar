@@ -1201,7 +1201,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 /* ============ LOBBY v2 — BANNER (game-night hero) ============ */
 /* Fills the screen below the sticky nav (--nav-h). Layers back-to-front:
    ground → bloom → ticket grid → fade → coins → hook. */
-.hg-banner{
+.hg-banner,
+.hg-screen--lobby{
   --nav-h:70px;
   /* banner-local palette — dark defaults; [data-theme='light'] overrides at the end */
   --bn-ground:var(--bg);
@@ -1353,12 +1354,19 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 /* light theme — pastel bloom on a near-white ground, ink grid, sticker buttons */
 /* bright/light skins — pastel bloom on light background, matching fade overlay, high contrast quotes & buttons */
 .hg-root[data-theme='light'] .hg-banner,
+.hg-root[data-theme='light'] .hg-screen--lobby,
 .hg-root[data-theme='playful_kids'] .hg-banner,
+.hg-root[data-theme='playful_kids'] .hg-screen--lobby,
 .hg-root[data-theme='independence_day'] .hg-banner,
+.hg-root[data-theme='independence_day'] .hg-screen--lobby,
 .hg-root[data-theme='dashain'] .hg-banner,
+.hg-root[data-theme='dashain'] .hg-screen--lobby,
 .hg-root[data-theme='holi'] .hg-banner,
+.hg-root[data-theme='holi'] .hg-screen--lobby,
 .hg-root[data-theme='monastic_serenity'] .hg-banner,
-.hg-root[data-theme='cherry_blossom'] .hg-banner {
+.hg-root[data-theme='monastic_serenity'] .hg-screen--lobby,
+.hg-root[data-theme='cherry_blossom'] .hg-banner,
+.hg-root[data-theme='cherry_blossom'] .hg-screen--lobby {
   --bn-ground: var(--bg);
   --bn-bloom-y: rgba(255, 204, 128, 0.22);
   --bn-bloom-o: rgba(255, 171, 64, 0.2);
