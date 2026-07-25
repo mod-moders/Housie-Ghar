@@ -26,7 +26,7 @@ export function PlayerReferralCard() {
   const [data, setData] = useState<PlayerRewards | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [showAllReferees, setShowAllReferees] = useState(false);
+  const [activeTab, setActiveTab] = useState<"playing" | "waiting" | null>(null);
 
   const load = useCallback(() => {
     apiFetch<PlayerRewards>("/api/rewards/player")
@@ -147,27 +147,42 @@ export function PlayerReferralCard() {
       {/* Standing */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
         {[
-          { label: "Free tickets", value: data.credits_available, accent: true },
-          { label: "Friends playing", value: data.qualified_referrals, accent: false },
-          { label: "Waiting", value: data.pending_referrals, accent: false },
-        ].map((s) => (
-          <div
-            key={s.label}
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border-light)",
-              borderRadius: 10,
-              padding: "12px",
-              textAlign: "center",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ fontSize: 20, fontWeight: 800, color: s.accent ? "var(--accent)" : "var(--text)" }}>
-              {s.value}
+          { label: "Free tickets", value: data.credits_available, accent: true, key: "free", clickable: false },
+          { label: "Friends playing", value: data.qualified_referrals, accent: false, key: "playing", clickable: true },
+          { label: "Waiting", value: data.pending_referrals, accent: false, key: "waiting", clickable: true },
+        ].map((s) => {
+          const isActive = activeTab === s.key;
+          return (
+            <div
+              key={s.label}
+              onClick={s.clickable ? () => setActiveTab(activeTab === s.key ? null : s.key as "playing" | "waiting") : undefined}
+              style={{
+                background: isActive ? "var(--surface-3)" : "var(--surface-2)",
+                border: isActive ? "1px solid var(--accent)" : "1px solid var(--border-light)",
+                borderRadius: 10,
+                padding: "12px",
+                textAlign: "center",
+                minWidth: 0,
+                cursor: s.clickable ? "pointer" : "default",
+                transition: "all 0.2s ease",
+                transform: isActive ? "scale(0.97)" : "none",
+                boxShadow: isActive ? "0 0 12px rgba(212, 175, 55, 0.15)" : "none",
+              }}
+            >
+              <div style={{ fontSize: 20, fontWeight: 800, color: s.accent || isActive ? "var(--accent)" : "var(--text)" }}>
+                {s.value}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                {s.label}
+                {s.clickable && (
+                  <span style={{ fontSize: 9, opacity: 0.6, transition: "transform 0.2s ease", transform: isActive ? "rotate(180deg)" : "none" }}>
+                    ▼
+                  </span>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Ladder progress — one continuous thick bar from 0 up to the top rung,
@@ -226,59 +241,69 @@ export function PlayerReferralCard() {
         </div>
       </div>
 
-      {/* Who you brought in */}
-      {data.referees.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Friends you invited</div>
-          {(showAllReferees ? data.referees : data.referees.slice(0, 8)).map((r) => (
-            <div
-              key={r.housie_name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                background: "var(--surface-2)",
-                border: "1px solid var(--border-light)",
-                borderRadius: 10,
-                padding: "10px 12px",
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {r.housie_name}
-              </span>
-              <span
-                style={{
-                  flexShrink: 0,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  borderRadius: 999,
-                  padding: "3px 10px",
-                  color: r.qualified ? "var(--success)" : "var(--text-dim)",
-                  background: r.qualified ? "var(--success-soft)" : "transparent",
-                  border: `1px solid ${r.qualified ? "var(--success)" : "var(--border-light)"}`,
-                }}
-              >
-                {r.qualified ? "Playing" : "Not booked yet"}
-              </span>
+      {/* Who you brought in (Toggled Dropdown) */}
+      {activeTab && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px solid var(--border-light)", paddingTop: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+              {activeTab === "playing" ? "Friends playing" : "Friends waiting to join"}
             </div>
-          ))}
-          {data.referees.length > 8 && (
             <button
-              onClick={() => setShowAllReferees((v) => !v)}
+              onClick={() => setActiveTab(null)}
               style={{
-                alignSelf: "flex-start",
                 background: "none",
                 border: "none",
-                padding: 0,
+                color: "var(--text-dim)",
                 fontSize: 11,
-                fontWeight: 700,
-                color: "var(--accent)",
                 cursor: "pointer",
+                padding: "2px 6px",
               }}
             >
-              {showAllReferees ? "Show less" : `+${data.referees.length - 8} more`}
+              Close
             </button>
+          </div>
+          {data.referees.filter(r => activeTab === "playing" ? r.qualified : !r.qualified).length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--text-dim)", padding: "4px 0" }}>
+              {activeTab === "playing"
+                ? "No friends playing yet. Share your invite link to get started!"
+                : "No pending invites. Everyone has joined!"}
+            </div>
+          ) : (
+            data.referees
+              .filter(r => activeTab === "playing" ? r.qualified : !r.qualified)
+              .map((r) => (
+                <div
+                  key={r.housie_name}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {r.housie_name}
+                  </span>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      borderRadius: 999,
+                      padding: "3px 10px",
+                      color: r.qualified ? "var(--success)" : "var(--text-dim)",
+                      background: r.qualified ? "var(--success-soft)" : "transparent",
+                      border: `1px solid ${r.qualified ? "var(--success)" : "var(--border-light)"}`,
+                    }}
+                  >
+                    {r.qualified ? "Playing" : "Not booked yet"}
+                  </span>
+                </div>
+              ))
           )}
         </div>
       )}
