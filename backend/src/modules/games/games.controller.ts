@@ -1034,11 +1034,29 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
     return;
   }
 
+  let avatar_url: string | null = null;
+  try {
+    if (playerToken) {
+      const pRes = await pool.query('SELECT avatar_url FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [resolvedName]);
+      if (pRes.rows && pRes.rows.length > 0) {
+        avatar_url = pRes.rows[0].avatar_url;
+      }
+    } else {
+      const uRes = await pool.query('SELECT avatar_url FROM Users WHERE LOWER(TRIM(full_name)) = LOWER(TRIM($1))', [resolvedName]);
+      if (uRes.rows && uRes.rows.length > 0) {
+        avatar_url = uRes.rows[0].avatar_url;
+      }
+    }
+  } catch (err) {
+    console.error("Error querying sender avatar_url:", err);
+  }
+
   // Broadcast to all SSE clients listening to this game
   sseManager.broadcast(game_id, {
     event: 'emoji_reaction',
     emoji,
     player_id: resolvedName,
+    avatar_url: avatar_url || null,
   });
 
   res.json({ success: true });

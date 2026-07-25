@@ -309,6 +309,18 @@ async function processNextDraw(gameId: string): Promise<void> {
     // There are winner(s) on this tick!
     // Broadcast win announcements
     for (const win of winners) {
+      let avatarUrl: string | null = null;
+      if (win.housieName && !win.housieName.includes(',')) {
+        try {
+          const pRes = await pool.query('SELECT avatar_url FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [win.housieName]);
+          if (pRes.rows && pRes.rows.length > 0) {
+            avatarUrl = pRes.rows[0].avatar_url;
+          }
+        } catch (err) {
+          console.error("Failed to fetch winner avatar_url:", err);
+        }
+      }
+
       const winnerEvent = {
         event: 'winner' as const,
         prize: win.patternName,
@@ -317,6 +329,7 @@ async function processNextDraw(gameId: string): Promise<void> {
         winner_ticket_number: win.ticketNumber,
         amount: win.amountPerWinner,
         split_count: win.splitCount,
+        avatar_url: avatarUrl || null,
       };
       await publishGameEvent(gameId, winnerEvent);
     }

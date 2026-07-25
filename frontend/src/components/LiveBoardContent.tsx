@@ -32,29 +32,30 @@ interface WinOverlay {
   ticket_id: number;
   winner_ticket_number?: number;
   amount: number;
+  avatar_url?: string | null;
 }
 
 interface FloatingReaction {
   id: number;
   emoji: string;
   senderName: string;
+  avatarUrl?: string | null;
   x: number;
 }
 
 // Startup choreography, expressed in GAME time (ms since the operator hit Start),
 // not in page time. FIRST_DRAW_AT_MS must stay in step with gameEngine.ts's
-// `initialDelay` (53000 for a fresh game) — that is when the backend actually
-// draws the first number.
+// Conductor initial delay.
 const WELCOME_IN_MS = 10000;
 const WELCOME_OUT_MS = 20000;
 const INTRO_AT_MS = 30000;
 const FIRST_DRAW_AT_MS = 53000;
 
 let reactionSeq = 0;
-function makeReaction(emoji: string, senderName: string): FloatingReaction {
+function makeReaction(emoji: string, senderName: string, avatarUrl?: string | null): FloatingReaction {
   reactionSeq += 1;
   // Center reactions over the live board/HUD screen (between 35% and 65% with random drift)
-  return { id: reactionSeq, emoji, senderName, x: 50 + (Math.random() - 0.5) * 30 };
+  return { id: reactionSeq, emoji, senderName, avatarUrl, x: 50 + (Math.random() - 0.5) * 30 };
 }
 
 export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; isStaff?: boolean; onBack?: () => void }) {
@@ -587,7 +588,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         isLastPrize
       };
     } else if (data.event === "emoji_reaction") {
-      const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player");
+      const next = makeReaction(data.emoji as string, (data.player_id as string) || "Player", data.avatar_url as string | null);
       setReactions((r) => [...r, next]);
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
@@ -1017,7 +1018,22 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 className="hg-react-float hg-react-pill"
                 style={{ left: `${r.x}%` }}
               >
-                <span className="hg-react-avatar">{r.senderName.slice(0, 2).toUpperCase()}</span>
+                {r.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.avatarUrl}
+                    alt={r.senderName}
+                    style={{
+                      width: "24px",
+                      height: "24px",
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <span className="hg-react-avatar">{r.senderName.slice(0, 2).toUpperCase()}</span>
+                )}
                 <span className="hg-react-name">{r.senderName}</span>
                 <span className="hg-react-emoji">{r.emoji}</span>
               </div>
@@ -1035,7 +1051,43 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                     <span key={i} style={{ "--i": i } as React.CSSProperties} />
                   ))}
                 </div>
-                <div className="hg-win-card">
+                <div className="hg-win-card" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  {winOverlay.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={winOverlay.avatar_url}
+                      alt={winOverlay.housie_name}
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "50%",
+                        border: "3px solid var(--accent)",
+                        marginBottom: "12px",
+                        objectFit: "cover",
+                        boxShadow: "0 0 20px rgba(212, 175, 55, 0.4)",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "50%",
+                        background: "var(--accent-gradient)",
+                        color: "#000",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "24px",
+                        fontWeight: "bold",
+                        border: "3px solid var(--accent)",
+                        marginBottom: "12px",
+                        boxShadow: "0 0 20px rgba(212, 175, 55, 0.4)",
+                      }}
+                    >
+                      {winOverlay.housie_name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div className="hg-win-label">{winOverlay.prize}!</div>
                   <div className="hg-win-name">{winOverlay.housie_name}</div>
                   <div className="hg-win-sub">{money(winOverlay.amount)}</div>

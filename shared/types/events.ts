@@ -21,6 +21,7 @@ export interface WinnerEvent {
   ticket_id: number;
   amount: number;
   split_count: number;
+  avatar_url?: string | null;
 }
 
 export interface GamePausedEvent {
@@ -58,6 +59,7 @@ export interface EmojiReactionEvent {
   event: 'emoji_reaction';
   emoji: string;
   player_id: string;
+  avatar_url?: string | null;
 }
 
 export type SSEEvent =
