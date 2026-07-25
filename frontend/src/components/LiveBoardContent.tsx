@@ -750,7 +750,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               <div className="hg-live-sticky">
               {/* Cage + status — outside the card on desktop */}
               <div className="hg-cage-area">
-                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed && (gameStatus === "Live" || gameStatus === "Paused" || !numberRevealed)} numberRevealed={numberRevealed} muted={muted} compact={isNarrowViewport} />
+                <RealisticBingoCage lastDrawn={lastDrawn ?? null} isTeasing={!revealed && (gameStatus === "Live" || gameStatus === "Paused")} numberRevealed={numberRevealed} muted={muted} compact={isNarrowViewport} />
                 
                 <div style={{ textAlign: "center", marginTop: isNarrowViewport ? "2px" : "6px", fontSize: isNarrowViewport ? "12px" : "13px", fontWeight: 600, color: !revealed ? "var(--text-dim)" : "var(--cyan)", letterSpacing: "0.5px" }}>
                   {gameStatus === "Completed" || gameStatus === "Draw_Ended"
