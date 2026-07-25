@@ -279,7 +279,7 @@ export async function qualifyReferralOnFirstSale(
   const claimed = await client.query(
     `UPDATE Players
         SET referral_qualified_at = NOW()
-      WHERE housie_name = $1
+      WHERE LOWER(TRIM(housie_name)) = LOWER($1)
         AND referral_qualified_at IS NULL
         AND referred_by IS NOT NULL
       RETURNING referred_by`,
@@ -354,7 +354,7 @@ export async function redeemPlayerCredit(
 
   const res = await client.query(
     `SELECT player_id, qualified_referrals, reward_credits_redeemed
-       FROM Players WHERE housie_name = $1 FOR UPDATE`,
+       FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1) FOR UPDATE`,
     [housieName.trim()]
   );
   if (res.rows.length === 0) return none;
@@ -398,7 +398,7 @@ export async function refundPlayerCreditForBooking(
   await client.query(
     `UPDATE Players
         SET reward_credits_redeemed = GREATEST(reward_credits_redeemed - 1, 0)
-      WHERE housie_name = $1`,
+      WHERE LOWER(TRIM(housie_name)) = LOWER($1)`,
     [released.rows[0].housie_name]
   );
 

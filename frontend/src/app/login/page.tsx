@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { getDeviceId } from "@/lib/deviceId";
 import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
 export default function Login() {
@@ -51,6 +52,7 @@ export default function Login() {
         body: JSON.stringify({
           housie_name: housieName,
           password: passwordRequired ? password : undefined,
+          device_id: getDeviceId(),
         }),
       });
 
@@ -61,10 +63,18 @@ export default function Login() {
       // Redirect to lobby
       router.push("/");
     } catch (err) {
-      const e = err as { password_required?: boolean; message?: string };
+      const e = err as { password_required?: boolean; new_device?: boolean; message?: string };
       if (e.password_required) {
         setPasswordRequired(true);
         setError("This account is secured. Please enter your password.");
+      } else if (e.new_device) {
+        // Passwordless account being signed into from a device it has never
+        // been seen on. Show the server's guidance verbatim; offering the
+        // password field here would be misleading, the account has no password.
+        setError(
+          e.message ||
+            "This account is already active on another device. Open Housie Ghar on your usual device and set a password under Profile to sign in here."
+        );
       } else {
         setError(e.message || "Housie Name not found. Check spelling or sign up.");
       }

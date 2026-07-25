@@ -99,6 +99,31 @@ const loginLimiter = rateLimit({
 });
 app.use('/api/auth/login', loginLimiter);
 
+// 4c. Player auth limiter. The staff limiter above only covered /api/auth/login,
+// so player sign-in fell back to the shared 1200/min global limiter — enough
+// headroom to enumerate housie names or grind a player's password. Failed
+// attempts only, so a normal sign-in is never throttled.
+const playerAuthLimiter = rateLimit({
+  windowMs: env.LOCK_DURATION_MINUTES * 60 * 1000,
+  max: env.MAX_LOCK_ATTEMPTS_PER_MINUTE,
+  skipSuccessfulRequests: true,
+  message: { message: 'Too many failed attempts. Please wait a few minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/player/login', playerAuthLimiter);
+
+// Signup counts SUCCESSFUL requests too — the abuse here is bulk account
+// creation (squatting housie names), not guessing a credential.
+const signupLimiter = rateLimit({
+  windowMs: CONSTANTS.RATE_LIMIT_WINDOW_MS,
+  max: 10,
+  message: { message: 'Too many sign-up attempts. Please wait a minute and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/player/signup', signupLimiter);
+
 import path from 'path';
 import fs from 'fs';
 

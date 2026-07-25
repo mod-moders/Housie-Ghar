@@ -59,8 +59,15 @@ export async function authenticateToken(
   // status gate and has no effect on Active accounts. NOTE: temp_password_required
   // is deliberately NOT enforced here — the frontend has no forced-change-password
   // flow, so gating on it would break the dashboard for temp-flagged users.
+  let liveRoleName: RoleName;
   try {
-    const result = await pool.query('SELECT status FROM Users WHERE user_id = $1', [decoded.userId]);
+    const result = await pool.query(
+      `SELECT u.status, r.role_name
+         FROM Users u
+         JOIN Roles r ON r.role_id = u.role_id
+        WHERE u.user_id = $1`,
+      [decoded.userId]
+    );
     if (result.rowCount === 0) {
       res.status(403).json({ message: 'Account no longer exists. Please log in again.' });
       return;
@@ -69,6 +76,12 @@ export async function authenticateToken(
       res.status(403).json({ message: 'Account is suspended. Contact admin.' });
       return;
     }
+    // Authorize against the role in the DB, never the one baked into the token.
+    // Tokens are signed with a 10-year expiry, so trusting the JWT's roleName
+    // meant demoting a Superadmin to Operator changed nothing until they
+    // happened to log out — their old token kept full privileges, including
+    // POST /api/config/reset-database.
+    liveRoleName = result.rows[0].role_name as RoleName;
   } catch (error) {
     console.error('Account status check failed:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -77,7 +90,7 @@ export async function authenticateToken(
 
   req.user = {
     userId: decoded.userId,
-    roleName: decoded.roleName,
+    roleName: liveRoleName,
     fullName: decoded.fullName,
     email: decoded.email,
   };

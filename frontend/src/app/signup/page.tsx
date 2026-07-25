@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { getDeviceId } from "@/lib/deviceId";
 import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
 export default function SignUp() {
@@ -69,6 +70,9 @@ export default function SignUp() {
           housie_name: housieName,
           ref_promoter_id: refId,
           referral_code: referralCode.trim() || undefined,
+          // Binds the new passwordless account to this browser, so a stranger
+          // who reads this housie name off the leaderboard can't sign in as them.
+          device_id: getDeviceId(),
         }),
       });
 

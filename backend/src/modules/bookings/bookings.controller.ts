@@ -3,9 +3,12 @@
  */
 
 import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import pool from '../../db';
+import { env } from '../../config/env';
 import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { validateHousieName, normalizeHousieName } from '../../utils/housieName';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
 import {
@@ -19,6 +22,27 @@ import {
 } from '../../services/loyalty';
 
 /**
+ * Read and verify an optional player bearer token. Returns the token's housie
+ * name, or null when absent/invalid. Never throws — callers decide whether an
+ * unauthenticated request is acceptable for what they're about to do.
+ */
+function readPlayerIdentity(req: Request): { playerId: string; housieName: string } | null {
+  let token: string | null = null;
+  const authHeader = req.headers['authorization'] as string | undefined;
+  if (authHeader?.startsWith('Bearer ')) token = authHeader.substring(7);
+  if (!token) token = (req as any).cookies?.hg_player_token ?? null;
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
+    if (!decoded?.playerId || !decoded?.housieName) return null;
+    return { playerId: decoded.playerId, housieName: decoded.housieName };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Lock tickets and initiate the WhatsApp P2P workflow
  */
 export async function lockTickets(req: Request, res: Response): Promise<void> {
@@ -30,20 +54,54 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (housie_name.length < 3 || housie_name.length > 20) {
+  const cleanBookingName = String(housie_name).trim().replace(/\s+/g, ' ');
+  const identity = readPlayerIdentity(req);
+
+  if (cleanBookingName.length < 3 || cleanBookingName.length > 20) {
     res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
     return;
   }
 
-  // Check if player is suspended
+  // This route is intentionally not behind `authenticatePlayer` — but it takes
+  // the housie name from the request body, which meant anyone could book (and,
+  // via redeem_credit below, spend reward credits) in another player's name.
+  // Rule: a name that belongs to a registered account may only be used by that
+  // account. Unregistered names stay open so the anonymous path still works.
+  let bookingPlayer: { player_id: string; status: string } | null = null;
   try {
-    const playerCheck = await pool.query('SELECT status FROM Players WHERE housie_name = $1', [housie_name.trim()]);
-    if (playerCheck.rows.length > 0 && playerCheck.rows[0].status === 'Suspended') {
+    const playerCheck = await pool.query(
+      'SELECT player_id, status FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)',
+      [cleanBookingName]
+    );
+    bookingPlayer = playerCheck.rows[0] ?? null;
+  } catch (err) {
+    console.error('Error looking up booking player:', err);
+    res.status(500).json({ message: 'Internal server error' });
+    return;
+  }
+
+  if (!bookingPlayer) {
+    // Unregistered name: apply the full charset rules so a booking can't
+    // introduce a name that would corrupt the winner string later. Registered
+    // players skip this — accounts created before the rules existed may hold a
+    // legacy name, and blocking them from booking would be a worse regression
+    // than the parsing risk (their identity is already proven by the token).
+    const nameCheck = validateHousieName(cleanBookingName);
+    if (!nameCheck.ok) {
+      res.status(400).json({ message: nameCheck.error });
+      return;
+    }
+  } else {
+    if (bookingPlayer.status === 'Suspended') {
       res.status(403).json({ message: 'Your account has been suspended. Ticket booking is disabled.' });
       return;
     }
-  } catch (err) {
-    console.error('Error checking player suspension status:', err);
+    if (!identity || normalizeHousieName(identity.housieName) !== normalizeHousieName(cleanBookingName)) {
+      res.status(401).json({
+        message: 'Please log in as this Housie Name to book tickets under it.',
+      });
+      return;
+    }
   }
 
   const client = await pool.connect();
@@ -89,8 +147,12 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     const loyaltyCfg = await getLoyaltyConfig(client);
     let playerWaived = 0;
     let redeemingPlayerId: string | null = null;
-    if (req.body?.redeem_credit === true && loyaltyCfg.enabled) {
-      const r = await redeemPlayerCredit(client, housie_name, ticketPrice, loyaltyCfg);
+    // Redeeming a credit spends a balance that belongs to a specific player, so
+    // it requires that player's own token — not just their name in the body.
+    const mayRedeem =
+      !!identity && normalizeHousieName(identity.housieName) === normalizeHousieName(cleanBookingName);
+    if (req.body?.redeem_credit === true && loyaltyCfg.enabled && mayRedeem) {
+      const r = await redeemPlayerCredit(client, cleanBookingName, ticketPrice, loyaltyCfg);
       playerWaived = r.amountWaived;
       redeemingPlayerId = r.playerId;
     }

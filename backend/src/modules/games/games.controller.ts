@@ -13,6 +13,11 @@ import { generateTicketsForGame } from '../../db/generateGameTickets';
 import { logAuditEvent } from '../../services/audit.service';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import {
+  normalizeHousieName,
+  parseWinnerNames,
+  winnerStringIncludes,
+} from '../../utils/housieName';
+import {
   startGame,
   pauseGame,
   resumeGame,
@@ -1397,12 +1402,14 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
       [game_id]
     );
 
-    const myWonPrizes = prizesRes.rows.filter(p => {
-      if (!p.winner_housie_name) return false;
-      const lowerWinner = p.winner_housie_name.toLowerCase();
-      const lowerPlayer = playerHousieName.toLowerCase();
-      return lowerWinner === lowerPlayer || lowerWinner.split(/[,&()]/).map((s: string) => s.trim().toLowerCase()).includes(lowerPlayer);
-    });
+    // Match through the shared winner-string parser. The previous inline split
+    // on /[,&()]/ also produced the TICKET NUMBERS as candidate "names", so a
+    // player whose name normalized to a bare number could match a stranger's
+    // prize; and it compared against a differently-normalized player name than
+    // the payout expansion below used.
+    const myWonPrizes = prizesRes.rows.filter((p) =>
+      winnerStringIncludes(p.winner_housie_name, playerHousieName)
+    );
 
     if (myWonPrizes.length === 0) {
       res.status(400).json({ message: 'No unclaimed prizes found for you in this game' });
@@ -1429,32 +1436,43 @@ export async function claimAllPrizes(req: Request, res: Response): Promise<void>
 
     // Preserve chronological draw win order, combine multi-ticket wins for same player (e.g. NRPS winning Full House on Tk #4 & #5 -> ₹800)
     const expandedPrizes: Array<{ pattern_name: string; amount: number; ticket_label?: string }> = [];
-    const lowerPlayer = playerHousieName.toLowerCase();
+    const normalizedPlayer = normalizeHousieName(playerHousieName);
 
     for (const p of myWonPrizes) {
-      const rawName = p.winner_housie_name || "";
       const baseAmt = parseFloat(p.amount_per_winner ?? p.prize_amount);
       const fallbackTk = p.winner_ticket_number ? parseInt(p.winner_ticket_number, 10) : undefined;
-      const segments = rawName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
 
-      let foundEntry = false;
-      for (const seg of segments) {
-        const match = seg.match(/^([^(]+)(?:\(([^)]+)\))?/);
-        if (match) {
-          const pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim().toLowerCase();
-          if (pName === lowerPlayer) {
-            foundEntry = true;
-            const tksStr = match[2];
-            const tks = tksStr ? (tksStr.match(/\d+/g) || []) : [];
-            const ticketNums = tks.length > 0 ? tks.map((n: string) => parseInt(n, 10)) : (fallbackTk ? [fallbackTk] : []);
-            const ticketCount = ticketNums.length > 0 ? ticketNums.length : 1;
-            const tkLabel = ticketNums.length > 0 ? ticketNums.map((t: number, i: number) => (i === 0 ? `${t}` : `#${t}`)).join(' & ') : (fallbackTk ? `${fallbackTk}` : '');
-            expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt * ticketCount, ticket_label: tkLabel });
-          }
-        }
+      // `amount_per_winner` is the prize divided by the number of winning
+      // TICKETS, so a player holding several of them is owed one share per
+      // ticket. The old inline parser stripped punctuation from the stored name
+      // but not from the player's, so anyone with a '.' or apostrophe in their
+      // name silently fell through to the single-share fallback.
+      const mySegments = parseWinnerNames(p.winner_housie_name).filter(
+        (s) => s.normalized === normalizedPlayer
+      );
+
+      if (mySegments.length === 0) {
+        expandedPrizes.push({
+          pattern_name: p.pattern_name,
+          amount: baseAmt,
+          ticket_label: fallbackTk ? `${fallbackTk}` : '',
+        });
+        continue;
       }
-      if (!foundEntry) {
-        expandedPrizes.push({ pattern_name: p.pattern_name, amount: baseAmt, ticket_label: fallbackTk ? `${fallbackTk}` : '' });
+
+      for (const seg of mySegments) {
+        const ticketNums = seg.ticketNumbers.length > 0
+          ? seg.ticketNumbers
+          : (fallbackTk ? [fallbackTk] : []);
+        const ticketCount = Math.max(1, ticketNums.length);
+        const tkLabel = ticketNums
+          .map((t: number, i: number) => (i === 0 ? `${t}` : `#${t}`))
+          .join(' & ');
+        expandedPrizes.push({
+          pattern_name: p.pattern_name,
+          amount: baseAmt * ticketCount,
+          ticket_label: tkLabel,
+        });
       }
     }
 

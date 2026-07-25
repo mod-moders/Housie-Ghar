@@ -3,26 +3,33 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import pool from '../../db';
 import { env } from '../../config/env';
+import { validateHousieName } from '../../utils/housieName';
+import { registerDevice, checkDevice } from '../../services/playerDevices';
 
 export async function signup(req: Request, res: Response): Promise<void> {
-  const { full_name, housie_name, ref_promoter_id, referral_code } = req.body;
+  const { full_name, housie_name, ref_promoter_id, referral_code, device_id } = req.body;
 
-  if (!housie_name) {
-    res.status(400).json({ message: 'Housie name is required' });
+  // Charset rules matter beyond cosmetics: a name containing & ( ) or a comma
+  // corrupts the `winner_housie_name` grammar used by prize claims, so one
+  // player's winnings could be matched to another player's name.
+  const nameCheck = validateHousieName(housie_name);
+  if (!nameCheck.ok) {
+    res.status(400).json({ message: nameCheck.error });
     return;
   }
 
-  const cleanHousieName = housie_name.trim();
+  const cleanHousieName = housie_name.trim().replace(/\s+/g, ' ');
   const cleanFullName = full_name ? full_name.trim() : null;
 
-  if (cleanHousieName.length < 3 || cleanHousieName.length > 20) {
-    res.status(400).json({ message: 'Housie name must be between 3 and 20 characters' });
-    return;
-  }
-
   try {
-    // 1. Check uniqueness in Players
-    const checkPlayer = await pool.query('SELECT player_id FROM Players WHERE housie_name = $1', [cleanHousieName]);
+    // 1. Check uniqueness CASE-INSENSITIVELY. A raw `=` comparison let
+    //    'RajaBabu' and 'rajababu' coexist while every downstream consumer
+    //    (prize claims, leaderboard, stats) compares lowercased — so the
+    //    case variant could claim the original's prizes.
+    const checkPlayer = await pool.query(
+      'SELECT player_id FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)',
+      [cleanHousieName]
+    );
     if ((checkPlayer.rowCount ?? 0) > 0) {
       res.status(409).json({ message: 'Housie name is already taken. Please choose another one.' });
       return;
@@ -50,6 +57,16 @@ export async function signup(req: Request, res: Response): Promise<void> {
     );
 
     const player = result.rows[0];
+
+    // 2b. Bind this browser to the new account. Because signup is passwordless,
+    // this device becomes the account's proof of ownership until the player
+    // sets a password. Failing to register must not fail the signup — worst
+    // case the next login on this device takes the trust-on-first-use path.
+    try {
+      await registerDevice(player.player_id, device_id, req.headers['user-agent']);
+    } catch (err) {
+      console.error('Failed to register signup device:', err);
+    }
 
     // 3. Check for promoter referral linkage
     if (ref_promoter_id) {
@@ -91,19 +108,20 @@ export async function signup(req: Request, res: Response): Promise<void> {
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
-  const { housie_name, password } = req.body;
+  const { housie_name, password, device_id } = req.body;
 
   if (!housie_name) {
     res.status(400).json({ message: 'Housie name is required' });
     return;
   }
 
-  const cleanHousieName = housie_name.trim();
+  const cleanHousieName = String(housie_name).trim().replace(/\s+/g, ' ');
 
   try {
-    // 1. Fetch player
+    // 1. Fetch player. Case-insensitive so a login matches the same row the
+    //    case-insensitive uniqueness check protects at signup.
     const result = await pool.query(
-      'SELECT player_id, player_code, full_name, housie_name, password_hash, status FROM Players WHERE housie_name = $1',
+      'SELECT player_id, player_code, full_name, housie_name, password_hash, status FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)',
       [cleanHousieName]
     );
 
@@ -119,7 +137,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // If password is set in DB, check for it
+    // A password, when set, is sufficient on its own from any device.
     if (player.password_hash) {
       if (!password) {
         res.status(401).json({ message: 'Password required', password_required: true });
@@ -130,6 +148,32 @@ export async function login(req: Request, res: Response): Promise<void> {
         res.status(401).json({ message: 'Invalid password' });
         return;
       }
+    } else {
+      // No password set. Housie names are public — they're on the leaderboard,
+      // the live board and the ticket search — so the name alone must not be
+      // enough to sign in. Require a device this account has been seen on.
+      //
+      // `firstEver` is trust-on-first-use: accounts that predate this check have
+      // no registered devices, and locking them all out on launch day would be
+      // worse than the residual risk. The first device to log in claims the
+      // account and every later device is gated.
+      const device = await checkDevice(player.player_id, device_id);
+
+      if (!device.known && !device.firstEver) {
+        res.status(401).json({
+          message:
+            'This account is already active on another device. Open Housie Ghar on your usual device and set a password under Profile to sign in here.',
+          new_device: true,
+        });
+        return;
+      }
+    }
+
+    // Refresh/record the device so the account stays bound to what it's used on.
+    try {
+      await registerDevice(player.player_id, device_id, req.headers['user-agent']);
+    } catch (err) {
+      console.error('Failed to register login device:', err);
     }
 
     // 2. Sign JWT
@@ -209,22 +253,56 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
       }
     }
 
-    const result = await pool.query(
-      `UPDATE Players 
-       SET full_name = COALESCE($1, full_name),
-           phone = $2,
-           email = $3,
-           theme_preference = $4,
-           sound_enabled = COALESCE($5, sound_enabled),
-           password_hash = CASE WHEN $6 = TRUE THEN $7 ELSE password_hash END,
-           avatar_url = COALESCE($8, avatar_url)
-       WHERE player_id = $9
-       RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password`,
-      [full_name, phone, email, theme_preference, sound_enabled, shouldUpdatePassword, passwordHashUpdate, avatar_url, req.player.playerId]
-    );
+    // Only touch fields the request actually carried. `phone`, `email` and
+    // `theme_preference` used to be assigned unconditionally, so any partial
+    // PATCH silently nulled them — the frontend never sends theme_preference,
+    // so every profile save was wiping it. Explicitly sending null still
+    // clears a field, which is how the UI lets a player remove their phone.
+    const sets: string[] = [];
+    const params: any[] = [];
+    const setField = (column: string, value: any) => {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    };
+
+    if (full_name !== undefined) setField('full_name', full_name);
+    if (phone !== undefined) setField('phone', phone);
+    if (email !== undefined) setField('email', email);
+    if (theme_preference !== undefined) setField('theme_preference', theme_preference);
+    if (sound_enabled !== undefined) setField('sound_enabled', sound_enabled);
+    if (avatar_url !== undefined) setField('avatar_url', avatar_url);
+    if (shouldUpdatePassword) setField('password_hash', passwordHashUpdate);
+
+    const returning = `RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password`;
+
+    params.push(req.player.playerId);
+    const result = sets.length
+      ? await pool.query(
+          `UPDATE Players SET ${sets.join(', ')} WHERE player_id = $${params.length} ${returning}`,
+          params
+        )
+      : await pool.query(
+          `SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password
+           FROM Players WHERE player_id = $1`,
+          [req.player.playerId]
+        );
 
     res.json({ player: result.rows[0], message: 'Profile updated successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    // Migration 046 added a partial UNIQUE index on Players(phone). Two players
+    // entering the same number (a shared family phone is common here) otherwise
+    // surfaced as a bare 500 with no explanation on the profile page.
+    if (error?.code === '23505') {
+      const constraint = String(error?.constraint ?? '');
+      if (constraint.includes('phone')) {
+        res.status(409).json({
+          message: 'That phone number is already linked to another Housie Ghar account.',
+        });
+        return;
+      }
+      res.status(409).json({ message: 'That value is already in use on another account.' });
+      return;
+    }
     console.error('Error updating player profile:', error);
     res.status(500).json({ message: 'Internal server error' });
   }

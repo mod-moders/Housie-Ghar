@@ -86,6 +86,16 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
   const { audio_data, lang } = req.body;
   const targetLang = (lang === 'ne' || lang === 'nepali') ? 'ne' : 'en';
 
+  // Validate BEFORE `number` reaches any filesystem path. It is interpolated
+  // into the upload filename below, and the parseInt sanity check used to
+  // happen only after the file had already been written — so a param like
+  // `..%2f..%2fx` escaped the uploads directory into an arbitrary file write.
+  const parsedNumber = Number(number);
+  if (!Number.isInteger(parsedNumber) || parsedNumber < 1 || parsedNumber > 90) {
+    res.status(400).json({ message: 'Number must be an integer between 1 and 90' });
+    return;
+  }
+
   if (!audio_data || typeof audio_data !== 'string') {
     res.status(400).json({ message: 'audio_data is required as a base64 string' });
     return;
@@ -127,7 +137,7 @@ export async function uploadNumberAudio(req: Request, res: Response): Promise<vo
     const frontendPublicDir = path.resolve(rootDir, 'frontend/public/audio/calls');
     try { fs.mkdirSync(frontendPublicDir, { recursive: true }); } catch {}
 
-    const filePrefix = targetLang === 'ne' ? `${number}_ne` : `${number}_en`;
+    const filePrefix = targetLang === 'ne' ? `${parsedNumber}_ne` : `${parsedNumber}_en`;
     const possibleExts = ['mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'aac', 'flac', 'opus', '3gp', 'wma'];
     [backendUploadDir, frontendPublicDir].forEach((dir) => {
       if (fs.existsSync(dir)) {
@@ -214,6 +224,14 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
   const { number } = req.params;
   const targetLang = (req.query.lang || (req.body && req.body.lang) || '') as string;
 
+  // Same traversal guard as uploadNumberAudio: `number` is interpolated into
+  // the unlink path below, so an unvalidated param is an arbitrary file delete.
+  const parsedNumber = Number(number);
+  if (!Number.isInteger(parsedNumber) || parsedNumber < 1 || parsedNumber > 90) {
+    res.status(400).json({ message: 'Number must be an integer between 1 and 90' });
+    return;
+  }
+
   try {
     const backendUploadDir = path.resolve(__dirname, '../../../uploads/audio/calls');
     let rootDir = process.cwd();
@@ -239,7 +257,7 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
     const numVal = parseInt(number as string, 10);
 
     if (targetLang === 'ne') {
-      unlinkFile(`${number}_ne`);
+      unlinkFile(`${parsedNumber}_ne`);
       await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = $1`, [`number_call_${numVal}_ne`]);
       await pool.query(
         `UPDATE Number_Calls
@@ -250,7 +268,7 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
         [numVal]
       );
     } else if (targetLang === 'en') {
-      unlinkFile(`${number}_en`);
+      unlinkFile(`${parsedNumber}_en`);
       await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = $1`, [`number_call_${numVal}_en`]);
       await pool.query(
         `UPDATE Number_Calls
@@ -261,9 +279,9 @@ export async function deleteNumberAudio(req: Request, res: Response): Promise<vo
         [numVal]
       );
     } else {
-      unlinkFile(`${number}_en`);
-      unlinkFile(`${number}_ne`);
-      unlinkFile(`${number}`);
+      unlinkFile(`${parsedNumber}_en`);
+      unlinkFile(`${parsedNumber}_ne`);
+      unlinkFile(`${parsedNumber}`);
       await pool.query(`DELETE FROM Platform_Audio_Files WHERE config_key = ANY($1)`, [
         [`number_call_${numVal}_en`, `number_call_${numVal}_ne`],
       ]);

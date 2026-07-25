@@ -26,6 +26,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { CONSTANTS } from '../config/constants';
 import { RoleName } from '@shared/types/user';
+import pool from '../db';
 
 export interface SocketUser {
   userId: string;
@@ -57,7 +58,7 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
  * `io.use` middleware. Never rejects: it only attaches `socket.data.user` when a
  * valid staff token is present so join-time authorization can make decisions.
  */
-export function socketAuth(socket: Socket, next: (err?: Error) => void): void {
+export async function socketAuth(socket: Socket, next: (err?: Error) => void): Promise<void> {
   try {
     let token = socket.handshake.auth?.token;
     if (!token) {
@@ -66,12 +67,27 @@ export function socketAuth(socket: Socket, next: (err?: Error) => void): void {
     }
     if (token) {
       const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-      socket.data.user = {
-        userId: decoded.userId,
-        roleName: decoded.roleName,
-        fullName: decoded.fullName,
-        email: decoded.email,
-      } satisfies SocketUser;
+
+      // Resolve the role from the DB, not from the token. Room authorization
+      // (admin-room, any agent-*/operator-* room for oversight roles) leaks
+      // financial and PII events, and a 10-year token would otherwise keep
+      // granting a demoted or deactivated account that access.
+      const result = await pool.query(
+        `SELECT u.status, r.role_name
+           FROM Users u
+           JOIN Roles r ON r.role_id = u.role_id
+          WHERE u.user_id = $1`,
+        [decoded.userId]
+      );
+
+      if ((result.rowCount ?? 0) > 0 && result.rows[0].status === 'Active') {
+        socket.data.user = {
+          userId: decoded.userId,
+          roleName: result.rows[0].role_name as RoleName,
+          fullName: decoded.fullName,
+          email: decoded.email,
+        } satisfies SocketUser;
+      }
     }
   } catch {
     // Invalid/expired token: treat as anonymous. Sensitive joins are denied
