@@ -26,6 +26,7 @@ export function PlayerReferralCard() {
   const [data, setData] = useState<PlayerRewards | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [showAllReferees, setShowAllReferees] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<PlayerRewards>("/api/rewards/player")
@@ -229,7 +230,7 @@ export function PlayerReferralCard() {
       {data.referees.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Friends you invited</div>
-          {data.referees.slice(0, 8).map((r) => (
+          {(showAllReferees ? data.referees : data.referees.slice(0, 8)).map((r) => (
             <div
               key={r.housie_name}
               style={{
@@ -263,9 +264,21 @@ export function PlayerReferralCard() {
             </div>
           ))}
           {data.referees.length > 8 && (
-            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              +{data.referees.length - 8} more
-            </div>
+            <button
+              onClick={() => setShowAllReferees((v) => !v)}
+              style={{
+                alignSelf: "flex-start",
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--accent)",
+                cursor: "pointer",
+              }}
+            >
+              {showAllReferees ? "Show less" : `+${data.referees.length - 8} more`}
+            </button>
           )}
         </div>
       )}
