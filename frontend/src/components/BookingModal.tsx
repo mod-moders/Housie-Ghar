@@ -71,8 +71,8 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
     error ?? (expired ? "The reservation timer ran out. Your tickets were released — please book again." : null);
 
   const urgent = secondsLeft <= 120;
-  const shortId = lock.booking_id.substring(0, 8).toUpperCase();
-  const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: #${shortId}. Amount: ${moneyStr(lock.total_amount)}.`;
+  const bookingRef = lock.formatted_booking_id || lock.booking_id.substring(0, 8).toUpperCase();
+  const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: ${bookingRef}. Amount: ${moneyStr(lock.total_amount)}.`;
 
   if (phase === "confirmed") {
     return (
@@ -166,7 +166,7 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
           <div className="hg-ls-row"><span>Game</span><b>{gameTitle}</b></div>
           <div className="hg-ls-row"><span>Tickets</span><b>{ticketNumbers.map((t) => "#" + t).join(", ")}</b></div>
           <div className="hg-ls-row"><span>Total payable</span><b className="hg-ls-amt">{money(lock.total_amount)}</b></div>
-          <div className="hg-ls-row"><span>Booking ID</span><b>#{shortId}</b></div>
+          <div className="hg-ls-row"><span>Booking ID</span><b>{bookingRef}</b></div>
         </div>
 
         <div className="hg-wa-block">

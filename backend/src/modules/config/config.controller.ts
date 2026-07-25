@@ -216,6 +216,16 @@ export async function resetDatabase(req: AuthenticatedRequest, res: Response): P
         Bookie_Applications 
       RESTART IDENTITY CASCADE;
     `);
+
+    // Reset standalone custom sequences to start fresh from 1
+    await client.query(`
+      ALTER SEQUENCE seq_booking_id RESTART WITH 1;
+      ALTER SEQUENCE seq_topup_id RESTART WITH 1;
+      ALTER SEQUENCE seq_claim_id RESTART WITH 1;
+      ALTER SEQUENCE seq_bookie_app_id RESTART WITH 1;
+      ALTER SEQUENCE seq_staff_id RESTART WITH 1;
+      ALTER SEQUENCE seq_player_id RESTART WITH 1;
+    `);
     
     await client.query(`
       UPDATE Users SET current_balance = 0.00;

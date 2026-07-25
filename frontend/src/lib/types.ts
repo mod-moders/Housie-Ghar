@@ -77,6 +77,7 @@ export interface TicketDetail {
 
 export interface LockResponse {
   booking_id: string;
+  formatted_booking_id?: string;
   locked_until: string;
   agent_name: string;
   agent_phone: string;
