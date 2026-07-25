@@ -59,6 +59,10 @@ export function PlayerReferralCard() {
   const next = data.next_rung_at;
   const maxRung = data.ladder.length > 0 ? data.ladder[data.ladder.length - 1] : 1;
 
+  const modalList = activeTab
+    ? data.referees.filter((r) => (activeTab === "playing" ? r.qualified : !r.qualified))
+    : [];
+
   return (
     <div
       style={{
@@ -241,70 +245,120 @@ export function PlayerReferralCard() {
         </div>
       </div>
 
-      {/* Who you brought in (Toggled Dropdown) */}
+      {/* Who you brought in (Overlay Popup Modal) */}
       {activeTab && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px solid var(--border-light)", paddingTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
-              {activeTab === "playing" ? "Friends playing" : "Friends waiting to join"}
-            </div>
-            <button
-              onClick={() => setActiveTab(null)}
+        <div
+          onClick={() => setActiveTab(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "480px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "16px",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 24px rgba(212, 175, 55, 0.15)",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "80vh",
+            }}
+          >
+            {/* Modal Header */}
+            <div
               style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-dim)",
-                fontSize: 11,
-                cursor: "pointer",
-                padding: "2px 6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--border-light)",
               }}
             >
-              Close
-            </button>
-          </div>
-          {data.referees.filter(r => activeTab === "playing" ? r.qualified : !r.qualified).length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--text-dim)", padding: "4px 0" }}>
-              {activeTab === "playing"
-                ? "No friends playing yet. Share your invite link to get started!"
-                : "No pending invites. Everyone has joined!"}
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+                {activeTab === "playing" ? "Friends Playing" : "Friends Waiting to Join"}
+              </h3>
+              <button
+                onClick={() => setActiveTab(null)}
+                aria-label="Close"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  fontSize: 22,
+                  fontWeight: "300",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
             </div>
-          ) : (
-            data.referees
-              .filter(r => activeTab === "playing" ? r.qualified : !r.qualified)
-              .map((r) => (
-                <div
-                  key={r.housie_name}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border-light)",
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {r.housie_name}
-                  </span>
-                  <span
+
+            {/* Modal Body */}
+            <div
+              style={{
+                padding: "20px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              {modalList.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "20px 0" }}>
+                  {activeTab === "playing"
+                    ? "No friends playing yet. Share your invite link to get started!"
+                    : "No pending invites. Everyone has joined!"}
+                </div>
+              ) : (
+                modalList.map((r) => (
+                  <div
+                    key={r.housie_name}
                     style={{
-                      flexShrink: 0,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      borderRadius: 999,
-                      padding: "3px 10px",
-                      color: r.qualified ? "var(--success)" : "var(--text-dim)",
-                      background: r.qualified ? "var(--success-soft)" : "transparent",
-                      border: `1px solid ${r.qualified ? "var(--success)" : "var(--border-light)"}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: 10,
+                      padding: "10px 12px",
                     }}
                   >
-                    {r.qualified ? "Playing" : "Not booked yet"}
-                  </span>
-                </div>
-              ))
-          )}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.housie_name}
+                    </span>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 999,
+                        padding: "3px 10px",
+                        color: r.qualified ? "var(--success)" : "var(--text-dim)",
+                        background: r.qualified ? "var(--success-soft)" : "transparent",
+                        border: `1px solid ${r.qualified ? "var(--success)" : "var(--border-light)"}`,
+                      }}
+                    >
+                      {r.qualified ? "Playing" : "Not booked yet"}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
