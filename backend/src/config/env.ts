@@ -97,13 +97,6 @@ export const env = {
   SUPERADMIN_EMAIL: optionalEnv('SUPERADMIN_EMAIL', 'superadmin@housieghar.local'),
   SUPERADMIN_TEMP_PASSWORD: optionalEnv('SUPERADMIN_TEMP_PASSWORD', 'ChangeMe123!'),
 
-  // WhatsApp OTP (Meta Cloud API) — all optional. Signup OTP falls back to a
-  // logged/mock code (see services/whatsappOtp.ts) until both are set, so a
-  // missing config here does not crash boot, it just can't deliver for real.
-  WHATSAPP_ACCESS_TOKEN: optionalEnv('WHATSAPP_ACCESS_TOKEN', ''),
-  WHATSAPP_PHONE_NUMBER_ID: optionalEnv('WHATSAPP_PHONE_NUMBER_ID', ''),
-  WHATSAPP_OTP_TEMPLATE_NAME: optionalEnv('WHATSAPP_OTP_TEMPLATE_NAME', 'otp_login'),
-
   // Security
   LOCK_DURATION_MINUTES: parseInt(optionalEnv('LOCK_DURATION_MINUTES', '10'), 10),
   MAX_LOCK_ATTEMPTS_PER_MINUTE: parseInt(optionalEnv('MAX_LOCK_ATTEMPTS_PER_MINUTE', '5'), 10),
