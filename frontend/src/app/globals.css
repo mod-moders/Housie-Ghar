@@ -2667,7 +2667,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-form-field{display:flex;flex-direction:column;gap:4px}
 .hg-form-field span{font-size:11.5px;font-weight:600;color:var(--text-dim);font-family:var(--font-head)}
 .hg-form-field input,.hg-form-field select{padding:10px 14px;border-radius:999px;border:1.5px solid var(--border-2);
-  background:var(--surface);color:var(--text);font:600 13px var(--font-head);outline:none}
+  background:var(--surface);color:var(--text);font:600 16px var(--font-head);outline:none}
 .hg-form-field input:focus,.hg-form-field select:focus{border-color:var(--ink)}
 
 select option {
