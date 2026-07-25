@@ -330,7 +330,8 @@ export function CallVoiceSettings() {
     if (!url) return;
 
     const resolved = resolveAudioUrl(url);
-    const audio = new Audio(resolved);
+    const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+    audio.src = resolved;
     if (!resolved.startsWith("data:")) {
       audio.crossOrigin = "anonymous";
     }
@@ -519,7 +520,8 @@ export function CallVoiceSettings() {
     if (!url) return;
 
     const resolved = resolveAudioUrl(url);
-    const audio = new Audio(resolved);
+    const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+    audio.src = resolved;
     const itemVol = item.volume !== undefined ? item.volume : 1.0;
     const targetVol = itemVol * masterCallsVolume;
 

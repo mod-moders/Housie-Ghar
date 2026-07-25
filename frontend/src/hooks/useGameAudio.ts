@@ -125,7 +125,8 @@ export function useGameAudio(
           try { bgMusicRef.current.pause(); } catch {}
         }
         activeBgUrlRef.current = resolvedBgUrl;
-        const audio = new Audio(resolvedBgUrl);
+        const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+        audio.src = resolvedBgUrl;
         if (!resolvedBgUrl.startsWith("data:")) {
           audio.crossOrigin = "anonymous";
         }
@@ -359,7 +360,8 @@ export function useGameAudio(
       }
 
       const resolvedUrl = resolveAudioUrl(mp3Path);
-      const audio = new Audio(resolvedUrl);
+      const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+      audio.src = resolvedUrl;
       if (!resolvedUrl.startsWith("data:")) {
         audio.crossOrigin = "anonymous";
       }

@@ -3,6 +3,7 @@ import { resolveAudioUrl } from "./api";
 
 class SoundSynthesizer {
   private ctx: AudioContext | null = null;
+  private audioPool: HTMLAudioElement[] = [];
   
   // Cage spinning state
   private spinInterval: ReturnType<typeof setInterval> | null = null;
@@ -31,6 +32,59 @@ class SoundSynthesizer {
     }
   }
 
+  initPool() {
+    if (typeof window === "undefined" || this.audioPool.length > 0) return;
+    for (let i = 0; i < 6; i++) {
+      const audio = new Audio();
+      if (!window.location.host.includes("localhost")) {
+        audio.crossOrigin = "anonymous";
+      }
+      this.audioPool.push(audio);
+    }
+  }
+
+  unlock() {
+    this.initCtx();
+    this.initPool();
+    if (this.ctx) {
+      try {
+        const buffer = this.ctx.createBuffer(1, 1, 22050);
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.ctx.destination);
+        source.start(0);
+      } catch (e) {
+        console.warn("Failed to unlock AudioContext:", e);
+      }
+    }
+    this.audioPool.forEach((audio) => {
+      try {
+        audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+        audio.play().catch(() => {});
+      } catch (e) {
+        console.warn("Failed to unlock audio pool element:", e);
+      }
+    });
+  }
+
+  getUnlockedAudio(): HTMLAudioElement | null {
+    this.initPool();
+    const audio = this.audioPool.shift();
+    if (audio) {
+      try {
+        audio.pause();
+        audio.src = "";
+        audio.loop = false;
+        audio.volume = 1.0;
+        audio.muted = false;
+        audio.currentTime = 0;
+      } catch {}
+      this.audioPool.push(audio);
+      return audio;
+    }
+    return null;
+  }
+
   private initCtx() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext ||
@@ -54,7 +108,8 @@ class SoundSynthesizer {
       if (customUrl) {
         this.stopCageSpin();
         const resolved = resolveAudioUrl(customUrl);
-        this.customCageAudio = new Audio(resolved);
+        this.customCageAudio = this.getUnlockedAudio() || new Audio();
+        this.customCageAudio.src = resolved;
         this.customCageAudio.loop = true;
         this.customCageAudio.volume = Math.max(0, Math.min(1, volMultiplier));
         this.customCageAudio.play().catch(() => {});
@@ -372,7 +427,8 @@ class SoundSynthesizer {
           try { this.customCelebrationAudio.pause(); } catch {}
         }
         const resolved = resolveAudioUrl(customUrl);
-        this.customCelebrationAudio = new Audio(resolved);
+        this.customCelebrationAudio = this.getUnlockedAudio() || new Audio();
+        this.customCelebrationAudio.src = resolved;
         this.customCelebrationAudio.volume = Math.max(0, Math.min(1, volMultiplier));
         this.customCelebrationAudio.play().catch(() => {});
         return;
@@ -960,3 +1016,15 @@ class SoundSynthesizer {
 }
 
 export const soundSynthesizer = new SoundSynthesizer();
+
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    soundSynthesizer.unlock();
+    document.removeEventListener("click", unlockAudio);
+    document.removeEventListener("touchstart", unlockAudio);
+    document.removeEventListener("touchend", unlockAudio);
+  };
+  document.addEventListener("click", unlockAudio);
+  document.addEventListener("touchstart", unlockAudio);
+  document.addEventListener("touchend", unlockAudio);
+}

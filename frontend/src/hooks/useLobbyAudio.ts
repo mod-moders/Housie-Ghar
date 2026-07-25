@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { resolveAudioUrl } from "@/lib/api";
 import { usePauseAudioOnHidden } from "@/hooks/usePauseAudioOnHidden";
+import { soundSynthesizer } from "@/lib/soundSynthesizer";
 
 export function useLobbyAudio(active: boolean) {
   const { config } = useConfigStore();
@@ -61,7 +62,8 @@ export function useLobbyAudio(active: boolean) {
       }
 
       const resolvedUrl = resolveAudioUrl(url);
-      const audio = new Audio(resolvedUrl);
+      const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+      audio.src = resolvedUrl;
       if (!resolvedUrl.startsWith("data:")) {
         audio.crossOrigin = "anonymous";
       }

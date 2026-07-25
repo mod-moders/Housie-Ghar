@@ -781,7 +781,8 @@ export function OverflowSection({ me }: { me: AuthUser }) {
       if (event === "overflow_booking" || event === "ticket_status_change") {
         load();
         try {
-          const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav");
+          const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+          audio.src = "https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav";
           audio.volume = 0.5;
           audio.play().catch(() => {});
         } catch {}
