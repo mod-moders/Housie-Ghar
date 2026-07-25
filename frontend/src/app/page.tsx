@@ -70,7 +70,7 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
               game.game_status === "Paused" 
                 ? "Paused mid-draw" 
                 : game.game_status === "Draw_Ended" 
-                  ? "Claims & disbursal in process" 
+                  ? "Game Ended" 
                   : "Ongoing"
             ) : `${when.date} · ${when.time}`}
           </div>

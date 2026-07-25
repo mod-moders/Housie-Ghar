@@ -41,7 +41,7 @@ function GameCard({ game, goLive }: { game: GameSummary; goLive: (id: string) =>
           {game.game_status === "Paused" 
             ? "Paused" 
             : game.game_status === "Draw_Ended" 
-              ? "Claiming" 
+              ? "Game Ended" 
               : "Ongoing"}
         </span>
       </div>
