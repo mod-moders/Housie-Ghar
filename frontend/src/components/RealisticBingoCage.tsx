@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Sphere, Torus, Cylinder, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -118,35 +118,164 @@ const INNER_BALLS = [...Array(90)].map((_, i) => {
 
 function InnerBalls({ isSpinning, drawn }: { isSpinning: boolean; drawn: Set<number> }) {
   const groupRef = useRef<THREE.Group>(null);
+  const physicsStateRef = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number }[] | null>(null);
 
   const balls = INNER_BALLS;
 
-  // Pre-calculate dense hemispherical pack layout
-  const settlePositions = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    const R = CAGE_R - BALL_R - 0.05;
-    for (let i = 0; i < 90; i++) {
-      const phi = Math.PI - 0.1 - (i / 90) * 0.45; // build upward
-      const theta = i * 2.39996; // golden angle
-      const r = BALL_R + (i / 90) * (R - BALL_R) * 0.75;
-      pts.push(
-        new THREE.Vector3(
-          Math.sin(phi) * Math.cos(theta) * r,
-          Math.cos(phi) * r,
-          Math.sin(phi) * Math.sin(theta) * r
-        )
-      );
-    }
-    return pts;
-  }, []);
-
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return;
-    const t = state.clock.elapsedTime;
-    const R = CAGE_R - BALL_R - 0.05;
 
-    let undrawnIdx = 0;
+    if (!physicsStateRef.current) {
+      physicsStateRef.current = balls.map(() => {
+        const angle = Math.random() * Math.PI * 2;
+        const r = Math.random() * 0.4;
+        return {
+          x: (Math.random() - 0.5) * 0.6,
+          y: -0.6 - Math.random() * 0.4,
+          z: Math.sin(angle) * r,
+          vx: (Math.random() - 0.5) * 0.1,
+          vy: (Math.random() - 0.5) * 0.1,
+          vz: (Math.random() - 0.5) * 0.1,
+        };
+      });
+    }
 
+    const physics = physicsStateRef.current;
+    const dt = Math.min(delta, 0.03); // cap step to prevent explosion
+    const R_limit = CAGE_R - BALL_R - 0.04;
+    const gravity = 9.8;
+    const restitution = 0.4;
+    const targetOmega = isSpinning ? 4.0 : 0.08;
+
+    // 1. Apply gravity, centrifugal drag from spinning cage, and air resistance
+    for (let i = 0; i < 90; i++) {
+      const b = balls[i];
+      const p = physics[i];
+
+      if (drawn.has(b.num)) {
+        p.x = 999;
+        p.y = 999;
+        p.z = 999;
+        p.vx = 0;
+        p.vy = 0;
+        p.vz = 0;
+        continue;
+      }
+
+      // Gravity pulls down
+      p.vy -= gravity * dt;
+
+      // Friction/drag force from the rotating wire cap (around X axle)
+      const r_yz = Math.sqrt(p.y * p.y + p.z * p.z);
+      if (r_yz > R_limit - 0.15) {
+        const targetVy = -p.z * targetOmega;
+        const targetVz = p.y * targetOmega;
+        const dragFactor = isSpinning ? 18.0 : 6.0;
+        p.vy += (targetVy - p.vy) * dragFactor * dt;
+        p.vz += (targetVz - p.vz) * dragFactor * dt;
+      }
+
+      // Air friction
+      const airFriction = isSpinning ? 0.3 : 1.2;
+      p.vx *= (1 - airFriction * dt);
+      p.vy *= (1 - airFriction * dt);
+      p.vz *= (1 - airFriction * dt);
+
+      // Noise to keep it lively
+      if (isSpinning) {
+        p.vx += (Math.random() - 0.5) * 1.5 * dt;
+        p.vy += (Math.random() - 0.5) * 1.5 * dt;
+        p.vz += (Math.random() - 0.5) * 1.5 * dt;
+      }
+
+      // Integrate position
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+    }
+
+    // 2. Ball-on-Ball Collisions
+    const min_dist = 2 * BALL_R;
+    const min_dist_sq = min_dist * min_dist;
+    for (let i = 0; i < 90; i++) {
+      if (drawn.has(balls[i].num)) continue;
+      const pi = physics[i];
+
+      for (let j = i + 1; j < 90; j++) {
+        if (drawn.has(balls[j].num)) continue;
+        const pj = physics[j];
+
+        const dx = pj.x - pi.x;
+        const dy = pj.y - pi.y;
+        const dz = pj.z - pi.z;
+        const dist_sq = dx * dx + dy * dy + dz * dz;
+
+        if (dist_sq < min_dist_sq && dist_sq > 0.0001) {
+          const dist = Math.sqrt(dist_sq);
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const nz = dz / dist;
+
+          const overlap = min_dist - dist;
+          pi.x -= nx * overlap * 0.5;
+          pi.y -= ny * overlap * 0.5;
+          pi.z -= nz * overlap * 0.5;
+
+          pj.x += nx * overlap * 0.5;
+          pj.y += ny * overlap * 0.5;
+          pj.z += nz * overlap * 0.5;
+
+          const rvx = pj.vx - pi.vx;
+          const rvy = pj.vy - pi.vy;
+          const rvz = pj.vz - pi.vz;
+          const velAlongNormal = rvx * nx + rvy * ny + rvz * nz;
+
+          if (velAlongNormal < 0) {
+            const impulse = -(1 + restitution) * velAlongNormal * 0.5;
+            pi.vx -= nx * impulse;
+            pi.vy -= ny * impulse;
+            pi.vz -= nz * impulse;
+
+            pj.vx += nx * impulse;
+            pj.vy += ny * impulse;
+            pj.vz += nz * impulse;
+          }
+        }
+      }
+    }
+
+    // 3. Boundary Collisions (Perfect spherical wire barrel cage constraint)
+    for (let i = 0; i < 90; i++) {
+      if (drawn.has(balls[i].num)) continue;
+      const p = physics[i];
+
+      const r_sph = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+      if (r_sph > R_limit) {
+        const nx = p.x / r_sph;
+        const ny = p.y / r_sph;
+        const nz = p.z / r_sph;
+
+        p.x = nx * R_limit;
+        p.y = ny * R_limit;
+        p.z = nz * R_limit;
+
+        const dot = p.vx * nx + p.vy * ny + p.vz * nz;
+        if (dot > 0) {
+          p.vx -= (1 + restitution) * dot * nx;
+          p.vy -= (1 + restitution) * dot * ny;
+          p.vz -= (1 + restitution) * dot * nz;
+        }
+      }
+
+      // Strict capsule cap constraints
+      const xLim = 0.58;
+      if (Math.abs(p.x) > xLim) {
+        p.x = Math.sign(p.x) * xLim;
+        p.vx = -p.vx * restitution;
+      }
+    }
+
+    // 4. Update Three.js objects
     groupRef.current.children.forEach((child) => {
       const num = child.userData.num;
       if (drawn.has(num)) {
@@ -155,42 +284,14 @@ function InnerBalls({ isSpinning, drawn }: { isSpinning: boolean; drawn: Set<num
       }
       child.visible = true;
 
+      const p = physics[num - 1];
+      child.position.x = p.x;
+      child.position.y = p.y;
+      child.position.z = p.z;
+
       const b = balls[num - 1];
-
-      if (isSpinning) {
-        // High-energy tumbling
-        const tt = t * 3.4 + b.seed;
-        // Limit X-axis swing along the axle to keep them centered, while tumbling fully in Y-Z plane
-        let tx = Math.sin(tt * b.freq.x) * R * 0.45;
-        let ty = Math.cos(tt * b.freq.y) * R * 0.9;
-        let tz = Math.sin(tt * b.freq.z + b.seed) * R * 0.9;
-        
-        // Enforce strict spherical boundary constraint (convex sphere constraint)
-        const dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
-        const maxDist = R * 0.88; // Keep center of ball within 88% of cage radius to avoid wire clipping
-        if (dist > maxDist) {
-          tx = (tx / dist) * maxDist;
-          ty = (ty / dist) * maxDist;
-          tz = (tz / dist) * maxDist;
-        }
-
-        child.position.x = THREE.MathUtils.lerp(child.position.x, tx, 0.12);
-        child.position.y = THREE.MathUtils.lerp(child.position.y, ty, 0.12);
-        child.position.z = THREE.MathUtils.lerp(child.position.z, tz, 0.12);
-      } else {
-        // Slide / fall down cleanly into pile
-        const target = settlePositions[undrawnIdx] || settlePositions[0];
-        const vx = target.x + Math.sin(t * 1.5 + b.seed) * 0.005;
-        const vy = target.y + Math.cos(t * 1.2 + b.seed) * 0.005;
-        const vz = target.z + Math.sin(t * 1.8 + b.seed) * 0.005;
-        child.position.x = THREE.MathUtils.lerp(child.position.x, vx, 0.05);
-        child.position.y = THREE.MathUtils.lerp(child.position.y, vy, 0.05);
-        child.position.z = THREE.MathUtils.lerp(child.position.z, vz, 0.05);
-        undrawnIdx++;
-      }
-
-      child.rotation.x += b.spinX * (isSpinning ? 0.03 : 0.002);
-      child.rotation.y += b.spinY * (isSpinning ? 0.03 : 0.002);
+      child.rotation.x += b.spinX * (isSpinning ? 0.05 : 0.005);
+      child.rotation.y += b.spinY * (isSpinning ? 0.05 : 0.005);
     });
   });
 
