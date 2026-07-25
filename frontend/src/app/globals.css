@@ -2876,7 +2876,7 @@ select option {
 .hg-burger:active,.hg-staff-btn:active,.hg-theme-btn:active,.hg-back:active,.hg-mute:active{transform:translateY(2px);box-shadow:none}
 .hg-nav-sheet{border:1.5px solid var(--card-line);border-radius:0 0 var(--radius-lg) var(--radius-lg);
   box-shadow:var(--card-shadow)}
-.hg-nav{background:color-mix(in srgb,var(--bg) 86%,transparent);padding:14px 18px}
+.hg-nav{background:var(--bg);padding:14px 18px}
 
 /* logo image — intrinsic sizing via height prop, width:auto */
 .hg-logo img{display:block}
@@ -2953,7 +2953,7 @@ select option {
   .hg-reactions{max-width:none}
   .hg-nav{
     padding:16px 40px;
-    background:color-mix(in srgb,var(--bg) 78%,transparent);
+    background:var(--bg);
     border-bottom:1.5px solid var(--card-line);
   }
   .hg-nav-links{margin-left:14px}
