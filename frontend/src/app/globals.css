@@ -44,9 +44,10 @@
 .hg-root[data-theme='dark']{
   /* Warm-neutral charcoal — drops the old blue cast (surface was #1b1f2b, b>r) for a
      cleaner, less "default-AI" dark. Lightness/contrast kept close to the originals. */
-  --bg:#0b0b0a; --bg2:#151513; --surface:#1e1d1a; --surface-2:#2a2925;
-  --elevate:#343330; --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.17);
-  --text:#f3f2ec; --text-dim:#a6a498; --text-mute:#78766a;
+  --bg-image: radial-gradient(circle at 50% 50%, #1e1d1a 0%, #0b0b0a 100%);
+  --bg: rgba(11, 11, 10, 0.68); --bg2: rgba(21, 21, 19, 0.78); --surface: rgba(30, 29, 26, 0.88); --surface-2: rgba(42, 41, 37, 0.94);
+  --elevate: rgba(52, 51, 48, 0.97); --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.17);
+  --text:#f3f2ec; --text-dim:#cfcdc3; --text-mute:#a6a498;
   --ink:#000000; --card-line:rgba(255,255,255,.14); --card-shadow:0 5px 0 -1px #000;
   --card-shadow-sm:0 3px 0 -1px #000;
   --cta:oklch(0.84 0.16 88); --cta-ink:#241a00; --cta-glow:oklch(0.84 0.16 88 / .35);
@@ -58,9 +59,10 @@
   --scrim:rgba(5,6,8,.75);
 }
 .hg-root[data-theme='light']{
-  --bg:#f4f6fa; --bg2:#e9ecf4; --surface:#ffffff; --surface-2:#dfe3ee;
-  --elevate:#ffffff; --border:rgba(30,35,48,.1); --border-2:rgba(30,35,48,.2);
-  --text:#1e2330; --text-dim:#4c5266; --text-mute:#70768c;
+  --bg-image: radial-gradient(circle at 50% 50%, #ffffff 0%, #e9ecf4 100%);
+  --bg: rgba(244, 246, 250, 0.68); --bg2: rgba(233, 236, 244, 0.78); --surface: rgba(255, 255, 255, 0.88); --surface-2: rgba(223, 227, 238, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97); --border:rgba(30,35,48,.1); --border-2:rgba(30,35,48,.2);
+  --text:#1e2330; --text-dim:#30374c; --text-mute:#5e6685;
   --ink:#1e2330; --card-line:#1e2330; --card-shadow:0 5px 0 -1px #1e2330;
   --card-shadow-sm:0 3px 0 -1px #1e2330;
   --cta:oklch(0.80 0.17 86); --cta-ink:#2a1d00; --cta-glow:oklch(0.80 0.17 86 / .4);
@@ -75,9 +77,10 @@
 /* 1. Retro Arcade */
 .hg-root[data-theme='retro_arcade'] {
   --accent:#ff00ff; --accent-ink:#ffffff; --accent-soft:rgba(255,0,255,0.15);
-  --bg:#030005; --bg2:#0f0721; --surface:#1a0e36; --surface-2:#291652;
-  --elevate:#391f71; --border:rgba(0, 255, 255, 0.4); --border-2:rgba(255, 0, 255, 0.5);
-  --text:#e0f8ff; --text-dim:#8a9bbd; --text-mute:#b366ff;
+  --bg-image: radial-gradient(circle at 50% 50%, #1a0026 0%, #030005 100%);
+  --bg: rgba(3, 0, 5, 0.68); --bg2: rgba(15, 7, 33, 0.78); --surface: rgba(26, 14, 54, 0.88); --surface-2: rgba(41, 22, 82, 0.94);
+  --elevate: rgba(57, 31, 113, 0.97); --border:rgba(0, 255, 255, 0.4); --border-2:rgba(255, 0, 255, 0.5);
+  --text:#e0f8ff; --text-dim:#b8cdfc; --text-mute:#8a9bbd;
   --ink:#000000; --card-line:#ff00ff; --card-shadow:0 0 15px rgba(255,0,255,0.4);
   --card-shadow-sm:0 0 8px rgba(0,255,255,0.4);
   --cta:#00ffff; --cta-ink:#07040e; --cta-glow:rgba(0, 255, 255, 0.7);
@@ -691,9 +694,10 @@
 /* 4. Digital Neon */
 .hg-root[data-theme='digital_neon'] {
   --accent:#00ffff; --accent-ink:#000000; --accent-soft:rgba(0,255,255,0.15);
-  --bg:#000000; --bg2:#0a0a0a; --surface:#141414; --surface-2:#1f1f1f;
-  --elevate:#292929; --border:#00ffff; --border-2:#ff00ff;
-  --text:#ffffff; --text-dim:#00ffff; --text-mute:#ff00ff;
+  --bg-image: radial-gradient(circle at 50% 50%, #14051a 0%, #000000 100%);
+  --bg: rgba(0, 0, 0, 0.68); --bg2: rgba(10, 10, 10, 0.78); --surface: rgba(20, 20, 20, 0.88); --surface-2: rgba(31, 31, 31, 0.94);
+  --elevate: rgba(41, 41, 41, 0.97); --border:#00ffff; --border-2:#ff00ff;
+  --text:#ffffff; --text-dim:#b3ffff; --text-mute:#ffb3ff;
   --ink:#000000; --card-line:#00ffff; --card-shadow:0 0 10px #00ffff;
   --card-shadow-sm:0 0 5px #00ffff;
   --cta:#ff00ff; --cta-ink:#ffffff; --cta-glow:rgba(255,0,255,0.6);
@@ -706,9 +710,10 @@
 /* 5. Traditional Festival */
 .hg-root[data-theme='traditional_festival'] {
   --accent:#ff5722; --accent-ink:#ffffff; --accent-soft:rgba(255,87,34,0.15);
-  --bg:#fff3e0; --bg2:#ffe0b2; --surface:#ffcc80; --surface-2:#ffb74d;
-  --elevate:#ffa726; --border:#e65100; --border-2:#bf360c;
-  --text:#3e2723; --text-dim:#5d4037; --text-mute:#795548;
+  --bg-image: radial-gradient(circle at 50% 50%, #fff3e0 0%, #ffe0b2 100%);
+  --bg: rgba(255, 243, 224, 0.68); --bg2: rgba(255, 224, 178, 0.78); --surface: rgba(255, 204, 128, 0.88); --surface-2: rgba(255, 183, 77, 0.94);
+  --elevate: rgba(255, 167, 38, 0.97); --border:#e65100; --border-2:#bf360c;
+  --text:#2d1a15; --text-dim:#5d4037; --text-mute:#795548;
   --ink:#212121; --card-line:#e65100; --card-shadow:0 4px 0 -1px #d84315;
   --card-shadow-sm:0 2px 0 -1px #d84315;
   --cta:#ff5722; --cta-ink:#ffffff; --cta-glow:rgba(255,87,34,0.4);
@@ -721,9 +726,10 @@
 /* 6. Classic Tambola */
 .hg-root[data-theme='classic_tambola'] {
   --accent:#2e7d32; --accent-ink:#ffffff; --accent-soft:rgba(46,125,50,0.15);
-  --bg:#f1f8e9; --bg2:#dcedc8; --surface:#c5e1a5; --surface-2:#aed581;
-  --elevate:#9ccc65; --border:#33691e; --border-2:#1b5e20;
-  --text:#1b5e20; --text-dim:#2e7d32; --text-mute:#388e3c;
+  --bg-image: radial-gradient(circle at 50% 50%, #f1f8e9 0%, #dcedc8 100%);
+  --bg: rgba(241, 248, 233, 0.68); --bg2: rgba(220, 237, 200, 0.78); --surface: rgba(197, 225, 165, 0.88); --surface-2: rgba(174, 213, 129, 0.94);
+  --elevate: rgba(156, 204, 101, 0.97); --border:#33691e; --border-2:#1b5e20;
+  --text:#0d3a10; --text-dim:#2e7d32; --text-mute:#4caf50;
   --ink:#000000; --card-line:#2e7d32; --card-shadow:0 5px 0 -1px #1b5e20;
   --card-shadow-sm:0 3px 0 -1px #1b5e20;
   --cta:#2e7d32; --cta-ink:#ffffff; --cta-glow:rgba(46,125,50,0.4);
@@ -767,14 +773,12 @@
 
 .hg-root[data-theme='luxury_gold'] {
   --accent:#c5a059; --accent-ink:#000000; --accent-soft:rgba(197,160,89,0.16);
-  /* Warm near-black grounds (r>g>b, tiny deltas) so the gold reads as integrated light
-     rather than sitting on flat cool grey — the luxury-casino direction. */
-  --bg:#0a0906; --bg2:#141210; --surface:#1b1813; --surface-2:#241f18;
-  --elevate:#2d2820; --border:#c5a059; --border-2:#e6c781;
-  --text:#f4ecd8; --text-dim:#c5a059; --text-mute:#8a713b;
+  --bg-image: radial-gradient(circle at 50% 50%, #1f1a10 0%, #0a0906 100%);
+  --bg: rgba(10, 9, 6, 0.68); --bg2: rgba(20, 18, 16, 0.78); --surface: rgba(27, 24, 19, 0.88); --surface-2: rgba(36, 31, 24, 0.94);
+  --elevate: rgba(45, 40, 32, 0.97); --border:#c5a059; --border-2:#e6c781;
+  --text:#f4ecd8; --text-dim:#e5c78f; --text-mute:#c5a059;
   --ink:#000000; --card-line:#c5a059; --card-shadow:0 5px 0 -1px #5c471a;
   --card-shadow-sm:0 3px 0 -1px #5c471a;
-  /* Richer 3-stop gold gives the CTA a lit metallic sheen instead of a flat 2-stop fade. */
   --cta:linear-gradient(135deg, #f0d89a 0%, #c5a059 55%, #a9843f 100%); --cta-ink:#1a1400; --cta-glow:rgba(197,160,89,0.4);
   --success:#5ca367; --success-soft:rgba(92,163,103,0.1);
   --danger:#c24a4a; --danger-soft:rgba(194,74,74,0.1);
@@ -784,8 +788,10 @@
 
 /* 10. Playful Kids/Family */
 .hg-root[data-theme='playful_kids'] {
-  --bg:#fff9e6; --bg2:#ffecb3; --surface:#ffcc80; --surface-2:#ffab40;
-  --elevate:#ff9100; --border:#ff4081; --border-2:#d50000;
+  --accent:#ff4081; --accent-ink:#ffffff; --accent-soft:rgba(255,64,129,0.16);
+  --bg-image: radial-gradient(circle at 50% 50%, #fffdf5 0%, #ffecb3 100%);
+  --bg: rgba(255, 249, 230, 0.68); --bg2: rgba(255, 236, 179, 0.78); --surface: rgba(255, 204, 128, 0.88); --surface-2: rgba(255, 171, 64, 0.94);
+  --elevate: rgba(255, 145, 0, 0.97); --border:#ff4081; --border-2:#d50000;
   --text:#311b92; --text-dim:#4527a0; --text-mute:#5e35b1;
   --ink:#1a237e; --card-line:#ff4081; --card-shadow:0 6px 0 -1px #d500f9;
   --card-shadow-sm:0 4px 0 -1px #d500f9;
@@ -796,12 +802,12 @@
   --cyan:#00b0ff; --shadow:0 6px 15px rgba(213,0,249,0.2); --scrim:rgba(255,249,230,0.7);
 }
 
-/* 11. Independence Day of India — tiranga: saffron CTA, Ashoka-chakra blue accent,
-   India-green success on a warm ivory ground with navy ink. */
+/* 11. Independence Day of India */
 .hg-root[data-theme='independence_day'] {
   --accent:#204a9c; --accent-ink:#ffffff; --accent-soft:rgba(32,74,156,0.12);
-  --bg:#fdf9f0; --bg2:#f5eede; --surface:#ffffff; --surface-2:#f0e7d4;
-  --elevate:#ffffff; --border:rgba(28,35,64,0.14); --border-2:rgba(28,35,64,0.28);
+  --bg-image: radial-gradient(circle at 50% 50%, #fffbf2 0%, #f5eede 100%);
+  --bg: rgba(253, 249, 240, 0.68); --bg2: rgba(245, 238, 222, 0.78); --surface: rgba(255, 255, 255, 0.88); --surface-2: rgba(240, 231, 212, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97); --border:rgba(28,35,64,0.14); --border-2:rgba(28,35,64,0.28);
   --text:#1c2340; --text-dim:#3b4360; --text-mute:#5e6685;
   --ink:#1c2340; --card-line:#1c2340; --card-shadow:0 5px 0 -1px #1c2340;
   --card-shadow-sm:0 3px 0 -1px #1c2340;
@@ -812,13 +818,13 @@
   --cyan:#204a9c; --shadow:0 5px 0 -1px #1c2340; --scrim:rgba(253,249,240,0.78);
 }
 
-/* 12. Tihar — festival of lights: deep indigo night lit by marigold diyos,
-   warm lamp-glow borders and a marigold CTA. */
+/* 12. Tihar */
 .hg-root[data-theme='tihar'] {
   --accent:#ff6d3a; --accent-ink:#ffffff; --accent-soft:rgba(255,109,58,0.16);
-  --bg:#140d26; --bg2:#1d1436; --surface:#271a45; --surface-2:#332257;
-  --elevate:#3f2c69; --border:rgba(255,190,92,0.25); --border-2:rgba(255,190,92,0.45);
-  --text:#fdf3e3; --text-dim:#d3b98a; --text-mute:#97836b;
+  --bg-image: radial-gradient(circle at 50% 50%, #1d1436 0%, #140d26 100%);
+  --bg: rgba(20, 13, 38, 0.68); --bg2: rgba(29, 20, 54, 0.78); --surface: rgba(39, 26, 69, 0.88); --surface-2: rgba(51, 34, 87, 0.94);
+  --elevate: rgba(63, 44, 105, 0.97); --border:rgba(255,190,92,0.25); --border-2:rgba(255,190,92,0.45);
+  --text:#fdf3e3; --text-dim:#ffd280; --text-mute:#d3b98a;
   --ink:#000000; --card-line:rgba(255,190,92,0.4); --card-shadow:0 5px 0 -1px #000;
   --card-shadow-sm:0 3px 0 -1px #000;
   --cta:#f5a623; --cta-ink:#2a1800; --cta-glow:rgba(245,166,35,0.5);
@@ -828,13 +834,13 @@
   --cyan:#7ec8e3; --shadow:0 5px 0 -1px #000; --scrim:rgba(12,7,24,0.8);
 }
 
-/* 13. Dashain — tika crimson accent, jamara-green success and a golden-kite CTA
-   on rice-cream (akshata) ground with deep maroon ink. */
+/* 13. Dashain */
 .hg-root[data-theme='dashain'] {
   --accent:#c8102e; --accent-ink:#ffffff; --accent-soft:rgba(200,16,46,0.12);
-  --bg:#fdf6ec; --bg2:#f7ecd9; --surface:#ffffff; --surface-2:#f3e6cf;
-  --elevate:#ffffff; --border:rgba(140,29,32,0.18); --border-2:rgba(140,29,32,0.32);
-  --text:#3d1512; --text-dim:#683b37; --text-mute:#8c524b;
+  --bg-image: radial-gradient(circle at 50% 50%, #fdf6ec 0%, #f7ecd9 100%);
+  --bg: rgba(253, 246, 236, 0.68); --bg2: rgba(247, 236, 217, 0.78); --surface: rgba(255, 255, 255, 0.88); --surface-2: rgba(243, 230, 207, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97); --border:rgba(140,29,32,0.18); --border-2:rgba(140,29,32,0.32);
+  --text:#3d1512; --text-dim:#7a3c35; --text-mute:#8c524b;
   --ink:#3d1512; --card-line:#8c1d20; --card-shadow:0 5px 0 -1px #8c1d20;
   --card-shadow-sm:0 3px 0 -1px #8c1d20;
   --cta:#e6a817; --cta-ink:#3a2600; --cta-glow:rgba(230,168,23,0.45);
@@ -844,13 +850,13 @@
   --cyan:#3f7cac; --shadow:0 5px 0 -1px #8c1d20; --scrim:rgba(253,246,236,0.8);
 }
 
-/* 14. Christmas — deep pine night, snow-white text, ribbon-red CTA and
-   gold-star accent with icy cyan details. */
+/* 14. Christmas */
 .hg-root[data-theme='christmas'] {
   --accent:#e6c36e; --accent-ink:#2a1f00; --accent-soft:rgba(230,195,110,0.16);
-  --bg:#0b1f16; --bg2:#12291d; --surface:#183526; --surface-2:#1f4230;
-  --elevate:#2a533c; --border:rgba(230,195,110,0.25); --border-2:rgba(230,195,110,0.45);
-  --text:#f6f8f2; --text-dim:#b8c9b8; --text-mute:#7f9382;
+  --bg-image: radial-gradient(circle at 50% 50%, #12291d 0%, #0b1f16 100%);
+  --bg: rgba(11, 31, 22, 0.68); --bg2: rgba(18, 41, 29, 0.78); --surface: rgba(24, 53, 38, 0.88); --surface-2: rgba(31, 66, 48, 0.94);
+  --elevate: rgba(42, 83, 60, 0.97); --border:rgba(230,195,110,0.25); --border-2:rgba(230,195,110,0.45);
+  --text:#f6f8f2; --text-dim:#dfedf0; --text-mute:#b8c9b8;
   --ink:#000000; --card-line:rgba(230,195,110,0.4); --card-shadow:0 5px 0 -1px #000;
   --card-shadow-sm:0 3px 0 -1px #000;
   --cta:#d1352b; --cta-ink:#ffffff; --cta-glow:rgba(209,53,43,0.45);
@@ -860,12 +866,12 @@
   --cyan:#8fd4d9; --shadow:0 5px 0 -1px #000; --scrim:rgba(5,15,10,0.8);
 }
 
-/* 15. Holi — white-kurta ground splashed with gulal: magenta CTA, violet accent
-   and vivid green/amber/cyan semantics. */
+/* 15. Holi */
 .hg-root[data-theme='holi'] {
   --accent:#7b2ff2; --accent-ink:#ffffff; --accent-soft:rgba(123,47,242,0.14);
-  --bg:#fefcf7; --bg2:#f7f3ea; --surface:#ffffff; --surface-2:#f2ecdf;
-  --elevate:#ffffff; --border:rgba(45,27,78,0.14); --border-2:rgba(45,27,78,0.26);
+  --bg-image: radial-gradient(circle at 50% 50%, #fefcf7 0%, #f7f3ea 100%);
+  --bg: rgba(254, 252, 247, 0.68); --bg2: rgba(247, 243, 234, 0.78); --surface: rgba(255, 255, 255, 0.88); --surface-2: rgba(242, 236, 223, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97); --border:rgba(45,27,78,0.14); --border-2:rgba(45,27,78,0.26);
   --text:#2d1b4e; --text-dim:#513d75; --text-mute:#725e9c;
   --ink:#2d1b4e; --card-line:#2d1b4e; --card-shadow:0 5px 0 -1px #c2187e;
   --card-shadow-sm:0 3px 0 -1px #c2187e;
@@ -884,16 +890,16 @@
   --accent: #FF7A00;
   --accent-ink: #FFFFFF;
   --accent-soft: rgba(255, 122, 0, 0.16);
-  --bg: rgba(20, 14, 10, 0.65);
-  --bg2: rgba(30, 20, 14, 0.75);
-  --surface: rgba(40, 26, 18, 0.85);
-  --surface-2: rgba(50, 32, 22, 0.92);
-  --elevate: rgba(60, 38, 26, 0.96);
+  --bg: rgba(20, 14, 10, 0.68);
+  --bg2: rgba(30, 20, 14, 0.78);
+  --surface: rgba(40, 26, 18, 0.88);
+  --surface-2: rgba(50, 32, 22, 0.94);
+  --elevate: rgba(60, 38, 26, 0.97);
   --border: rgba(255, 122, 0, 0.3);
   --border-2: rgba(255, 122, 0, 0.5);
   --text: #FFFFFF;
-  --text-dim: #FFA852;
-  --text-mute: #FFA340;
+  --text-dim: #ffd0a3;
+  --text-mute: #ffa852;
   --ink: #FFFFFF;
   --card-line: rgba(255, 122, 0, 0.4);
   --card-shadow: 0 5px 0 -1px #994900;
@@ -930,8 +936,8 @@
   --border: rgba(46, 125, 50, 0.35);
   --border-2: rgba(46, 125, 50, 0.55);
   --text: #F3F4F6;
-  --text-dim: #A3C2A5;
-  --text-mute: #7BA87E;
+  --text-dim: #cce0cd;
+  --text-mute: #a3c2a5;
   --ink: #F3F4F6;
   --card-line: rgba(46, 125, 50, 0.4);
   --card-shadow: 0 5px 0 -1px #154c18;
@@ -960,16 +966,16 @@
   --accent: #8D6E63;
   --accent-ink: #FDF5E6;
   --accent-soft: rgba(141, 110, 99, 0.16);
-  --bg: rgba(24, 20, 18, 0.7);
-  --bg2: rgba(34, 28, 25, 0.8);
+  --bg: rgba(24, 20, 18, 0.68);
+  --bg2: rgba(34, 28, 25, 0.78);
   --surface: rgba(46, 38, 34, 0.88);
   --surface-2: rgba(58, 48, 43, 0.94);
   --elevate: rgba(70, 58, 52, 0.97);
   --border: rgba(141, 110, 99, 0.35);
   --border-2: rgba(141, 110, 99, 0.55);
   --text: #FDF5E6;
-  --text-dim: #D7CCC8;
-  --text-mute: #BCAAA4;
+  --text-dim: #e8deda;
+  --text-mute: #d7ccc8;
   --ink: #FDF5E6;
   --card-line: rgba(141, 110, 99, 0.4);
   --card-shadow: 0 5px 0 -1px #5d4037;
@@ -998,16 +1004,16 @@
   --accent: #F5B041;
   --accent-ink: #4A154B;
   --accent-soft: rgba(245, 176, 65, 0.18);
-  --bg: rgba(253, 246, 227, 0.72);
-  --bg2: rgba(244, 230, 196, 0.82);
-  --surface: rgba(255, 255, 255, 0.95);
-  --surface-2: rgba(238, 220, 178, 0.96);
-  --elevate: rgba(255, 255, 255, 1.0);
+  --bg: rgba(253, 246, 227, 0.68);
+  --bg2: rgba(244, 230, 196, 0.78);
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-2: rgba(238, 220, 178, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97);
   --border: rgba(74, 21, 75, 0.22);
   --border-2: rgba(74, 21, 75, 0.38);
-  --text: #4A154B;
-  --text-dim: rgba(74, 21, 75, 0.92);
-  --text-mute: rgba(74, 21, 75, 0.78);
+  --text: #3c0f3d;
+  --text-dim: #5c1f5e;
+  --text-mute: #824385;
   --ink: #4A154B;
   --card-line: rgba(74, 21, 75, 0.28);
   --card-shadow: 0 5px 0 -1px #4A154B;
@@ -1036,16 +1042,16 @@
   --accent: #F48FB1;
   --accent-ink: #1A237E;
   --accent-soft: rgba(244, 143, 177, 0.18);
-  --bg: rgba(255, 240, 245, 0.72);
-  --bg2: rgba(255, 225, 235, 0.82);
-  --surface: rgba(255, 255, 255, 0.95);
-  --surface-2: rgba(255, 212, 225, 0.96);
-  --elevate: rgba(255, 255, 255, 1.0);
+  --bg: rgba(255, 240, 245, 0.68);
+  --bg2: rgba(255, 225, 235, 0.78);
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-2: rgba(255, 212, 225, 0.94);
+  --elevate: rgba(255, 255, 255, 0.97);
   --border: rgba(26, 35, 126, 0.22);
   --border-2: rgba(26, 35, 126, 0.38);
-  --text: #1A237E;
-  --text-dim: rgba(26, 35, 126, 0.92);
-  --text-mute: rgba(26, 35, 126, 0.78);
+  --text: #12185c;
+  --text-dim: #2a349c;
+  --text-mute: #5c66c7;
   --ink: #1A237E;
   --card-line: rgba(26, 35, 126, 0.28);
   --card-shadow: 0 5px 0 -1px #1A237E;
@@ -2858,6 +2864,8 @@ select option {
   background:var(--surface);
   border:1.5px solid var(--card-line);
   box-shadow:var(--card-shadow);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 .hg-card{gap:12px;padding:18px}
 .hg-prize-row.is-won{border-color:var(--card-line)}
@@ -2889,7 +2897,7 @@ select option {
   border:1.5px solid var(--card-line);background:var(--surface);box-shadow:var(--card-shadow-sm)}
 .hg-burger:active,.hg-staff-btn:active,.hg-theme-btn:active,.hg-back:active,.hg-mute:active{transform:translateY(2px);box-shadow:none}
 .hg-nav-sheet{border:1.5px solid var(--card-line);border-radius:0 0 var(--radius-lg) var(--radius-lg);
-  box-shadow:var(--card-shadow)}
+  box-shadow:var(--card-shadow);backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);}
 .hg-nav{background:var(--bg);padding:14px 18px}
 
 /* logo image — intrinsic sizing via height prop, width:auto */
