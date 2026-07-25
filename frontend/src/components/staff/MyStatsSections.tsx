@@ -7,6 +7,7 @@ import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { EmptyHint } from "@/components/ui";
 import type { AuthUser } from "@/lib/stores/authStore";
+import { useSocket } from "@/lib/hooks/useSocket";
 
 /* ── Operator Stats Interfaces ───────────────────────────────────────── */
 
@@ -104,6 +105,12 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
   // On mount `loading` is already true and `error` already null, so the first
   // fetch skips that reset — no synchronous setState in the effect body.
   useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  useSocket((event) => {
+    if (event === "game_list_update" || event === "ticket_status_change") {
+      fetchStats();
+    }
+  });
 
   if (loading) {
     return (

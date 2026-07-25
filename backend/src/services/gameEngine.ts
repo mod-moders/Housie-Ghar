@@ -206,13 +206,22 @@ export async function startGame(gameId: string, operatorId: string): Promise<voi
     currentIndex = logRes.rows[0].current_index;
   }
 
-  // Update game status to Live
-  await pool.query(
-    `UPDATE Scheduled_Games
-     SET game_status = 'Live', started_at = COALESCE(started_at, NOW())
-     WHERE game_id = $1`,
-    [gameId]
-  );
+  // Update game status to Live and assign starting operator if valid
+  if (operatorId && operatorId !== 'system-boot') {
+    await pool.query(
+      `UPDATE Scheduled_Games
+       SET game_status = 'Live', started_at = COALESCE(started_at, NOW()), operator_id = COALESCE(operator_id, $2)
+       WHERE game_id = $1`,
+      [gameId, operatorId]
+    );
+  } else {
+    await pool.query(
+      `UPDATE Scheduled_Games
+       SET game_status = 'Live', started_at = COALESCE(started_at, NOW())
+       WHERE game_id = $1`,
+      [gameId]
+    );
+  }
 
   // Initialize runtime state
   const activeGame: ActiveGame = {
