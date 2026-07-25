@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings } from './player.controller';
+import { startSignup, verifySignupOtp, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings } from './player.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
 const router = Router();
 
 // Player endpoints
-router.post('/signup', signup);
+router.post('/signup/start', startSignup);
+router.post('/signup/verify', verifySignupOtp);
 router.post('/login', login);
 router.post('/logout', logout);
 router.get('/me', authenticatePlayer, getProfile);

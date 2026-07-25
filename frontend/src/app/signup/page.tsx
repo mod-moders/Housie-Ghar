@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,14 +9,23 @@ import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
+type Step = "form" | "otp";
+
 export default function SignUp() {
   const router = useRouter();
+  const [step, setStep] = useState<Step>("form");
   const [housieName, setHousieName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [refId, setRefId] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [showBookieForm, setShowBookieForm] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Redirect only if THIS tab actually holds a session token — see the same
@@ -52,10 +61,34 @@ export default function SignUp() {
     }
   }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    return () => {
+      if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+    };
+  }, []);
+
+  const startCooldown = (seconds: number) => {
+    setCooldown(seconds);
+    if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+    cooldownTimer.current = setInterval(() => {
+      setCooldown((c) => {
+        if (c <= 1) {
+          if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+  };
+
+  const requestOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!housieName) {
       setError("Please fill in a Housie Name.");
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      setError("Enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -63,25 +96,54 @@ export default function SignUp() {
     setError(null);
 
     try {
-      const res = await apiFetch<{ token: string }>("/api/player/signup", {
+      const res = await apiFetch<{ pending: boolean; expires_in: number; delivered: boolean; dev_otp?: string }>(
+        "/api/player/signup/start",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            housie_name: housieName,
+            phone,
+            ref_promoter_id: refId,
+            referral_code: referralCode.trim() || undefined,
+          }),
+        }
+      );
+      setDevOtp(res.dev_otp ?? null);
+      setOtp("");
+      setStep("otp");
+      startCooldown(30);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(otp)) {
+      setError("Enter the 6-digit code.");
+      return;
+    }
+
+    setVerifying(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch<{ token: string }>("/api/player/signup/verify", {
         method: "POST",
-        body: JSON.stringify({
-          housie_name: housieName,
-          ref_promoter_id: refId,
-          referral_code: referralCode.trim() || undefined,
-        }),
+        body: JSON.stringify({ phone, otp }),
       });
 
       if (typeof window !== "undefined") {
         sessionStorage.setItem("hg_player_token", res.token);
       }
 
-      // Redirect to lobby
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed. Please try again.");
+      setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
     } finally {
-      setLoading(false);
+      setVerifying(false);
     }
   };
 
@@ -109,7 +171,7 @@ export default function SignUp() {
           Sign Up
         </h1>
         <p className="text-center text-sm mb-6" style={{ color: "var(--text-mute)" }}>
-          Sign up to pick tickets and join the live draws.
+          {step === "form" ? "Sign up to pick tickets and join the live draws." : `Enter the code sent to your WhatsApp`}
         </p>
 
         {error && (
@@ -118,48 +180,128 @@ export default function SignUp() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium mb-1.5" htmlFor="housie-name" style={{ color: "var(--text-dim)" }}>
-              Housie Name
-            </label>
-            <input
-              id="housie-name"
-              type="text"
-              required
-              placeholder="Choose a username/alias (3-20 chars)"
-              value={housieName}
-              onChange={(e) => setHousieName(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
-              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
-            />
-            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
-              Your Housie Name will be used to log in on returning visits.
-            </p>
+        {devOtp && step === "otp" && (
+          <div className="bg-amber-900/30 border border-amber-500/50 rounded-lg p-3 text-amber-200 text-xs mb-6 text-center">
+            WhatsApp delivery isn&apos;t configured yet, so here&apos;s your code for testing: <b className="font-mono">{devOtp}</b>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium mb-1.5" htmlFor="referral-code" style={{ color: "var(--text-dim)" }}>
-              Referral Code <span style={{ color: "var(--text-mute)", fontWeight: "normal" }}>(optional)</span>
-            </label>
-            <input
-              id="referral-code"
-              type="text"
-              placeholder="e.g. HGPLA042"
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm uppercase"
-              style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
-            />
-            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
-              Got a code from a friend? Enter it here so they get credit once you book your first ticket.
-            </p>
-          </div>
+        {step === "form" ? (
+          <form onSubmit={requestOtp} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium mb-1.5" htmlFor="housie-name" style={{ color: "var(--text-dim)" }}>
+                Housie Name
+              </label>
+              <input
+                id="housie-name"
+                type="text"
+                required
+                placeholder="Choose a username/alias (3-20 chars)"
+                value={housieName}
+                onChange={(e) => setHousieName(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
+              />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+                Your Housie Name will be used to log in on returning visits.
+              </p>
+            </div>
 
-          <Button type="submit" variant="cta" full disabled={loading}>
-            {loading ? "Registering..." : "ENTER LOBBY"}
-          </Button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium mb-1.5" htmlFor="phone" style={{ color: "var(--text-dim)" }}>
+                Mobile Number
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-3 rounded-lg font-mono text-sm" style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text-mute)" }}>
+                  +91
+                </span>
+                <input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  required
+                  placeholder="10-digit mobile number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
+                  style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
+                />
+              </div>
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+                We&apos;ll send a one-time code to this number on WhatsApp to confirm it&apos;s you.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5" htmlFor="referral-code" style={{ color: "var(--text-dim)" }}>
+                Referral Code <span style={{ color: "var(--text-mute)", fontWeight: "normal" }}>(optional)</span>
+              </label>
+              <input
+                id="referral-code"
+                type="text"
+                placeholder="e.g. HGPLA042"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm uppercase"
+                style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
+              />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+                Got a code from a friend? Enter it here so they get credit once you book your first ticket.
+              </p>
+            </div>
+
+            <Button type="submit" variant="cta" full disabled={loading}>
+              {loading ? "Sending code…" : "Send OTP"}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={verifyOtp} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium mb-1.5" htmlFor="otp" style={{ color: "var(--text-dim)" }}>
+                6-digit code
+              </label>
+              <input
+                id="otp"
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                placeholder="000000"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full px-4 py-3 rounded-lg text-center tracking-[0.5em] focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-lg"
+                style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
+              />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+                Sent to +91 {phone}. The code expires in 10 minutes.
+              </p>
+            </div>
+
+            <Button type="submit" variant="cta" full disabled={verifying}>
+              {verifying ? "Verifying…" : "Verify & Create Account"}
+            </Button>
+
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={() => { setStep("form"); setError(null); setOtp(""); }}
+                className="hover:underline"
+                style={{ color: "var(--text-mute)" }}
+              >
+                Change number
+              </button>
+              <button
+                type="button"
+                disabled={cooldown > 0 || loading}
+                onClick={() => requestOtp()}
+                className="hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+                style={{ color: "var(--accent)" }}
+              >
+                {cooldown > 0 ? `Resend in ${cooldown}s` : loading ? "Resending…" : "Resend code"}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mt-6 text-center text-sm flex flex-col gap-4" style={{ color: "var(--text-mute)" }}>
           <div>
@@ -169,9 +311,9 @@ export default function SignUp() {
             </Link>
           </div>
           <div className="pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-            <button 
-              type="button" 
-              onClick={() => setShowBookieForm(true)} 
+            <button
+              type="button"
+              onClick={() => setShowBookieForm(true)}
               style={{
                 background: "linear-gradient(90deg, var(--accent-soft) 0%, rgba(255, 255, 255, 0.02) 100%)",
                 border: "1px solid var(--accent)",
