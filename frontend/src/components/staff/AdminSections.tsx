@@ -1883,8 +1883,6 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ full_name: "", username: "bookie", email: "", phone: "", town: "", role_id: "4", password: "", monthly_salary: "" });
-  const [editingSalaryUserId, setEditingSalaryUserId] = useState<string | null>(null);
-  const [salaryInputValue, setSalaryInputValue] = useState<string>("");
 
   const load = useCallback(() => {
     apiFetch<StaffUser[]>("/api/users").then(setUsers).catch(() => {});
@@ -1948,20 +1946,6 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
-    }
-  };
-
-  const saveSalary = async (u: StaffUser) => {
-    setError(null);
-    try {
-      await apiFetch(`/api/users/${u.user_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ monthly_salary: parseFloat(salaryInputValue) || 0 }),
-      });
-      setEditingSalaryUserId(null);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update salary");
     }
   };
 
@@ -2228,80 +2212,9 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span className="hg-dim">Monthly Salary:</span>
-                    
-                    {editingSalaryUserId === u.user_id ? (
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <input
-                          type="number"
-                          value={salaryInputValue}
-                          onChange={(e) => setSalaryInputValue(e.target.value)}
-                          style={{
-                            width: "80px",
-                            padding: "2px 6px",
-                            fontSize: "12px",
-                            borderRadius: "4px",
-                            border: "1px solid var(--border)",
-                            background: "var(--surface)",
-                            color: "var(--text)"
-                          }}
-                        />
-                        <button
-                          onClick={() => saveSalary(u)}
-                          style={{
-                            padding: "2px 6px",
-                            background: "var(--success)",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: "4px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            cursor: "pointer"
-                          }}
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingSalaryUserId(null)}
-                          style={{
-                            padding: "2px 6px",
-                            background: "var(--surface-2)",
-                            color: "var(--text-dim)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "4px",
-                            fontSize: "11px",
-                            cursor: "pointer"
-                          }}
-                        >
-                          X
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontWeight: 700, color: "var(--accent)" }}>
-                          {money(u.monthly_salary || 0)}
-                        </span>
-                        {isSuper && (
-                          <button
-                            onClick={() => {
-                              setEditingSalaryUserId(u.user_id);
-                              setSalaryInputValue(String(u.monthly_salary || ""));
-                            }}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              cursor: "pointer",
-                              color: "var(--text-mute)",
-                              padding: "2px",
-                              display: "flex",
-                              alignItems: "center"
-                            }}
-                            title="Edit Salary"
-                          >
-                            <Icon name="edit" size={12} />
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                      {money(u.monthly_salary || 0)}
+                    </span>
                   </div>
                 </div>
               )}
