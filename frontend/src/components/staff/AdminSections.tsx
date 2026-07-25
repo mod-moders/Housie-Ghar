@@ -337,12 +337,21 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
   };
 
   const width = 600;
-  const height = 140;
+  const height = 160;
   let maxVal = 10;
   let paths: { points: { x: number; y: number }[]; color: string; label: string }[] = [];
 
+  // Totals calculations
+  const totalRevenue = marginData.revenue.reduce((a, b) => a + b, 0);
+  const totalPayouts = marginData.payouts.reduce((a, b) => a + b, 0);
+  const totalNet = marginData.net.reduce((a, b) => a + b, 0);
+  const totalVolume = volumeData.reduce((a, b) => a + b, 0);
+  const maxDau = Math.max(...engagementData.dau, 0);
+  const maxMau = Math.max(...engagementData.mau, 0);
+
   if (source === "margin") {
-    maxVal = Math.max(1, Math.max(...marginData.revenue) * 1.15);
+    // FIX: check all margin fields to avoid ceiling clipping
+    maxVal = Math.max(1, Math.max(...marginData.revenue, ...marginData.payouts, ...marginData.net) * 1.15);
     paths = [
       { points: getPathPoints(marginData.revenue, width, height, maxVal), color: "var(--cyan)", label: "Gross Revenue" },
       { points: getPathPoints(marginData.payouts, width, height, maxVal), color: "var(--danger)", label: "Total Payouts" },
@@ -354,7 +363,7 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
       { points: getPathPoints(volumeData, width, height, maxVal), color: "var(--accent)", label: "Ticket Sales Volume" },
     ];
   } else {
-    maxVal = Math.max(1, Math.max(...engagementData.mau) * 1.15);
+    maxVal = Math.max(1, Math.max(...engagementData.mau, ...engagementData.dau) * 1.15);
     paths = [
       { points: getPathPoints(engagementData.dau, width, height, maxVal), color: "var(--accent)", label: "Daily Active (DAU)" },
       { points: getPathPoints(engagementData.mau, width, height, maxVal), color: "var(--cyan)", label: "Monthly Active (MAU)" },
@@ -362,7 +371,7 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
   }
 
   return (
-    <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "16px 20px" }}>
+    <div className="hg-panel" style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h3 style={{ margin: 0 }}>Platform Performance Charts</h3>
@@ -396,7 +405,45 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
         </div>
       </div>
 
-      <div style={{ width: "100%", height: `${height}px`, position: "relative", marginTop: "10px" }}>
+      {/* Premium summary metrics cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", marginTop: "4px" }}>
+        {source === "margin" && (
+          <>
+            <div style={{ background: "rgba(0, 188, 255, 0.04)", border: "1px solid rgba(0, 188, 255, 0.12)", borderRadius: "8px", padding: "10px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Total Revenue</span>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--cyan)", marginTop: "2px" }}>{moneyStr(totalRevenue)}</div>
+            </div>
+            <div style={{ background: "rgba(255, 0, 99, 0.04)", border: "1px solid rgba(255, 0, 99, 0.12)", borderRadius: "8px", padding: "10px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Total Payouts</span>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--danger)", marginTop: "2px" }}>{moneyStr(totalPayouts)}</div>
+            </div>
+            <div style={{ background: "rgba(0, 255, 170, 0.04)", border: "1px solid rgba(0, 255, 170, 0.12)", borderRadius: "8px", padding: "10px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Net Profit</span>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--success)", marginTop: "2px" }}>{moneyStr(totalNet)}</div>
+            </div>
+          </>
+        )}
+        {source === "volume" && (
+          <div style={{ background: "rgba(212, 175, 55, 0.04)", border: "1px solid rgba(212, 175, 55, 0.12)", borderRadius: "8px", padding: "10px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Total Tickets Sold (7d)</span>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--accent)", marginTop: "2px" }}>{totalVolume.toLocaleString()}</div>
+          </div>
+        )}
+        {source === "engagement" && (
+          <>
+            <div style={{ background: "rgba(212, 175, 55, 0.04)", border: "1px solid rgba(212, 175, 55, 0.12)", borderRadius: "8px", padding: "10px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Peak Daily Active (DAU)</span>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--accent)", marginTop: "2px" }}>{maxDau.toLocaleString()}</div>
+            </div>
+            <div style={{ background: "rgba(0, 188, 255, 0.04)", border: "1px solid rgba(0, 188, 255, 0.12)", borderRadius: "8px", padding: "10px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-mute)", fontWeight: 600 }}>Peak Monthly Active (MAU)</span>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--cyan)", marginTop: "2px" }}>{maxMau.toLocaleString()}</div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ width: "100%", height: `${height}px`, position: "relative", marginTop: "14px" }}>
         <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: "hidden" }}>
           {[0.25, 0.5, 0.75, 1].map((p, i) => (
             <line
@@ -421,9 +468,9 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
                   </linearGradient>
                 </defs>
                 <path d={`M 0 ${height} L ${pStr} L ${width} ${height} Z`} fill={`url(#chart-grad-${i})`} />
-                <path d={`M ${pStr}`} fill="none" stroke={p.color} strokeWidth="2" style={{ transition: "d 0.3s" }} />
+                <path d={`M ${pStr}`} fill="none" stroke={p.color} strokeWidth="2.5" style={{ transition: "d 0.3s" }} />
                 {p.points.map((pt, j) => (
-                  <circle key={j} cx={pt.x} cy={pt.y} r="3.5" fill="var(--bg)" stroke={p.color} strokeWidth="1.5" />
+                  <circle key={j} cx={pt.x} cy={pt.y} r="4.5" fill="var(--bg)" stroke={p.color} strokeWidth="2" />
                 ))}
               </g>
             );
@@ -431,7 +478,7 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
         </svg>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 4px" }}>
         {days.map((d, i) => (
           <span key={i} className="text-[10px] text-mute font-bold" style={{ width: `${100 / days.length}%`, textAlign: "center" }}>
             {d}
@@ -439,13 +486,45 @@ export function AnalyticsChart({ series }: { series?: PerformanceSeries | null }
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "4px" }}>
-        {paths.map((p, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: p.color }} />
-            <span className="text-[11px] font-semibold text-text-dim">{p.label}</span>
-          </div>
-        ))}
+      {/* Daily Stats Table for staff to easily read exact numbers */}
+      <div style={{ marginTop: "8px", overflowX: "auto", border: "1px solid var(--border)", borderRadius: "8px", background: "var(--surface-2)" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "left" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+              <th style={{ padding: "8px 12px", color: "var(--text-mute)", fontWeight: 700 }}>Metric</th>
+              {days.map((d, i) => (
+                <th key={i} style={{ padding: "8px 6px", textAlign: "center", color: "var(--text-mute)", fontWeight: 700 }}>{d}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {paths.map((p, i) => {
+              let valArray: number[] = [];
+              if (source === "margin") {
+                if (i === 0) valArray = marginData.revenue;
+                else if (i === 1) valArray = marginData.payouts;
+                else valArray = marginData.net;
+              } else if (source === "volume") {
+                valArray = volumeData;
+              } else {
+                if (i === 0) valArray = engagementData.dau;
+                else valArray = engagementData.mau;
+              }
+              return (
+                <tr key={i} style={{ borderBottom: i === paths.length - 1 ? "none" : "1px solid var(--border)" }}>
+                  <td style={{ padding: "8px 12px", fontWeight: 700, color: p.color, whiteSpace: "nowrap" }}>
+                    {p.label}
+                  </td>
+                  {valArray.map((val, idx) => (
+                    <td key={idx} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: "var(--text)" }}>
+                      {source === "margin" ? moneyStr(val) : val.toLocaleString()}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
