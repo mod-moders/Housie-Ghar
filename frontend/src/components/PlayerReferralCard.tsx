@@ -56,6 +56,7 @@ export function PlayerReferralCard() {
   };
 
   const next = data.next_rung_at;
+  const maxRung = data.ladder.length > 0 ? data.ladder[data.ladder.length - 1] : 1;
 
   return (
     <div
@@ -168,43 +169,52 @@ export function PlayerReferralCard() {
         ))}
       </div>
 
-      {/* Ladder progress — one thick segment per rung (10 / 15 / 20…), each
-          filling as friends qualify and showing its own milestone number. */}
+      {/* Ladder progress — one continuous thick bar from 0 up to the top rung,
+          so growth reads as a single climb through 10 → 15 → 20 rather than
+          separate boxes (which, at 0 referrals, just looked like static
+          numbers with no visible progress at all). */}
       <div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div
+          style={{
+            position: "relative",
+            height: 28,
+            borderRadius: 999,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-light)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.max(0, Math.min(100, (data.qualified_referrals / maxRung) * 100))}%`,
+              height: "100%",
+              borderRadius: 999,
+              background: "var(--cta)",
+              transition: "width .35s ease",
+            }}
+          />
           {data.ladder.map((rung, i) => {
-            const prevRungMark = i === 0 ? 0 : data.ladder[i - 1];
-            const segPct = Math.max(0, Math.min(100, ((data.qualified_referrals - prevRungMark) / Math.max(1, rung - prevRungMark)) * 100));
             const reached = data.qualified_referrals >= rung;
+            const isLast = i === data.ladder.length - 1;
             return (
-              <div
+              <span
                 key={rung}
                 style={{
-                  flex: 1,
-                  position: "relative",
-                  height: 28,
-                  borderRadius: 999,
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border-light)",
-                  overflow: "hidden",
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: `${(rung / maxRung) * 100}%`,
+                  transform: isLast ? "translateX(-100%)" : "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 6px",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: reached ? "var(--cta-ink)" : "var(--text-dim)",
                 }}
               >
-                <div style={{ width: `${segPct}%`, height: "100%", borderRadius: 999, background: "var(--cta)", transition: "width .35s ease" }} />
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: reached ? "var(--cta-ink)" : "var(--text-dim)",
-                  }}
-                >
-                  {rung}
-                </div>
-              </div>
+                {rung}
+              </span>
             );
           })}
         </div>
