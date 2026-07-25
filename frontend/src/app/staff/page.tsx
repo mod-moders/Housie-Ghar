@@ -377,54 +377,58 @@ export default function StaffDashboard() {
                 <div className="hg-status-title">{(nav.find((n) => n[0] === active) ?? nav[0])[1]}</div>
               )}
               <div className="hg-status-right">
-                {user.role_name === "Bookie" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginRight: "12px", background: "rgba(255,255,255,0.03)", padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <span style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", color: user.receive_overflow ? "#10B981" : "#EF4444" }}>
-                      {user.receive_overflow ? "Available" : "Skipped"}
-                    </span>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const nextVal = !user.receive_overflow;
-                          const res = await apiFetch<{ user: AuthUser }>("/api/auth/me", {
-                            method: "PATCH",
-                            body: JSON.stringify({ receive_overflow: nextVal })
-                          });
-                          setUser({ ...user, ...res.user });
-                        } catch {}
-                      }}
-                      style={{
-                        position: "relative",
-                        width: "36px",
-                        height: "20px",
-                        borderRadius: "10px",
-                        background: user.receive_overflow ? "#10B981" : "#EF4444",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        transition: "background 0.25s ease"
-                      }}
-                      title={user.receive_overflow ? "Set skipped / unavailable" : "Set active / available"}
-                    >
-                      <span style={{
-                        display: "block",
-                        width: "16px",
-                        height: "16px",
-                        borderRadius: "50%",
-                        background: "white",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                        transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                        transform: user.receive_overflow ? "translateX(18px)" : "translateX(2px)"
-                      }} />
-                    </button>
-                  </div>
-                )}
                 <span className="hg-status-role">{roleLabel}</span>
                 <Avatar src={roleAvatar(user)} name={user.full_name} />
               </div>
             </header>
+
+            {user.role_name === "Bookie" && (
+              <div className="hg-bookie-availability">
+                <span
+                  className="hg-bookie-availability-label"
+                  style={{ color: user.receive_overflow ? "#10B981" : "#EF4444" }}
+                >
+                  {user.receive_overflow ? "Available" : "Skipped"}
+                </span>
+                <button
+                  onClick={async () => {
+                    try {
+                      const nextVal = !user.receive_overflow;
+                      const res = await apiFetch<{ user: AuthUser }>("/api/auth/me", {
+                        method: "PATCH",
+                        body: JSON.stringify({ receive_overflow: nextVal })
+                      });
+                      setUser({ ...user, ...res.user });
+                    } catch {}
+                  }}
+                  style={{
+                    position: "relative",
+                    width: "36px",
+                    height: "20px",
+                    borderRadius: "10px",
+                    background: user.receive_overflow ? "#10B981" : "#EF4444",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    transition: "background 0.25s ease"
+                  }}
+                  title={user.receive_overflow ? "Set skipped / unavailable" : "Set active / available"}
+                >
+                  <span style={{
+                    display: "block",
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "50%",
+                    background: "white",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                    transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transform: user.receive_overflow ? "translateX(18px)" : "translateX(2px)"
+                  }} />
+                </button>
+              </div>
+            )}
 
             <main className="hg-dash-content" ref={dashContentRef} style={{ position: "relative" }}>
               <div className="hg-ptr-indicator" style={indicatorStyle}>↓</div>

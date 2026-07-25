@@ -2445,6 +2445,9 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-fin-stat.is-alert b{color:var(--danger);animation:hg-blink 1.4s infinite}
 .hg-status-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .hg-status-role{font:600 12px var(--font-head);color:var(--text-dim);white-space:nowrap}
+.hg-bookie-availability{display:flex;align-items:center;justify-content:flex-end;gap:8px;
+  padding:8px 18px;background:rgba(255,255,255,0.03);border-bottom:1.5px solid var(--card-line)}
+.hg-bookie-availability-label{font-size:11px;font-weight:bold;text-transform:uppercase}
 .hg-avatar-sm{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);
   font-weight:700;font-size:12px;background:var(--accent);color:var(--accent-ink);flex-shrink:0}
 .hg-avatar-lg{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);
@@ -2754,11 +2757,8 @@ select option {
 @media(max-width:899px){
   .hg-status-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hg-status-role{max-width:112px;overflow:hidden;text-overflow:ellipsis}
-  /* .hg-status-right also holds the Bookie-only AVAILABLE/SKIPPED toggle (fixed-width,
-     un-shrinkable) ahead of the role text and avatar — on a phone-width sidebar+statusbar
-     combo that row has no room left and the avatar was silently clipped by .hg-frame-wide's
-     overflow-x:hidden. Let this cluster wrap onto its own line instead of forcing overflow. */
   .hg-status-right{flex-wrap:wrap;justify-content:flex-end;row-gap:6px}
+  .hg-bookie-availability{padding:8px 14px}
 }
 
 /* ============ Finance Hub statusbar — stats row wraps below, mobile + tablet ============
