@@ -55,17 +55,7 @@ export function PlayerReferralCard() {
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
   };
 
-  // Progress across the current rung, measured from the previous rung so the bar
-  // fills smoothly instead of jumping.
   const next = data.next_rung_at;
-  const prevRung = (() => {
-    const passed = data.ladder.filter((t) => t <= data.qualified_referrals);
-    if (passed.length === 0) return 0;
-    return passed[passed.length - 1];
-  })();
-  const span = next !== null ? Math.max(1, next - prevRung) : 1;
-  const into = next !== null ? data.qualified_referrals - prevRung : 0;
-  const pct = next !== null ? Math.max(0, Math.min(100, (into / span) * 100)) : 100;
 
   return (
     <div
@@ -178,12 +168,47 @@ export function PlayerReferralCard() {
         ))}
       </div>
 
-      {/* Ladder progress */}
+      {/* Ladder progress — one thick segment per rung (10 / 15 / 20…), each
+          filling as friends qualify and showing its own milestone number. */}
       <div>
-        <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border-light)", overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "var(--cta)", transition: "width .35s ease" }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          {data.ladder.map((rung, i) => {
+            const prevRungMark = i === 0 ? 0 : data.ladder[i - 1];
+            const segPct = Math.max(0, Math.min(100, ((data.qualified_referrals - prevRungMark) / Math.max(1, rung - prevRungMark)) * 100));
+            const reached = data.qualified_referrals >= rung;
+            return (
+              <div
+                key={rung}
+                style={{
+                  flex: 1,
+                  position: "relative",
+                  height: 28,
+                  borderRadius: 999,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-light)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ width: `${segPct}%`, height: "100%", borderRadius: 999, background: "var(--cta)", transition: "width .35s ease" }} />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: reached ? "var(--cta-ink)" : "var(--text-dim)",
+                  }}
+                >
+                  {rung}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10, lineHeight: 1.5 }}>
           {next === null
             ? <>You&rsquo;ve reached the top of the reward ladder.</>
             : <>{data.referrals_to_next_rung} more friend{data.referrals_to_next_rung === 1 ? "" : "s"} to earn your next free ticket.</>}
