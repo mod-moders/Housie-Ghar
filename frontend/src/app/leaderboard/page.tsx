@@ -84,24 +84,7 @@ export default function LeaderboardAndStats() {
     }
   });
 
-  // Global insight metrics calculated from all entries
-  const insights = useMemo(() => {
-    if (!entries || entries.length === 0) return null;
-    const totalEarnings = entries.reduce((sum, e) => sum + e.total_won, 0);
-    const maxWin = Math.max(...entries.map(e => e.biggest_win));
-    const maxWinsOverall = Math.max(...entries.map(e => e.wins));
-    const maxEarningsOverall = Math.max(...entries.map(e => e.total_won));
-    const totalWins = entries.reduce((sum, e) => sum + e.wins, 0);
-    const avgWinValue = totalWins > 0 ? totalEarnings / totalWins : 0;
-    
-    return {
-      totalEarnings,
-      maxWin,
-      maxWinsOverall,
-      maxEarningsOverall,
-      avgWinValue,
-    };
-  }, [entries]);
+
 
   // Filter and sort the list of entries by unified Performance Rating Score
   const processedEntries = useMemo(() => {
@@ -271,14 +254,8 @@ export default function LeaderboardAndStats() {
               const isHighRoller = w.total_won > HIGH_ROLLER_THRESHOLD;
 
               // Master Title Determination
-              const isMaxWins = insights && w.wins === insights.maxWinsOverall && insights.maxWinsOverall > 0;
-              const isMaxEarnings = insights && w.total_won === insights.maxEarningsOverall && insights.maxEarningsOverall > 0;
-              const isDiamondMaster = isMaxWins && isMaxEarnings;
-
               let masterTitle: string | null = null;
-              if (isDiamondMaster) {
-                masterTitle = "Diamond Master";
-              } else if (rank === 1) {
+              if (rank === 1) {
                 masterTitle = "Gold Master";
               } else if (rank === 2) {
                 masterTitle = "Silver Master";
@@ -304,16 +281,22 @@ export default function LeaderboardAndStats() {
                       gap: 12,
                       flexWrap: "wrap",
                       background: isCurrentUser ? "rgba(244, 201, 93, 0.05)" : "var(--surface)",
-                      border: isDiamondMaster
-                        ? "2px solid #38bdf8"
-                        : rank === 1
+                      border: rank === 1
                         ? "2px solid var(--accent)"
+                        : rank === 2
+                        ? "2px solid #94a3b8"
+                        : rank === 3
+                        ? "2px solid #d97706"
                         : isCurrentUser
                         ? "2px solid var(--accent)"
                         : "1.5px solid var(--card-line)",
                       borderRadius: "var(--radius)",
-                      boxShadow: isDiamondMaster
-                        ? "0 0 20px rgba(56, 189, 248, 0.25)"
+                      boxShadow: rank === 1
+                        ? "0 0 20px rgba(244, 201, 93, 0.25)"
+                        : rank === 2
+                        ? "0 0 15px rgba(148, 163, 184, 0.2)"
+                        : rank === 3
+                        ? "0 0 15px rgba(217, 119, 6, 0.2)"
                         : isCurrentUser
                         ? "0 0 15px var(--accent-soft)"
                         : "var(--card-shadow-sm)",
@@ -323,7 +306,7 @@ export default function LeaderboardAndStats() {
                   >
                     {/* Rank Badge */}
                     <span className="hg-lb-rank" style={{ minWidth: 32, textAlign: "center", fontSize: 20, fontWeight: 800 }}>
-                      {isDiamondMaster ? "💎" : rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
+                      {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
                     </span>
 
                     {/* Avatar */}
@@ -366,24 +349,18 @@ export default function LeaderboardAndStats() {
                               fontWeight: 800,
                               padding: "2px 8px",
                               borderRadius: "6px",
-                              background: isDiamondMaster
-                                ? "linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(244, 201, 93, 0.25))"
-                                : rank === 1
+                              background: rank === 1
                                 ? "rgba(244, 201, 93, 0.18)"
                                 : rank === 2
                                 ? "rgba(148, 163, 184, 0.18)"
                                 : "rgba(217, 119, 6, 0.18)",
-                              color: isDiamondMaster
-                                ? "#38bdf8"
-                                : rank === 1
+                              color: rank === 1
                                 ? "var(--accent)"
                                 : rank === 2
                                 ? "#cbd5e1"
                                 : "#f59e0b",
                               border: `1px solid ${
-                                isDiamondMaster
-                                  ? "#38bdf8"
-                                  : rank === 1
+                                rank === 1
                                   ? "var(--accent)"
                                   : rank === 2
                                   ? "#94a3b8"
@@ -394,7 +371,7 @@ export default function LeaderboardAndStats() {
                               gap: 4
                             }}
                           >
-                            {isDiamondMaster ? "💎 Diamond Master" : rank === 1 ? "🥇 Gold Master" : rank === 2 ? "🥈 Silver Master" : "🥉 Bronze Master"}
+                            {rank === 1 ? "🥇 Gold Master" : rank === 2 ? "🥈 Silver Master" : "🥉 Bronze Master"}
                           </span>
                         )}
 
