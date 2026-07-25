@@ -9,7 +9,7 @@ import { Icon } from "@/components/Icon";
 import { Button, EmptyHint, Avatar } from "@/components/ui";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuditEntry, GameSummary, StaffUser } from "@/lib/types";
-import type { AuthUser } from "@/lib/stores/authStore";
+import { useAuthStore, type AuthUser } from "@/lib/stores/authStore";
 import { useConfigStore } from "@/lib/stores/configStore";
 import { getPresetClass } from "@/lib/presetHelper";
 import { useSocket } from "@/lib/hooks/useSocket";
@@ -1293,6 +1293,9 @@ export function GamesSection({ me }: { me: AuthUser }) {
 
 // ── Ticket Sales details Modal ───────────────────────────────────────────────
 export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose: () => void }) {
+  const { user } = useAuthStore();
+  const isOperator = user?.role_name === "Operator";
+
   const [data, setData] = useState<{
     title: string;
     tickets: Array<{
@@ -1341,6 +1344,12 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
   const query = searchQuery.trim().toLowerCase();
   const filteredTickets = data.tickets.filter((t) => {
     if (!query) return true;
+    if (isOperator) {
+      return (
+        t.ticket_number.toString().includes(query) ||
+        t.owner_housie_name.toLowerCase().includes(query)
+      );
+    }
     return (
       t.ticket_number.toString().includes(query) ||
       t.owner_housie_name.toLowerCase().includes(query) ||
@@ -1379,46 +1388,48 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
         {/* Search & Tabs */}
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 10, background: "rgba(0,0,0,0.15)", padding: 4, borderRadius: 30, width: "fit-content" }}>
-            <button
-              onClick={() => setActiveTab("tickets")}
-              style={{
-                border: "none",
-                background: activeTab === "tickets" ? "var(--brand)" : "transparent",
-                color: activeTab === "tickets" ? "var(--accent-ink)" : "var(--text-dim)",
-                padding: "8px 18px",
-                borderRadius: 24,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              TICKET LIST
-            </button>
-            <button
-              onClick={() => setActiveTab("agents")}
-              style={{
-                border: "none",
-                background: activeTab === "agents" ? "var(--brand)" : "transparent",
-                color: activeTab === "agents" ? "var(--accent-ink)" : "var(--text-dim)",
-                padding: "8px 18px",
-                borderRadius: 24,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              BOOKIE LIST
-            </button>
-          </div>
+          {!isOperator && (
+            <div style={{ display: "flex", gap: 10, background: "rgba(0,0,0,0.15)", padding: 4, borderRadius: 30, width: "fit-content" }}>
+              <button
+                onClick={() => setActiveTab("tickets")}
+                style={{
+                  border: "none",
+                  background: activeTab === "tickets" ? "var(--brand)" : "transparent",
+                  color: activeTab === "tickets" ? "var(--accent-ink)" : "var(--text-dim)",
+                  padding: "8px 18px",
+                  borderRadius: 24,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                TICKET LIST
+              </button>
+              <button
+                onClick={() => setActiveTab("agents")}
+                style={{
+                  border: "none",
+                  background: activeTab === "agents" ? "var(--brand)" : "transparent",
+                  color: activeTab === "agents" ? "var(--accent-ink)" : "var(--text-dim)",
+                  padding: "8px 18px",
+                  borderRadius: 24,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                BOOKIE LIST
+              </button>
+            </div>
+          )}
 
           {/* Search bar */}
           <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder="Enter keyword (Ticket #, name, bookie...)"
+              placeholder={isOperator ? "Enter keyword (Ticket #, name...)" : "Enter keyword (Ticket #, name, bookie...)"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -1440,7 +1451,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
 
         {/* Content Table */}
         <div style={{ marginTop: 16, maxHeight: "360px", overflowY: "auto", border: "1px solid var(--border-light)", borderRadius: 8 }}>
-          {activeTab === "tickets" ? (
+          {activeTab === "tickets" || isOperator ? (
             filteredTickets.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
                 No matching tickets found.
@@ -1451,7 +1462,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                   <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border-light)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-dim)" }}>
                     <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>TNO</th>
                     <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Name</th>
-                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Bookie</th>
+                    {!isOperator && <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Bookie</th>}
                     <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Status</th>
                   </tr>
                 </thead>
@@ -1462,9 +1473,11 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                         {t.ticket_number}
                       </td>
                       <td style={{ padding: "10px 14px", fontWeight: 600 }}>{t.owner_housie_name}</td>
-                      <td style={{ padding: "10px 14px", color: "var(--text-dim)" }}>
-                        {t.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)" }}>({t.bookie_role || 'System'})</span>
-                      </td>
+                      {!isOperator && (
+                        <td style={{ padding: "10px 14px", color: "var(--text-dim)" }}>
+                          {t.bookie_name} <span style={{ fontSize: 11, color: "var(--text-mute)" }}>({t.bookie_role || 'System'})</span>
+                        </td>
+                      )}
                       <td style={{ padding: "10px 14px", textAlign: "right" }}>
                         <span className={`hg-pill hg-pill-${t.status.toLowerCase()}`} style={{ fontSize: 11 }}>
                           {t.status}
