@@ -1295,7 +1295,10 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   border-top:3px solid var(--accent);
   border-radius:var(--radius-lg);
   padding:20px;
-  max-width:320px;
+  /* No max-width cap: a fixed 320px card left a huge gap of bare banner around it on
+     desktop, showing its border as a visibly smaller box floating inside the section
+     instead of filling it. Sizing purely off the banner's own content width now, so the
+     hook always fits the section it's in. */
   width:calc(100% - 48px);
   box-shadow:0 15px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(244, 63, 94, 0.25);
 }
