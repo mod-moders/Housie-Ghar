@@ -2364,7 +2364,6 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                         }}
                         title="Set Operator Salary"
                       >
-                        <Icon name="award" size={12} />
                         Salary
                       </button>
                     )}
