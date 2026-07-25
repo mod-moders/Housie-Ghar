@@ -4,6 +4,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
@@ -304,6 +306,51 @@ export default function Lobby() {
   const goLive = (id: string) => router.push(`/game/${id}/live`);
 
   const lobbyRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const gamesPanelRef = useRef<HTMLDivElement>(null);
+
+  // Mobile-only "curtain" reveal: the games panel rises and covers the hero banner as the
+  // user scrolls, then releases into normal scrolling once it fully covers it. The public
+  // site scrolls inside `.hg-frame` (not the window) below the 900px breakpoint — see
+  // `.hg-frame`'s overflow rules in globals.css — so ScrollTrigger must target that element
+  // as its scroller, not the default window.
+  useEffect(() => {
+    // Runs once on mount *and* once more when the auth-check placeholder is
+    // replaced by the real lobby markup — heroRef isn't attached to anything
+    // until that second commit, so a plain `[]` dep array would fire too early.
+    if (isCheckingAuth) return;
+    const frame = heroRef.current?.closest(".hg-frame") as HTMLElement | null;
+    if (!frame) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+    const mm = gsap.matchMedia();
+
+    mm.add("(max-width: 899.98px)", () => {
+      if (!heroRef.current) return;
+      const nav = frame.querySelector(".hg-nav") as HTMLElement | null;
+      const navHeight = nav?.getBoundingClientRect().height ?? 70;
+
+      const trigger = ScrollTrigger.create({
+        trigger: heroRef.current,
+        scroller: frame,
+        start: `top ${navHeight}px`,
+        end: `bottom ${navHeight}px`,
+        pin: true,
+        pinSpacing: false,
+        anticipatePin: 1,
+      });
+
+      return () => trigger.kill();
+    });
+
+    return () => mm.revert();
+  }, [isCheckingAuth]);
+
+  // The lucky-number wizard mounts asynchronously and can change the hero's height —
+  // recompute the pin's trigger points once it appears.
+  useEffect(() => {
+    ScrollTrigger.refresh();
+  }, [lucky]);
 
   const all = games ?? [];
   const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
@@ -367,38 +414,41 @@ export default function Lobby() {
         ))}
 
         <div className="hg-lobby-v2" ref={lobbyRef}>
-          {/* Brand Welcome Header with Logo */}
-          <div className="hg-lobby-header">
-            <div className="hg-lobby-header-row">
-              <Image 
-                src="/HG Secondary.png" 
-                alt="Housie Ghar" 
-                width={160} 
-                height={160} 
-                priority 
-                className="hg-lobby-logo" 
-              />
-              {lucky && lucky.lucky_number !== null && (
-                <section
-                  className="hg-lucky-wizard"
-                  aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
-                >
-                  <div className="hg-lucky-wizard-scene">
-                     {/* eslint-disable-next-line @next/next/no-img-element -- decorative CSS-positioned PNG; next/image fill would fight the wizard-scene layout */}
-                     <img src="/assets/wizard_globe.png" className="hg-wizard-img" alt="Wizard predicting lucky number" />
-                     <div className="hg-globe-glow"></div>
-                     <div className="hg-lucky-number-overlay">
-                       <div className="hg-lucky-number-inner">
-                         {lucky.lucky_number}
+          {/* Brand Welcome Header with Logo — covered by the games panel as it rises on scroll (mobile) */}
+          <div className="hg-lobby-hero" ref={heroRef}>
+            <div className="hg-lobby-header">
+              <div className="hg-lobby-header-row">
+                <Image
+                  src="/HG Secondary.png"
+                  alt="Housie Ghar"
+                  width={160}
+                  height={160}
+                  priority
+                  className="hg-lobby-logo"
+                />
+                {lucky && lucky.lucky_number !== null && (
+                  <section
+                    className="hg-lucky-wizard"
+                    aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
+                  >
+                    <div className="hg-lucky-wizard-scene">
+                       {/* eslint-disable-next-line @next/next/no-img-element -- decorative CSS-positioned PNG; next/image fill would fight the wizard-scene layout */}
+                       <img src="/assets/wizard_globe.png" className="hg-wizard-img" alt="Wizard predicting lucky number" />
+                       <div className="hg-globe-glow"></div>
+                       <div className="hg-lucky-number-overlay">
+                         <div className="hg-lucky-number-inner">
+                           {lucky.lucky_number}
+                         </div>
                        </div>
-                     </div>
-                  </div>
-                </section>
-              )}
+                    </div>
+                  </section>
+                )}
+              </div>
+              <p className="hg-lobby-tagline">The entire town is playing! Are you?</p>
             </div>
-            <p className="hg-lobby-tagline">The entire town is playing! Are you?</p>
           </div>
 
+          <div className="hg-games-panel" ref={gamesPanelRef}>
           {textToScroll && (
             <div className="hg-announcement-banner">
               <div className="hg-info-sticker">INFO</div>
@@ -489,6 +539,7 @@ export default function Lobby() {
           )}
 
           <PlayerReferralCard />
+          </div>
         </div>
 
         <Footer />

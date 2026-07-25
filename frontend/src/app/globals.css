@@ -1399,6 +1399,20 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-screen--lobby{position:relative;overflow:hidden;min-height:calc(100vh - 70px)}
 .hg-lobby-v2{position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
 .hg-lobby-header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:6px;padding:8px 16px}
+/* Games panel replaces .hg-lobby-v2's flex gap for everything after the hero banner —
+   the flex/gap here is layout-preserving on every viewport size. Only below 900px does
+   it also become the rising "curtain" that GSAP pins/reveals over .hg-lobby-hero (see
+   page.tsx) — desktop keeps today's plain scroll with no bg/radius/offset. */
+.hg-games-panel{display:flex;flex-direction:column;gap:18px}
+@media (max-width: 899.98px) {
+  .hg-lobby-hero{position:relative;z-index:1}
+  .hg-games-panel{
+    position:relative;z-index:2;
+    margin:0 -16px;padding:20px 16px 0;
+    background:var(--bg2);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}
 .hg-lobby-logo{object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.3))}
 .hg-lobby-tagline{margin:8px 0 0;font-family:var(--font-head);font-size:16px;font-weight:700;letter-spacing:0.03em;color:var(--text-dim)}
 .hg-section-live{display:inline-flex;align-items:center;gap:9px}
