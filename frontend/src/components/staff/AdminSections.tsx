@@ -1215,7 +1215,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         {pastGames.length === 0 ? (
           <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 3 days will show up here." />
         ) : (
-          <div className="hg-table" style={{ minWidth: "650px" }}>
+          <div className="hg-table" style={{ minWidth: "760px" }}>
             <div className="hg-tr hg-tr-history hg-tr-head">
               <span>Game Name</span><span>Date &amp; Time</span><span>Tickets Sold</span><span>Revenue</span><span>Action</span>
             </div>
@@ -1230,7 +1230,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
                   <span className="hg-dim">{dateStr}</span>
                   <span>{g.sold_count} / {g.total_tickets}</span>
                   <strong>{money(totalRevenue)}</strong>
-                  <span className="hg-row-ctrls" style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                  <span className="hg-row-ctrls" style={{ display: "flex", gap: 6, justifyContent: "flex-start", flexWrap: "nowrap" }}>
                     <Button variant="ghost" size="sm" onClick={() => viewResults(g)}>View Results</Button>
                     <Button variant="ghost" size="sm" onClick={() => setSalesGameId(g.game_id)}>View Tickets</Button>
                   </span>

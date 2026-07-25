@@ -2517,7 +2517,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   background:var(--surface-2)}
 .hg-tr-6{grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr}
 .hg-tr-games{grid-template-columns:2fr 1fr 1.2fr 1fr 1.2fr 1fr 180px}
-.hg-tr-history{grid-template-columns:2fr 1fr 1.2fr 1fr 200px}
+.hg-tr-history{grid-template-columns:2fr 1.2fr 1.2fr 1fr 280px}
 .hg-tr-players{grid-template-columns:1.8fr 1fr .7fr .7fr 1fr 1fr .9fr 90px;min-width:860px;white-space:nowrap}
 .hg-tr-players .hg-td-name{white-space:normal}
 .hg-tr-fin-games{grid-template-columns:1.8fr 1fr .8fr 1fr 1fr 1fr .8fr}
