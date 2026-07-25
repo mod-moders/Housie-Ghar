@@ -2220,18 +2220,14 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="hg-dim" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <Icon name="calendar" size={13} /> Operator since:
-                    </span>
+                    <span className="hg-dim">Operator since:</span>
                     <span style={{ fontWeight: 600, color: "var(--text)" }}>
                       {u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
                     </span>
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="hg-dim" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <Icon name="award" size={13} /> Monthly Salary:
-                    </span>
+                    <span className="hg-dim">Monthly Salary:</span>
                     
                     {editingSalaryUserId === u.user_id ? (
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>

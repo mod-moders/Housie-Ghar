@@ -194,7 +194,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Operator Since</span>
             <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(168, 85, 247, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="calendar" size={16} style={{ color: "#A855F7" }} />
+              <Icon name="clock" size={16} style={{ color: "#A855F7" }} />
             </div>
           </div>
           <b style={{ display: "block", fontSize: "20px", fontWeight: "800", marginTop: "20px", color: "var(--text)" }}>
@@ -208,7 +208,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Monthly Salary</span>
             <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="award" size={16} style={{ color: "#10B981" }} />
+              <Icon name="wallet" size={16} style={{ color: "#10B981" }} />
             </div>
           </div>
           <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--accent)" }}>{money(data.monthly_salary)}</b>
@@ -220,7 +220,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span className="hg-dim" style={{ fontSize: "11px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Overall Salary Earned</span>
             <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="award" size={16} style={{ color: "#F59E0B" }} />
+              <Icon name="trophy" size={16} style={{ color: "#F59E0B" }} />
             </div>
           </div>
           <b style={{ display: "block", fontSize: "30px", fontWeight: "800", marginTop: "10px", color: "var(--accent)" }}>{money(data.overall_salary_earned)}</b>
@@ -272,7 +272,7 @@ export function OperatorStatsSection({ me }: { me: AuthUser }) {
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Icon name="award" size={14} style={{ color: "var(--accent)" }} />
+            <Icon name="trophy" size={14} style={{ color: "var(--accent)" }} />
           </div>
           <div>
             <span style={{ fontSize: "11px", color: "var(--text-mute)", textTransform: "uppercase", fontWeight: "bold" }}>Payout Disbursed</span>
