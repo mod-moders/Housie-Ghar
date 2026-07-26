@@ -70,7 +70,7 @@ export async function listPendingTopUps(req: AuthenticatedRequest, res: Response
                  t.request_status, t.requested_at, t.reviewed_at, u.full_name AS agent_name, u.phone AS agent_phone, u.town AS agent_town, 2 AS sort_order
           FROM TopUp_Requests t
           JOIN Users u ON t.agent_id = u.user_id
-          WHERE LOWER(t.request_status) IN ('approved', 'rejected') AND COALESCE(t.reviewed_at, t.requested_at) >= NOW() - INTERVAL '2 days'
+          WHERE LOWER(t.request_status) IN ('approved', 'rejected') AND COALESCE(t.reviewed_at, t.requested_at) >= NOW() - INTERVAL '7 days'
           ORDER BY COALESCE(t.reviewed_at, t.requested_at) DESC
          )
        ) AS combined

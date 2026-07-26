@@ -658,15 +658,15 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 )}
               </div>
 
-              {/* SECTION 2: PAST HISTORY (2 DAYS) */}
+              {/* SECTION 2: PAST HISTORY (7 DAYS) */}
               <div style={{ paddingTop: "14px", borderTop: "1px dashed var(--border-light)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Icon name="clock" size={13} /> Past History (2 Days) ({historyRecharges.length})
+                    <Icon name="clock" size={13} /> Past History (7 Days) ({historyRecharges.length})
                   </span>
                 </div>
                 {historyRecharges.length === 0 ? (
-                  <EmptyHint icon="check" title="No History in 2 Days" sub="Approved or rejected recharges from the past 48 hours will show here." />
+                  <EmptyHint icon="check" title="No History in 7 Days" sub="Approved or rejected recharges from the past 7 days will show here." />
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {historyRecharges.map((r) => {
@@ -787,15 +787,15 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 )}
               </div>
 
-              {/* SECTION 2: PAST CLAIM REQUEST HISTORY (PAST 2 DAYS) */}
+              {/* SECTION 2: PAST CLAIM REQUEST HISTORY (PAST 7 DAYS) */}
               <div style={{ paddingTop: "14px", borderTop: "1px dashed var(--border-light)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Icon name="clock" size={13} /> Past History (2 Days) ({historyClaims.length})
+                    <Icon name="clock" size={13} /> Past History (7 Days) ({historyClaims.length})
                   </span>
                 </div>
                 {historyClaims.length === 0 ? (
-                  <EmptyHint icon="check" title="No History in 2 Days" sub="Disbursed claims from the past 48 hours will show here." />
+                  <EmptyHint icon="check" title="No History in 7 Days" sub="Disbursed claims from the past 7 days will show here." />
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {historyClaims.map((c) => (

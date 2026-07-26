@@ -1554,7 +1554,7 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
          LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
          LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
          WHERE p.player_claimed = TRUE
-           AND ${isDisbursed ? "p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '2 days'" : "(p.disbursed = FALSE OR p.disbursed IS NULL)"}
+           AND ${isDisbursed ? "p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '7 days'" : "(p.disbursed = FALSE OR p.disbursed IS NULL)"}
          ORDER BY p.prize_id ASC, p.player_claimed_at DESC`;
 
       const res = await pool.query(query);
