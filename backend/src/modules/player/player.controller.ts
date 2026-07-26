@@ -6,6 +6,7 @@ import { env } from '../../config/env';
 import { validateHousieName, generateAlternatives } from '../../utils/housieName';
 import { registerDevice, checkDevice } from '../../services/playerDevices';
 import { buildWaLink } from '../../utils/waLink';
+import { logAuditEvent } from '../../services/audit.service';
 
 /** Shared by signup and the profile password change, so the two can't drift apart. */
 export const MIN_PLAYER_PASSWORD_LENGTH = 6;
@@ -889,6 +890,64 @@ export async function getAllPlayers(req: any, res: Response): Promise<void> {
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching all players:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Staff-set player password.
+ *
+ * The last-resort recovery path. Self-service covers a player with a phone on the
+ * account or one sitting on a device the account has been seen on; a player with
+ * neither has no way back in on their own, and previously the only remedy was editing
+ * the row by hand. Restricted to Superadmin and Financial Admin — the same pair that
+ * can already suspend an account — and always audit-logged, because setting someone's
+ * password is indistinguishable from taking their account if it is done quietly.
+ */
+export async function adminResetPlayerPassword(req: any, res: Response): Promise<void> {
+  const { player_id } = req.params;
+  const { password } = req.body;
+
+  if (typeof password !== 'string' || password.length < MIN_PLAYER_PASSWORD_LENGTH) {
+    res.status(400).json({
+      message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
+    });
+    return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `UPDATE Players SET password_hash = $1 WHERE player_id = $2
+       RETURNING player_id, housie_name`,
+      [passwordHash, player_id]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ message: 'Player not found' });
+      return;
+    }
+
+    const player = result.rows[0];
+    const actor = req.user ?? {};
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'RESET_PLAYER_PASSWORD',
+      targetType: 'Players',
+      targetId: player.player_id,
+      targetDescription: `Set a new password for player "${player.housie_name}"`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      message: `Password updated for ${player.housie_name}. Share it with them privately and ask them to change it under Profile.`,
+      player,
+    });
+  } catch (error) {
+    console.error('Error resetting player password:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings, forgotPassword, resetPassword } from './player.controller';
+import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminResetPlayerPassword, adminDeletePlayer, getPlayerWinnings, forgotPassword, resetPassword } from './player.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -21,6 +21,9 @@ router.get('/winnings', authenticatePlayer, getPlayerWinnings);
 // Administrative Player Management endpoints
 router.get('/', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), getAllPlayers);
 router.patch('/:player_id/status', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), adminUpdatePlayerStatus);
+// Last-resort recovery for a player with neither a phone on file nor a recognised
+// device. Same role pair that can suspend an account; always audit-logged.
+router.patch('/:player_id/password', authenticateToken, requireRole(['Superadmin', 'Financial Admin']), adminResetPlayerPassword);
 router.delete('/:player_id', authenticateToken, requireRole(['Superadmin']), adminDeletePlayer);
 
 export default router;

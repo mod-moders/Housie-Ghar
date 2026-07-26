@@ -28,6 +28,8 @@ export function PlayersSection() {
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const { alert, confirm } = useDialog();
 
   const loadPlayers = useCallback(async () => {
@@ -92,6 +94,38 @@ export function PlayersSection() {
       alert("Player profile deleted successfully", { type: "success" });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to delete player profile.", { type: "error" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  // Last-resort recovery: a player with no phone saved and no device we recognise can't
+  // use /forgot-password at all, and there is no other way back into their account.
+  const handleResetPassword = async (player: PlayerData) => {
+    if (newPassword.length < 6) {
+      alert("Password must be at least 6 characters long", { type: "error" });
+      return;
+    }
+    const confirmed = await confirm(
+      `Set a new password for '${player.housie_name}'? Share it with them privately — anyone who has it can sign in as them.`,
+      { type: "warning", title: "Reset Password" }
+    );
+    if (!confirmed) return;
+
+    setActionBusy(player.player_id);
+    try {
+      await apiFetch(`/api/player/${player.player_id}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: newPassword }),
+      });
+      setResetOpen(false);
+      setNewPassword("");
+      alert(
+        `Password updated for ${player.housie_name}. Send it to them privately and ask them to change it under Profile.`,
+        { type: "success" }
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to reset password.", { type: "error" });
     } finally {
       setActionBusy(null);
     }
@@ -312,7 +346,52 @@ export function PlayersSection() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
+            {resetOpen && (
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                  New password for {selectedPlayer.housie_name}
+                </label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    style={{
+                      flex: "1 1 180px", minWidth: 0,
+                      background: "var(--surface-2)", border: "1px solid var(--border-light)",
+                      borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "8px 12px",
+                      fontFamily: "var(--font-mono)", outline: "none",
+                    }}
+                  />
+                  <Button
+                    variant="cta"
+                    size="sm"
+                    disabled={actionBusy === selectedPlayer.player_id}
+                    onClick={() => handleResetPassword(selectedPlayer)}
+                  >
+                    {actionBusy === selectedPlayer.player_id ? "Saving…" : "Set Password"}
+                  </Button>
+                </div>
+                {/* Shown in the clear on purpose: staff have to read this back to the
+                    player over WhatsApp, and a masked field they can't verify is how
+                    typos become a second lockout. */}
+                <span style={{ fontSize: 11, color: "var(--text-mute)" }}>
+                  Visible so you can read it back accurately. Share it privately and ask them to
+                  change it under Profile.
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", borderTop: "1px solid var(--border)", paddingTop: "12px", flexWrap: "wrap" }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setResetOpen((v) => !v); setNewPassword(""); }}
+              >
+                {resetOpen ? "Cancel Reset" : "Reset Password"}
+              </Button>
               <Button
                 variant={selectedPlayer.status === "Active" ? "ghost" : "cta"}
                 size="sm"
@@ -328,7 +407,7 @@ export function PlayersSection() {
               >
                 Delete Profile
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedPlayer(null)}>Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedPlayer(null); setResetOpen(false); setNewPassword(""); }}>Close</Button>
             </div>
           </div>
         </div>
