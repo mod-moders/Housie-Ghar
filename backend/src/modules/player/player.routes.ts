@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings } from './player.controller';
+import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAllPlayers, adminUpdatePlayerStatus, adminDeletePlayer, getPlayerWinnings, forgotPassword, resetPassword } from './player.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -9,6 +9,10 @@ const router = Router();
 router.post('/signup', signup);
 router.post('/login', login);
 router.post('/logout', logout);
+// Password recovery. Both are unauthenticated by necessity — the caller is locked out —
+// so both sit behind the failed-attempt limiter in app.ts.
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.get('/me', authenticatePlayer, getProfile);
 router.patch('/me', authenticatePlayer, updateProfile);
 router.get('/stats', authenticatePlayer, getPlayerStats);

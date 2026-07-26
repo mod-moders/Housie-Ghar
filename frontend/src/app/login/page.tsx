@@ -148,6 +148,9 @@ export default function Login() {
                 <label className="block text-sm font-medium" htmlFor="password" style={{ color: "var(--text-dim)" }}>
                   Password
                 </label>
+                <Link href="/forgot-password" className="text-xs hover:underline" style={{ color: "var(--accent)" }}>
+                  Forgot password?
+                </Link>
               </div>
               <div className="hg-password-wrapper">
                 <input

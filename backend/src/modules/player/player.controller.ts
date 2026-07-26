@@ -5,6 +5,7 @@ import pool from '../../db';
 import { env } from '../../config/env';
 import { validateHousieName } from '../../utils/housieName';
 import { registerDevice, checkDevice } from '../../services/playerDevices';
+import { buildWaLink } from '../../utils/waLink';
 
 /** Shared by signup and the profile password change, so the two can't drift apart. */
 export const MIN_PLAYER_PASSWORD_LENGTH = 6;
@@ -340,6 +341,173 @@ export async function logout(req: Request, res: Response): Promise<void> {
     sameSite: 'strict',
   });
   res.json({ message: 'Player logged out successfully' });
+}
+
+/**
+ * Phone numbers are stored however they were typed — "9876543210", "+91 98765 43210",
+ * "098765-43210" have all been seen. Compare on digits only, and on the last 10 of
+ * them, so a country code or separators on either side don't cause a false mismatch.
+ */
+function phonesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (v: string | null | undefined) => String(v ?? '').replace(/\D/g, '').slice(-10);
+  const na = norm(a);
+  const nb = norm(b);
+  return na.length === 10 && na === nb;
+}
+
+/** "9876543210" -> "••••••3210", so the player can tell which number to reach for. */
+function maskPhone(phone: string): string {
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length < 4) return '••••';
+  return '•'.repeat(Math.max(4, digits.length - 4)) + digits.slice(-4);
+}
+
+/**
+ * Step 1 of "forgot password": what can this account actually use to recover?
+ *
+ * Deliberately does NOT reveal whether a housie name exists — those are public on the
+ * leaderboard, live board and ticket search, so confirming one is not a leak, but
+ * confirming which ones are RESETTABLE would tell an attacker exactly which accounts
+ * are worth targeting. Every unknown name is answered as if it had no phone on file,
+ * which is the same response a real phone-less account gets.
+ */
+export async function forgotPassword(req: Request, res: Response): Promise<void> {
+  const { housie_name } = req.body;
+
+  if (!housie_name) {
+    res.status(400).json({ message: 'Housie name is required' });
+    return;
+  }
+
+  const cleanHousieName = String(housie_name).trim().replace(/\s+/g, ' ');
+
+  try {
+    const result = await pool.query(
+      `SELECT phone, status FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)`,
+      [cleanHousieName]
+    );
+    const player = result.rows[0];
+    const phone: string | null = player?.phone ?? null;
+    const usable = !!player && player.status !== 'Suspended' && !!phone && String(phone).replace(/\D/g, '').length >= 10;
+
+    if (usable) {
+      res.json({ method: 'phone', phone_hint: maskPhone(phone as string) });
+      return;
+    }
+
+    // No phone on file (or no such account): the only route left is a human one.
+    // Surface whichever support contact the platform has configured.
+    const cfg = await pool.query(
+      `SELECT config_key, config_value FROM Platform_Config
+       WHERE config_key IN ('financial_officer_whatsapp', 'support_phone')`
+    );
+    const byKey: Record<string, string> = {};
+    for (const row of cfg.rows) byKey[row.config_key] = row.config_value;
+    const pick = (v?: string) => (String(v ?? '').replace(/\D/g, '').length >= 10 ? v : null);
+    // Only offer a link if the configured number is actually dialable — these keys hold
+    // placeholders like "+91" in some environments, and a wa.me link built from that
+    // opens a broken chat, which is worse than telling the player to contact their agent.
+    const supportPhone = pick(byKey.financial_officer_whatsapp) || pick(byKey.support_phone) || null;
+
+    res.json({
+      method: 'support',
+      support_whatsapp: supportPhone
+        ? buildWaLink(
+            supportPhone,
+            `Hi, I can't sign in to my Housie Ghar account "${cleanHousieName}" and there's no phone number saved on it. Can you help me reset my password?`
+          )
+        : null,
+    });
+  } catch (error) {
+    console.error('Forgot password lookup error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Step 2: set a new password, proving ownership with the phone number saved on the
+ * account. That is not a strong secret, but it is not public either — unlike the housie
+ * name, which is — and it is the only identifier this platform already holds for most
+ * players. The route is behind a failed-attempt rate limiter (see app.ts) so the number
+ * cannot be ground out, and a success signs the player straight in and registers the
+ * device, so a reset also restores access on whatever they are holding.
+ */
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const { housie_name, phone, password, device_id } = req.body;
+
+  if (!housie_name || !phone) {
+    res.status(400).json({ message: 'Housie name and phone number are required' });
+    return;
+  }
+  if (typeof password !== 'string' || password.length < MIN_PLAYER_PASSWORD_LENGTH) {
+    res.status(400).json({
+      message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
+    });
+    return;
+  }
+
+  const cleanHousieName = String(housie_name).trim().replace(/\s+/g, ' ');
+
+  try {
+    const result = await pool.query(
+      `SELECT player_id, player_code, full_name, housie_name, phone, status
+       FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)`,
+      [cleanHousieName]
+    );
+    const player = result.rows[0];
+
+    if (player && player.status === 'Suspended') {
+      res.status(403).json({ message: 'Your account has been suspended by the administrator.' });
+      return;
+    }
+
+    // One message whether the name is unknown or the phone is wrong — telling those two
+    // apart would turn this into a phone-number oracle for any name off the leaderboard.
+    if (!player || !phonesMatch(player.phone, phone)) {
+      res.status(401).json({
+        message: "Those details don't match an account. Check the phone number saved on your profile.",
+      });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await pool.query('UPDATE Players SET password_hash = $1 WHERE player_id = $2', [
+      passwordHash,
+      player.player_id,
+    ]);
+
+    try {
+      await registerDevice(player.player_id, device_id, req.headers['user-agent']);
+    } catch (err) {
+      console.error('Failed to register device on password reset:', err);
+    }
+
+    const token = jwt.sign(
+      { playerId: player.player_id, fullName: player.full_name, housieName: player.housie_name },
+      env.JWT_PRIVATE_KEY,
+      { algorithm: 'RS256' as any, expiresIn: '3650d' }
+    );
+
+    res.cookie('hg_player_token', token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 3650 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      token,
+      player: {
+        player_id: player.player_id,
+        player_code: player.player_code,
+        full_name: player.full_name,
+        housie_name: player.housie_name,
+      },
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 }
 
 export async function getPlayerStats(req: any, res: Response): Promise<void> {

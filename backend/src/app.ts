@@ -113,6 +113,23 @@ const playerAuthLimiter = rateLimit({
 });
 app.use('/api/player/login', playerAuthLimiter);
 
+// Password recovery is unauthenticated by necessity — the caller is locked out — and
+// /reset-password checks a phone number, which is short enough to grind. Same
+// failed-attempts-only shape as the login limiter, so a genuine reset is never
+// throttled. /forgot-password counts EVERY request instead: it succeeds by design
+// whatever name you give it, so skipping successes would leave it unlimited.
+app.use('/api/player/reset-password', playerAuthLimiter);
+app.use(
+  '/api/player/forgot-password',
+  rateLimit({
+    windowMs: env.LOCK_DURATION_MINUTES * 60 * 1000,
+    max: env.MAX_LOCK_ATTEMPTS_PER_MINUTE,
+    message: { message: 'Too many attempts. Please wait a few minutes and try again.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+
 // Signup counts SUCCESSFUL requests too — the abuse here is bulk account
 // creation (squatting housie names), not guessing a credential.
 const signupLimiter = rateLimit({
