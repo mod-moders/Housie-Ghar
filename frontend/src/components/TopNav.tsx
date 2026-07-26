@@ -60,10 +60,13 @@ export function TopNav() {
     ["/stats", "STATS", "chart"],
     ["/how-to-play", "HOW TO PLAY", "help"],
   ];
+  // A signed-in player gets their housie name in place of the generic
+  // "PROFILE" label — in the bar as an avatar chip, and in the burger sheet.
+  const player = user?.role === "player" ? user : null;
   const accountItem =
     user?.role === "staff"
       ? ["/staff/login", "STAFF LOGIN", "shield"]
-      : ["/profile", "PROFILE", "user"];
+      : ["/profile", player ? player.name : "PROFILE", "user"];
   const navItems = [...sectionItems, accountItem];
 
   return (
@@ -84,12 +87,24 @@ export function TopNav() {
       </nav>
 
       <div className="hg-nav-right">
-        <button
-          className={`hg-nav-link hg-nav-account${pathname === accountItem[0] ? " is-active" : ""}`}
-          onClick={() => go(accountItem[0])}
-        >
-          <Icon name={accountItem[2]} size={16} /> <span style={{ marginLeft: "6px" }}>{accountItem[1]}</span>
-        </button>
+        {player ? (
+          <button
+            className={`hg-player-chip hg-account-chip${pathname === "/profile" ? " is-active" : ""}`}
+            onClick={() => go("/profile")}
+            title={player.name}
+            aria-label={`Profile — ${player.name}`}
+          >
+            <span className="hg-account-avatar" aria-hidden="true">{Array.from(player.name)[0] ?? "?"}</span>
+            <span className="hg-account-name">{player.name}</span>
+          </button>
+        ) : (
+          <button
+            className={`hg-nav-link hg-nav-account${pathname === accountItem[0] ? " is-active" : ""}`}
+            onClick={() => go(accountItem[0])}
+          >
+            <Icon name={accountItem[2]} size={16} /> <span style={{ marginLeft: "6px" }}>{accountItem[1]}</span>
+          </button>
+        )}
         {user?.role === "staff" && (
           <button className="hg-staff-btn is-active" onClick={() => go("/staff")} aria-label="Staff panel" title="Staff panel">
             <Icon name="shield" size={18} strokeWidth={2.2} />

@@ -1230,6 +1230,18 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   background:var(--surface);border:1.5px solid var(--border-2);color:var(--text-dim);
   font:600 12px var(--font-head);white-space:nowrap}
 .hg-player-chip:hover{border-color:var(--ink);color:var(--text);box-shadow:0 3px 0 -1px var(--ink)}
+/* Signed-in player's account chip: initial-avatar + housie name. Unlike the
+   plain .hg-nav-account link this stays visible below 900px, but avatar-only —
+   at 390px the bar has ~142px of clear space and a 16-character housie name
+   would swallow all of it. The name returns with the inline links at 900px. */
+.hg-account-chip{padding:4px;gap:8px;max-width:190px;color:var(--text);font-weight:700}
+.hg-account-chip.is-active{border-color:var(--accent);color:var(--accent)}
+.hg-account-avatar{display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;
+  border-radius:50%;background:var(--cta);color:var(--cta-ink);
+  font:800 12.5px var(--font-head);text-transform:uppercase}
+/* min-width:0 lets the name shrink so the ellipsis can engage — a flex item's
+   automatic minimum size would otherwise hold it at the full nowrap width. */
+.hg-account-name{display:none;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .hg-staff-btn:hover,.hg-theme-btn:hover{color:var(--text)}
 .hg-burger{display:grid;place-items:center;width:36px;height:36px;color:var(--text);cursor:pointer}
 .hg-nav-backdrop{position:fixed;inset:0;z-index:38;background:transparent}
@@ -1252,6 +1264,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
      min-content width — a squashed logo is worse than an off-centre row. */
   .hg-nav-left,.hg-nav-right{flex:1 1 0}
   .hg-nav-account{display:flex}
+  .hg-account-chip{padding:4px 14px 4px 4px}
+  .hg-account-name{display:block}
   .hg-burger{display:none}
 }
 
