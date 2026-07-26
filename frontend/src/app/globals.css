@@ -99,13 +99,20 @@
   position: relative;
   overflow: hidden;
 }
-.hg-root[data-theme='retro_arcade'] .hg-banner-grid {
+/* Lower half of the synthwave tunnel. This used to be layered onto .hg-banner-grid,
+   which meant retro_arcade was the one skin with no ticket grid — the banner grid was
+   hijacked for the floor and .hg-banner-cell was hidden outright. Moved onto its own
+   pseudo-element (mirroring .hg-screen::after, which already drew the upper half) so
+   the tunnel survives intact AND .hg-banner-grid is free to be the ticket grid here
+   like it is everywhere else. */
+.hg-root[data-theme='retro_arcade'] .hg-screen::before {
+  content: '';
   position: absolute;
   top: 50vh; left: -50vw; right: -50vw; height: 100vh;
   display: block;
   transform: perspective(300px) rotateX(70deg);
   transform-origin: center top;
-  background-image: 
+  background-image:
     linear-gradient(rgba(255, 0, 255, 0.5) 2px, transparent 2px),
     linear-gradient(90deg, rgba(0, 255, 255, 0.3) 2px, transparent 2px);
   background-size: 40px 40px;
@@ -134,7 +141,10 @@
 .hg-root[data-theme='retro_arcade'] .hg-logo img {
   content: url('/HG Secondary.png');
 }
-.hg-root[data-theme='retro_arcade'] .hg-banner-cell { display: none; }
+/* .hg-banner-cell is no longer hidden here — see .hg-screen::before above; retro now
+   gets the same ticket grid as every other skin. The bloom stays off: this skin's
+   ground is already a radial gradient plus the tunnel, and a fourth glow layer on
+   top of that just muddies it. */
 .hg-root[data-theme='retro_arcade'] .hg-banner-bloom { display: none; }
 .hg-root[data-theme='retro_arcade'] .hg-banner {
   border-bottom: 2px solid var(--card-line);
@@ -1111,7 +1121,20 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
   height: 100% !important;
 }
 
-.hg-root{font-family:var(--font-body);color:var(--text)}
+.hg-root{font-family:var(--font-body);color:var(--text);
+
+  /* Ticket-grid tokens live at the root, not in the banner block, because the grid
+     is now page-wide: .hg-page-grid is rendered by PublicShell as a sibling ABOVE
+     .hg-screen--lobby in the tree, and the other five public pages have no
+     .hg-screen--lobby at all, so anything scoped there resolves to empty for them.
+     Both --bn-grid-line and --bn-grid-opacity still re-derive per skin because
+     --text is themed on .hg-root[data-theme=...].
+     Raised from 14%/.18: the grid became hard to see once it stopped being a
+     saturated brand colour and started deriving from --text. */
+  --bn-grid-line:color-mix(in srgb, var(--text) 26%, transparent);
+  --bn-grid-opacity:.34;
+  --bn-grid-cell:44px;
+}
 
 /* Shared page content column — keeps stats/profile in step with the
    leaderboard/how-to-play 940px desktop column (see @media(min-width:900px) below). */
@@ -1235,8 +1258,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   --bn-bloom-o:color-mix(in srgb, var(--bg2) 55%, transparent);
   --bn-bloom-p:color-mix(in srgb, var(--accent) 12%, transparent);
   --bn-bloom-v:color-mix(in srgb, var(--elevate) 45%, transparent);
-  --bn-grid-line:color-mix(in srgb, var(--text) 14%, transparent);
-  --bn-grid-opacity:.18;
+  /* --bn-grid-* live on .hg-root, not here — see the note there. */
   --bn-num-yellow:color-mix(in srgb, var(--accent) 85%, var(--text));
   --bn-num-ocean:var(--text-mute);
   --bn-num-pink:var(--accent);
@@ -1296,6 +1318,20 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(3,1fr);
   opacity:var(--bn-grid-opacity);filter:blur(0.5px)}
 .hg-banner-cell{border:1px solid var(--bn-grid-line);display:flex;align-items:center;justify-content:center}
+
+/* Page-wide ticket-grid backdrop (rendered by PublicShell on every public page).
+   Shares --bn-grid-line / --bn-grid-opacity with the banner grid so the two never
+   drift apart and both re-skin with the theme. Drawn with repeating gradients so it
+   tiles down a page of any height at a fixed cell size, and sits at z-index 0 behind
+   all content. The banner's own DOM grid still overlays this inside the hero — same
+   cell size and colour, so they read as one continuous sheet of ticket paper. */
+.hg-page-grid{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+  opacity:var(--bn-grid-opacity);
+  background-image:
+    repeating-linear-gradient(to right, var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell)),
+    repeating-linear-gradient(to bottom, var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell));
+}
 .hg-banner-num{position:relative;font:700 16px var(--font-head);text-shadow:0 0 6px currentColor}
 .hg-banner-num--yellow{color:var(--bn-num-yellow)}
 .hg-banner-num--ocean{color:var(--bn-num-ocean)}
@@ -1434,7 +1470,6 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
      definitions from the base block instead; --accent / --text / --bg already
      carry the right values on a light ground, so nothing needs restating. */
   --bn-ground: var(--bg);
-  --bn-grid-opacity: 0.1;
   --bn-fade: color-mix(in srgb, var(--bg) 80%, transparent);
   --bn-quote-ink: var(--text);
   --bn-logo-shadow: drop-shadow(0 8px 18px rgba(0,0,0,0.12));
