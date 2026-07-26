@@ -1221,19 +1221,29 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-banner,
 .hg-screen--lobby{
   --nav-h:70px;
-  /* banner-local palette — dark defaults; [data-theme='light'] overrides at the end */
+  /* Banner-local palette, DERIVED from the active skin rather than hardcoded.
+     These used to be fixed "game night" hues (yellow 96 / ocean 205 / pink 350 /
+     violet 290 glows, white grid lines, and a green-tinted near-black fade at
+     oklch(0.16 0.01 120)). Those are the original brand colours, so on any skin
+     that isn't built from them — luxury_gold's warm gold-on-black above all —
+     the banner rendered as a cyan-and-magenta box sitting on a warm black page:
+     the one region of the site that visibly did not belong to the theme.
+     Everything here now resolves through --accent / --bg / --text, so the banner
+     grounds itself in whatever skin is active, on every theme, automatically. */
   --bn-ground:var(--bg);
-  --bn-bloom-y:oklch(0.88 0.17 96 / .18);
-  --bn-bloom-o:oklch(0.78 0.13 205 / .16);
-  --bn-bloom-p:oklch(0.70 0.24 350 / .20);
-  --bn-bloom-v:oklch(0.58 0.25 290 / .15);
-  --bn-grid-line:rgba(255,255,255,.2);
+  --bn-bloom-y:color-mix(in srgb, var(--accent) 20%, transparent);
+  --bn-bloom-o:color-mix(in srgb, var(--bg2) 55%, transparent);
+  --bn-bloom-p:color-mix(in srgb, var(--accent) 12%, transparent);
+  --bn-bloom-v:color-mix(in srgb, var(--elevate) 45%, transparent);
+  --bn-grid-line:color-mix(in srgb, var(--text) 14%, transparent);
   --bn-grid-opacity:.18;
-  --bn-num-yellow:oklch(0.88 0.17 96);
-  --bn-num-ocean:oklch(0.78 0.13 205);
-  --bn-num-pink:oklch(0.70 0.24 350);
+  --bn-num-yellow:color-mix(in srgb, var(--accent) 85%, var(--text));
+  --bn-num-ocean:var(--text-mute);
+  --bn-num-pink:var(--accent);
   --bn-num-plain:var(--text);
-  --bn-fade:oklch(0.16 0.01 120 / .92);
+  /* Same hue as the page ground, so the vignette that keeps the logo legible
+     reads as depth rather than as a differently-coloured panel. */
+  --bn-fade:color-mix(in srgb, var(--bg) 70%, transparent);
   --bn-quote-ink:#e6e3ee;
   --bn-logo-shadow:drop-shadow(0 0 20px rgba(14,13,18,.35));
 
@@ -1246,6 +1256,29 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   text-align:center;padding:40px 22px;
   border-bottom:1.5px solid var(--card-line);
   background:var(--bn-ground);
+}
+
+/* Feathers the decorative layers out to nothing before they reach the hero's
+   edges. They are oversized (negative insets) and the hero is overflow:hidden,
+   so without this they get hard-clipped at its box — which drew the banner as a
+   visible lighter rectangle sitting on the page rather than as part of it. That
+   only became apparent once these layers moved from the page into the hero.
+   Masking rather than shrinking keeps the glows and grid at full spread in the
+   middle; only the last stretch to the edge is faded, so the banner's ground
+   resolves to exactly the page's own background at the seam. */
+/* The radii are deliberately small. Both layers are sized with negative insets
+   (bloom -12%, grid -8%/-4%), so their own boxes are larger than the hero and
+   the hero's edge sits well inside them — a mask that only reaches zero at the
+   layer's own boundary is still ~78% opaque where it actually gets clipped,
+   which leaves the seam intact. Reaching zero at 78% of a 46% radius puts full
+   transparency ~0.36 of the way across each layer's box, i.e. comfortably
+   inside the hero on both axes for both layers, while still covering ~85% of
+   the visible banner. Verified by toggling each layer: bloom alone reproduced
+   the seam, all three hidden removed it. */
+.hg-banner-bloom,
+.hg-banner-grid{
+  -webkit-mask-image:radial-gradient(ellipse 46% 46% at 50% 50%, #000 20%, transparent 78%);
+  mask-image:radial-gradient(ellipse 46% 46% at 50% 50%, #000 20%, transparent 78%);
 }
 
 /* bloom — four soft brand glows, slowly drifting */
@@ -1394,18 +1427,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-root[data-theme='monastic_serenity'] .hg-screen--lobby,
 .hg-root[data-theme='cherry_blossom'] .hg-banner,
 .hg-root[data-theme='cherry_blossom'] .hg-screen--lobby {
+  /* Only the values that genuinely differ on a light ground are set here now.
+     The bloom/grid/number colours were another hardcoded set (amber, pink, cyan)
+     that ignored the active skin, so a green or blue bright skin got the same
+     orange-and-cyan banner as every other one. They inherit the theme-derived
+     definitions from the base block instead; --accent / --text / --bg already
+     carry the right values on a light ground, so nothing needs restating. */
   --bn-ground: var(--bg);
-  --bn-bloom-y: rgba(255, 204, 128, 0.22);
-  --bn-bloom-o: rgba(255, 171, 64, 0.2);
-  --bn-bloom-p: rgba(244, 143, 177, 0.22);
-  --bn-bloom-v: rgba(0, 229, 255, 0.16);
-  --bn-grid-line: rgba(30, 35, 48, 0.12);
   --bn-grid-opacity: 0.1;
-  --bn-num-yellow: #e0931f;
-  --bn-num-ocean: #007c8c;
-  --bn-num-pink: #e07598;
-  --bn-num-plain: var(--text);
-  --bn-fade: color-mix(in srgb, var(--bg) 95%, transparent);
+  --bn-fade: color-mix(in srgb, var(--bg) 80%, transparent);
   --bn-quote-ink: var(--text);
   --bn-logo-shadow: drop-shadow(0 8px 18px rgba(0,0,0,0.12));
 }
