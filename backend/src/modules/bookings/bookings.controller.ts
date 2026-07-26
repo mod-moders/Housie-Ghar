@@ -406,6 +406,9 @@ export async function getAgentQueue(req: any, res: Response): Promise<void> {
       [agentId]
     );
 
+    const userRes = await pool.query('SELECT upi_id FROM Users WHERE user_id = $1', [agentId]);
+    const agentUpi = userRes.rows[0]?.upi_id || null;
+
     // Fetch ticket numbers for each booking
     const bookings = [];
     for (const row of result.rows) {
@@ -413,6 +416,12 @@ export async function getAgentQueue(req: any, res: Response): Promise<void> {
         `SELECT ticket_number FROM Tickets WHERE ticket_id = ANY($1)`,
         [row.ticket_ids]
       );
+      const playerRes = await pool.query(
+        'SELECT phone FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)',
+        [row.housie_name]
+      );
+      const playerPhone = playerRes.rows[0]?.phone || null;
+
       bookings.push({
         booking_id: row.booking_id,
         housie_name: row.housie_name,
@@ -423,6 +432,8 @@ export async function getAgentQueue(req: any, res: Response): Promise<void> {
         locked_at: row.locked_at,
         locked_until: row.locked_until,
         time_remaining_ms: new Date(row.locked_until).getTime() - Date.now(),
+        player_phone: playerPhone,
+        agent_upi: agentUpi,
       });
     }
 
@@ -940,12 +951,21 @@ export async function getOperatorOverflowQueue(req: AuthenticatedRequest, res: R
       [operatorId]
     );
 
+    const userRes = await pool.query('SELECT upi_id FROM Users WHERE user_id = $1', [operatorId]);
+    const staffUpi = userRes.rows[0]?.upi_id || null;
+
     const bookings = [];
     for (const row of result.rows) {
       const ticketsRes = await pool.query(
         `SELECT ticket_number FROM Tickets WHERE ticket_id = ANY($1) ORDER BY ticket_number`,
         [row.ticket_ids]
       );
+      const playerRes = await pool.query(
+        'SELECT phone FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)',
+        [row.housie_name]
+      );
+      const playerPhone = playerRes.rows[0]?.phone || null;
+
       bookings.push({
         booking_id: row.booking_id,
         housie_name: row.housie_name,
@@ -956,6 +976,8 @@ export async function getOperatorOverflowQueue(req: AuthenticatedRequest, res: R
         locked_at: row.locked_at,
         locked_until: row.locked_until,
         time_remaining_ms: new Date(row.locked_until).getTime() - Date.now(),
+        player_phone: playerPhone,
+        staff_upi: staffUpi,
       });
     }
 

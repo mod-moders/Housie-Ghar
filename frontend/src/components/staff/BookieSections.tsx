@@ -37,6 +37,7 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
   const [history, setHistory] = useState<BookieHistoryItem[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
+  const [upiSent, setUpiSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Free tickets this bookie can spend, and which queued booking they've chosen to
   // spend one on. Only ever one per booking — 10 points buys exactly one ticket.
@@ -81,6 +82,25 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
     navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(r.booking_id);
     setTimeout(() => setCopied(null), 1500);
+  };
+
+  const sendUpiToPlayer = (r: QueueBooking) => {
+    const upiId = r.agent_upi || me.upi_id || "";
+    if (!upiId) {
+      alert("Please configure your UPI ID in your Profile settings first!");
+      return;
+    }
+    const msg = `*Housie Ghar Payment Request*\nHi *${r.housie_name}*, please pay *₹${r.total_amount}* for your booking of Ticket(s): *${r.ticket_numbers.map(n => '#' + n).join(', ')}* for the game *"${r.game_title}"*.\n\nUPI ID for direct payment: *${upiId}*\n\nAfter paying, please share the screenshot here. Thank you! 🍀`;
+
+    if (r.player_phone) {
+      const cleanedPhone = r.player_phone.replace(/\D/g, "");
+      const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+      window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+    } else {
+      navigator.clipboard?.writeText(msg).catch(() => {});
+      setUpiSent(r.booking_id);
+      setTimeout(() => setUpiSent(null), 2500);
+    }
   };
 
   return (
@@ -131,6 +151,17 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
               <div className="hg-bq-actions">
                 <button className="hg-bq-copy" onClick={() => copyReply(r)}>
                   <Icon name="chat" size={15} /> {copied === r.booking_id ? "Copied!" : "Copy WhatsApp reply"}
+                </button>
+                <button 
+                  className="hg-bq-copy" 
+                  onClick={() => sendUpiToPlayer(r)}
+                  style={{
+                    background: "rgba(6, 182, 212, 0.12)",
+                    borderColor: "rgba(6, 182, 212, 0.3)",
+                    color: "var(--accent)",
+                  }}
+                >
+                  <Icon name="wallet" size={15} /> {upiSent === r.booking_id ? "UPI Copied!" : r.player_phone ? "Send UPI to Player" : "Copy UPI Message"}
                 </button>
                 <button className="hg-bq-confirm" onClick={() => act(r.booking_id, "confirm")}>
                   <Icon name="check" size={15} strokeWidth={2.6} /> Confirm

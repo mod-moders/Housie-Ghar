@@ -201,6 +201,9 @@ export interface QueueBooking {
   total_amount: number;
   locked_at: string;
   locked_until: string;
+  player_phone?: string | null;
+  agent_upi?: string | null;
+  staff_upi?: string | null;
 }
 
 export interface WalletLedgerEntry {
