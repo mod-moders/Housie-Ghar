@@ -7,7 +7,7 @@ import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
-import { clearPlayerToken } from "@/lib/playerSession";
+import { clearPlayerToken, setPlayerToken } from "@/lib/playerSession";
 import { useDialog } from "@/components/DialogProvider";
 
 const AVATAR_PRESETS = [
@@ -32,6 +32,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   // Form states
+  const [housieName, setHousieName] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -53,6 +54,7 @@ export default function ProfilePage() {
         .then((res) => {
           if (cancelled) return;
           setProfile(res.player);
+          setHousieName(res.player.housie_name || "");
           setFullName(res.player.full_name || "");
           setPhone(res.player.phone || "");
           setEmail(res.player.email || "");
@@ -107,12 +109,14 @@ export default function ProfilePage() {
         avatar_url: string | null;
         sound_enabled: boolean;
         password?: string;
+        housie_name?: string;
       } = {
         full_name: fullName,
         phone: phone || null,
         email: email || null,
         avatar_url: avatarUrl || null,
         sound_enabled: soundEnabled,
+        housie_name: housieName,
       };
 
       // Only ever SET a password, never clear one: an empty string is simply not sent.
@@ -121,12 +125,17 @@ export default function ProfilePage() {
         updates.password = password;
       }
 
-      const res = await apiFetch<{ player: PlayerProfile }>("/api/player/me", {
+      const res = await apiFetch<{ player: PlayerProfile; token?: string }>("/api/player/me", {
         method: "PATCH",
         body: JSON.stringify(updates),
       });
 
+      if (res.token) {
+        setPlayerToken(res.token);
+      }
+
       setProfile(res.player);
+      setHousieName(res.player.housie_name || "");
       setFullName(res.player.full_name || "");
       setPhone(res.player.phone || "");
       setEmail(res.player.email || "");
@@ -344,8 +353,20 @@ export default function ProfilePage() {
               </h3>
               
               <div>
-                <label style={labelStyle}>Housie Name (Permanent)</label>
-                <input type="text" value={profile?.housie_name || ""} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed", fontFamily: "var(--font-mono)" }} />
+                <label style={labelStyle}>
+                  {profile && (profile.housie_name_changes || 0) >= 1 ? "Housie Name (Permanent)" : "Housie Name (Can be changed once)"}
+                </label>
+                <input 
+                  type="text" 
+                  value={housieName} 
+                  onChange={e => setHousieName(e.target.value)} 
+                  disabled={profile ? (profile.housie_name_changes || 0) >= 1 : true} 
+                  style={{ 
+                    ...inputStyle, 
+                    ...(profile && (profile.housie_name_changes || 0) >= 1 ? { opacity: 0.6, cursor: "not-allowed" } : {}), 
+                    fontFamily: "var(--font-mono)" 
+                  }} 
+                />
               </div>
               
               <div>

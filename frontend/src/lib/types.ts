@@ -230,6 +230,7 @@ export interface PlayerProfile {
   sound_enabled: boolean;
   has_password?: boolean;
   avatar_url?: string | null;
+  housie_name_changes?: number;
 }
 
 export interface PlayerStats {

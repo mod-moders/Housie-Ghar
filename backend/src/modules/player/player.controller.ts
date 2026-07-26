@@ -231,7 +231,7 @@ export async function getProfile(req: any, res: Response): Promise<void> {
   
   try {
     const result = await pool.query(
-      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, avatar_url, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
+      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
       [req.player.playerId]
     );
     if ((result.rowCount ?? 0) === 0) {
@@ -256,7 +256,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     return;
   }
 
-  const { full_name, phone, email, theme_preference, sound_enabled, password, avatar_url } = req.body;
+  const { full_name, phone, email, theme_preference, sound_enabled, password, avatar_url, housie_name } = req.body;
 
   try {
     let passwordHashUpdate = null;
@@ -291,6 +291,44 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
       sets.push(`${column} = $${params.length}`);
     };
 
+    let housieNameChanged = false;
+    if (housie_name !== undefined && housie_name !== null && housie_name !== '') {
+      const cleanHousieName = housie_name.trim().replace(/\s+/g, ' ');
+      const nameCheck = validateHousieName(cleanHousieName);
+      if (!nameCheck.ok) {
+        res.status(400).json({ message: nameCheck.error });
+        return;
+      }
+
+      // Fetch current name and changes count
+      const currentRes = await pool.query(
+        'SELECT housie_name, housie_name_changes FROM Players WHERE player_id = $1',
+        [req.player.playerId]
+      );
+      if (currentRes.rows.length > 0) {
+        const playerRow = currentRes.rows[0];
+        if (cleanHousieName.toLowerCase() !== playerRow.housie_name.toLowerCase()) {
+          // It's a change!
+          if ((playerRow.housie_name_changes || 0) >= 1) {
+            res.status(400).json({ message: 'You can only change your Housie Name once after signup.' });
+            return;
+          }
+          // Check uniqueness
+          const checkPlayer = await pool.query(
+            'SELECT player_id FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1) AND player_id <> $2',
+            [cleanHousieName, req.player.playerId]
+          );
+          if ((checkPlayer.rowCount ?? 0) > 0) {
+            res.status(409).json({ message: 'Housie name is already taken. Please choose another one.' });
+            return;
+          }
+          setField('housie_name', cleanHousieName);
+          setField('housie_name_changes', (playerRow.housie_name_changes || 0) + 1);
+          housieNameChanged = true;
+        }
+      }
+    }
+
     if (full_name !== undefined) setField('full_name', full_name);
     if (phone !== undefined) setField('phone', phone);
     if (email !== undefined) setField('email', email);
@@ -299,7 +337,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     if (avatar_url !== undefined) setField('avatar_url', avatar_url);
     if (shouldUpdatePassword) setField('password_hash', passwordHashUpdate);
 
-    const returning = `RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password`;
+    const returning = `RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password`;
 
     params.push(req.player.playerId);
     const result = sets.length
@@ -308,12 +346,34 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
           params
         )
       : await pool.query(
-          `SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, (password_hash IS NOT NULL) AS has_password
+          `SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password
            FROM Players WHERE player_id = $1`,
           [req.player.playerId]
         );
 
-    res.json({ player: result.rows[0], message: 'Profile updated successfully' });
+    const updatedPlayer = result.rows[0];
+
+    if (housieNameChanged) {
+      const payload = {
+        playerId: updatedPlayer.player_id,
+        fullName: updatedPlayer.full_name,
+        housieName: updatedPlayer.housie_name,
+      };
+      const token = jwt.sign(payload, env.JWT_PRIVATE_KEY, {
+        algorithm: 'RS256' as any,
+        expiresIn: '3650d',
+      });
+      res.cookie('hg_player_token', token, {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 3650 * 24 * 60 * 60 * 1000,
+      });
+      res.json({ player: updatedPlayer, token, message: 'Profile updated successfully' });
+      return;
+    }
+
+    res.json({ player: updatedPlayer, message: 'Profile updated successfully' });
   } catch (error: any) {
     // Migration 046 added a partial UNIQUE index on Players(phone). Two players
     // entering the same number (a shared family phone is common here) otherwise
