@@ -5,13 +5,20 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { Logo } from "./ui";
+import { PlayerAvatar } from "./PlayerAvatar";
+import { PLAYER_UPDATED_EVENT, type PlayerUpdatedDetail } from "@/lib/playerSession";
 import { apiFetch } from "@/lib/api";
 
 export function TopNav() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ role: "player" | "staff"; name: string; label: string } | null>(null);
+  const [user, setUser] = useState<{
+    role: "player" | "staff";
+    name: string;
+    label: string;
+    avatar?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +30,9 @@ export function TopNav() {
     // and hid the Staff Panel shortcut even though the user was already
     // authenticated as staff. Run both checks in parallel and prefer
     // staff whenever it succeeds, so a real staff session is never hidden.
-    const playerCheck = apiFetch<{ player: { housie_name: string } }>("/api/player/me").catch(() => null);
+    const playerCheck = apiFetch<{ player: { housie_name: string; avatar_url: string | null } }>(
+      "/api/player/me"
+    ).catch(() => null);
     const staffCheck = apiFetch<{ user: { full_name: string; role_name: string } }>("/api/auth/me").catch(() => null);
 
     Promise.all([playerCheck, staffCheck]).then(([playerRes, staffRes]) => {
@@ -35,7 +44,12 @@ export function TopNav() {
           label: `${staffRes.user.full_name} (${staffRes.user.role_name})`
         });
       } else if (playerRes) {
-        setUser({ role: "player", name: playerRes.player.housie_name, label: playerRes.player.housie_name });
+        setUser({
+          role: "player",
+          name: playerRes.player.housie_name,
+          label: playerRes.player.housie_name,
+          avatar: playerRes.player.avatar_url,
+        });
       } else {
         setUser(null);
       }
@@ -44,6 +58,29 @@ export function TopNav() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // The profile page and the nav are separate trees, and saving a profile does
+  // not remount the nav — so without this the new picture only appeared after a
+  // navigation or a reload. The profile page announces what it saved and the
+  // chip follows immediately.
+  useEffect(() => {
+    const onPlayerUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<PlayerUpdatedDetail>).detail;
+      if (!detail) return;
+      setUser((prev) =>
+        prev && prev.role === "player"
+          ? {
+              ...prev,
+              name: detail.housie_name || prev.name,
+              label: detail.housie_name || prev.label,
+              avatar: detail.avatar_url ?? null,
+            }
+          : prev
+      );
+    };
+    window.addEventListener(PLAYER_UPDATED_EVENT, onPlayerUpdated);
+    return () => window.removeEventListener(PLAYER_UPDATED_EVENT, onPlayerUpdated);
   }, []);
 
   const go = (href: string) => {
@@ -94,7 +131,9 @@ export function TopNav() {
             title={player.name}
             aria-label={`Profile — ${player.name}`}
           >
-            <span className="hg-account-avatar" aria-hidden="true">{Array.from(player.name)[0] ?? "?"}</span>
+            <span className="hg-account-avatar" aria-hidden="true">
+              <PlayerAvatar avatar={player.avatar} name={player.name} />
+            </span>
             <span className="hg-account-name">{player.name}</span>
           </button>
         ) : (

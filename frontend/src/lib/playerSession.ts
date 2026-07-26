@@ -46,3 +46,20 @@ export function clearPlayerToken(): void {
   sessionStorage.removeItem(PLAYER_TOKEN_KEY);
   localStorage.removeItem(PLAYER_TOKEN_KEY);
 }
+
+/**
+ * Announced by the profile page after a save so surfaces that cache the player
+ * (the nav bar's account chip) can update without a reload. Kept here next to
+ * the token so the whole player-session contract is in one file.
+ */
+export const PLAYER_UPDATED_EVENT = "hg:player-updated";
+
+export interface PlayerUpdatedDetail {
+  housie_name?: string | null;
+  avatar_url?: string | null;
+}
+
+export function announcePlayerUpdated(detail: PlayerUpdatedDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<PlayerUpdatedDetail>(PLAYER_UPDATED_EVENT, { detail }));
+}

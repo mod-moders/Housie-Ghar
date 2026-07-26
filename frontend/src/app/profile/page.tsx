@@ -7,7 +7,8 @@ import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
-import { clearPlayerToken, setPlayerToken } from "@/lib/playerSession";
+import { announcePlayerUpdated, clearPlayerToken, setPlayerToken } from "@/lib/playerSession";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { useDialog } from "@/components/DialogProvider";
 
 const AVATAR_PRESETS = [
@@ -163,6 +164,13 @@ export default function ProfilePage() {
       setHasPassword(!!res.player.has_password);
       setPassword("");
 
+      // The nav bar's account chip caches the player from its own fetch on
+      // mount; saving here does not remount it, so tell it what changed.
+      announcePlayerUpdated({
+        housie_name: res.player.housie_name,
+        avatar_url: res.player.avatar_url,
+      });
+
       alert("Profile updated successfully!", { type: "success" });
     } catch (err: unknown) {
       const errorObj = err as Error & { alternatives?: string[] };
@@ -248,14 +256,7 @@ export default function ProfilePage() {
                   overflow: "hidden"
                 }}
               >
-                {avatarUrl && avatarUrl.startsWith("data:") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt={profile?.housie_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : avatarUrl ? (
-                  <span>{avatarUrl}</span>
-                ) : (
-                  (profile?.full_name || profile?.housie_name || "?")[0].toUpperCase()
-                )}
+                <PlayerAvatar avatar={avatarUrl} name={profile?.full_name || profile?.housie_name} />
               </div>
 
               <div>
