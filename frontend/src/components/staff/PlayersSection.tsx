@@ -240,6 +240,17 @@ export function PlayersSection() {
                         </span>
                       </span>
                       <span className="hg-row-ctrls" style={{ gap: "8px" }}>
+                        {/* Opens the detail modal with the reset field already expanded —
+                            the action lives there because it needs a text input and a
+                            confirm, which don't fit an icon-button row. */}
+                        <button
+                          className="hg-ic-btn"
+                          title="Reset Password"
+                          disabled={isBusy}
+                          onClick={() => { setSelectedPlayer(p); setResetOpen(true); setNewPassword(""); }}
+                        >
+                          <Icon name="key" size={14} />
+                        </button>
                         <button
                           className="hg-ic-btn"
                           title={p.status === "Active" ? "Suspend Account" : "Activate Account"}
