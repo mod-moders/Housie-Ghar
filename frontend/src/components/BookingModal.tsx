@@ -20,9 +20,10 @@ interface BookingModalProps {
   freeTicketNumber?: number | null;
   onClose: () => void;
   goLive: () => void;
+  gameTime: string;
 }
 
-export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matrices, freeTicketNumber, onClose, goLive }: BookingModalProps) {
+export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matrices, freeTicketNumber, onClose, goLive, gameTime }: BookingModalProps) {
   const [phase, setPhase] = useState<"lock" | "confirmed">("lock");
   const [polls, setPolls] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export function BookingModal({ lock, housieName, gameTitle, ticketNumbers, matri
 
   const urgent = secondsLeft <= 120;
   const bookingRef = lock.formatted_booking_id || lock.booking_id.substring(0, 8).toUpperCase();
-  const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}". Booking ID: ${bookingRef}. Amount: ${moneyStr(lock.total_amount)}.`;
+  const waMessage = `Hi, I am ${housieName}. I want to book Ticket(s): [${ticketNumbers.join(", ")}] for "${gameTitle}" scheduled on ${gameTime}. Booking ID: ${bookingRef}. Amount: ${moneyStr(lock.total_amount)}. Please send me the payment link, UPI ID, or QR code to complete the payment.`;
 
   if (phase === "confirmed") {
     return (

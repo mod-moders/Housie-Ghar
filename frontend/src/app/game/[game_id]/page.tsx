@@ -456,6 +456,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             ticketNumbers={selected}
             matrices={matrices}
             freeTicketNumber={freeTicketNumber}
+            gameTime={when}
             onClose={() => {
               setLock(null);
               setSelected([]);

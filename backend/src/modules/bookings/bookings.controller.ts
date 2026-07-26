@@ -134,7 +134,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
     // 3. Fetch ticket price to calculate total amount
     const gameRes = await client.query(
-      `SELECT ticket_price, title FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT ticket_price, title, scheduled_at FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
     const game = gameRes.rows[0];
@@ -210,9 +210,17 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       }
     };
 
+    const formattedWhen = new Date(game.scheduled_at).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).replace(', ', ' · ');
+
     const makeBookingWaLink = (phone: string, fullName: string, bookingId: string, formattedBookingId?: string): string => {
       const code = formattedBookingId || `#${bookingId.substring(0, 8).toUpperCase()}`;
-      const msg = `Hi, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}". Booking ID: ${code}. Amount: ₹${totalAmount}.`;
+      const msg = `Hi, I am ${housie_name}. I want to book Ticket(s): [${ticketNumbersList}] for "${game.title}" scheduled on ${formattedWhen}. Booking ID: ${code}. Amount: ₹${totalAmount}. Please send me the payment link, UPI ID, or QR code to complete the payment.`;
       return buildWaLink(phone, msg);
     };
 
