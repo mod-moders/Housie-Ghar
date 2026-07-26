@@ -241,6 +241,9 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
         whatsappLink: res.whatsapp_link,
       });
       setLock(res);
+      if (res.whatsapp_link) {
+        window.open(res.whatsapp_link, "_blank", "noopener,noreferrer");
+      }
     } catch (e) {
       setLockError(e instanceof Error ? e.message : "Could not reserve tickets — please try again.");
     } finally {
