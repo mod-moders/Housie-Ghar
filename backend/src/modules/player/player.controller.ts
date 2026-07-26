@@ -480,18 +480,40 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
     }
 
     // No phone on file (or no such account): the only route left is a human one.
-    // Surface whichever support contact the platform has configured.
+    //
+    // The request goes to the Superadmin, read live from Users rather than from a config
+    // key. financial_officer_whatsapp and support_phone are unset placeholders
+    // ("+91XXXXXXXXXX") in every environment checked, there is no staff UI to edit them,
+    // and a recovery path that silently does nothing because a config row was never
+    // filled in is worse than no path at all. The Superadmin's number is real data that
+    // already exists, and this is also who ends up actioning the reset in the Players
+    // dashboard. The config keys stay as a fallback for anyone who does set them.
+    const pick = (v?: string | null) => (String(v ?? '').replace(/\D/g, '').length >= 10 ? v ?? null : null);
+
+    const sa = await pool.query(
+      `SELECT u.phone
+         FROM Users u
+         JOIN Roles r ON r.role_id = u.role_id
+        WHERE r.role_name = 'Superadmin'
+          AND u.status = 'Active'
+          AND u.phone IS NOT NULL
+          AND TRIM(u.phone) <> ''
+        ORDER BY u.created_at ASC NULLS LAST, u.user_id ASC
+        LIMIT 1`
+    );
+
     const cfg = await pool.query(
       `SELECT config_key, config_value FROM Platform_Config
        WHERE config_key IN ('financial_officer_whatsapp', 'support_phone')`
     );
     const byKey: Record<string, string> = {};
     for (const row of cfg.rows) byKey[row.config_key] = row.config_value;
-    const pick = (v?: string) => (String(v ?? '').replace(/\D/g, '').length >= 10 ? v : null);
-    // Only offer a link if the configured number is actually dialable — these keys hold
-    // placeholders like "+91" in some environments, and a wa.me link built from that
-    // opens a broken chat, which is worse than telling the player to contact their agent.
-    const supportPhone = pick(byKey.financial_officer_whatsapp) || pick(byKey.support_phone) || null;
+
+    // Only offer a link if the number is actually dialable — a wa.me link built from a
+    // placeholder opens a broken chat, which is worse than telling the player to contact
+    // their agent directly.
+    const supportPhone =
+      pick(sa.rows[0]?.phone) || pick(byKey.financial_officer_whatsapp) || pick(byKey.support_phone) || null;
 
     res.json({
       method: 'support',
