@@ -526,10 +526,45 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     return loadMyTickets();
   }, [loadMyTickets]);
 
-  useSocket((event) => {
-    if (event === "ticket_status_change" || event === "game_list_update" || event === "prize_claim_received" || event === "prize_disbursed" || event === "winner" || event === "prize_won" || event === "draw_ended" || event === "game_completed") {
-      loadMyTickets();
-      loadGameData();
+  useSocket((event, payload) => {
+    // 1. Guard against updates from other games
+    if (payload && typeof payload === "object" && "game_id" in payload && payload.game_id !== game_id) {
+      return;
+    }
+
+    // 2. Staff members (operators/bookies) need comprehensive DB sync for active dashboards
+    const isStaff = typeof window !== "undefined" && !!sessionStorage.getItem("hg_staff_token");
+    if (isStaff) {
+      if (
+        event === "ticket_status_change" ||
+        event === "game_list_update" ||
+        event === "prize_claim_received" ||
+        event === "prize_disbursed" ||
+        event === "winner" ||
+        event === "prize_won" ||
+        event === "draw_ended" ||
+        event === "game_completed"
+      ) {
+        loadMyTickets();
+        loadGameData();
+      }
+      return;
+    }
+
+    // 3. For standard players, SSE handles all live draw conduction (number call, winners, pause/resume, completion) in-memory.
+    //    We only query the DB if this specific player is the one whose prize was disbursed.
+    if (event === "prize_disbursed") {
+      const myName = typeof window !== "undefined" ? localStorage.getItem("hg-last-housie-name") : null;
+      const winnerName = payload && typeof payload === "object" && "winner_housie_name" in payload
+        ? (payload as Record<string, unknown>).winner_housie_name
+        : null;
+      if (
+        myName &&
+        typeof winnerName === "string" &&
+        winnerName.toLowerCase().includes(myName.toLowerCase())
+      ) {
+        loadGameData();
+      }
     }
   });
 
