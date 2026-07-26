@@ -2194,6 +2194,8 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
         {users.map((u) => {
           const isSuper = me.role_name === "Superadmin";
           const isActive = u.status === "Active";
+          const isFounder = u.full_name.toLowerCase().includes("priyankar pradhan") ||
+                            u.full_name.toLowerCase().includes("pretty");
           
           // Role pill colors matching the website's professional design
           let roleColor = "var(--text-dim)";
@@ -2299,8 +2301,8 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                 </div>
               )}
 
-              {/* Staff details: created_at, monthly_salary (Operator), and estimated_earnings (Bookie) */}
-              {(u.role_name === "Operator" || u.role_name === "Bookie") && (
+              {/* Staff details: created_at, monthly_salary (Operator), estimated_earnings (Bookie) */}
+              {(u.role_name === "Operator" || u.role_name === "Bookie" || isFounder) && (
                 <div
                   style={{
                     display: "flex",
@@ -2334,6 +2336,15 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                       <span className="hg-dim">Est. Earnings:</span>
                       <span style={{ fontWeight: 700, color: "#10B981" }}>
                         {money(u.estimated_earnings || 0)}
+                      </span>
+                    </div>
+                  )}
+
+                  {isFounder && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="hg-dim">Founder Member:</span>
+                      <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                        Yes
                       </span>
                     </div>
                   )}
