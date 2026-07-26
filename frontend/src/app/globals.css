@@ -1343,23 +1343,29 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
    tiles down a page of any height at a fixed cell size, and sits at z-index 0 behind
    all content. The banner's own DOM grid still overlays this inside the hero — same
    cell size and colour, so they read as one continuous sheet of ticket paper. */
-/* Page-wide bloom — the glow the grid sits on, matching how frontend-v2 layers
-   its banner (ground -> bloom -> grid -> fade). Without it the page-wide grid was
-   a flat uniform mesh; these are the gradients that give it depth and variation.
-   Same four radial geometries as .hg-banner-bloom.
-   background-size pins the tile to 820px tall and repeats down the page: the
-   percentages inside each radial resolve against the TILE, not the element, so a
-   glow stays glow-sized instead of being stretched into a flat wash on a 2200px
-   page — and the rhythm continues the whole way down rather than dying after one
-   screen. Sits below .hg-page-grid, which is the next z-index 0 sibling in DOM
-   order. */
+/* Page-wide bloom — the glow the grid sits on, matching how frontend-v2 layers its
+   banner (ground -> bloom -> grid -> fade). Without it the page-wide grid is a flat
+   uniform mesh; these gradients are what give it depth.
+   The tile is 820px tall and repeats down the page so a glow stays glow-sized rather
+   than stretching into a flat wash on a 2200px page (percentages inside each radial
+   resolve against the TILE, not the element).
+   The geometry is NOT .hg-banner-bloom's. That one puts glows at 10% and 110% — hard
+   up against, and past, its edges — which is fine for a single un-repeated banner but
+   draws a hard horizontal seam everywhere a repeated tile meets the next one. At 820px
+   the first seam lands at y=820, right through the Upcoming Games row, and read as the
+   page being split into two differently-shaded sections.
+   So every glow here is fully contained VERTICALLY: centre ± radius stays inside
+   0-100% (18±16, 38±16, 62±16, 84±15), which makes both tile edges fully transparent
+   and the repeat invisible. Horizontal radii can stay wide because background-size is
+   100% — the tile never repeats sideways, so only the horizontal edges can seam.
+   Sits below .hg-page-grid, the next z-index 0 sibling in DOM order. */
 .hg-page-bloom{
   position:absolute;inset:0;z-index:0;pointer-events:none;
   background-image:
-    radial-gradient(70% 55% at 12% 10%, var(--bn-bloom-y), transparent 60%),
-    radial-gradient(66% 60% at 88% 16%, var(--bn-bloom-o), transparent 62%),
-    radial-gradient(82% 72% at 50% 110%, var(--bn-bloom-p), transparent 64%),
-    radial-gradient(56% 60% at 80% 88%, var(--bn-bloom-v), transparent 62%);
+    radial-gradient(55% 16% at 50% 18%, var(--bn-bloom-y), transparent 100%),
+    radial-gradient(48% 16% at 85% 38%, var(--bn-bloom-o), transparent 100%),
+    radial-gradient(52% 16% at 15% 62%, var(--bn-bloom-p), transparent 100%),
+    radial-gradient(46% 15% at 60% 84%, var(--bn-bloom-v), transparent 100%);
   background-size:100% 820px;
   background-repeat:repeat-y;
 }
