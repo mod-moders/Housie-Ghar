@@ -3842,6 +3842,18 @@ select option {
   cursor: default;
 }
 
+/* Locked rather than disabled: a `disabled` button swallows the click, and the
+   click is how the reason gets explained on touch, where there is no hover. */
+.hg-ticket-rename-btn.is-locked {
+  opacity: 0.4;
+  cursor: help;
+}
+
+.hg-ticket-rename-btn.is-locked:hover {
+  opacity: 0.7;
+  background: rgba(74, 74, 58, 0.12);
+}
+
 .hg-ticket-rename-error {
   margin-top: 4px;
   font-family: var(--font-head);

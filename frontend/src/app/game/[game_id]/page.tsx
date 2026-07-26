@@ -52,6 +52,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameSaving, setRenameSaving] = useState(false);
+  const [lockedNoticeId, setLockedNoticeId] = useState<number | null>(null);
 
   // Referral reward — a player who has reached a referral rung (10/15/20…) can
   // claim one ticket free. The backend only discounts one ticket's price off
@@ -265,8 +266,14 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
 
   // Names are fixed once the draw starts: the board is being read live by
   // everyone, and any prize already awarded has the old name written into
-  // winner_housie_name, which a rename here cannot rewrite.
-  const canRenameTickets = game?.game_status === "Scheduled";
+  // winner_housie_name, which a rename here cannot rewrite. Non-null means the
+  // control is shown locked, with this as its tooltip and click message.
+  const renameLockedReason =
+    !game || game.game_status === "Scheduled"
+      ? null
+      : game.game_status === "Completed" || game.game_status === "Draw_Ended"
+        ? "This game has finished — the ticket name is now fixed."
+        : "Ticket names lock once the game starts.";
 
   const saveTicketName = async (ticketId: number) => {
     const next = renameValue.trim();
@@ -520,26 +527,41 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                           ) : (
                             <span className="hg-live-ticket-player-name">
                               {t.display_name || t.owner_housie_name || name || "You"}
-                              {canRenameTickets && (
-                                <button
-                                  type="button"
-                                  className="hg-ticket-rename-btn"
-                                  onClick={() => {
-                                    setRenamingTicketId(t.ticket_id);
-                                    setRenameValue(t.display_name || "");
-                                    setRenameError(null);
-                                  }}
-                                  aria-label={`Rename ticket ${t.ticket_number}`}
-                                  title="Rename this ticket"
-                                >
-                                  <Icon name="edit" size={12} />
-                                </button>
-                              )}
+                              {/* Shown even when renaming is closed. Hiding it outright
+                                  made a deliberately locked ticket look like a broken
+                                  feature — there was nothing to hover and nothing to
+                                  click, so no way to learn the name was fixed. */}
+                              <button
+                                type="button"
+                                className={`hg-ticket-rename-btn${renameLockedReason ? " is-locked" : ""}`}
+                                aria-disabled={renameLockedReason ? true : undefined}
+                                onClick={() => {
+                                  if (renameLockedReason) {
+                                    setLockedNoticeId(t.ticket_id);
+                                    return;
+                                  }
+                                  setLockedNoticeId(null);
+                                  setRenamingTicketId(t.ticket_id);
+                                  setRenameValue(t.display_name || "");
+                                  setRenameError(null);
+                                }}
+                                aria-label={
+                                  renameLockedReason
+                                    ? `Ticket ${t.ticket_number} name is locked`
+                                    : `Rename ticket ${t.ticket_number}`
+                                }
+                                title={renameLockedReason ?? "Rename this ticket"}
+                              >
+                                <Icon name={renameLockedReason ? "lock" : "edit"} size={12} />
+                              </button>
                             </span>
                           )}
                         </div>
                         {renamingTicketId === t.ticket_id && renameError && (
                           <div className="hg-ticket-rename-error">{renameError}</div>
+                        )}
+                        {lockedNoticeId === t.ticket_id && renameLockedReason && (
+                          <div className="hg-ticket-rename-error">{renameLockedReason}</div>
                         )}
                       </div>
                     </div>
