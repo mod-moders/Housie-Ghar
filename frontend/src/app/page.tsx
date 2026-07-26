@@ -4,8 +4,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { apiFetch, isAuthError } from "@/lib/api";
 import { money } from "@/lib/money";
 import { PublicShell } from "@/components/PublicShell";
@@ -316,44 +314,6 @@ export default function Lobby() {
   // site scrolls inside `.hg-frame` (not the window) below the 900px breakpoint — see
   // `.hg-frame`'s overflow rules in globals.css — so ScrollTrigger must target that element
   // as its scroller, not the default window.
-  useEffect(() => {
-    // Runs once on mount *and* once more when the auth-check placeholder is
-    // replaced by the real lobby markup — heroRef isn't attached to anything
-    // until that second commit, so a plain `[]` dep array would fire too early.
-    if (isCheckingAuth) return;
-    const frame = heroRef.current?.closest(".hg-frame") as HTMLElement | null;
-    if (!frame) return;
-
-    gsap.registerPlugin(ScrollTrigger);
-    const mm = gsap.matchMedia();
-
-    mm.add("(max-width: 899.98px)", () => {
-      if (!heroRef.current) return;
-      const nav = frame.querySelector(".hg-nav") as HTMLElement | null;
-      const navHeight = nav?.getBoundingClientRect().height ?? 70;
-
-      const trigger = ScrollTrigger.create({
-        trigger: heroRef.current,
-        scroller: frame,
-        start: `top ${navHeight}px`,
-        end: `bottom ${navHeight}px`,
-        pin: true,
-        pinSpacing: false,
-        anticipatePin: 1,
-      });
-
-      return () => trigger.kill();
-    });
-
-    return () => mm.revert();
-  }, [isCheckingAuth]);
-
-  // The lucky-number wizard mounts asynchronously and can change the hero's height —
-  // recompute the pin's trigger points once it appears.
-  useEffect(() => {
-    ScrollTrigger.refresh();
-  }, [lucky]);
-
   const all = games ?? [];
   const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
   const scheduled = all
