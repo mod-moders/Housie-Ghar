@@ -753,6 +753,8 @@ interface StaffDue {
   staff_name: string;
   staff_role: string;
   ticket_numbers: number[];
+  player_credit_applied?: boolean;
+  reward_amount_waived?: number;
 }
 
 export function OverflowSection({ me }: { me: AuthUser }) {
@@ -986,10 +988,37 @@ export function OverflowSection({ me }: { me: AuthUser }) {
                       <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedGameTime}</div>
                     </div>
                     <div>
-                      <span style={{ color: "var(--text)" }}>
-                        {d.ticket_numbers.map(num => `#${num}`).join(", ")}
-                      </span>
-                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""} @ {money(d.ticket_price)}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        <span style={{ color: "var(--text)" }}>
+                          {d.ticket_numbers.map(num => `#${num}`).join(", ")}
+                        </span>
+                        {d.player_credit_applied && (
+                          <span 
+                            style={{ 
+                              background: "rgba(16, 185, 129, 0.15)", 
+                              color: "#10b981", 
+                              fontSize: "9px", 
+                              fontWeight: 700, 
+                              padding: "1px 5px", 
+                              borderRadius: "4px",
+                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                              textTransform: "uppercase"
+                            }}
+                          >
+                            Free Ticket Claimed
+                          </span>
+                        )}
+                      </div>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>
+                        {d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""}{" "}
+                        {d.player_credit_applied ? (
+                          <>
+                            ({d.ticket_numbers.length - 1} paid + 1 free) @ {money(d.ticket_price)}
+                          </>
+                        ) : (
+                          <>@ {money(d.ticket_price)}</>
+                        )}
+                      </div>
                     </div>
                     <strong style={{ color: "var(--accent)", fontSize: "15px" }}>{money(d.total_amount)}</strong>
                     <span className="hg-dim">{formattedConfirmed}</span>
@@ -1064,10 +1093,37 @@ export function OverflowSection({ me }: { me: AuthUser }) {
                       <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedGameTime}</div>
                     </div>
                     <div>
-                      <span style={{ color: "var(--text)" }}>
-                        {d.ticket_numbers.map(num => `#${num}`).join(", ")}
-                      </span>
-                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""} @ {money(d.ticket_price)}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        <span style={{ color: "var(--text)" }}>
+                          {d.ticket_numbers.map(num => `#${num}`).join(", ")}
+                        </span>
+                        {d.player_credit_applied && (
+                          <span 
+                            style={{ 
+                              background: "rgba(16, 185, 129, 0.15)", 
+                              color: "#10b981", 
+                              fontSize: "9px", 
+                              fontWeight: 700, 
+                              padding: "1px 5px", 
+                              borderRadius: "4px",
+                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                              textTransform: "uppercase"
+                            }}
+                          >
+                            Free Ticket Claimed
+                          </span>
+                        )}
+                      </div>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>
+                        {d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""}{" "}
+                        {d.player_credit_applied ? (
+                          <>
+                            ({d.ticket_numbers.length - 1} paid + 1 free) @ {money(d.ticket_price)}
+                          </>
+                        ) : (
+                          <>@ {money(d.ticket_price)}</>
+                        )}
+                      </div>
                     </div>
                     <strong className="hg-dim">{money(d.total_amount)}</strong>
                     <span className="hg-dim">{formattedSettled}</span>

@@ -1314,6 +1314,7 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
   try {
     const result = await pool.query(
       `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
+              b.player_credit_applied, b.reward_amount_waived,
               g.title AS game_title, g.scheduled_at AS game_time, g.ticket_price,
               u.full_name AS staff_name, r.role_name AS staff_role,
               array_agg(t.ticket_number ORDER BY t.ticket_number) AS ticket_numbers
@@ -1324,7 +1325,9 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
        JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
        WHERE b.booking_status = 'Sold'
          AND r.role_name IN ('Superadmin', 'Financial Admin', 'Operator')
-       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at, g.title, g.scheduled_at, g.ticket_price, u.full_name, r.role_name
+       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
+                b.player_credit_applied, b.reward_amount_waived,
+                g.title, g.scheduled_at, g.ticket_price, u.full_name, r.role_name
        ORDER BY b.confirmed_at DESC
        LIMIT 200`
     );
@@ -1342,6 +1345,8 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
       staff_name: row.staff_name,
       staff_role: row.staff_role,
       ticket_numbers: row.ticket_numbers as number[],
+      player_credit_applied: !!row.player_credit_applied,
+      reward_amount_waived: parseFloat(row.reward_amount_waived || "0"),
     }));
 
     res.json(dues);
