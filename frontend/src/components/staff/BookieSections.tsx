@@ -36,7 +36,6 @@ interface BookieHistoryItem {
 export function BookieQueueSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
   const [history, setHistory] = useState<BookieHistoryItem[]>([]);
-  const [copied, setCopied] = useState<string | null>(null);
   const [upiSent, setUpiSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Free tickets this bookie can spend, and which queued booking they've chosen to
@@ -75,13 +74,6 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     }
-  };
-
-  const copyReply = (r: QueueBooking) => {
-    const text = `✅ Payment received, ${r.housie_name}! Your ticket(s) ${r.ticket_numbers.map((t) => "#" + t).join(", ")} for "${r.game_title}" are confirmed. Good luck! 🍀`;
-    navigator.clipboard?.writeText(text).catch(() => {});
-    setCopied(r.booking_id);
-    setTimeout(() => setCopied(null), 1500);
   };
 
   const sendUpiToPlayer = (r: QueueBooking) => {
@@ -149,9 +141,6 @@ export function BookieQueueSection({ me }: { me: AuthUser }) {
                 </label>
               )}
               <div className="hg-bq-actions">
-                <button className="hg-bq-copy" onClick={() => copyReply(r)}>
-                  <Icon name="chat" size={15} /> {copied === r.booking_id ? "Copied!" : "Copy WhatsApp reply"}
-                </button>
                 <button 
                   className="hg-bq-copy" 
                   onClick={() => sendUpiToPlayer(r)}
