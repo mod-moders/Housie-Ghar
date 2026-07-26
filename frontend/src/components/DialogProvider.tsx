@@ -1,153 +1,274 @@
 "use client";
-/**
- * App-wide alert/confirm dialogs, replacing the native browser ones.
- *
- * Wraps the tree in layout.tsx; call sites use `const { alert, confirm } = useDialog()`.
- * `alert` resolves once dismissed, `confirm` resolves true/false, so both can be awaited
- * in place of `window.alert` / `window.confirm`.
- */
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { Icon } from "@/components/Icon";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
+import { Icon } from "./Icon";
 
-export type DialogType = "info" | "success" | "warning" | "error";
-
-export interface DialogOptions {
-  type?: DialogType;
+interface DialogOptions {
   title?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  isConfirm?: boolean;
+  type?: "info" | "success" | "warning" | "error";
 }
 
-interface DialogApi {
+interface DialogState {
+  isOpen: boolean;
+  message: string;
+  title: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  isConfirm: boolean;
+  type: "info" | "success" | "warning" | "error";
+  resolve: ((value: boolean) => void) | null;
+}
+
+interface DialogContextType {
   alert: (message: string, options?: DialogOptions) => Promise<void>;
   confirm: (message: string, options?: DialogOptions) => Promise<boolean>;
 }
 
-interface DialogState extends DialogOptions {
-  message: string;
-  mode: "alert" | "confirm";
+const DialogContext = createContext<DialogContextType | null>(null);
+
+export function useDialog() {
+  const context = useContext(DialogContext);
+  if (!context) {
+    throw new Error("useDialog must be used within a DialogProvider");
+  }
+  return context;
 }
 
-const DialogContext = createContext<DialogApi | null>(null);
-
-/** Per-type accent + icon. Every colour is a theme token so dialogs re-skin with the site. */
-const TONE: Record<DialogType, { accent: string; soft: string; icon: string }> = {
-  info: { accent: "var(--accent)", soft: "var(--accent-soft)", icon: "help" },
-  success: { accent: "var(--success)", soft: "var(--success-soft)", icon: "check" },
-  warning: { accent: "var(--accent)", soft: "var(--accent-soft)", icon: "alert" },
-  error: { accent: "var(--danger)", soft: "var(--danger-soft)", icon: "alert" },
-};
-
 export function DialogProvider({ children }: { children: React.ReactNode }) {
-  const [dialog, setDialog] = useState<DialogState | null>(null);
-  // Held across renders so the promise opened in `alert`/`confirm` is settled by
-  // whichever button the user presses, rather than being recreated on each render.
-  const resolverRef = useRef<((value: boolean) => void) | null>(null);
+  const [state, setState] = useState<DialogState>({
+    isOpen: false,
+    message: "",
+    title: "",
+    confirmLabel: "OK",
+    cancelLabel: "Cancel",
+    isConfirm: false,
+    type: "info",
+    resolve: null,
+  });
 
-  const close = useCallback((result: boolean) => {
-    const resolve = resolverRef.current;
-    resolverRef.current = null;
-    setDialog(null);
-    resolve?.(result);
-  }, []);
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const api = useMemo<DialogApi>(
-    () => ({
-      alert: (message, options) =>
-        new Promise<void>((resolve) => {
-          resolverRef.current = () => resolve();
-          setDialog({ ...options, message, mode: "alert" });
-        }),
-      confirm: (message, options) =>
-        new Promise<boolean>((resolve) => {
-          resolverRef.current = resolve;
-          setDialog({ ...options, message, mode: "confirm" });
-        }),
-    }),
+  const showDialog = useCallback(
+    (message: string, options: DialogOptions = {}, isConfirm = false): Promise<boolean> => {
+      return new Promise<boolean>((resolve) => {
+        let defaultTitle = isConfirm ? "Confirm Action" : "Notice";
+        if (options.type === "success") defaultTitle = "Success";
+        if (options.type === "error") defaultTitle = "Error";
+        if (options.type === "warning") defaultTitle = "Warning";
+
+        setState({
+          isOpen: true,
+          message,
+          title: options.title || defaultTitle,
+          confirmLabel: options.confirmLabel || (isConfirm ? "Confirm" : "OK"),
+          cancelLabel: options.cancelLabel || "Cancel",
+          isConfirm,
+          type: options.type || (isConfirm ? "warning" : "info"),
+          resolve,
+        });
+      });
+    },
     []
   );
 
-  const tone = TONE[dialog?.type ?? "info"];
+  const alert = useCallback(
+    (message: string, options?: DialogOptions): Promise<void> => {
+      return showDialog(message, options, false).then(() => {});
+    },
+    [showDialog]
+  );
+
+  const confirm = useCallback(
+    (message: string, options?: DialogOptions): Promise<boolean> => {
+      return showDialog(message, options, true);
+    },
+    [showDialog]
+  );
+
+  const handleClose = useCallback((value: boolean) => {
+    if (state.resolve) {
+      state.resolve(value);
+    }
+    setState((prev) => ({ ...prev, isOpen: false, resolve: null }));
+  }, [state]);
+
+  // Keyboard accessibility
+  useEffect(() => {
+    if (!state.isOpen) return;
+
+    // Focus primary button when open
+    setTimeout(() => {
+      confirmButtonRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [state.isOpen, handleClose]);
+
+  // Color theme helpers based on alert type
+  let typeColor = "var(--accent)";
+  let typeIcon: "info" | "check" | "x" | "alert" = "info";
+  if (state.type === "success") {
+    typeColor = "#10b981"; // success green
+    typeIcon = "check";
+  } else if (state.type === "error") {
+    typeColor = "#ef4444"; // danger red
+    typeIcon = "x";
+  } else if (state.type === "warning") {
+    typeColor = "var(--accent)"; // gold
+    typeIcon = "alert";
+  }
 
   return (
-    <DialogContext.Provider value={api}>
+    <DialogContext.Provider value={{ alert, confirm }}>
       {children}
-      {dialog && (
+      {state.isOpen && (
         <div
-          role="presentation"
-          onClick={() => close(false)}
           style={{
-            position: "fixed", inset: 0, zIndex: 10000,
-            background: "var(--scrim, rgba(0,0,0,0.7))",
-            backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(6px)",
+            animation: "hgFadeIn 0.2s ease-out forwards",
           }}
+          onClick={() => handleClose(false)}
         >
           <div
-            role={dialog.mode === "confirm" ? "alertdialog" : "alert"}
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
             style={{
-              width: "100%", maxWidth: 380,
+              width: "100%",
+              maxWidth: "400px",
               background: "var(--surface)",
-              border: "1.5px solid var(--card-line)",
-              borderTop: `3px solid ${tone.accent}`,
-              borderRadius: "var(--radius-lg)",
-              boxShadow: "var(--card-shadow)",
-              padding: 22,
-              display: "flex", flexDirection: "column", gap: 14,
+              border: "1.5px solid var(--border)",
+              borderRadius: "16px",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.6)",
+              padding: "24px",
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              animation: "hgSlideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span
+            {/* Header / Icon */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <div
                 style={{
-                  width: 30, height: 30, borderRadius: 999, flexShrink: 0,
-                  background: tone.soft, color: tone.accent,
-                  display: "grid", placeItems: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  background: `rgba(${state.type === "success" ? "16,185,129" : state.type === "error" ? "239,68,68" : "212,175,55"}, 0.12)`,
+                  border: `1.5px solid ${typeColor}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: typeColor,
+                  flexShrink: 0
                 }}
               >
-                <Icon name={tone.icon} size={16} strokeWidth={2.2} />
-              </span>
-              <h2
+                <Icon name={typeIcon} size={18} strokeWidth={2.5} />
+              </div>
+              <h3
                 style={{
-                  margin: 0, fontFamily: "var(--font-head)", fontSize: 16,
-                  fontWeight: 700, color: "var(--text)",
+                  margin: 0,
+                  fontSize: "17px",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  fontFamily: "var(--font-space-grotesk)",
+                  letterSpacing: "-0.01em"
                 }}
               >
-                {dialog.title ?? (dialog.mode === "confirm" ? "Are you sure?" : "Housie Ghar")}
-              </h2>
+                {state.title}
+              </h3>
             </div>
 
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--text-dim)" }}>
-              {dialog.message}
-            </p>
+            {/* Message Body */}
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: "1.5",
+                color: "var(--text-dim)",
+                wordBreak: "break-word"
+              }}
+            >
+              {state.message}
+            </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 2 }}>
-              {dialog.mode === "confirm" && (
+            {/* Actions */}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+                marginTop: "4px"
+              }}
+            >
+              {state.isConfirm && (
                 <button
-                  type="button"
-                  onClick={() => close(false)}
+                  onClick={() => handleClose(false)}
                   style={{
-                    borderRadius: 999, padding: "9px 18px", fontSize: 13, fontWeight: 700,
-                    cursor: "pointer", color: "var(--text-dim)",
-                    background: "transparent", border: "1.5px solid var(--border-2)",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-2)",
+                    background: "var(--surface-2)",
+                    color: "var(--text-dim)",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--surface-3)";
+                    e.currentTarget.style.color = "var(--text)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "var(--surface-2)";
+                    e.currentTarget.style.color = "var(--text-dim)";
                   }}
                 >
-                  {dialog.cancelLabel ?? "Cancel"}
+                  {state.cancelLabel}
                 </button>
               )}
               <button
-                type="button"
-                autoFocus
-                onClick={() => close(true)}
+                ref={confirmButtonRef}
+                onClick={() => handleClose(true)}
                 style={{
-                  borderRadius: 999, padding: "9px 20px", fontSize: 13, fontWeight: 800,
-                  cursor: "pointer", color: "var(--cta-ink)",
-                  background: tone.accent, border: "none",
+                  padding: "8px 18px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: typeColor,
+                  color: state.type === "success" || state.type === "error" ? "#ffffff" : "var(--accent-ink)",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: `0 4px 12px rgba(${state.type === "success" ? "16,185,129" : state.type === "error" ? "239,68,68" : "212,175,55"}, 0.2)`,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = `0 6px 16px rgba(${state.type === "success" ? "16,185,129" : state.type === "error" ? "239,68,68" : "212,175,55"}, 0.3)`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = `0 4px 12px rgba(${state.type === "success" ? "16,185,129" : state.type === "error" ? "239,68,68" : "212,175,55"}, 0.2)`;
                 }}
               >
-                {dialog.confirmLabel ?? (dialog.mode === "confirm" ? "Confirm" : "OK")}
+                {state.confirmLabel}
               </button>
             </div>
           </div>
@@ -155,10 +276,4 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
       )}
     </DialogContext.Provider>
   );
-}
-
-export function useDialog(): DialogApi {
-  const ctx = useContext(DialogContext);
-  if (!ctx) throw new Error("useDialog must be used inside <DialogProvider>");
-  return ctx;
 }
