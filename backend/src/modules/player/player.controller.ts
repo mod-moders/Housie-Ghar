@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import pool from '../../db';
 import { env } from '../../config/env';
-import { validateHousieName } from '../../utils/housieName';
+import { validateHousieName, generateAlternatives } from '../../utils/housieName';
 import { registerDevice, checkDevice } from '../../services/playerDevices';
 import { buildWaLink } from '../../utils/waLink';
 
@@ -18,7 +18,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
   // player's winnings could be matched to another player's name.
   const nameCheck = validateHousieName(housie_name);
   if (!nameCheck.ok) {
-    res.status(400).json({ message: nameCheck.error });
+    res.status(400).json({ message: nameCheck.error, alternatives: nameCheck.alternatives });
     return;
   }
 
@@ -49,7 +49,10 @@ export async function signup(req: Request, res: Response): Promise<void> {
       [cleanHousieName]
     );
     if ((checkPlayer.rowCount ?? 0) > 0) {
-      res.status(409).json({ message: 'Housie name is already taken. Please choose another one.' });
+      res.status(409).json({
+        message: 'Housie name is already taken. Please choose another one.',
+        alternatives: generateAlternatives(cleanHousieName)
+      });
       return;
     }
 
@@ -296,7 +299,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
       const cleanHousieName = housie_name.trim().replace(/\s+/g, ' ');
       const nameCheck = validateHousieName(cleanHousieName);
       if (!nameCheck.ok) {
-        res.status(400).json({ message: nameCheck.error });
+        res.status(400).json({ message: nameCheck.error, alternatives: nameCheck.alternatives });
         return;
       }
 
@@ -319,7 +322,10 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
             [cleanHousieName, req.player.playerId]
           );
           if ((checkPlayer.rowCount ?? 0) > 0) {
-            res.status(409).json({ message: 'Housie name is already taken. Please choose another one.' });
+            res.status(409).json({
+              message: 'Housie name is already taken. Please choose another one.',
+              alternatives: generateAlternatives(cleanHousieName)
+            });
             return;
           }
           setField('housie_name', cleanHousieName);

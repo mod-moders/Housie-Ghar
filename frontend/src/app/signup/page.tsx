@@ -22,6 +22,25 @@ export default function SignUp() {
   const [referralCode, setReferralCode] = useState("");
   const [showBookieForm, setShowBookieForm] = useState(false);
 
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+
+  function localValidateUsername(name: string): { ok: boolean; error?: string } {
+    if (!name) return { ok: false };
+    if (name.length < 2 || name.length > 16) {
+      return { ok: false, error: "Must be between 2 and 16 characters." };
+    }
+    if (!/^[A-Za-z0-9_.]+$/.test(name)) {
+      if (/\s/.test(name)) {
+        return { ok: false, error: "Cannot contain spaces." };
+      }
+      if (/[\uD800-\uDFFF].|[\u2600-\u27FF]/.test(name)) {
+        return { ok: false, error: "Cannot contain emojis." };
+      }
+      return { ok: false, error: "Only alphanumeric, underscores (_), and periods (.) allowed." };
+    }
+    return { ok: true };
+  }
+
   useEffect(() => {
     // Redirect only if a stored token is actually present — see the same guard in
     // login/page.tsx. A live /api/player/me check here would also succeed off a
@@ -68,6 +87,7 @@ export default function SignUp() {
 
     setLoading(true);
     setError(null);
+    setAlternatives([]);
 
     try {
       const res = await apiFetch<{ token: string }>("/api/player/signup", {
@@ -91,8 +111,12 @@ export default function SignUp() {
 
       // Redirect to lobby
       router.push("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed. Please try again.");
+    } catch (err: unknown) {
+      const errorObj = err as Error & { alternatives?: string[] };
+      setError(errorObj.message || "Sign up failed. Please try again.");
+      if (Array.isArray(errorObj.alternatives)) {
+        setAlternatives(errorObj.alternatives);
+      }
     } finally {
       setLoading(false);
     }
@@ -126,8 +150,29 @@ export default function SignUp() {
         </p>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3 text-red-200 text-sm mb-6 text-center">
-            {error}
+          <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 text-red-200 text-sm mb-6 text-center">
+            <div>{error}</div>
+            {alternatives.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-red-500/20 text-xs">
+                <span className="opacity-80 block mb-2 font-medium">Suggested Usernames:</span>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {alternatives.map((alt) => (
+                    <button
+                      key={alt}
+                      type="button"
+                      onClick={() => {
+                        setHousieName(alt);
+                        setAlternatives([]);
+                        setError(null);
+                      }}
+                      className="px-2.5 py-1 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/30 rounded text-cyan-200 font-mono transition-colors cursor-pointer"
+                    >
+                      {alt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -140,13 +185,29 @@ export default function SignUp() {
               id="housie-name"
               type="text"
               required
-              placeholder="Choose a username/alias (3-20 chars)"
+              placeholder="Choose a username/alias (2-16 chars)"
               value={housieName}
               onChange={(e) => setHousieName(e.target.value)}
               className="w-full px-4 py-3 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors font-mono text-sm"
               style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
             />
-            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+            {housieName && (
+              <div 
+                className="text-[11px] mt-1 font-medium flex items-center gap-1"
+                style={{ color: localValidateUsername(housieName).ok ? "#10b981" : "#ef4444" }}
+              >
+                {localValidateUsername(housieName).ok ? (
+                  <>
+                    <Icon name="check" size={12} strokeWidth={3} /> Username format is valid
+                  </>
+                ) : (
+                  <>
+                    ✕ {localValidateUsername(housieName).error}
+                  </>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] mt-1.5" style={{ color: "var(--text-mute)" }}>
               Your Housie Name will be used to log in on returning visits.
             </p>
           </div>

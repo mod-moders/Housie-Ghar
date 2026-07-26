@@ -22,8 +22,8 @@ const FORBIDDEN_CHARS = /[&(),;|<>"\\\/`]/;
 /** A standalone "and" is a separator in the winner-string grammar. */
 const STANDALONE_AND = /\band\b/i;
 
-export const HOUSIE_NAME_MIN_LENGTH = 3;
-export const HOUSIE_NAME_MAX_LENGTH = 20;
+export const HOUSIE_NAME_MIN_LENGTH = 2;
+export const HOUSIE_NAME_MAX_LENGTH = 16;
 
 /**
  * Canonical comparison form. Applied to BOTH sides of every name comparison —
@@ -39,15 +39,71 @@ export function normalizeHousieName(name: string): string {
 export interface HousieNameValidation {
   ok: boolean;
   error?: string;
+  alternatives?: string[];
+}
+
+export function generateAlternatives(rawName: string): string[] {
+  const base = String(rawName ?? '').trim();
+  // Remove emojis and non-ascii / non-latin symbols
+  let cleaned = base.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+  
+  // Replace spaces and typical separators with underscores for cand1, periods for cand2
+  let cand1 = cleaned.replace(/[\s\-!@#$%^&*()+=~`[\]{}|\\:;"'<>,?/]/g, '_').replace(/__+/g, '_');
+  let cand2 = cleaned.replace(/[\s\-!@#$%^&*()+=~`[\]{}|\\:;"'<>,?/]/g, '.').replace(/\.\.+/g, '.');
+  let cand3 = cleaned.replace(/[\s\-!@#$%^&*()+=~`[\]{}|\\:;"'<>,?/]/g, '');
+
+  // Strip leading/trailing dots/underscores
+  const cleanEnds = (s: string) => s.replace(/^[._]+|[._]+$/g, '');
+  cand1 = cleanEnds(cand1);
+  cand2 = cleanEnds(cand2);
+  cand3 = cleanEnds(cand3);
+
+  // If any candidate is empty/invalid, fallback to a base name
+  const fallbackBase = "player";
+  if (!/^[A-Za-z0-9_.]+$/.test(cand1) || cand1.length < 2) cand1 = `${fallbackBase}_1`;
+  if (!/^[A-Za-z0-9_.]+$/.test(cand2) || cand2.length < 2) cand2 = `${fallbackBase}.2`;
+  if (!/^[A-Za-z0-9_.]+$/.test(cand3) || cand3.length < 2) cand3 = `${fallbackBase}3`;
+
+  // Truncate to maximum 13 chars to leave space for suffix
+  const truncate = (s: string) => s.substring(0, 13);
+  cand1 = truncate(cand1);
+  cand2 = truncate(cand2);
+  cand3 = truncate(cand3);
+
+  // Ensure alternatives are distinct and meet rules (2-16 chars)
+  const results = new Set<string>();
+  
+  // Add first candidate
+  results.add(cand1);
+  
+  // Add second candidate
+  if (cand2 !== cand1) {
+    results.add(cand2);
+  } else {
+    results.add(`${cand1}_1`);
+  }
+
+  // Add third candidate: append a random 2-digit number
+  const num = Math.floor(Math.random() * 90) + 10;
+  results.add(`${cand3}${num}`);
+
+  // Make sure we have exactly 3 alternatives
+  let attempts = 0;
+  while (results.size < 3 && attempts < 10) {
+    const extraNum = Math.floor(Math.random() * 90) + 10;
+    results.add(`${cand3}_${extraNum}`);
+    attempts++;
+  }
+
+  return Array.from(results).slice(0, 3);
 }
 
 /**
- * Validate a name at the point of entry (signup / ticket lock).
- *
- * Deliberately a denylist rather than an allowlist: this market has players with
- * Devanagari names, apostrophes and initials, and launch day is the wrong time
- * to reject a legitimate name. We only forbid what actually breaks the
- * winner-string grammar or the storage layer.
+ * Validate a name at the point of entry (signup / ticket lock / profile).
+ * Enforces the strict platform constraints:
+ * 1. Technical Limits: Length between 2 and 16 characters.
+ * 2. Permitted characters: Alphanumeric (A-Z, a-z, 0-9), underscores (_), and periods (.).
+ * 3. Strictly forbidden: Spaces, emojis, and special symbols.
  */
 export function validateHousieName(rawName: unknown): HousieNameValidation {
   if (typeof rawName !== 'string') {
@@ -59,29 +115,25 @@ export function validateHousieName(rawName: unknown): HousieNameValidation {
   if (name.length < HOUSIE_NAME_MIN_LENGTH || name.length > HOUSIE_NAME_MAX_LENGTH) {
     return {
       ok: false,
-      error: `Housie name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters`,
+      error: `Housie name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters in length.`,
+      alternatives: generateAlternatives(name)
     };
   }
 
-  // Control characters would survive into WhatsApp messages and stored winner
-  // strings. Tabs/newlines are already folded to spaces by the collapse above.
-  if (/[\x00-\x1f\x7f]/.test(name)) {
-    return { ok: false, error: 'Housie name contains invalid characters' };
-  }
-
-  if (FORBIDDEN_CHARS.test(name)) {
+  if (!/^[A-Za-z0-9_.]+$/.test(name)) {
+    let reason = 'Housie name contains invalid characters.';
+    if (/\s/.test(name)) {
+      reason = 'Housie name cannot contain spaces.';
+    } else if (/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(name)) {
+      reason = 'Housie name cannot contain emojis.';
+    } else {
+      reason = 'Housie name can only contain alphanumeric characters, underscores (_), and periods (.).';
+    }
     return {
       ok: false,
-      error: 'Housie name cannot contain & ( ) , ; | < > " \\ / or backticks',
+      error: reason,
+      alternatives: generateAlternatives(name)
     };
-  }
-
-  if (STANDALONE_AND.test(name)) {
-    return { ok: false, error: 'Housie name cannot contain the word "and"' };
-  }
-
-  if (!/[\p{L}\p{N}]/u.test(name)) {
-    return { ok: false, error: 'Housie name must contain at least one letter or number' };
   }
 
   return { ok: true };

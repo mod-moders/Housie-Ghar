@@ -30,6 +30,24 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+
+  function localValidateUsername(name: string): { ok: boolean; error?: string } {
+    if (!name) return { ok: false };
+    if (name.length < 2 || name.length > 16) {
+      return { ok: false, error: "Must be between 2 and 16 characters." };
+    }
+    if (!/^[A-Za-z0-9_.]+$/.test(name)) {
+      if (/\s/.test(name)) {
+        return { ok: false, error: "Cannot contain spaces." };
+      }
+      if (/[\uD800-\uDFFF].|[\u2600-\u27FF]/.test(name)) {
+        return { ok: false, error: "Cannot contain emojis." };
+      }
+      return { ok: false, error: "Only alphanumeric, underscores (_), and periods (.) allowed." };
+    }
+    return { ok: true };
+  }
 
   // Form states
   const [housieName, setHousieName] = useState("");
@@ -101,6 +119,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setAlternatives([]);
     try {
       const updates: {
         full_name: string;
@@ -145,8 +164,12 @@ export default function ProfilePage() {
       setPassword("");
 
       alert("Profile updated successfully!", { type: "success" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save profile");
+    } catch (err: unknown) {
+      const errorObj = err as Error & { alternatives?: string[] };
+      setError(errorObj.message || "Failed to save profile");
+      if (Array.isArray(errorObj.alternatives)) {
+        setAlternatives(errorObj.alternatives);
+      }
     } finally {
       setSaving(false);
     }
@@ -342,7 +365,50 @@ export default function ProfilePage() {
         {/* Profile Settings Form */}
         <form onSubmit={handleSave} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 20, background: "var(--surface)", padding: "24px", borderRadius: 16, border: "1px solid var(--border-light)" }}>
           
-          {error && <div className="hg-sec-err" style={{ padding: 12, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8 }}>{error}</div>}
+          {error && (
+            <div className="hg-sec-err" style={{ padding: 16, background: "var(--danger-soft)", color: "var(--danger)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>{error}</div>
+              {alternatives.length > 0 && (
+                <div style={{ borderTop: "1.5px solid rgba(239, 68, 68, 0.15)", paddingTop: 10, fontSize: "12px" }}>
+                  <span style={{ opacity: 0.8, display: "block", marginBottom: 8, fontWeight: 600 }}>Suggested Usernames:</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {alternatives.map((alt) => (
+                      <button
+                        key={alt}
+                        type="button"
+                        onClick={() => {
+                          setHousieName(alt);
+                          setAlternatives([]);
+                          setError(null);
+                        }}
+                        style={{
+                          padding: "4px 10px",
+                          background: "rgba(6, 182, 212, 0.12)",
+                          border: "1.5px solid rgba(6, 182, 212, 0.25)",
+                          borderRadius: "6px",
+                          color: "var(--accent)",
+                          fontFamily: "var(--font-mono)",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(6, 182, 212, 0.2)";
+                          e.currentTarget.style.borderColor = "var(--accent)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "rgba(6, 182, 212, 0.12)";
+                          e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.25)";
+                        }}
+                      >
+                        {alt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: 20 }}>
             
@@ -367,6 +433,29 @@ export default function ProfilePage() {
                     fontFamily: "var(--font-mono)" 
                   }} 
                 />
+                {housieName && profile && (profile.housie_name_changes || 0) < 1 && (
+                  <div 
+                    style={{ 
+                      fontSize: "11px", 
+                      marginTop: "6px", 
+                      fontWeight: 600, 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: "4px",
+                      color: localValidateUsername(housieName).ok ? "#10b981" : "#ef4444" 
+                    }}
+                  >
+                    {localValidateUsername(housieName).ok ? (
+                      <>
+                        <Icon name="check" size={12} strokeWidth={3} /> Username format is valid
+                      </>
+                    ) : (
+                      <>
+                        ✕ {localValidateUsername(housieName).error}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div>

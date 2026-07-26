@@ -28,41 +28,26 @@ test('normalizeHousieName handles null/undefined without throwing', () => {
 
 // --- validation ------------------------------------------------------------
 
-test('validateHousieName accepts ordinary names', () => {
-  for (const name of ['RajaBabu', 'Ram Kumar', 'R.K.Singh', "D'Souza", 'Anu-Priya', 'प्रिया देवी']) {
+test('validateHousieName accepts alphanumeric names, underscores, and periods', () => {
+  for (const name of ['RajaBabu', 'R_K_Singh', 'R.K.Singh', 'player_123', 'admin.99', 'ab']) {
     assert.strictEqual(validateHousieName(name).ok, true, `expected ${name} to be valid`);
   }
 });
 
-test('validateHousieName rejects winner-string separator characters', () => {
-  // These are what corrupt `winner_housie_name` and let one player's prize
-  // match another player's name.
-  for (const name of ['Ram & Sham', 'Alice (5)', 'Ram, Sham', 'a;b', 'a|b', 'a<b', 'a>b']) {
-    assert.strictEqual(validateHousieName(name).ok, false, `expected ${name} to be rejected`);
+test('validateHousieName rejects spaces, emojis, and special characters', () => {
+  for (const name of ['Ram Kumar', 'Housie!Ghar', 'Housie@Ghar', 'player_🌟', 'abc?', 'hello#world']) {
+    const res = validateHousieName(name);
+    assert.strictEqual(res.ok, false, `expected ${name} to be rejected`);
+    assert.strictEqual(Array.isArray(res.alternatives), true, `expected alternatives for ${name}`);
+    assert.strictEqual(res.alternatives!.length, 3, `expected 3 alternatives for ${name}`);
   }
 });
 
-test('validateHousieName rejects a standalone "and" but allows it inside a word', () => {
-  assert.strictEqual(validateHousieName('Ram and Sham').ok, false);
-  assert.strictEqual(validateHousieName('Anand').ok, true);
-  assert.strictEqual(validateHousieName('Chandni').ok, true);
-});
-
-test('validateHousieName enforces length bounds', () => {
-  assert.strictEqual(validateHousieName('ab').ok, false);
-  assert.strictEqual(validateHousieName('a'.repeat(21)).ok, false);
-  assert.strictEqual(validateHousieName('abc').ok, true);
-  assert.strictEqual(validateHousieName('a'.repeat(20)).ok, true);
-});
-
-test('validateHousieName rejects names with no alphanumeric content', () => {
-  assert.strictEqual(validateHousieName('...').ok, false);
-  assert.strictEqual(validateHousieName('---').ok, false);
-});
-
-test('validateHousieName rejects control characters', () => {
-  assert.strictEqual(validateHousieName('ab\x00cd').ok, false);
-  assert.strictEqual(validateHousieName('ab\x07cd').ok, false);
+test('validateHousieName enforces length bounds (2 to 16 characters)', () => {
+  assert.strictEqual(validateHousieName('a').ok, false); // too short
+  assert.strictEqual(validateHousieName('a'.repeat(17)).ok, false); // too long
+  assert.strictEqual(validateHousieName('ab').ok, true); // valid min
+  assert.strictEqual(validateHousieName('a'.repeat(16)).ok, true); // valid max
 });
 
 test('validateHousieName rejects non-string input', () => {
