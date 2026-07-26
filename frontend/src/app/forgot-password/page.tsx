@@ -57,6 +57,19 @@ export default function ForgotPassword() {
         body: JSON.stringify({ housie_name: housieName.trim(), device_id: getDeviceId() }),
       });
       setLookup(res);
+
+      // Nothing self-service is possible for this account, so hand straight off to
+      // WhatsApp with the name already in the message rather than making them find
+      // and tap a button.
+      //
+      // Navigating the current tab, not window.open: this runs after an await, so the
+      // click that started it is no longer the active user gesture and a popup would be
+      // blocked. A same-tab navigation is not, and wa.me hands off to the WhatsApp app
+      // on mobile and WhatsApp Web on desktop either way. The button stays rendered
+      // underneath for anyone who comes back, or whose browser blocks even this.
+      if (res.method === "support" && res.support_whatsapp) {
+        window.location.href = res.support_whatsapp;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -238,9 +251,19 @@ export default function ForgotPassword() {
         {lookup?.method === "support" && (
           <div className="space-y-4">
             <p className="text-sm text-center" style={{ color: "var(--text-dim)", lineHeight: 1.6 }}>
-              There&rsquo;s no phone number saved on this account, so we can&rsquo;t verify it
-              automatically. Message your bookie or the Housie Ghar team and they&rsquo;ll get you
-              back in.
+              {lookup.support_whatsapp ? (
+                <>
+                  There&rsquo;s no phone number saved on this account, so we can&rsquo;t verify it
+                  automatically. Opening WhatsApp with your details &mdash; just press send and the
+                  team will reset it for you.
+                </>
+              ) : (
+                <>
+                  There&rsquo;s no phone number saved on this account, so we can&rsquo;t verify it
+                  automatically. Message your bookie or the Housie Ghar team and they&rsquo;ll get
+                  you back in.
+                </>
+              )}
             </p>
             {lookup.support_whatsapp && (
               <a
@@ -250,7 +273,7 @@ export default function ForgotPassword() {
                 className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-bold"
                 style={{ background: "var(--cta)", color: "var(--cta-ink)" }}
               >
-                <Icon name="chat" size={16} /> Message us on WhatsApp
+                <Icon name="chat" size={16} /> {"Didn't open? Message us on WhatsApp"}
               </a>
             )}
             <p className="text-[11px] text-center" style={{ color: "var(--text-mute)" }}>

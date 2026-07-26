@@ -498,7 +498,9 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       support_whatsapp: supportPhone
         ? buildWaLink(
             supportPhone,
-            `Hi, I can't sign in to my Housie Ghar account "${cleanHousieName}" and there's no phone number saved on it. Can you help me reset my password?`
+            // Leads with the housie name because that is what staff search the Players
+            // dashboard by, and it is the one field they need to action the reset.
+            `Hi, this is ${cleanHousieName} from Housie Ghar. I can't sign in to my account and there's no phone number saved on it, so I can't reset the password myself. Could you please reset it for me?`
           )
         : null,
     });
