@@ -740,6 +740,21 @@ interface OverflowHistoryItem {
   processed_at: string | null;
 }
 
+interface StaffDue {
+  booking_id: string;
+  housie_name: string;
+  total_amount: number;
+  confirmed_at: string;
+  due_settled: boolean;
+  due_settled_at: string | null;
+  game_title: string;
+  game_time: string;
+  ticket_price: number;
+  staff_name: string;
+  staff_role: string;
+  ticket_numbers: number[];
+}
+
 export function OverflowSection({ me }: { me: AuthUser }) {
   const [queue, setQueue] = useState<QueueBooking[]>([]);
   const [history, setHistory] = useState<OverflowHistoryItem[]>([]);
@@ -747,6 +762,8 @@ export function OverflowSection({ me }: { me: AuthUser }) {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<{ user_id: string; full_name: string; role_name: string; receive_overflow: boolean }[]>([]);
   const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [dues, setDues] = useState<StaffDue[]>([]);
+  const [settlingBookingId, setSettlingBookingId] = useState<string | null>(null);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -757,7 +774,21 @@ export function OverflowSection({ me }: { me: AuthUser }) {
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/operator/overflow-queue").then(setQueue).catch(() => {});
     apiFetch<OverflowHistoryItem[]>("/api/bookings/operator/overflow-history").then(setHistory).catch(() => {});
+    apiFetch<StaffDue[]>("/api/bookings/operator/staff-dues").then(setDues).catch(() => {});
   }, []);
+
+  const settleDue = async (bookingId: string) => {
+    setSettlingBookingId(bookingId);
+    setError(null);
+    try {
+      await apiFetch(`/api/bookings/operator/${bookingId}/settle-due`, { method: "POST" });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to settle due");
+    } finally {
+      setSettlingBookingId(null);
+    }
+  };
 
   const loadSettings = useCallback(() => {
     if (me.role_name !== "Superadmin") return;
@@ -823,6 +854,9 @@ export function OverflowSection({ me }: { me: AuthUser }) {
       setUpdatingSettings(false);
     }
   };
+
+  const pendingDues = dues.filter((d) => !d.due_settled);
+  const settledDues = dues.filter((d) => d.due_settled);
 
   return (
     <div className="hg-sec">
@@ -903,6 +937,156 @@ export function OverflowSection({ me }: { me: AuthUser }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pending Dues Panel */}
+      <div className="hg-panel" style={{ marginTop: "32px" }}>
+        <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)" }}>
+            <Icon name="rupee" size={16} /> Pending Dues from Staff
+          </h3>
+          <p className="hg-sec-sub" style={{ fontSize: "11px", marginTop: "2px" }}>
+            Unsettled cash collections for manual bookings or accepted overflow bookings confirmed directly by staff.
+          </p>
+        </div>
+        {pendingDues.length === 0 ? (
+          <EmptyHint icon="check" title="All staff dues settled" sub="No pending dues from manual or overflow staff bookings." />
+        ) : (
+          <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
+            <div className="hg-table" style={{ minWidth: "900px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                <span>Staff Member</span>
+                <span>Game Details</span>
+                <span>Ticket Info</span>
+                <span>Amount Due</span>
+                <span>Confirmed At</span>
+                <span style={{ textAlign: "right" }}>Action</span>
+              </div>
+              {pendingDues.map((d) => {
+                const formattedConfirmed = new Date(d.confirmed_at).toLocaleString("en-IN", {
+                  day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+                });
+                const formattedGameTime = new Date(d.game_time).toLocaleString("en-IN", {
+                  day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+                });
+                const isSettling = settlingBookingId === d.booking_id;
+
+                return (
+                  <div key={d.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                    <div>
+                      <b style={{ color: "var(--text)" }}>{d.staff_name}</b>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.staff_role}</div>
+                    </div>
+                    <div>
+                      <b style={{ color: "var(--text)" }}>{d.game_title}</b>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedGameTime}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: "var(--text)" }}>
+                        {d.ticket_numbers.map(num => `#${num}`).join(", ")}
+                      </span>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""} @ {money(d.ticket_price)}</div>
+                    </div>
+                    <strong style={{ color: "var(--accent)", fontSize: "15px" }}>{money(d.total_amount)}</strong>
+                    <span className="hg-dim">{formattedConfirmed}</span>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        className="hg-bq-confirm"
+                        disabled={isSettling}
+                        onClick={() => settleDue(d.booking_id)}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          background: "var(--brand)",
+                          color: "var(--accent-ink)",
+                          border: "none",
+                          borderRadius: "6px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          boxShadow: "0 2px 8px rgba(244, 201, 93, 0.15)"
+                        }}
+                      >
+                        <Icon name="check" size={12} strokeWidth={3} /> {isSettling ? "Settling..." : "Mark Settled"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Settled Dues History Panel */}
+      {settledDues.length > 0 && (
+        <div className="hg-panel" style={{ marginTop: "32px" }}>
+          <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon name="clock" size={16} /> Settled Staff Dues (History)
+            </h3>
+          </div>
+          <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
+            <div className="hg-table" style={{ minWidth: "900px" }}>
+              <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                <span>Staff Member</span>
+                <span>Game Details</span>
+                <span>Ticket Info</span>
+                <span>Amount Paid</span>
+                <span>Settled At</span>
+                <span style={{ textAlign: "right" }}>Status</span>
+              </div>
+              {settledDues.map((d) => {
+                const formattedSettled = d.due_settled_at
+                  ? new Date(d.due_settled_at).toLocaleString("en-IN", {
+                      day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+                    })
+                  : "Unknown";
+                const formattedGameTime = new Date(d.game_time).toLocaleString("en-IN", {
+                  day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
+                });
+
+                return (
+                  <div key={d.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr" }}>
+                    <div>
+                      <b style={{ color: "var(--text)" }}>{d.staff_name}</b>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.staff_role}</div>
+                    </div>
+                    <div>
+                      <b style={{ color: "var(--text)" }}>{d.game_title}</b>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedGameTime}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: "var(--text)" }}>
+                        {d.ticket_numbers.map(num => `#${num}`).join(", ")}
+                      </span>
+                      <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.ticket_numbers.length} ticket{d.ticket_numbers.length > 1 ? "s" : ""} @ {money(d.ticket_price)}</div>
+                    </div>
+                    <strong className="hg-dim">{money(d.total_amount)}</strong>
+                    <span className="hg-dim">{formattedSettled}</span>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <span 
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "#10b981",
+                          background: "rgba(16,185,129,0.15)",
+                          border: "1px solid rgba(16,185,129,0.3)",
+                          padding: "4px 8px",
+                          borderRadius: "6px"
+                        }}
+                      >
+                        Settled
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

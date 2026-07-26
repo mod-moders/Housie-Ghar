@@ -1306,3 +1306,79 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+/**
+ * Get all staff dues (bookings confirmed by non-bookie staff)
+ */
+export async function getStaffDues(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
+              g.title AS game_title, g.scheduled_at AS game_time, g.ticket_price,
+              u.full_name AS staff_name, r.role_name AS staff_role,
+              array_agg(t.ticket_number ORDER BY t.ticket_number) AS ticket_numbers
+       FROM Bookings b
+       JOIN Scheduled_Games g ON b.game_id = g.game_id
+       JOIN Users u ON b.confirmed_by = u.user_id
+       JOIN Roles r ON u.role_id = r.role_id
+       JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
+       WHERE b.booking_status = 'Sold'
+         AND r.role_name IN ('Superadmin', 'Financial Admin', 'Operator')
+       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at, g.title, g.scheduled_at, g.ticket_price, u.full_name, r.role_name
+       ORDER BY b.confirmed_at DESC
+       LIMIT 200`
+    );
+
+    const dues = result.rows.map((row) => ({
+      booking_id: row.booking_id,
+      housie_name: row.housie_name,
+      total_amount: parseFloat(row.total_amount),
+      confirmed_at: row.confirmed_at,
+      due_settled: row.due_settled,
+      due_settled_at: row.due_settled_at,
+      game_title: row.game_title,
+      game_time: row.game_time,
+      ticket_price: parseFloat(row.ticket_price),
+      staff_name: row.staff_name,
+      staff_role: row.staff_role,
+      ticket_numbers: row.ticket_numbers as number[],
+    }));
+
+    res.json(dues);
+  } catch (error) {
+    console.error('Error fetching staff dues:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Mark a staff due as settled
+ */
+export async function settleStaffDue(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { booking_id } = req.params;
+  const adminId = req.user!.userId;
+
+  try {
+    const result = await pool.query(
+      `UPDATE Bookings
+       SET due_settled = TRUE,
+           due_settled_at = NOW(),
+           due_settled_by = $1
+       WHERE booking_id = $2
+         AND booking_status = 'Sold'
+         AND due_settled = FALSE
+       RETURNING booking_id`,
+      [adminId, booking_id]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: 'Due not found or already settled' });
+      return;
+    }
+
+    res.json({ message: 'Due successfully marked as settled.' });
+  } catch (error) {
+    console.error('Error settling staff due:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
