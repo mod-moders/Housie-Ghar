@@ -308,12 +308,6 @@ export default function Lobby() {
   const heroRef = useRef<HTMLDivElement>(null);
   const gamesPanelRef = useRef<HTMLDivElement>(null);
 
-
-  // Mobile-only "curtain" reveal: the games panel rises and covers the hero banner as the
-  // user scrolls, then releases into normal scrolling once it fully covers it. The public
-  // site scrolls inside `.hg-frame` (not the window) below the 900px breakpoint — see
-  // `.hg-frame`'s overflow rules in globals.css — so ScrollTrigger must target that element
-  // as its scroller, not the default window.
   const all = games ?? [];
   const inProgress = all.filter((g) => g.game_status === "Live" || g.game_status === "Paused" || g.game_status === "Draw_Ended");
   const scheduled = all
@@ -357,28 +351,32 @@ export default function Lobby() {
   return (
     <PublicShell>
       <div className="hg-screen hg-screen--lobby">
-        {/* Decorative background layers — bloom + grid + coins drifting in background */}
-        <div className="hg-banner-bloom" aria-hidden="true" />
-        <div className="hg-banner-grid" aria-hidden="true">
-          {GRID_CELLS.map((c, i) => (
-            <span key={i} className="hg-banner-cell">
-              {c && (
-                <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
-                  {c.n}
-                  {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
-                </span>
-              )}
-            </span>
-          ))}
-        </div>
-        <div className="hg-banner-fade" aria-hidden="true" />
-        {COINS.map((n, i) => (
-          <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
-        ))}
-
         <div className="hg-lobby-v2" ref={lobbyRef}>
-          {/* Brand Welcome Header with Logo — covered by the games panel as it rises on scroll (mobile) */}
+          {/* Brand Welcome Header with Logo. The decorative layers (bloom + ticket grid + fade +
+              coins) are children of the hero rather than of the page, so the whole banner — glows,
+              numbers, coins, logo, tagline — scrolls as one unit. As page-level children they were
+              positioned against the full lobby column instead, so they drifted independently of the
+              logo and tagline they belong to. .hg-lobby-hero is position:relative + overflow:hidden,
+              which is what anchors and clips them. */}
           <div className="hg-lobby-hero" ref={heroRef}>
+            <div className="hg-banner-bloom" aria-hidden="true" />
+            <div className="hg-banner-grid" aria-hidden="true">
+              {GRID_CELLS.map((c, i) => (
+                <span key={i} className="hg-banner-cell">
+                  {c && (
+                    <span className={`hg-banner-num hg-banner-num--${c.tone}`}>
+                      {c.n}
+                      {c.daub && <span className={`hg-banner-daub hg-banner-daub--${c.daub}`} />}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+            <div className="hg-banner-fade" aria-hidden="true" />
+            {COINS.map((n, i) => (
+              <span key={n} className={`hg-banner-coin hg-banner-coin--${i + 1}`} aria-hidden="true">{n}</span>
+            ))}
+
             <div className="hg-lobby-header">
               <div className="hg-lobby-header-row">
                 <Image

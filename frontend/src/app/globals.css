@@ -1279,11 +1279,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   background:radial-gradient(58% 56% at 50% 48%, var(--bn-fade), transparent 80%)}
 
 /* sticker coins styled as neon glowing 3D lottery balls */
+/* No `transition:all` here: these are pointer-events:none decorations that nothing
+   interacts with, and an all-property transition on a permanently animating element just
+   gives the style engine more to diff every frame. */
 .hg-banner-coin{position:absolute;z-index:1;border-radius:50%;display:grid;place-items:center;
   font-family:var(--font-head);font-weight:800;color:#0a0c10;
   border:1.5px solid rgba(255,255,255,0.22);pointer-events:none;
-  transform:translateY(var(--bob)) rotate(var(--coin-rot));
-  transition: all 0.3s ease;
+  transform:rotate(var(--coin-rot));
   text-shadow:0 1px 2px rgba(255,255,255,0.3)}
 .hg-banner-coin--1{--coin-rot:-9deg;top:15%;left:12%;width:44px;height:44px;font-size:15px;
   background:radial-gradient(circle at 30% 30%, #ffffff 0%, oklch(0.88 0.17 96) 60%, oklch(0.70 0.13 90) 100%);
@@ -1344,8 +1346,16 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-banner-btn--primary:hover{transform:translateY(-1.5px);box-shadow:var(--card-shadow);filter:brightness(1.05)}
 .hg-banner-btn--primary:active{transform:translateY(1px);box-shadow:none}
 
-@property --bob{syntax:"<length>";inherits:false;initial-value:0px}
-@keyframes hg-coin-bob{50%{--bob:-6px}}
+/* Animates `transform` directly rather than the `--bob` <length> custom property the coin's
+   transform used to read (its `@property` registration is gone with it). Registered or not,
+   a custom-property animation is only ever evaluated on the main thread: all four coins ran
+   a style recalc every frame, permanently, competing with scrolling for the same thread.
+   Animating transform hands the identical motion to the compositor instead. --coin-rot is a
+   static per-coin value, so re-stating it here preserves each coin's tilt. */
+@keyframes hg-coin-bob{
+  0%,100%{transform:translateY(0) rotate(var(--coin-rot))}
+  50%{transform:translateY(-6px) rotate(var(--coin-rot))}
+}
 @keyframes hg-bloom-drift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(1.5%,-1.5%,0) scale(1.05)}}
 @keyframes hg-daub{0%,100%{opacity:.55;transform:scale(.98) rotate(var(--daub-rot,0deg))}50%{opacity:1;transform:scale(1.02) rotate(var(--daub-rot,0deg))}}
 @keyframes hg-quote-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -1455,17 +1465,30 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-lobby-v2{position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px;
   width:100%}
 /* Positioned + clipped so the decorative bloom/grid/coins (absolutely positioned children,
-   moved here from the old page-wide layer) stay confined to the hero and travel/pin with
-   it instead of scrolling past it at the page's normal rate. */
+   moved back here from the page-wide layer) are anchored to the hero and scroll with it as
+   one banner, instead of drifting against the logo and tagline they belong to. */
 .hg-lobby-hero{position:relative;overflow:hidden}
-.hg-lobby-header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:6px;padding:8px 16px}
+/* The logo/tagline must out-paint the decorative layers they now sit among: .hg-banner-fade
+   and .hg-banner-coin are z-index:1, and an unpositioned in-flow box always paints below a
+   positioned one regardless of DOM order. */
+.hg-lobby-header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:6px;padding:8px 16px;
+  position:relative;z-index:3}
 /* Games panel replaces .hg-lobby-v2's flex gap for everything after the hero banner —
    the flex/gap here is layout-preserving on every viewport size. Only below 900px does
-   it also become the rising "curtain" that GSAP pins/reveals over .hg-lobby-hero (see
-   page.tsx) — desktop keeps today's plain scroll with no bg/radius/offset. */
+   it also pick up its own surface/radius/offset so it reads as a panel sitting on the page —
+   desktop keeps today's plain scroll with no bg/radius/offset. (It used to be a GSAP-pinned
+   "curtain" revealed over .hg-lobby-hero; that pin is gone and the lobby now scrolls as one
+   page.) */
 .hg-games-panel{display:flex;flex-direction:column;gap:18px}
 @media (max-width: 899.98px) {
-  .hg-lobby-hero{z-index:1}
+  /* Full-bleed to the frame edges, cancelling .hg-lobby-v2's 16px side padding the same way
+     .hg-games-panel and the announcement bar do, then re-padding so the logo and tagline keep
+     their inset. Now that the bloom/grid/coins are clipped to this box rather than spanning
+     the page, an inset hero would show them stopping dead at two hard vertical edges
+     mid-screen; edge-to-edge reads as a banner band instead. Padding lives here rather than
+     on .hg-lobby-header because that carries a `padding:8px 0 !important` (see below). */
+  .hg-lobby-hero{z-index:1;
+    margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
   .hg-games-panel{
     position:relative;z-index:2;
     margin:0 -16px;padding:20px 16px 0;
