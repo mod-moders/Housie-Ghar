@@ -145,6 +145,7 @@ export interface StaffUser {
   last_login: string | null;
   created_at?: string;
   monthly_salary?: number;
+  estimated_earnings?: number;
 }
 
 export interface AuditEntry {

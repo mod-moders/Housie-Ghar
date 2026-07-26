@@ -22,7 +22,9 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
               u.current_balance, u.last_login, u.role_id, u.is_cfo, r.role_name, u.created_at, u.monthly_salary,
               (SELECT COUNT(*) FROM Scheduled_Games g WHERE g.operator_id = u.user_id) AS assigned_games_count,
               (SELECT COUNT(*) FROM Bookings b
-               WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold')::INTEGER AS sold_count
+               WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold')::INTEGER AS sold_count,
+              (SELECT COALESCE(SUM(total_amount), 0)::float FROM Bookings b
+               WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold') AS total_sales_volume
        FROM Users u
        JOIN Roles r ON u.role_id = r.role_id
        WHERE u.status <> 'Deleted'
@@ -49,6 +51,7 @@ export async function listUsers(req: AuthenticatedRequest, res: Response): Promi
         last_login: row.last_login,
         created_at: row.created_at,
         monthly_salary: parseFloat(row.monthly_salary || '0'),
+        estimated_earnings: row.role_id === 4 ? parseFloat(row.total_sales_volume || '0') * 0.10 : 0,
       }))
     );
   } catch (error) {
