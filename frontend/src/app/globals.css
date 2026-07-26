@@ -1075,7 +1075,7 @@
 }
 
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overflow-x:hidden}
 /* Without this, mobile browsers "font-boost" text size based on the device's own
    screen width/DPI heuristics (varies by device, invisible in any desktop viewport
    emulation) — inflated text then busts fixed-width containers on some phones but
@@ -1108,10 +1108,11 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
 
 /* ---- Stage & frame ---- */
 .hg-stage{min-height:100vh;min-height:100dvh;display:flex;justify-content:center;
+  overflow-x:hidden;
   background:radial-gradient(120% 80% at 50% -10%, var(--bg2), var(--bg));}
 .hg-stage-wide{align-items:stretch}
 .hg-frame{position:relative;width:100%;max-width:452px;height:100vh;height:100dvh;
-  overflow-y:auto;overflow-x:hidden;background:var(--bg);
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;background:var(--bg);
   scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;}
 .hg-frame::-webkit-scrollbar{width:7px}
 .hg-frame::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
