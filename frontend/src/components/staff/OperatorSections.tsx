@@ -949,7 +949,7 @@ export function OverflowSection({ me }: { me: AuthUser }) {
         <div className="hg-panel" style={{ marginTop: "32px" }}>
         <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)" }}>
-            <Icon name="rupee" size={16} /> Pending Dues from Staff
+            <Icon name="rupee" size={16} /> Pending Staff Dues
           </h3>
           <p className="hg-sec-sub" style={{ fontSize: "11px", marginTop: "2px" }}>
             Unsettled cash collections for manual bookings or accepted overflow bookings confirmed directly by staff.
