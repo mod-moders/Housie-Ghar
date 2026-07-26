@@ -774,8 +774,10 @@ export function OverflowSection({ me }: { me: AuthUser }) {
   const load = useCallback(() => {
     apiFetch<QueueBooking[]>("/api/bookings/operator/overflow-queue").then(setQueue).catch(() => {});
     apiFetch<OverflowHistoryItem[]>("/api/bookings/operator/overflow-history").then(setHistory).catch(() => {});
-    apiFetch<StaffDue[]>("/api/bookings/operator/staff-dues").then(setDues).catch(() => {});
-  }, []);
+    if (me.role_name === "Financial Admin") {
+      apiFetch<StaffDue[]>("/api/bookings/operator/staff-dues").then(setDues).catch(() => {});
+    }
+  }, [me.role_name]);
 
   const settleDue = async (bookingId: string) => {
     setSettlingBookingId(bookingId);
@@ -941,7 +943,8 @@ export function OverflowSection({ me }: { me: AuthUser }) {
       )}
 
       {/* Pending Dues Panel */}
-      <div className="hg-panel" style={{ marginTop: "32px" }}>
+      {me.role_name === "Financial Admin" && (
+        <div className="hg-panel" style={{ marginTop: "32px" }}>
         <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px", color: "var(--accent)" }}>
             <Icon name="rupee" size={16} /> Pending Dues from Staff
@@ -1019,10 +1022,11 @@ export function OverflowSection({ me }: { me: AuthUser }) {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Settled Dues History Panel */}
-      {settledDues.length > 0 && (
+      {me.role_name === "Financial Admin" && settledDues.length > 0 && (
         <div className="hg-panel" style={{ marginTop: "32px" }}>
           <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-2)", paddingBottom: "12px", marginBottom: "16px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
