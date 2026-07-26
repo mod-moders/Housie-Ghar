@@ -554,17 +554,22 @@
   overflow: hidden;
   height: 44px;
   
-  /* Full-bleed on real phones, but never wider than the 452px phone frame,
-     so the bar spans the frame edge-to-edge instead of overhanging it on
-     tablet-band widths (560-899px). margin-left self-corrects to the frame's
-     left edge at any width: it equals frameCenter - halfBox, and the frame is
-     always centered in the viewport below 900px. */
-  width: min(100vw, 452px);
+  /* Full-bleed to the frame edges, expressed relative to the parent rather than
+     the viewport. The bar lives inside .hg-games-panel, which already bleeds to
+     the frame edge with its own `margin:0 -16px` and then re-pads by 16px — so
+     cancelling exactly that 16px is what "edge to edge" means here.
+     The previous `width:min(100vw,452px)` + `margin-left:calc(50% - min(50vw,226px))`
+     assumed frame width == min(100vw,452px). That is false whenever the frame
+     carries a classic (non-overlay) scrollbar, and it made a *viewport-sized*
+     box a child of a frame-sized column — which is what pushed the whole lobby
+     column past the frame. Nothing here depends on vw any more.
+     >=900px overrides width/margin-left/margin-right for the desktop bleed. */
+  width: auto;
   position: relative;
   left: auto;
   right: auto;
-  margin-left: calc(50% - min(50vw, 226px));
-  margin-right: 0;
+  margin-left: -16px;
+  margin-right: -16px;
   margin-top: 16px;
   margin-bottom: 16px;
 
@@ -601,6 +606,12 @@
 
 .hg-announcement-ticker {
   flex-grow: 1;
+  /* Required, not cosmetic: this is a flex item wrapping .hg-marquee, which is
+     white-space:nowrap. A flex item defaults to min-width:auto, so without this
+     its *minimum* size is the full un-wrapped announcement string — overflow:hidden
+     does not shrink a min-content contribution. That propagates up as a several-
+     hundred-px floor on the whole announcement bar. */
+  min-width: 0;
   display: flex;
   align-items: center;
   padding-left: 16px;
@@ -1111,7 +1122,12 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
   overflow-x:hidden;
   background:radial-gradient(120% 80% at 50% -10%, var(--bg2), var(--bg));}
 .hg-stage-wide{align-items:stretch}
-.hg-frame{position:relative;width:100%;max-width:452px;height:100vh;height:100dvh;
+/* min-width:0 defeats the flex-item `min-width:auto` default. Without it the frame
+   refuses to shrink below its content's min-content width, and because .hg-stage
+   centres it, an over-wide page pushes the frame off BOTH edges of the viewport
+   rather than overflowing in one direction. Below 900px overflow-x:hidden already
+   forces this to 0; it is the >=900px layer (overflow:visible) that needs it. */
+.hg-frame{position:relative;width:100%;min-width:0;max-width:452px;height:100vh;height:100dvh;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;background:var(--bg);
   scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;}
 .hg-frame::-webkit-scrollbar{width:7px}
@@ -1422,8 +1438,22 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   font-weight: 800;
 }
 
-.hg-screen--lobby{position:relative;overflow:hidden;min-height:calc(100vh - 70px)}
-.hg-lobby-v2{position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px}
+/* .hg-screen--lobby shares the big token/layout block above with .hg-banner (a hero
+   element). Those hero rules are wrong for a full *page* column and must be undone
+   here, or the lobby overflows the phone frame on both sides:
+   - align-items:center makes .hg-lobby-v2 a shrink-to-fit (fit-content) box instead
+     of a frame-width one. fit-content can never go below its min-content, so ONE
+     too-wide descendant stops being a local overflow and instead widens the entire
+     lobby column — and because it is centre-aligned, the excess hangs off the left
+     AND right, so every section (hero, Live Now, Upcoming, Past Games, referral card)
+     gets its first and last few characters clipped away. Stretch keeps the column
+     pinned to the frame width no matter what a descendant does.
+   - the 22px side padding would leave .hg-games-panel's -16px full-bleed 22px short
+     of the frame edge once the column is correctly sized. */
+.hg-screen--lobby{position:relative;overflow:hidden;min-height:calc(100vh - 70px);
+  align-items:stretch;padding-left:0;padding-right:0}
+.hg-lobby-v2{position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px;
+  width:100%}
 /* Positioned + clipped so the decorative bloom/grid/coins (absolutely positioned children,
    moved here from the old page-wide layer) stay confined to the hero and travel/pin with
    it instead of scrolling past it at the page's normal rate. */
