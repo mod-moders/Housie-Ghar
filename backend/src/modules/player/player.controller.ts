@@ -261,17 +261,21 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     let passwordHashUpdate = null;
     let shouldUpdatePassword = false;
 
-    if (password !== undefined) {
-      shouldUpdatePassword = true;
-      if (password !== '' && password !== null) {
-        if (password.length < MIN_PLAYER_PASSWORD_LENGTH) {
-          res.status(400).json({
-            message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
-          });
-          return;
-        }
-        passwordHashUpdate = await bcrypt.hash(password, 12);
+    // A password can be SET or CHANGED here, never cleared. An empty string used to
+    // mean "revert this account to passwordless", which put it back behind the
+    // Player_Devices known-device gate — so the owner would be locked out of every
+    // device except the one they happened to be on, with no way back in if that
+    // browser's storage were ever cleared. Removing the UI for it is not enough on
+    // its own; the endpoint has to refuse it too, or the same call still works.
+    if (password !== undefined && password !== null && password !== '') {
+      if (typeof password !== 'string' || password.length < MIN_PLAYER_PASSWORD_LENGTH) {
+        res.status(400).json({
+          message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
+        });
+        return;
       }
+      shouldUpdatePassword = true;
+      passwordHashUpdate = await bcrypt.hash(password, 12);
     }
 
     // Only touch fields the request actually carried. `phone`, `email` and

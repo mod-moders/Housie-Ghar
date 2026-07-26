@@ -41,7 +41,6 @@ export default function ProfilePage() {
 
   // Password states
   const [password, setPassword] = useState("");
-  const [removePassword, setRemovePassword] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -116,9 +115,9 @@ export default function ProfilePage() {
         sound_enabled: soundEnabled,
       };
 
-      if (removePassword) {
-        updates.password = "";
-      } else if (password) {
+      // Only ever SET a password, never clear one: an empty string is simply not sent.
+      // Dropping back to passwordless would strand the account on its known device again.
+      if (password) {
         updates.password = password;
       }
 
@@ -135,7 +134,6 @@ export default function ProfilePage() {
       setSoundEnabled(res.player.sound_enabled !== false);
       setHasPassword(!!res.player.has_password);
       setPassword("");
-      setRemovePassword(false);
 
       alert("Profile updated successfully!", { type: "success" });
     } catch (err) {
@@ -383,37 +381,26 @@ export default function ProfilePage() {
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      disabled={removePassword}
                       onChange={e => setPassword(e.target.value)}
                       placeholder={hasPassword ? "•••••••• (Leave blank to keep current)" : "At least 6 characters"}
-                      style={{ ...inputStyle, opacity: removePassword ? 0.5 : 1 }}
+                      style={inputStyle}
                     />
                     <button
                       type="button"
                       className="hg-password-toggle"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setShowPassword(!showPassword)}
-                      disabled={removePassword}
                     >
                       <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
                     </button>
                   </div>
                 </div>
 
-                {hasPassword && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                    <input 
-                      type="checkbox" 
-                      checked={removePassword} 
-                      onChange={e => {
-                        setRemovePassword(e.target.checked);
-                        if (e.target.checked) setPassword("");
-                      }} 
-                      style={{ width: 16, height: 16, accentColor: "var(--accent)" }} 
-                    />
-                    <span style={{ fontSize: 12, color: "var(--danger)" }}>Remove password security (revert to passwordless login)</span>
-                  </label>
-                )}
+                <p style={{ fontSize: 12, color: "var(--text-mute)", margin: 0, lineHeight: 1.5 }}>
+                  {hasPassword
+                    ? "Your password is what lets you sign in on any device. It can be changed here, but not removed."
+                    : "Set a password so you can sign in from any device, not just this one."}
+                </p>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

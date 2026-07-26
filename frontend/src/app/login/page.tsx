@@ -53,7 +53,11 @@ export default function Login() {
         method: "POST",
         body: JSON.stringify({
           housie_name: housieName,
-          password: passwordRequired ? password : undefined,
+          // Send whatever was typed. Accounts created since signup started collecting a
+          // password need it; the ones predating that have none, and for those an empty
+          // field means "omit it" so the server falls through to its known-device check
+          // rather than rejecting them outright.
+          password: password || undefined,
           device_id: getDeviceId(),
         }),
       });
@@ -113,7 +117,7 @@ export default function Login() {
           Login
         </h1>
         <p className="text-center text-sm mb-6" style={{ color: "var(--text-mute)" }}>
-          {passwordRequired ? "Authenticate with password to enter lobby" : "Enter your Housie Name to continue."}
+          Enter your Housie Name and password to continue.
         </p>
 
         {error && (
@@ -131,7 +135,6 @@ export default function Login() {
               id="housie-name"
               type="text"
               required
-              disabled={passwordRequired}
               placeholder="Enter your registered Housie Name"
               value={housieName}
               onChange={(e) => setHousieName(e.target.value)}
@@ -140,30 +143,17 @@ export default function Login() {
             />
           </div>
 
-          {passwordRequired && (
-            <div>
+          <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-sm font-medium" htmlFor="password" style={{ color: "var(--text-dim)" }}>
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPasswordRequired(false);
-                    setPassword("");
-                    setError(null);
-                  }}
-                  className="text-xs text-[#F43F5E] hover:underline"
-                >
-                  Change Name
-                </button>
               </div>
               <div className="hg-password-wrapper">
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  required
-                  autoFocus
+                  required={passwordRequired}
                   placeholder="Enter your account password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -184,7 +174,6 @@ export default function Login() {
                 </button>
               </div>
             </div>
-          )}
 
           <Button type="submit" variant="cta" full disabled={loading}>
             {loading ? "Checking..." : "ENTER LOBBY"}
