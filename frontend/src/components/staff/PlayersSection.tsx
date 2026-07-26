@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { money } from "@/lib/money";
 import { Icon } from "@/components/Icon";
 import { Button, EmptyHint } from "@/components/ui";
+import { useDialog } from "@/components/DialogProvider";
 
 interface PlayerData {
   player_id: string;
@@ -27,6 +28,7 @@ export function PlayersSection() {
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
+  const { alert, confirm } = useDialog();
 
   const loadPlayers = useCallback(async () => {
     setLoading(true);
@@ -52,7 +54,8 @@ export function PlayersSection() {
   const handleToggleStatus = async (player: PlayerData) => {
     const nextStatus = player.status === "Active" ? "Suspended" : "Active";
     const confirmMessage = `Are you sure you want to ${nextStatus.toLowerCase()} player '${player.housie_name}'?`;
-    if (!window.confirm(confirmMessage)) return;
+    const confirmed = await confirm(confirmMessage, { type: "warning", title: "Change Status" });
+    if (!confirmed) return;
 
     setActionBusy(player.player_id);
     try {
@@ -66,8 +69,9 @@ export function PlayersSection() {
       if (selectedPlayer && selectedPlayer.player_id === player.player_id) {
         setSelectedPlayer((prev) => prev ? { ...prev, status: nextStatus } : null);
       }
+      alert(`Player status updated to ${nextStatus}`, { type: "success" });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to update status.");
+      alert(e instanceof Error ? e.message : "Failed to update status.", { type: "error" });
     } finally {
       setActionBusy(null);
     }
@@ -75,7 +79,8 @@ export function PlayersSection() {
 
   const handleDeletePlayer = async (player: PlayerData) => {
     const confirmMessage = `⚠️ WARNING: Are you absolutely sure you want to DELETE player '${player.housie_name}'? This action is permanent and cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
+    const confirmed = await confirm(confirmMessage, { type: "error", title: "Delete Player" });
+    if (!confirmed) return;
 
     setActionBusy(player.player_id);
     try {
@@ -84,8 +89,9 @@ export function PlayersSection() {
       });
       setPlayers((prev) => prev.filter((p) => p.player_id !== player.player_id));
       setSelectedPlayer(null);
+      alert("Player profile deleted successfully", { type: "success" });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete player profile.");
+      alert(e instanceof Error ? e.message : "Failed to delete player profile.", { type: "error" });
     } finally {
       setActionBusy(null);
     }

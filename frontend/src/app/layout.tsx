@@ -9,6 +9,7 @@ const dmSerif = DM_Serif_Display({ subsets: ["latin", "latin-ext"], weight: "400
 const vt323 = VT323({ weight: "400", subsets: ["latin"], variable: "--font-pixel", display: "swap" });
 
 import { ConfigProvider } from "@/components/ConfigProvider";
+import { DialogProvider } from "@/components/DialogProvider";
 
 export const metadata: Metadata = {
   title: "Housie Ghar — Book on WhatsApp, Play Live",
@@ -48,25 +49,27 @@ document.addEventListener('touchend', function(e){
 }, { passive: false });
 })();` }} />
         <ConfigProvider>
-          <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-            <div style={{ flex: 1 }}>
-              {children}
+          <DialogProvider>
+            <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+              <div style={{ flex: 1 }}>
+                {children}
+              </div>
+              <div style={{
+                width: "100%",
+                // Extra bottom padding clears the home indicator on notched phones;
+                // env() resolves to 0 elsewhere, so this is a no-op on other devices.
+                padding: "24px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
+                textAlign: "center",
+                fontSize: "15px",
+                fontFamily: "var(--font-body)",
+                letterSpacing: "0.05em",
+                marginTop: "auto"
+              }}>
+                <span style={{ color: "#06B6D4", fontWeight: 500 }}>Powered by</span>{" "}
+                <span style={{ color: "var(--text)", fontWeight: 800, textShadow: "0px 1px 2px rgba(0,0,0,0.5)" }}>MOD</span>
+              </div>
             </div>
-            <div style={{
-              width: "100%",
-              // Extra bottom padding clears the home indicator on notched phones;
-              // env() resolves to 0 elsewhere, so this is a no-op on other devices.
-              padding: "24px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
-              textAlign: "center",
-              fontSize: "15px",
-              fontFamily: "var(--font-body)",
-              letterSpacing: "0.05em",
-              marginTop: "auto"
-            }}>
-              <span style={{ color: "#06B6D4", fontWeight: 500 }}>Powered by</span>{" "}
-              <span style={{ color: "var(--text)", fontWeight: 800, textShadow: "0px 1px 2px rgba(0,0,0,0.5)" }}>MOD</span>
-            </div>
-          </div>
+          </DialogProvider>
         </ConfigProvider>
       </body>
     </html>

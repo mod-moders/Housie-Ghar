@@ -7,6 +7,7 @@ import { Button, Avatar } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
+import { useDialog } from "@/components/DialogProvider";
 
 const inputStyle: React.CSSProperties = {
   padding: "10px 14px",
@@ -31,6 +32,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u: AuthUser) => void }) {
+  const { alert } = useDialog();
   const [fullName, setFullName] = useState(me.full_name);
   const [phone, setPhone] = useState(me.phone ?? "");
   const [upiId, setUpiId] = useState(me.upi_id ?? "");
@@ -68,7 +70,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image file size must be under 5MB");
+      alert("Image file size must be under 5MB", { type: "error" });
       return;
     }
     const reader = new FileReader();

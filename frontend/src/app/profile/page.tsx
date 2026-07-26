@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
 import { clearPlayerToken } from "@/lib/playerSession";
+import { useDialog } from "@/components/DialogProvider";
 
 const AVATAR_PRESETS = [
   { id: "crown", label: "Crown", icon: "👑" },
@@ -23,6 +24,7 @@ const AVATAR_PRESETS = [
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { alert } = useDialog();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [, setStats] = useState<PlayerStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image file size must be under 5MB");
+      alert("Image file size must be under 5MB", { type: "error" });
       return;
     }
     const reader = new FileReader();
@@ -135,7 +137,7 @@ export default function ProfilePage() {
       setPassword("");
       setRemovePassword(false);
 
-      alert("Profile updated successfully!");
+      alert("Profile updated successfully!", { type: "success" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
     } finally {
