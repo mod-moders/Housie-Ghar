@@ -11,7 +11,7 @@ import { Icon } from "@/components/Icon";
 import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, TrustBadges, EmptyHint } from "@/components/ui";
 import { PlayerReferralCard } from "@/components/PlayerReferralCard";
 import { useConfigStore } from "@/lib/stores/configStore";
-import type { GameSummary, LuckyNumberResponse } from "@/lib/types";
+import type { GameSummary } from "@/lib/types";
 
 // Decorative 3×9 ticket grid behind the hero. null = empty cell.
 type BannerCell = { n: number; tone: "yellow" | "ocean" | "pink" | "plain"; daub?: "pink" | "ocean" } | null;
@@ -32,12 +32,7 @@ function formatWhen(iso: string): { date: string; time: string } {
   };
 }
 
-function refreshCopy(refreshesAt: string): string {
-  const daysLeft = Math.ceil((new Date(refreshesAt).getTime() - Date.now()) / 86_400_000);
-  if (daysLeft > 1) return `fresh number in ${daysLeft} days`;
-  if (daysLeft === 1) return "fresh number tomorrow";
-  return "refreshes today";
-}
+
 
 function cardStatus(g: GameSummary): "sold" | "fast" | "filling" | "open" {
   if (g.available_count <= 0) return "sold";
@@ -180,7 +175,6 @@ export default function Lobby() {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { config } = useConfigStore();
-  const [lucky, setLucky] = useState<LuckyNumberResponse | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
 
@@ -290,16 +284,7 @@ export default function Lobby() {
     return () => { alive = false; clearInterval(id); };
   }, [isCheckingAuth]);
 
-  // One-shot fetch: the lucky number only changes every 12 days, so no polling.
-  // Any failure simply leaves the card hidden.
-  useEffect(() => {
-    if (isCheckingAuth) return;
-    let alive = true;
-    apiFetch<LuckyNumberResponse>("/api/stats/lucky-number")
-      .then((l) => { if (alive) setLucky(l); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [isCheckingAuth]);
+
 
   const go = (id: string) => router.push(`/game/${id}`);
   const goLive = (id: string) => router.push(`/game/${id}/live`);
@@ -378,33 +363,14 @@ export default function Lobby() {
             ))}
 
             <div className="hg-lobby-header">
-              <div className="hg-lobby-header-row">
-                <Image
-                  src="/HG Secondary.png"
-                  alt="Housie Ghar"
-                  width={160}
-                  height={160}
-                  priority
-                  className="hg-lobby-logo"
-                />
-                {lucky && lucky.lucky_number !== null && (
-                  <section
-                    className="hg-lucky-wizard"
-                    aria-label={`Lucky number ${lucky.lucky_number}, ${refreshCopy(lucky.refreshes_at)}`}
-                  >
-                    <div className="hg-lucky-wizard-scene">
-                       {/* eslint-disable-next-line @next/next/no-img-element -- decorative CSS-positioned PNG; next/image fill would fight the wizard-scene layout */}
-                       <img src="/assets/wizard_globe.png" className="hg-wizard-img" alt="Wizard predicting lucky number" />
-                       <div className="hg-globe-glow"></div>
-                       <div className="hg-lucky-number-overlay">
-                         <div className="hg-lucky-number-inner">
-                           {lucky.lucky_number}
-                         </div>
-                       </div>
-                    </div>
-                  </section>
-                )}
-              </div>
+              <Image
+                src="/HG Secondary.png"
+                alt="Housie Ghar"
+                width={240}
+                height={240}
+                priority
+                className="hg-lobby-logo"
+              />
               <p className="hg-lobby-tagline">The entire town is playing! Are you?</p>
             </div>
           </div>

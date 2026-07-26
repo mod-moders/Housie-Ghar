@@ -1498,20 +1498,8 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
   }
   .hg-lobby-logo {
-    width: 100px !important;
-    height: 100px !important;
-  }
-  .hg-lucky-wizard {
-    width: 100px !important;
-    height: 100px !important;
-  }
-  .hg-lucky-wizard-scene {
-    width: 100px !important;
-    height: 100px !important;
-    transform: scale(0.625) !important;
-  }
-  .hg-lobby-header-row {
-    gap: 16px !important;
+    width: 160px !important;
+    height: 160px !important;
   }
   .hg-lobby-tagline {
     font-size: 14px !important;
