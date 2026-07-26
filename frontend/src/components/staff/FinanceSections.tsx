@@ -692,9 +692,14 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
                             <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.agent_name}</b>
-                            <span style={{ background: isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: isApproved ? "#22c55e" : "#ef4444", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", flexShrink: 0 }}>
-                              {isApproved ? "APPROVED" : "REJECTED"}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.06)", padding: "2px 6px", borderRadius: "4px", color: "var(--text-mute)" }}>
+                                {r.formatted_request_id}
+                              </span>
+                              <span style={{ background: isApproved ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: isApproved ? "#22c55e" : "#ef4444", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", flexShrink: 0 }}>
+                                {isApproved ? "APPROVED" : "REJECTED"}
+                              </span>
+                            </div>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                             <b style={{ color: isApproved ? "#22c55e" : "#ef4444", fontWeight: 800, fontSize: "20px" }}>{money(r.requested_amount)}</b>
@@ -814,9 +819,14 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
                           <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.winner_housie_name}</b>
-                          <span style={{ background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
-                            DISBURSED
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.06)", padding: "2px 6px", borderRadius: "4px", color: "var(--text-mute)" }}>
+                              {c.formatted_claim_id}
+                            </span>
+                            <span style={{ background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
+                              DISBURSED
+                            </span>
+                          </div>
                         </div>
                         <b style={{ color: "#22c55e", fontWeight: 800, fontSize: "20px" }}>{money(c.total_amount)}</b>
                         <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", flexDirection: "column", gap: "2px" }}>
