@@ -20,6 +20,7 @@ import { setPlayerToken, MIN_PASSWORD_LENGTH } from "@/lib/playerSession";
 
 type Lookup =
   | { method: "phone"; phone_hint: string }
+  | { method: "device" }
   | { method: "support"; support_whatsapp: string | null };
 
 export default function ForgotPassword() {
@@ -51,7 +52,9 @@ export default function ForgotPassword() {
     try {
       const res = await apiFetch<Lookup>("/api/player/forgot-password", {
         method: "POST",
-        body: JSON.stringify({ housie_name: housieName.trim() }),
+        // The device id lets the server offer the "recognised device" path when there
+        // is no phone saved, instead of dead-ending at the WhatsApp hand-off.
+        body: JSON.stringify({ housie_name: housieName.trim(), device_id: getDeviceId() }),
       });
       setLookup(res);
     } catch (err) {
@@ -74,7 +77,8 @@ export default function ForgotPassword() {
         method: "POST",
         body: JSON.stringify({
           housie_name: housieName.trim(),
-          phone,
+          // Omitted on the device path — the server then verifies the device instead.
+          phone: lookup?.method === "phone" ? phone : undefined,
           password,
           device_id: getDeviceId(),
         }),
@@ -121,7 +125,9 @@ export default function ForgotPassword() {
             ? "Enter your Housie Name to get started."
             : lookup.method === "phone"
               ? "Confirm the phone number on your account, then pick a new password."
-              : "We need to check it's really you."}
+              : lookup.method === "device"
+                ? "We recognise this device. Pick a new password."
+                : "We need to check it's really you."}
         </p>
 
         {error && (
@@ -154,8 +160,9 @@ export default function ForgotPassword() {
           </form>
         )}
 
-        {lookup?.method === "phone" && (
+        {(lookup?.method === "phone" || lookup?.method === "device") && (
           <form onSubmit={handleReset} className="space-y-5">
+            {lookup.method === "phone" && (
             <div>
               <label className="block text-sm font-medium mb-1.5" htmlFor="fp-phone" style={{ color: "var(--text-dim)" }}>
                 Phone Number
@@ -176,6 +183,22 @@ export default function ForgotPassword() {
                 The number saved on your account: {lookup.phone_hint}
               </p>
             </div>
+            )}
+
+            {lookup.method === "device" && (
+              <div
+                className="flex items-start gap-2 rounded-lg p-3"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border-light)" }}
+              >
+                <span style={{ color: "var(--success)", flexShrink: 0, marginTop: 1 }}>
+                  <Icon name="shieldCheck" size={16} />
+                </span>
+                <p className="text-[12px]" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
+                  You&rsquo;ve used this device before, so we can reset it here. Add a phone number
+                  under Profile afterwards and you&rsquo;ll be able to do this from anywhere.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-1.5" htmlFor="fp-password" style={{ color: "var(--text-dim)" }}>

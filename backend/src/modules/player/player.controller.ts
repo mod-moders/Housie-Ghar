@@ -432,7 +432,7 @@ function maskPhone(phone: string): string {
  * which is the same response a real phone-less account gets.
  */
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
-  const { housie_name } = req.body;
+  const { housie_name, device_id } = req.body;
 
   if (!housie_name) {
     res.status(400).json({ message: 'Housie name is required' });
@@ -443,16 +443,33 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
   try {
     const result = await pool.query(
-      `SELECT phone, status FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)`,
+      `SELECT player_id, phone, status FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER($1)`,
       [cleanHousieName]
     );
     const player = result.rows[0];
+    const active = !!player && player.status !== 'Suspended';
     const phone: string | null = player?.phone ?? null;
-    const usable = !!player && player.status !== 'Suspended' && !!phone && String(phone).replace(/\D/g, '').length >= 10;
 
-    if (usable) {
+    if (active && !!phone && String(phone).replace(/\D/g, '').length >= 10) {
       res.json({ method: 'phone', phone_hint: maskPhone(phone as string) });
       return;
+    }
+
+    // No phone saved, but this browser is one the account has been used on before.
+    // Player_Devices is already what `login` accepts as proof of ownership for a
+    // passwordless account, so it is proof enough to set a new password here — and it
+    // keeps the common case ("I'm on my usual phone, I just forgot it") self-service
+    // instead of sending someone off to WhatsApp.
+    //
+    // `known` only, never `firstEver`. A first-ever device is any device: treating that
+    // as proof would let a stranger reset a phone-less account and lock its real owner
+    // out, which is worse than the takeover risk that already exists.
+    if (active) {
+      const device = await checkDevice(player.player_id, device_id);
+      if (device.known) {
+        res.json({ method: 'device' });
+        return;
+      }
     }
 
     // No phone on file (or no such account): the only route left is a human one.
@@ -495,8 +512,8 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { housie_name, phone, password, device_id } = req.body;
 
-  if (!housie_name || !phone) {
-    res.status(400).json({ message: 'Housie name and phone number are required' });
+  if (!housie_name) {
+    res.status(400).json({ message: 'Housie name is required' });
     return;
   }
   if (typeof password !== 'string' || password.length < MIN_PLAYER_PASSWORD_LENGTH) {
@@ -521,11 +538,26 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // One message whether the name is unknown or the phone is wrong — telling those two
-    // apart would turn this into a phone-number oracle for any name off the leaderboard.
-    if (!player || !phonesMatch(player.phone, phone)) {
+    // Ownership can be proved two ways, mirroring what forgotPassword offered:
+    // the phone saved on the account, or a device the account has been seen on before.
+    // The device path is `known` only — never `firstEver`, which would be any device at
+    // all and would let a stranger seize a phone-less account.
+    let proved = false;
+    if (player) {
+      if (phone) {
+        proved = phonesMatch(player.phone, phone);
+      } else {
+        const device = await checkDevice(player.player_id, device_id);
+        proved = device.known;
+      }
+    }
+
+    // One message whether the name is unknown, the phone is wrong, or the device is
+    // unrecognised — telling those apart would turn this into an oracle for which
+    // accounts are resettable, and for their phone numbers, off a public leaderboard.
+    if (!proved) {
       res.status(401).json({
-        message: "Those details don't match an account. Check the phone number saved on your profile.",
+        message: "We couldn't verify this account. Check the phone number saved on your profile, or try again on a device you've used before.",
       });
       return;
     }
