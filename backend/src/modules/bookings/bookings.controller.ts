@@ -8,7 +8,7 @@ import pool from '../../db';
 import { env } from '../../config/env';
 import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
-import { validateHousieName, normalizeHousieName } from '../../utils/housieName';
+import { validateHousieName, normalizeHousieName, HOUSIE_NAME_MIN_LENGTH, HOUSIE_NAME_MAX_LENGTH } from '../../utils/housieName';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
 import {
@@ -57,8 +57,8 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
   const cleanBookingName = String(housie_name).trim().replace(/\s+/g, ' ');
   const identity = readPlayerIdentity(req);
 
-  if (cleanBookingName.length < 3 || cleanBookingName.length > 20) {
-    res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
+  if (cleanBookingName.length < HOUSIE_NAME_MIN_LENGTH || cleanBookingName.length > HOUSIE_NAME_MAX_LENGTH) {
+    res.status(400).json({ message: `Housie Name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters` });
     return;
   }
 
@@ -697,8 +697,8 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
     res.status(400).json({ message: 'A maximum of 6 tickets can be purchased per sale' });
     return;
   }
-  if (housie_name.length < 3 || housie_name.length > 20) {
-    res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
+  if (housie_name.length < HOUSIE_NAME_MIN_LENGTH || housie_name.length > HOUSIE_NAME_MAX_LENGTH) {
+    res.status(400).json({ message: `Housie Name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters` });
     return;
   }
 
@@ -1157,8 +1157,8 @@ export async function staffManualBooking(req: AuthenticatedRequest, res: Respons
     res.status(400).json({ message: 'game_id, ticket_ids, and housie_name are required' });
     return;
   }
-  if (housie_name.length < 3 || housie_name.length > 20) {
-    res.status(400).json({ message: 'Housie Name must be between 3 and 20 characters' });
+  if (housie_name.length < HOUSIE_NAME_MIN_LENGTH || housie_name.length > HOUSIE_NAME_MAX_LENGTH) {
+    res.status(400).json({ message: `Housie Name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters` });
     return;
   }
 

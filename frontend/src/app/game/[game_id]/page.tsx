@@ -19,9 +19,12 @@ const BANNED = ["idiot", "fool", "damn", "hell", "stupid"];
 function validateName(name: string | undefined | null): { ok: boolean; msg: string } {
   const v = (name || "").trim();
   if (!v) return { ok: false, msg: "" };
-  if (v.length < 3) return { ok: false, msg: "At least 3 characters" };
-  if (v.length > 18) return { ok: false, msg: "Keep it under 18 characters" };
-  if (/\s/.test(v)) return { ok: false, msg: "No spaces — try an underscore" };
+  if (v.length < 2) return { ok: false, msg: "At least 2 characters" };
+  if (v.length > 16) return { ok: false, msg: "Keep it under 16 characters" };
+  if (!/^[A-Za-z0-9_.]+$/.test(v)) {
+    if (/\s/.test(v)) return { ok: false, msg: "No spaces allowed" };
+    return { ok: false, msg: "Only letters, numbers, underscores, and periods" };
+  }
   if (BANNED.some((b) => v.toLowerCase().includes(b))) return { ok: false, msg: "Keep it clean, please 😊" };
   return { ok: true, msg: "Looking good!" };
 }
