@@ -63,6 +63,7 @@ export async function apiFetch<T>(
       /\/my-tickets(\?|$)/.test(path) ||
       /\/claim(\?|$)/.test(path) ||
       /\/claim-all(\?|$)/.test(path) ||
+      /\/display-name(\?|$)/.test(path) ||
       /\/reactions(\?|$)/.test(path);
 
     if (isPlayerSelfPath && playerToken) {

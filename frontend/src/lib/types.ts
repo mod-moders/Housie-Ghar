@@ -73,6 +73,8 @@ export interface TicketDetail {
   grid_data: { row1: (number | null)[]; row2: (number | null)[]; row3: (number | null)[] };
   status: string;
   owner_housie_name: string | null;
+  /** Player-set nickname. Display only — owner_housie_name stays the ownership key. */
+  display_name?: string | null;
 }
 
 export interface LockResponse {

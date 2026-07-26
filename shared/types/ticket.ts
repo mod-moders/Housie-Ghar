@@ -20,6 +20,8 @@ export interface Ticket {
   locked_by_booking: string | null;
   locked_until: string | null;
   owner_housie_name: string | null;
+  /** Player-set nickname shown in place of owner_housie_name. Never the ownership key. */
+  display_name: string | null;
   confirmed_at: string | null;
 }
 

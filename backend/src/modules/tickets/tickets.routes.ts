@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getGameTicketsGrid, getTicketGridData, getGameMyTickets, searchGameTickets } from './tickets.controller';
+import { getGameTicketsGrid, getTicketGridData, getGameMyTickets, searchGameTickets, updateTicketDisplayName } from './tickets.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 
 const router = Router();
@@ -12,5 +12,8 @@ router.get('/tickets/games/:game_id/tickets', getGameTicketsGrid);
 router.get('/games/:game_id/my-tickets', authenticatePlayer, getGameMyTickets);
 router.get('/games/:game_id/search-tickets', searchGameTickets);
 router.get('/tickets/:ticket_id', getTicketGridData);
+// Player renames one of their own purchased tickets. Writes display_name only —
+// owner_housie_name stays the ownership key (see the controller).
+router.patch('/tickets/:ticket_id/display-name', authenticatePlayer, updateTicketDisplayName);
 
 export default router;

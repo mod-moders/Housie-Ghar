@@ -3776,6 +3776,9 @@ select option {
 }
 
 .hg-live-ticket-player-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-head);
   font-weight: 700;
   color: #dc143c !important; /* Player name highlighted in crimson pen */
@@ -3783,6 +3786,69 @@ select option {
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0.05em;
+}
+
+/* Renaming a purchased ticket. These sit on the printed-ticket surface, not on
+   the app chrome, so they take the ticket's own paper palette (#ebe7d5 rule,
+   crimson pen) rather than the theme tokens everything around them uses. */
+.hg-ticket-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hg-ticket-rename-input {
+  width: 92px;
+  padding: 1px 4px;
+  border: 0;
+  border-bottom: 1.5px dashed #dc143c;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #dc143c;
+  outline: none;
+}
+
+.hg-ticket-rename-input::placeholder {
+  color: rgba(220, 20, 60, 0.45);
+}
+
+.hg-ticket-rename-btn {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity var(--dur-1) var(--ease-out-quart), background-color var(--dur-1) var(--ease-out-quart);
+}
+
+.hg-ticket-rename-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(220, 20, 60, 0.12);
+}
+
+.hg-ticket-rename-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hg-ticket-rename-error {
+  margin-top: 4px;
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 700;
+  color: #dc143c;
+  text-align: right;
 }
 
 .hg-empty-tickets-placeholder {

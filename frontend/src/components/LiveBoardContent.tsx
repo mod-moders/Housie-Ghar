@@ -484,7 +484,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             tickets.map((t) => ({
               number: t.ticket_number,
               matrix: gridToMatrix(t.grid_data),
-              owner: t.owner_housie_name,
+              owner: t.display_name || t.owner_housie_name,
             }))
           );
         } else {
@@ -511,7 +511,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             .map((d) => ({
               number: d.ticket_number,
               matrix: gridToMatrix(d.grid_data),
-              owner: d.owner_housie_name,
+              owner: d.display_name || d.owner_housie_name,
             }))
         );
       });
@@ -578,7 +578,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         const mapped = tickets.map((t) => ({
           number: t.ticket_number,
           matrix: gridToMatrix(t.grid_data),
-          owner: t.owner_housie_name,
+          owner: t.display_name || t.owner_housie_name,
         }));
         setSearchedTickets((prev) => {
           const existing = new Set(prev.map((x) => x.number));

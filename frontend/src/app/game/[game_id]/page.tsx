@@ -45,6 +45,14 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const restoredLock = useRef(false);
   const [myBoughtTickets, setMyBoughtTickets] = useState<TicketDetail[]>([]);
 
+  // Renaming a purchased ticket. This sets display_name only — the ticket stays
+  // owned by owner_housie_name, which is what my-tickets and prize claims match
+  // on — and the backend closes the window once the draw starts.
+  const [renamingTicketId, setRenamingTicketId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
+
   // Referral reward — a player who has reached a referral rung (10/15/20…) can
   // claim one ticket free. The backend only discounts one ticket's price off
   // whatever ticket_ids are locked (it never adds a ticket on its own), so the
@@ -255,6 +263,40 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     ? `${new Date(game.scheduled_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${new Date(game.scheduled_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`
     : "";
 
+  // Names are fixed once the draw starts: the board is being read live by
+  // everyone, and any prize already awarded has the old name written into
+  // winner_housie_name, which a rename here cannot rewrite.
+  const canRenameTickets = game?.game_status === "Scheduled";
+
+  const saveTicketName = async (ticketId: number) => {
+    const next = renameValue.trim();
+    // An empty value clears the nickname and falls back to the booked name, so
+    // only a non-empty one has to pass the name rules.
+    if (next) {
+      const check = validateName(next);
+      if (!check.ok) {
+        setRenameError(check.msg || "That name will not work");
+        return;
+      }
+    }
+    setRenameSaving(true);
+    setRenameError(null);
+    try {
+      const updated = await apiFetch<TicketDetail>(`/api/tickets/${ticketId}/display-name`, {
+        method: "PATCH",
+        body: JSON.stringify({ display_name: next || null }),
+      });
+      setMyBoughtTickets((prev) =>
+        prev.map((t) => (t.ticket_id === ticketId ? { ...t, display_name: updated.display_name } : t))
+      );
+      setRenamingTicketId(null);
+    } catch (e) {
+      setRenameError(e instanceof Error ? e.message : "Could not save that name — please try again.");
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
   return (
     <PublicShell>
       <div className="hg-screen hg-screen-room">
@@ -437,8 +479,68 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                         <HousieTicket matrix={gridToMatrix(t.grid_data)} compact />
                         <div className="hg-live-ticket-footer" style={{ background: "rgba(34, 197, 94, 0.05)" }}>
                           <span className="hg-live-ticket-number">Ticket #{t.ticket_number}</span>
-                          <span className="hg-live-ticket-player-name">{t.owner_housie_name || name || "You"}</span>
+                          {renamingTicketId === t.ticket_id ? (
+                            <span className="hg-ticket-rename">
+                              <input
+                                className="hg-ticket-rename-input"
+                                value={renameValue}
+                                autoFocus
+                                maxLength={16}
+                                placeholder={t.owner_housie_name || "Ticket name"}
+                                onChange={(e) => {
+                                  setRenameValue(e.target.value);
+                                  setRenameError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveTicketName(t.ticket_id);
+                                  if (e.key === "Escape") setRenamingTicketId(null);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="hg-ticket-rename-btn"
+                                disabled={renameSaving}
+                                onClick={() => saveTicketName(t.ticket_id)}
+                                aria-label="Save ticket name"
+                                title="Save"
+                              >
+                                <Icon name="check" size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                className="hg-ticket-rename-btn"
+                                disabled={renameSaving}
+                                onClick={() => setRenamingTicketId(null)}
+                                aria-label="Cancel"
+                                title="Cancel"
+                              >
+                                <Icon name="x" size={13} />
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="hg-live-ticket-player-name">
+                              {t.display_name || t.owner_housie_name || name || "You"}
+                              {canRenameTickets && (
+                                <button
+                                  type="button"
+                                  className="hg-ticket-rename-btn"
+                                  onClick={() => {
+                                    setRenamingTicketId(t.ticket_id);
+                                    setRenameValue(t.display_name || "");
+                                    setRenameError(null);
+                                  }}
+                                  aria-label={`Rename ticket ${t.ticket_number}`}
+                                  title="Rename this ticket"
+                                >
+                                  <Icon name="edit" size={12} />
+                                </button>
+                              )}
+                            </span>
+                          )}
                         </div>
+                        {renamingTicketId === t.ticket_id && renameError && (
+                          <div className="hg-ticket-rename-error">{renameError}</div>
+                        )}
                       </div>
                     </div>
                   ))}
