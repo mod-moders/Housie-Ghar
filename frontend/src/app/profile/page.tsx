@@ -7,6 +7,7 @@ import { PublicShell } from "@/components/PublicShell";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { PlayerProfile, PlayerStats } from "@/lib/types";
+import { clearPlayerToken } from "@/lib/playerSession";
 
 const AVATAR_PRESETS = [
   { id: "crown", label: "Crown", icon: "👑" },
@@ -149,7 +150,7 @@ export default function ProfilePage() {
       // ignore
     } finally {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("hg_player_token");
+        clearPlayerToken();
       }
       router.push("/login");
     }

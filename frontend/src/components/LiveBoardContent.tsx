@@ -18,6 +18,7 @@ import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { usePullToRefresh } from "@/components/usePullToRefresh";
 import type { GameSummary, Prize, TicketDetail, ClaimPrizeResponse } from "@/lib/types";
+import { getPlayerToken } from "@/lib/playerSession";
 
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
@@ -74,7 +75,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [isSearching, setIsSearching] = useState(false);
   const [displayName, setDisplayName] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      const token = sessionStorage.getItem("hg_player_token");
+      const token = getPlayerToken();
       if (token) {
         try {
           const base64Url = token.split('.')[1];

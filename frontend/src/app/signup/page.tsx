@@ -8,11 +8,14 @@ import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { getDeviceId } from "@/lib/deviceId";
+import { getPlayerToken, setPlayerToken, MIN_PASSWORD_LENGTH } from "@/lib/playerSession";
 import { BookieApplicationModal } from "@/components/BookieApplicationModal";
 
 export default function SignUp() {
   const router = useRouter();
   const [housieName, setHousieName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refId, setRefId] = useState<string | null>(null);
@@ -20,13 +23,12 @@ export default function SignUp() {
   const [showBookieForm, setShowBookieForm] = useState(false);
 
   useEffect(() => {
-    // Redirect only if THIS tab actually holds a session token — see the same
-    // guard in login/page.tsx. A live /api/player/me check here would also
-    // succeed off a leftover hg_player_token cookie even with an empty
-    // sessionStorage, silently bouncing a visitor who followed someone's
-    // referral link away from the signup form before they could ever create
-    // the new, referred account.
-    if (typeof window !== "undefined" && sessionStorage.getItem("hg_player_token")) {
+    // Redirect only if a stored token is actually present — see the same guard in
+    // login/page.tsx. A live /api/player/me check here would also succeed off a
+    // leftover hg_player_token cookie, silently bouncing a visitor who followed
+    // someone's referral link away from the signup form before they could ever
+    // create the new, referred account.
+    if (getPlayerToken()) {
       router.push("/");
     }
 
@@ -59,6 +61,10 @@ export default function SignUp() {
       setError("Please fill in a Housie Name.");
       return;
     }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Please choose a password of at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -68,16 +74,19 @@ export default function SignUp() {
         method: "POST",
         body: JSON.stringify({
           housie_name: housieName,
+          // The password is what lets this account be used from more than one
+          // device — housie names are public, so the name alone can't be enough
+          // to sign in. Without it the server falls back to binding the account
+          // to this one browser and every other device is locked out.
+          password,
           ref_promoter_id: refId,
           referral_code: referralCode.trim() || undefined,
-          // Binds the new passwordless account to this browser, so a stranger
-          // who reads this housie name off the leaderboard can't sign in as them.
           device_id: getDeviceId(),
         }),
       });
 
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("hg_player_token", res.token);
+        setPlayerToken(res.token);
       }
 
       // Redirect to lobby
@@ -139,6 +148,38 @@ export default function SignUp() {
             />
             <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
               Your Housie Name will be used to log in on returning visits.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5" htmlFor="signup-password" style={{ color: "var(--text-dim)" }}>
+              Password
+            </label>
+            <div className="relative">
+              <input
+                id="signup-password"
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={MIN_PASSWORD_LENGTH}
+                autoComplete="new-password"
+                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 rounded-lg focus:outline-none focus:border-[#06B6D4] transition-colors text-sm"
+                style={{ background: "var(--bg)", border: "1.5px solid var(--border)", color: "var(--text)" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute inset-y-0 right-0 px-4 flex items-center"
+                style={{ color: "var(--text-mute)" }}
+              >
+                <Icon name={showPassword ? "eye" : "eyeOff"} size={16} />
+              </button>
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-mute)" }}>
+              Your password lets you open your account on any device — phone, laptop, anywhere.
             </p>
           </div>
 

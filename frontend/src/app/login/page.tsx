@@ -9,6 +9,7 @@ import { Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { getDeviceId } from "@/lib/deviceId";
 import { BookieApplicationModal } from "@/components/BookieApplicationModal";
+import { getPlayerToken, setPlayerToken } from "@/lib/playerSession";
 
 export default function Login() {
   const router = useRouter();
@@ -21,13 +22,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Redirect only if THIS tab actually holds a session token. A live
-    // /api/player/me check would also succeed off a leftover hg_player_token
-    // cookie (still set server-side, 10-year expiry) even after sessionStorage
-    // has been cleared or the browser restarted — bouncing to "/" in that case
-    // just sends the visitor straight back here (page.tsx gates on the same
-    // sessionStorage token), an infinite redirect loop between "/" and "/login".
-    if (typeof window !== "undefined" && sessionStorage.getItem("hg_player_token")) {
+    // Gate on the stored token rather than a live /api/player/me check: that
+    // check can also succeed off the leftover hg_player_token cookie, which
+    // would bounce to "/" while the lobby gates on the stored token and sends
+    // the visitor straight back — an infinite /login <-> / redirect loop. Both
+    // ends read the same key via getPlayerToken(), so they can't disagree.
+    // The token now persists in localStorage, so a returning player lands in
+    // the lobby instead of being asked to sign in again.
+    if (getPlayerToken()) {
       router.push("/");
     }
   }, [router]);
@@ -56,17 +58,21 @@ export default function Login() {
         }),
       });
 
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("hg_player_token", res.token);
-      }
+      setPlayerToken(res.token);
 
       // Redirect to lobby
       router.push("/");
     } catch (err) {
       const e = err as { password_required?: boolean; new_device?: boolean; message?: string };
       if (e.password_required) {
+        // Not an error — it's the normal second step for any account with a
+        // password, which since signup started collecting one is every new
+        // account. The form already swaps its subtitle to "Authenticate with
+        // password to enter lobby" and reveals the field, so surfacing a red
+        // error box here would flag routine sign-in as a failure. A genuinely
+        // wrong password still comes back as "Invalid password" below.
         setPasswordRequired(true);
-        setError("This account is secured. Please enter your password.");
+        setError(null);
       } else if (e.new_device) {
         // Passwordless account being signed into from a device it has never
         // been seen on. Show the server's guidance verbatim; offering the

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiFetch } from "../api";
+import { getPlayerToken } from "../playerSession";
 
 export interface PublicConfig {
   active_theme: string;
@@ -75,7 +76,7 @@ export const useConfigStore = create<ConfigState>((set) => ({
       // storage on login/signup, so its absence is a reliable "anonymous" signal.
       const hasPlayerToken =
         typeof window !== "undefined" &&
-        !!sessionStorage.getItem("hg_player_token");
+        !!getPlayerToken();
       if (hasPlayerToken) {
         try {
           const res = await apiFetch<{ player: { theme_preference: string | null } }>("/api/player/me");

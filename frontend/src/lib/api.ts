@@ -1,3 +1,4 @@
+import { getPlayerToken } from "./playerSession";
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export function resolveAudioUrl(url: string | null | undefined): string {
@@ -50,7 +51,7 @@ export async function apiFetch<T>(
 
   if (typeof window !== "undefined") {
     const staffToken = sessionStorage.getItem("hg_staff_token");
-    const playerToken = sessionStorage.getItem("hg_player_token");
+    const playerToken = getPlayerToken();
 
     // Player self-service endpoints (identity comes from the token, not a URL param)
     // must always use the player token — a staff member can be signed into both

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
+import { getPlayerToken } from "../playerSession";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -37,7 +38,7 @@ export function useSocket(
 
   useEffect(() => {
     const staffToken = typeof window !== "undefined" ? sessionStorage.getItem("hg_staff_token") : null;
-    const playerToken = typeof window !== "undefined" ? sessionStorage.getItem("hg_player_token") : null;
+    const playerToken = getPlayerToken();
     const token = staffToken || playerToken;
 
     const socket = io(BASE, {

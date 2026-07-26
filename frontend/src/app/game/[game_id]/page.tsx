@@ -12,6 +12,7 @@ import { Button } from "@/components/ui";
 import { BookingModal } from "@/components/BookingModal";
 import { HousieTicket, TicketMatrix, gridToMatrix } from "@/components/HousieTicket";
 import type { GameSummary, LockResponse, TicketDetail, TicketListItem, TicketListResponse } from "@/lib/types";
+import { clearPlayerToken } from "@/lib/playerSession";
 
 const BANNED = ["idiot", "fool", "damn", "hell", "stupid"];
 
@@ -81,7 +82,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
           // auth-check effect: leaving it would make /login bounce straight
           // back to "/" (it gates on sessionStorage presence), reproducing
           // the same redirect loop this pattern is meant to prevent.
-          sessionStorage.removeItem("hg_player_token");
+          clearPlayerToken();
           router.push("/login");
         });
     };

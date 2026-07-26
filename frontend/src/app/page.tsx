@@ -12,6 +12,7 @@ import { Badge, Button, CountdownPills, Footer, GameStatusBadge, ProgressBar, Tr
 import { PlayerReferralCard } from "@/components/PlayerReferralCard";
 import { useConfigStore } from "@/lib/stores/configStore";
 import type { GameSummary } from "@/lib/types";
+import { getPlayerToken, clearPlayerToken } from "@/lib/playerSession";
 
 // Decorative 3×9 ticket grid behind the hero. null = empty cell.
 type BannerCell = { n: number; tone: "yellow" | "ocean" | "pink" | "plain"; daub?: "pink" | "ocean" } | null;
@@ -241,7 +242,7 @@ export default function Lobby() {
       localStorage.setItem("hg_ref_promoter_id", ref);
     }
 
-    const token = sessionStorage.getItem("hg_player_token");
+    const token = getPlayerToken();
     if (!token) {
       router.push("/login");
       return;
@@ -264,7 +265,7 @@ export default function Lobby() {
           // A genuinely invalid token must be cleared here — otherwise /login's
           // sessionStorage-presence check (see login/page.tsx) would still see
           // it, redirect straight back to "/", and reproduce the same loop.
-          sessionStorage.removeItem("hg_player_token");
+          clearPlayerToken();
           router.push("/login");
         });
     };

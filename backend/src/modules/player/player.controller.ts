@@ -6,8 +6,11 @@ import { env } from '../../config/env';
 import { validateHousieName } from '../../utils/housieName';
 import { registerDevice, checkDevice } from '../../services/playerDevices';
 
+/** Shared by signup and the profile password change, so the two can't drift apart. */
+export const MIN_PLAYER_PASSWORD_LENGTH = 6;
+
 export async function signup(req: Request, res: Response): Promise<void> {
-  const { full_name, housie_name, ref_promoter_id, referral_code, device_id } = req.body;
+  const { full_name, housie_name, ref_promoter_id, referral_code, device_id, password } = req.body;
 
   // Charset rules matter beyond cosmetics: a name containing & ( ) or a comma
   // corrupts the `winner_housie_name` grammar used by prize claims, so one
@@ -15,6 +18,20 @@ export async function signup(req: Request, res: Response): Promise<void> {
   const nameCheck = validateHousieName(housie_name);
   if (!nameCheck.ok) {
     res.status(400).json({ message: nameCheck.error });
+    return;
+  }
+
+  // A password is set at signup so the account is usable from more than one
+  // device. Housie names are public (leaderboard, live board, ticket search), so
+  // without a password the only thing standing between a stranger and someone
+  // else's prizes is the Player_Devices known-device gate in `login` below — and
+  // that gate, by construction, locks the real owner out of their second device
+  // too. Collecting a password here is what makes "same account on phone and
+  // laptop" possible without reopening account takeover.
+  if (typeof password !== 'string' || password.length < MIN_PLAYER_PASSWORD_LENGTH) {
+    res.status(400).json({
+      message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
+    });
     return;
   }
 
@@ -51,17 +68,19 @@ export async function signup(req: Request, res: Response): Promise<void> {
     }
 
     // 2. Insert player
+    const passwordHash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      'INSERT INTO Players (full_name, housie_name, referred_by) VALUES ($1, $2, $3) RETURNING player_id, player_code, full_name, housie_name',
-      [cleanFullName, cleanHousieName, referrerId]
+      'INSERT INTO Players (full_name, housie_name, referred_by, password_hash) VALUES ($1, $2, $3, $4) RETURNING player_id, player_code, full_name, housie_name',
+      [cleanFullName, cleanHousieName, referrerId, passwordHash]
     );
 
     const player = result.rows[0];
 
-    // 2b. Bind this browser to the new account. Because signup is passwordless,
-    // this device becomes the account's proof of ownership until the player
-    // sets a password. Failing to register must not fail the signup — worst
-    // case the next login on this device takes the trust-on-first-use path.
+    // 2b. Record this browser as a known device. Now that signup always sets a
+    // password this is no longer the account's only proof of ownership — the
+    // password is, and it works from any device — but keeping the registry
+    // populated means a player who later clears their password still has the
+    // known-device path. Failing to register must not fail the signup.
     try {
       await registerDevice(player.player_id, device_id, req.headers['user-agent']);
     } catch (err) {
@@ -245,8 +264,10 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     if (password !== undefined) {
       shouldUpdatePassword = true;
       if (password !== '' && password !== null) {
-        if (password.length < 6) {
-          res.status(400).json({ message: 'Password must be at least 6 characters long' });
+        if (password.length < MIN_PLAYER_PASSWORD_LENGTH) {
+          res.status(400).json({
+            message: `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters long`,
+          });
           return;
         }
         passwordHashUpdate = await bcrypt.hash(password, 12);
