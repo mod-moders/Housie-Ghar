@@ -2299,35 +2299,35 @@ export function WorkforceSection({ me }: { me: AuthUser }) {
                 </div>
               )}
 
-              {/* Operator details: created_at and monthly_salary */}
-              {u.role_name === "Operator" && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                    background: "rgba(212, 175, 55, 0.03)",
-                    border: "1px solid rgba(212, 175, 55, 0.12)",
-                    borderRadius: "8px",
-                    padding: "10px 14px",
-                    fontSize: "13px"
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="hg-dim">Operator since:</span>
-                    <span style={{ fontWeight: 600, color: "var(--text)" }}>
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
-                    </span>
-                  </div>
+              {/* Staff details: created_at and monthly_salary */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  background: roleBg,
+                  border: `1px solid ${roleBorder}`,
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  fontSize: "13px"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="hg-dim">{u.role_name} since:</span>
+                  <span style={{ fontWeight: 600, color: "var(--text)" }}>
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
+                  </span>
+                </div>
 
+                {(u.role_name === "Operator" || (u.monthly_salary && u.monthly_salary > 0)) && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span className="hg-dim">Monthly Salary:</span>
                     <span style={{ fontWeight: 700, color: "var(--accent)" }}>
                       {money(u.monthly_salary || 0)}
                     </span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Action buttons at the bottom */}
               <div 
