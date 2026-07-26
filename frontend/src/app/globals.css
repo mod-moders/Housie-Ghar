@@ -1131,6 +1131,17 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
      --text is themed on .hg-root[data-theme=...].
      Raised from 14%/.18: the grid became hard to see once it stopped being a
      saturated brand colour and started deriving from --text. */
+  /* Bloom alphas match frontend-v2 (.27 / .24 / .32 / .22). Master had dialled these
+     down until the grid sat on a flat ground with no glow behind it at all. Hue comes
+     from the skin rather than v2's fixed yellow/ocean/pink/violet, so the glow belongs
+     to the theme. Up here for the same reason as the grid tokens: .hg-page-bloom is a
+     sibling ABOVE .hg-screen--lobby, and the other five pages have no
+     .hg-screen--lobby, so scoped to the banner block these resolve to empty and the
+     whole background-image collapses to `none`. */
+  --bn-bloom-y:color-mix(in srgb, var(--accent) 27%, transparent);
+  --bn-bloom-o:color-mix(in srgb, var(--bg2) 72%, transparent);
+  --bn-bloom-p:color-mix(in srgb, var(--accent) 19%, transparent);
+  --bn-bloom-v:color-mix(in srgb, var(--elevate) 62%, transparent);
   --bn-grid-line:color-mix(in srgb, var(--text) 26%, transparent);
   /* .38 and the 51x85 cell are frontend-v2-housieghar's exact values (its
      --bn-grid-opacity, and the measured size of a cell in its 9x3 banner grid).
@@ -1261,10 +1272,7 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
      Everything here now resolves through --accent / --bg / --text, so the banner
      grounds itself in whatever skin is active, on every theme, automatically. */
   --bn-ground:var(--bg);
-  --bn-bloom-y:color-mix(in srgb, var(--accent) 20%, transparent);
-  --bn-bloom-o:color-mix(in srgb, var(--bg2) 55%, transparent);
-  --bn-bloom-p:color-mix(in srgb, var(--accent) 12%, transparent);
-  --bn-bloom-v:color-mix(in srgb, var(--elevate) 45%, transparent);
+  /* --bn-bloom-* live on .hg-root alongside --bn-grid-* — see the note there. */
   /* --bn-grid-* live on .hg-root, not here — see the note there. */
   --bn-num-yellow:color-mix(in srgb, var(--accent) 85%, var(--text));
   --bn-num-ocean:var(--text-mute);
@@ -1335,6 +1343,27 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
    tiles down a page of any height at a fixed cell size, and sits at z-index 0 behind
    all content. The banner's own DOM grid still overlays this inside the hero — same
    cell size and colour, so they read as one continuous sheet of ticket paper. */
+/* Page-wide bloom — the glow the grid sits on, matching how frontend-v2 layers
+   its banner (ground -> bloom -> grid -> fade). Without it the page-wide grid was
+   a flat uniform mesh; these are the gradients that give it depth and variation.
+   Same four radial geometries as .hg-banner-bloom.
+   background-size pins the tile to 820px tall and repeats down the page: the
+   percentages inside each radial resolve against the TILE, not the element, so a
+   glow stays glow-sized instead of being stretched into a flat wash on a 2200px
+   page — and the rhythm continues the whole way down rather than dying after one
+   screen. Sits below .hg-page-grid, which is the next z-index 0 sibling in DOM
+   order. */
+.hg-page-bloom{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(70% 55% at 12% 10%, var(--bn-bloom-y), transparent 60%),
+    radial-gradient(66% 60% at 88% 16%, var(--bn-bloom-o), transparent 62%),
+    radial-gradient(82% 72% at 50% 110%, var(--bn-bloom-p), transparent 64%),
+    radial-gradient(56% 60% at 80% 88%, var(--bn-bloom-v), transparent 62%);
+  background-size:100% 820px;
+  background-repeat:repeat-y;
+}
+
 .hg-page-grid{
   position:absolute;inset:0;z-index:0;pointer-events:none;
   opacity:var(--bn-grid-opacity);
@@ -1548,8 +1577,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
      pinned to the frame width no matter what a descendant does.
    - the 22px side padding would leave .hg-games-panel's -16px full-bleed 22px short
      of the frame edge once the column is correctly sized. */
+/* background:transparent overrides the shared block's `background:var(--bn-ground)`.
+   That was a second translucent copy of --bg (68% alpha on this skin) painted over
+   the one .hg-frame already draws, so it both double-darkened the lobby relative to
+   the rest of the site and dimmed the .hg-page-bloom behind it — the glow is a
+   sibling EARLIER in DOM order, so this positioned box paints on top of it. */
 .hg-screen--lobby{position:relative;overflow:hidden;min-height:calc(100vh - 70px);
-  align-items:stretch;padding-left:0;padding-right:0}
+  align-items:stretch;padding-left:0;padding-right:0;background:transparent}
 .hg-lobby-v2{position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;padding:22px 16px 0;scroll-margin-top:70px;
   width:100%}
 /* Positioned + clipped so the decorative bloom/grid/coins (absolutely positioned children,

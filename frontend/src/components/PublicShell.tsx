@@ -21,6 +21,7 @@ export function PublicShell({ children, nav = true }: { children: React.ReactNod
               grid stretched over a 3000px page would render three 1000px-tall cells.
               Colour and strength come from the same --bn-grid-* tokens the banner
               uses, so the two always agree and both follow the active skin. */}
+          <div className="hg-page-bloom" aria-hidden="true" />
           <div className="hg-page-grid" aria-hidden="true" />
           {nav && <TopNav />}
           {children}
