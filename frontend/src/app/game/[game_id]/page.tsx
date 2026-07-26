@@ -54,6 +54,10 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   const [renameSaving, setRenameSaving] = useState(false);
   const [lockedNoticeId, setLockedNoticeId] = useState<number | null>(null);
 
+  // The name to print on the tickets being bought. Separate from `name`, which
+  // is the registered housie name the booking is made under and must not change.
+  const [ticketName, setTicketName] = useState("");
+
   // Referral reward — a player who has reached a referral rung (10/15/20…) can
   // claim one ticket free. The backend only discounts one ticket's price off
   // whatever ticket_ids are locked (it never adds a ticket on its own), so the
@@ -183,9 +187,11 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
   };
 
   const nameState = validateName(name);
+  // Empty is valid — it just means "keep the registered name on the ticket".
+  const ticketNameCheck = ticketName.trim() ? validateName(ticketName) : { ok: true, msg: "" };
   const price = game?.ticket_price ?? 0;
   const total = selected.length * price;
-  const canBook = selected.length > 0 && nameState.ok && !locking;
+  const canBook = selected.length > 0 && nameState.ok && ticketNameCheck.ok && !locking;
 
   const canClaimReferralTicket = rewardsEnabled && creditsAvailable >= 1;
   const availableCount = tickets.filter((t) => t.status === "Available").length;
@@ -229,6 +235,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
           game_id,
           ticket_ids: ticketIds,
           housie_name: (name || "").trim(),
+          display_name: ticketName.trim() || null,
           redeem_credit: freeTicketId !== null,
         }),
       });
@@ -395,7 +402,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                           )}
                           <div className="hg-live-ticket-footer">
                             <span className="hg-live-ticket-number">Ticket #{n}</span>
-                            <span className="hg-live-ticket-player-name">{name || "You"}</span>
+                            <span className="hg-live-ticket-player-name">{ticketName.trim() || name || "You"}</span>
                           </div>
                         </div>
                       </div>
@@ -405,15 +412,27 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
 
                 <div className="hg-action-foot">
                   <div className="hg-name-field">
+                    {/* Editable, but it sets the LABEL on the tickets — the booking
+                        itself is still made under the registered housie name below,
+                        which is what decides who the tickets belong to. Leaving it
+                        empty keeps the registered name on the ticket. */}
                     <input
-                      className="hg-name-input is-good"
-                      placeholder="Your Housie Name"
-                      value={name}
-                      readOnly
-                      disabled
+                      className={`hg-name-input${ticketNameCheck.ok ? " is-good" : " is-bad"}`}
+                      placeholder={name || "Name on your ticket"}
+                      value={ticketName}
+                      maxLength={16}
+                      onChange={(e) => setTicketName(e.target.value)}
+                      aria-label="Name to print on your tickets"
                     />
-                    <span className="hg-name-hint is-good">
-                      Playing as: <strong>{name}</strong> (Registered Housie Name)
+                    <span className={`hg-name-hint${ticketNameCheck.ok ? " is-good" : " is-bad"}`}>
+                      {ticketNameCheck.ok ? (
+                        <>
+                          Ticket name: <strong>{ticketName.trim() || name}</strong>
+                          {" · "}booked as <strong>{name}</strong>
+                        </>
+                      ) : (
+                        ticketNameCheck.msg
+                      )}
                     </span>
                   </div>
                   {lockError && <p className="hg-sec-err">{lockError}</p>}

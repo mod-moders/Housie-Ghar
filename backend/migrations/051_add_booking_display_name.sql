@@ -1,0 +1,11 @@
+-- Migration 051: carry the ticket nickname chosen at booking time.
+--
+-- Migration 050 put display_name on Tickets, but a ticket only becomes Sold
+-- when staff confirm the payment — so a name typed while booking has nowhere to
+-- live until then. This column holds it on the Booking and the confirm paths
+-- copy it onto the tickets alongside owner_housie_name.
+--
+-- housie_name on this table stays the identity the booking is made under (it is
+-- what becomes Tickets.owner_housie_name, the ownership key). This column is
+-- the label only; NULL means "show the booked name".
+ALTER TABLE Bookings ADD COLUMN IF NOT EXISTS display_name VARCHAR(50);

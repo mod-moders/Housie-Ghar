@@ -46,7 +46,7 @@ function readPlayerIdentity(req: Request): { playerId: string; housieName: strin
  * Lock tickets and initiate the WhatsApp P2P workflow
  */
 export async function lockTickets(req: Request, res: Response): Promise<void> {
-  const { game_id, ticket_ids, housie_name } = req.body;
+  const { game_id, ticket_ids, housie_name, display_name } = req.body;
 
   // 1. Basic validation
   if (!game_id || !ticket_ids || !Array.isArray(ticket_ids) || ticket_ids.length === 0 || !housie_name) {
@@ -56,6 +56,21 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
 
   const cleanBookingName = String(housie_name).trim().replace(/\s+/g, ' ');
   const identity = readPlayerIdentity(req);
+
+  // Optional label the player wants printed on the tickets. It is NOT the
+  // booking identity: housie_name below still decides who the tickets belong
+  // to, so a nickname can never be used to book in someone else's name.
+  // Validated with the same rules anyway — this string ends up beside names
+  // that the winner-string grammar parses.
+  const rawDisplayName = display_name === undefined || display_name === null ? '' : String(display_name).trim();
+  const cleanDisplayName = rawDisplayName === '' ? null : rawDisplayName.replace(/\s+/g, ' ');
+  if (cleanDisplayName !== null) {
+    const displayCheck = validateHousieName(cleanDisplayName);
+    if (!displayCheck.ok) {
+      res.status(400).json({ message: displayCheck.error, alternatives: displayCheck.alternatives });
+      return;
+    }
+  }
 
   if (cleanBookingName.length < HOUSIE_NAME_MIN_LENGTH || cleanBookingName.length > HOUSIE_NAME_MAX_LENGTH) {
     res.status(400).json({ message: `Housie Name must be between ${HOUSIE_NAME_MIN_LENGTH} and ${HOUSIE_NAME_MAX_LENGTH} characters` });
@@ -250,11 +265,11 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
         `INSERT INTO Bookings (
            game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
            booking_status, locked_at, locked_until, is_overflow,
-           player_credit_applied, reward_amount_waived
-         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE, $7, $8)
+           player_credit_applied, reward_amount_waived, display_name
+         ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, TRUE, $7, $8, $9)
          RETURNING booking_id, formatted_booking_id`,
         [game_id, ticket_ids, housie_name, selectedStaff.user_id, totalAmount, lockedUntil,
-         playerWaived > 0, playerWaived]
+         playerWaived > 0, playerWaived, cleanDisplayName]
       );
       const overflowBookingId = overflowRes.rows[0].booking_id;
 
@@ -307,11 +322,11 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       `INSERT INTO Bookings (
         game_id, ticket_ids, housie_name, assigned_agent_id, total_amount,
         booking_status, locked_at, locked_until,
-        player_credit_applied, reward_amount_waived
-      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, $7, $8)
+        player_credit_applied, reward_amount_waived, display_name
+      ) VALUES ($1, $2, $3, $4, $5, 'Locked', NOW(), $6, $7, $8, $9)
       RETURNING booking_id, formatted_booking_id`,
       [game_id, ticket_ids, housie_name, assigned.user_id, totalAmount, lockedUntil,
-       playerWaived > 0, playerWaived]
+       playerWaived > 0, playerWaived, cleanDisplayName]
     );
     const bookingId = bookingRes.rows[0].booking_id;
 
@@ -465,7 +480,7 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
 
     // 1. Fetch booking with row lock
     const bookingRes = await client.query(
-      `SELECT booking_id, ticket_ids, total_amount, booking_status, housie_name, game_id, assigned_agent_id
+      `SELECT booking_id, ticket_ids, total_amount, booking_status, housie_name, display_name, game_id, assigned_agent_id
        FROM Bookings
        WHERE booking_id = $1 AND assigned_agent_id = $2
        FOR UPDATE`,
@@ -575,11 +590,12 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
       `UPDATE Tickets
        SET status = 'Sold',
            owner_housie_name = $1,
+           display_name = $2,
            confirmed_at = NOW(),
            locked_until = NULL,
            locked_by_booking = NULL
-       WHERE ticket_id = ANY($2)`,
-      [booking.housie_name, booking.ticket_ids]
+       WHERE ticket_id = ANY($3)`,
+      [booking.housie_name, booking.display_name ?? null, booking.ticket_ids]
     );
 
     // 6b. Credit Promoter Referral Commission if player is referred
@@ -1010,7 +1026,7 @@ export async function forceConfirmBooking(req: AuthenticatedRequest, res: Respon
     await client.query('BEGIN');
 
     const bookingRes = await client.query(
-      `SELECT booking_id, game_id, ticket_ids, total_amount, booking_status, housie_name, is_overflow
+      `SELECT booking_id, game_id, ticket_ids, total_amount, booking_status, housie_name, display_name, is_overflow
        FROM Bookings
        WHERE booking_id = $1 AND assigned_agent_id = $2
        FOR UPDATE`,
@@ -1044,10 +1060,10 @@ export async function forceConfirmBooking(req: AuthenticatedRequest, res: Respon
 
     await client.query(
       `UPDATE Tickets
-       SET status = 'Sold', owner_housie_name = $1, confirmed_at = NOW(),
+       SET status = 'Sold', owner_housie_name = $1, display_name = $2, confirmed_at = NOW(),
            locked_until = NULL, locked_by_booking = NULL
-       WHERE ticket_id = ANY($2)`,
-      [booking.housie_name, booking.ticket_ids]
+       WHERE ticket_id = ANY($3)`,
+      [booking.housie_name, booking.display_name ?? null, booking.ticket_ids]
     );
 
     // 6b. Credit Promoter Referral Commission if player is referred
