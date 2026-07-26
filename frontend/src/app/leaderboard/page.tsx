@@ -223,16 +223,17 @@ export default function LeaderboardAndStats() {
 
           {/* Unified Rating formula explanation */}
           <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
-            background: "rgba(244, 201, 93, 0.06)", border: "1px solid rgba(244, 201, 93, 0.2)",
-            borderRadius: "var(--radius)", padding: "10px 14px", fontSize: 12, color: "var(--text-dim)"
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+            background: "rgba(255, 255, 255, 0.02)", border: "1.5px solid var(--border-2)",
+            borderRadius: "12px", padding: "12px 18px", fontSize: 13, color: "var(--text-dim)",
+            marginTop: "6px", lineHeight: "1.6"
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 14 }}>⚡</span>
-              <strong style={{ color: "var(--accent)", fontWeight: 700 }}>Unified Master Performance Rating</strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="alert" size={14} style={{ color: "var(--accent)" }} />
+              <strong style={{ color: "var(--text)", fontWeight: 700 }}>Unified Master Performance Rating</strong>
             </div>
-            <span style={{ fontSize: 11.5, opacity: 0.9 }}>
-              Rating = No. of Wins + (Total Winnings + Best Win + Average Win) / 1,000
+            <span style={{ fontSize: "12px", color: "var(--accent)", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "-0.01em" }}>
+              Housie Rating = Wins + (Total Wins + Best Win + Avg. Win)/1000
             </span>
           </div>
         </div>
