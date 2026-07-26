@@ -1474,6 +1474,35 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
     box-shadow:0 -8px 20px rgba(0,0,0,0.25);
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
   }
+  .hg-lobby-logo {
+    width: 100px !important;
+    height: 100px !important;
+  }
+  .hg-lucky-wizard {
+    width: 100px !important;
+    height: 100px !important;
+  }
+  .hg-lucky-wizard-scene {
+    width: 100px !important;
+    height: 100px !important;
+    transform: scale(0.625) !important;
+  }
+  .hg-lobby-header-row {
+    gap: 16px !important;
+  }
+  .hg-lobby-tagline {
+    font-size: 14px !important;
+    margin-top: 4px !important;
+  }
+  .hg-lobby-header {
+    padding: 8px 0 !important;
+  }
+  .hg-feed {
+    padding: 22px 0 !important;
+  }
+  .hg-hero {
+    padding: 8px 0 6px !important;
+  }
 }
 .hg-lobby-logo{object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.3))}
 .hg-lobby-tagline{margin:8px 0 0;font-family:var(--font-head);font-size:16px;font-weight:700;letter-spacing:0.03em;color:var(--text-dim)}
