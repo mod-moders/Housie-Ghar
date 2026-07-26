@@ -16,14 +16,6 @@ export function PublicShell({ children, nav = true }: { children: React.ReactNod
             page's height. .hg-frame-content additionally stretches it to fill the frame
             when the content is shorter than the viewport; see globals.css. */}
         <div className="hg-frame-content" style={{ ...contentStyle, position: "relative" }}>
-          {/* Ticket-grid backdrop, on every public page. Purely decorative and
-              CSS-drawn (repeating gradients rather than the banner's 27 DOM cells)
-              because it has to tile down a page of arbitrary height — a 9x3 element
-              grid stretched over a 3000px page would render three 1000px-tall cells.
-              Colour and strength come from the same --bn-grid-* tokens the banner
-              uses, so the two always agree and both follow the active skin. */}
-          <div className="hg-page-bloom" aria-hidden="true" />
-          <div className="hg-page-grid" aria-hidden="true" />
           {nav && <TopNav />}
           {children}
         </div>

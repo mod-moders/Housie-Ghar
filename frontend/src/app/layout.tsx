@@ -50,8 +50,20 @@ document.addEventListener('touchend', function(e){
 })();` }} />
         <ConfigProvider>
           <DialogProvider>
-            <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-              <div style={{ flex: 1 }}>
+            {/* hg-app-shell carries the ticket-grid backdrop for public pages (see
+                globals.css). It lives here rather than inside PublicShell because the
+                "Powered by MOD" footer below is a sibling of {children} — a backdrop
+                scoped to PublicShell stops at the frame and leaves that strip bare. */}
+            <div className="hg-app-shell" style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+              {/* Ticket-grid backdrop. CSS-drawn with repeating gradients rather than the
+                  banner's 27 DOM cells because it tiles down a page of arbitrary height —
+                  a 9x3 element grid stretched over a 3000px page renders three 1000px
+                  cells. Colour and strength come from the same --bn-grid-* tokens the
+                  banner uses, so the two agree and both follow the active skin. Hidden on
+                  staff pages by the :not(:has(...)) rule in globals.css. */}
+              <div className="hg-page-bloom" aria-hidden="true" />
+              <div className="hg-page-grid" aria-hidden="true" />
+              <div style={{ flex: 1, position: "relative" }}>
                 {children}
               </div>
               <div style={{

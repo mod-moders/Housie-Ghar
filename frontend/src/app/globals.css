@@ -1181,7 +1181,16 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
    dashboard (.hg-frame-wide) and the staff login both live in .hg-frame too and must
    not be turned into flex containers. */
 .hg-frame:has(> .hg-frame-content){display:flex;flex-direction:column}
-.hg-frame-content{flex:1 0 auto}
+/* The wrapper is also a flex column, and .hg-screen inside it is a flex item with its
+   percentage min-height cancelled. That percentage is the subtle part: .hg-screen's base
+   rule is `min-height:100%`, resolved against this wrapper — whose own height the flex
+   pass is still deciding. The two disagreed by exactly the nav's height, so the wrapper
+   settled 67px shorter than its own content and the backdrop (inset:0 on it) stopped
+   67px above the bottom of the scroll. Sizing .hg-screen with flex instead of a
+   percentage removes the circularity: nav takes its height, .hg-screen takes the rest
+   and grows past it when the content is longer. */
+.hg-frame-content{flex:1 0 auto;display:flex;flex-direction:column}
+.hg-frame-content > .hg-screen{flex:1 0 auto;min-height:0}
 .hg-frame::-webkit-scrollbar{width:7px}
 .hg-frame::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
 .hg-frame-wide{max-width:none;width:100%;height:100vh;height:100dvh;overflow:hidden}
@@ -1370,6 +1379,19 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
    and the repeat invisible. Horizontal radii can stay wide because background-size is
    100% — the tile never repeats sideways, so only the horizontal edges can seam.
    Sits below .hg-page-grid, the next z-index 0 sibling in DOM order. */
+/* Both backdrops hang off .hg-app-shell (layout.tsx), not off PublicShell's frame.
+   The frame is not the bottom of the page: the "Powered by MOD" footer is a sibling of
+   {children}, so a backdrop scoped to the frame ended above it and left a bare strip —
+   ~70px on every desktop page. .hg-app-shell wraps the frame AND the footer, so one
+   layer covers the lot with no seam to line up.
+   `:has(.hg-frame-content)` keeps this to public pages; the staff dashboard renders
+   through the same layout and must not get a ticket grid behind it. */
+.hg-app-shell{position:relative}
+/* Public pages only — the staff dashboard renders through the same layout and must not
+   get a ticket grid behind it. .hg-frame-content is rendered solely by PublicShell. */
+.hg-app-shell:not(:has(.hg-frame-content)) > .hg-page-bloom,
+.hg-app-shell:not(:has(.hg-frame-content)) > .hg-page-grid{display:none}
+
 .hg-page-bloom{
   position:absolute;inset:0;z-index:0;pointer-events:none;
   background-image:
