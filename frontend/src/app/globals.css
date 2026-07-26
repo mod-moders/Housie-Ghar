@@ -1132,8 +1132,15 @@ html:has(.hg-frame-wide), body:has(.hg-frame-wide) {
      Raised from 14%/.18: the grid became hard to see once it stopped being a
      saturated brand colour and started deriving from --text. */
   --bn-grid-line:color-mix(in srgb, var(--text) 26%, transparent);
-  --bn-grid-opacity:.34;
-  --bn-grid-cell:44px;
+  /* .38 and the 51x85 cell are frontend-v2-housieghar's exact values (its
+     --bn-grid-opacity, and the measured size of a cell in its 9x3 banner grid).
+     The line colour stays theme-derived rather than v2's flat rgba(255,255,255,.12)
+     — that is the part of the current approach worth keeping, and 26% holds the
+     visibility raised in bfe53d1 instead of halving it back to v2's level. */
+  --bn-grid-opacity:.38;
+  --bn-grid-cell-w:51px;
+  --bn-grid-cell-h:85px;
+  --bn-grid-tilt:-4deg;
 }
 
 /* Shared page content column — keeps stats/profile in step with the
@@ -1313,10 +1320,13 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   animation:hg-bloom-drift 22s ease-in-out infinite}
 
 /* tilted 3×9 ticket grid */
+/* Matches frontend-v2-housieghar exactly. Master had added filter:blur(0.5px)
+   here, which softens a 1px line to the point of mush; v2 keeps the rules crisp,
+   which is what makes the grid read as ticket paper rather than as haze. */
 .hg-banner-grid{position:absolute;inset:-8% -4%;z-index:0;pointer-events:none;
-  transform:rotate(-4deg);display:grid;
+  transform:rotate(var(--bn-grid-tilt));display:grid;
   grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(3,1fr);
-  opacity:var(--bn-grid-opacity);filter:blur(0.5px)}
+  opacity:var(--bn-grid-opacity)}
 .hg-banner-cell{border:1px solid var(--bn-grid-line);display:flex;align-items:center;justify-content:center}
 
 /* Page-wide ticket-grid backdrop (rendered by PublicShell on every public page).
@@ -1328,16 +1338,29 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-page-grid{
   position:absolute;inset:0;z-index:0;pointer-events:none;
   opacity:var(--bn-grid-opacity);
+  /* Same tilted 51x85 ticket cell as the banner grid, so the page reads as one
+     continuous sheet of ticket paper rather than two different grids.
+     The tilt is baked into the gradient ANGLES (90deg and 180deg, each offset by
+     --bn-grid-tilt) rather than applied as transform:rotate on the element. A
+     rotated element would have to be oversized to keep its corners covered, and
+     by how much depends on the page's height — which varies per route from ~520px
+     to ~2200px here. Angled repeating gradients tile to infinity, so they fill the
+     box at any height with no oversize maths and no risk of a bare corner. */
   background-image:
-    repeating-linear-gradient(to right, var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell)),
-    repeating-linear-gradient(to bottom, var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell));
+    repeating-linear-gradient(calc(90deg + var(--bn-grid-tilt)),
+      var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell-w)),
+    repeating-linear-gradient(calc(180deg + var(--bn-grid-tilt)),
+      var(--bn-grid-line) 0 1px, transparent 1px var(--bn-grid-cell-h));
 }
-.hg-banner-num{position:relative;font:700 16px var(--font-head);text-shadow:0 0 6px currentColor}
+/* v2 exactly: no text-shadow. Master's `0 0 6px currentColor` gave every number a
+   neon halo, which fought the flat printed-ticket look the grid is going for. */
+.hg-banner-num{position:relative;font:700 16px var(--font-head)}
 .hg-banner-num--yellow{color:var(--bn-num-yellow)}
 .hg-banner-num--ocean{color:var(--bn-num-ocean)}
 .hg-banner-num--pink{color:var(--bn-num-pink)}
 .hg-banner-num--plain{color:var(--bn-num-plain)}
-.hg-banner-daub{position:absolute;inset:-8px -10px;border-radius:50%;border:1.5px solid transparent;filter:drop-shadow(0 0 4px currentColor)}
+/* v2 exactly: a 2.5px drawn ring, no drop-shadow glow — a daub mark on paper. */
+.hg-banner-daub{position:absolute;inset:-8px -10px;border-radius:50%;border:2.5px solid transparent}
 .hg-banner-daub--pink{--daub-rot:-8deg;border-color:var(--bn-num-pink);transform:rotate(var(--daub-rot));
   animation:hg-daub 3s ease-in-out infinite}
 .hg-banner-daub--ocean{--daub-rot:6deg;border-color:var(--bn-num-ocean);transform:rotate(var(--daub-rot));
