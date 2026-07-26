@@ -1215,12 +1215,16 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   background:var(--bg);border-bottom:1px solid var(--border-light)}
 .hg-logo{display:flex;align-items:center;gap:10px;background:none;border:0;cursor:pointer;
   padding:0;color:var(--text)}
+.hg-nav-left{display:flex;align-items:center}
 .hg-nav-links{display:none;flex:1;justify-content:center;gap:3.5vw}
 .hg-nav-link{display:flex;align-items:center;background:none;border:0;cursor:pointer;color:var(--text-dim);
   font:600 13.5px var(--font-head);padding:7px 11px;border-radius:8px;transition:color 0.2s}
 .hg-nav-link:hover{color:var(--text);background:var(--surface-2)}
 .hg-nav-link.is-active{color:var(--accent)}
 .hg-nav-right{display:flex;align-items:center;gap:12px;min-width:40px;justify-content:flex-end}
+/* Account link lives at the end of the bar on desktop only — below 900px the
+   burger sheet already lists it alongside the section links. */
+.hg-nav-account{display:none;flex:0 0 auto;white-space:nowrap}
 .hg-staff-btn,.hg-theme-btn{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;color:var(--text-dim);cursor:pointer;background:var(--surface-2);border:1px solid var(--border-light)}
 .hg-player-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;cursor:pointer;
   background:var(--surface);border:1.5px solid var(--border-2);color:var(--text-dim);
@@ -1237,7 +1241,19 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 /* Inline nav links only once the frame de-phones to full width (>=900px).
    Below that the frame is a fixed 452px column, so the links would overflow
    it on tablet-band widths (560-899px) — the hamburger stays until then. */
-@media(min-width:900px){.hg-nav-links{display:flex}.hg-burger{display:none}}
+/* The section links are optically centred in the bar by letting the logo and
+   the account/staff cluster share the leftover space equally (flex:1 1 0 on
+   both), with the link row itself content-sized. Leaving .hg-nav-links on
+   flex:1 would centre it inside the *remaining* space instead, offsetting it
+   by half the difference between the two ends. */
+@media(min-width:900px){
+  .hg-nav-links{display:flex;flex:0 0 auto}
+  /* min-width stays auto so neither end can be squashed below its
+     min-content width — a squashed logo is worse than an off-centre row. */
+  .hg-nav-left,.hg-nav-right{flex:1 1 0}
+  .hg-nav-account{display:flex}
+  .hg-burger{display:none}
+}
 
 /* ============ BUTTONS ============ */
 .hg-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
@@ -3281,7 +3297,6 @@ select option {
     background:var(--bg);
     border-bottom:1.5px solid var(--card-line);
   }
-  .hg-nav-links{margin-left:14px}
   .hg-nav-link{font-size:14.5px;padding:8px 14px}
   .hg-staff-btn,.hg-theme-btn{width:40px;height:40px}
   /* cards lift on hover — a desktop affordance phones don't get */
@@ -4574,3 +4589,16 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   }
 }
 
+
+/* Nav compaction for the narrow desktop band. Between 900px (where the inline
+   links replace the burger) and ~1150px the logo, the four section links and
+   the account link together need more room than the bar has, and the account
+   link — pinned to the end — would ride back over HOW TO PLAY. Tighten the
+   bar padding, gap and link metrics instead of dropping anything. The retro
+   skin's own .hg-nav-link rule outranks the base one, so it is named here too. */
+@media(min-width:900px) and (max-width:1150px){
+  .hg-nav{padding-left:20px;padding-right:20px}
+  .hg-nav-links{gap:10px}
+  .hg-nav-link,
+  .hg-root[data-theme='retro_arcade'] .hg-nav-link{font-size:13px;padding:7px 9px}
+}

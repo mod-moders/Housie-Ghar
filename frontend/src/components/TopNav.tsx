@@ -51,21 +51,28 @@ export function TopNav() {
     router.push(href);
   };
 
-  const navItems = [
+  // The four section links sit in the centre column; the account link is
+  // pulled out so it can live at the far end of the bar next to the staff
+  // shortcut. The mobile sheet still lists all five together.
+  const sectionItems = [
     ["/", "GAMES", "grid"],
     ["/leaderboard", "LEADERBOARD", "trophy"],
     ["/stats", "STATS", "chart"],
     ["/how-to-play", "HOW TO PLAY", "help"],
+  ];
+  const accountItem =
     user?.role === "staff"
       ? ["/staff/login", "STAFF LOGIN", "shield"]
-      : ["/profile", "PROFILE", "user"],
-  ];
+      : ["/profile", "PROFILE", "user"];
+  const navItems = [...sectionItems, accountItem];
 
   return (
     <header className="hg-nav">
-      <Logo onClick={() => go("/")} />
+      <div className="hg-nav-left">
+        <Logo onClick={() => go("/")} />
+      </div>
       <nav className="hg-nav-links">
-        {navItems.map(([href, lbl, icon]) => (
+        {sectionItems.map(([href, lbl, icon]) => (
           <button
             key={lbl}
             className={`hg-nav-link${pathname === href ? " is-active" : ""}`}
@@ -77,6 +84,12 @@ export function TopNav() {
       </nav>
 
       <div className="hg-nav-right">
+        <button
+          className={`hg-nav-link hg-nav-account${pathname === accountItem[0] ? " is-active" : ""}`}
+          onClick={() => go(accountItem[0])}
+        >
+          <Icon name={accountItem[2]} size={16} /> <span style={{ marginLeft: "6px" }}>{accountItem[1]}</span>
+        </button>
         {user?.role === "staff" && (
           <button className="hg-staff-btn is-active" onClick={() => go("/staff")} aria-label="Staff panel" title="Staff panel">
             <Icon name="shield" size={18} strokeWidth={2.2} />
