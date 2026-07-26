@@ -1617,27 +1617,45 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
      on .hg-lobby-header because that carries a `padding:8px 0 !important` (see below). */
   .hg-lobby-hero{z-index:1;
     margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+  /* Geometry only — no surface, border, radius or shadow. Those made everything below
+     the banner a separate opaque sheet sitting on top of the page, so mobile read as
+     "banner, then a different document", while desktop has the games flowing straight
+     over the same continuous grid and bloom. The negative margin and matching padding
+     stay: they are what lets the announcement bar bleed to the frame edges. */
   .hg-games-panel{
     position:relative;z-index:2;
     margin:0 -16px;padding:20px 16px 0;
-    background:var(--surface);
-    border-top:1.5px solid var(--card-line);
-    box-shadow:0 -8px 20px rgba(0,0,0,0.25);
-    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
   }
   .hg-lobby-logo {
     width: 160px !important;
     height: 160px !important;
   }
+  /* Matches desktop's 16px / 8px rather than shrinking to 14px / 4px. At 16px the
+     tagline measures ~294px against ~347px of available width, so it still fits on
+     one line at 390px. */
   .hg-lobby-tagline {
-    font-size: 14px !important;
-    margin-top: 4px !important;
+    font-size: 16px !important;
+    margin-top: 8px !important;
   }
   .hg-lobby-header {
     padding: 8px 0 !important;
   }
   .hg-feed {
-    padding: 22px 0 !important;
+    padding: 10px 0 !important;
+  }
+  /* Desktop renders these as a real 24px heading; the 11.5px base turns them into a
+     tiny eyebrow label, which was the other thing making the two views read as
+     different pages. 18px is the largest that still leaves room for the count on the
+     right of .hg-feed-head at 390px ("UPCOMING GAMES" ~218px + ~70px in ~347px).
+     Scoped to .hg-screen--lobby for two reasons: .hg-section-title is a shared class
+     the staff dashboard also uses as a genuine eyebrow label, and its 11.5px base rule
+     lives ~1500 lines further down this file — at equal specificity that one would win
+     on source order alone. */
+  .hg-screen--lobby .hg-section-title {
+    font-size: 18px;
+  }
+  .hg-screen--lobby .hg-feed-head {
+    margin: 4px 2px 16px;
   }
   .hg-hero {
     padding: 8px 0 6px !important;
