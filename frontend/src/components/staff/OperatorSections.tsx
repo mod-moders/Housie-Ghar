@@ -732,6 +732,7 @@ export function OperatorHudSection() {
 
 interface OverflowHistoryItem {
   booking_id: string;
+  formatted_booking_id?: string | null;
   housie_name: string;
   game_title: string;
   ticket_numbers: number[];
@@ -742,6 +743,7 @@ interface OverflowHistoryItem {
 
 interface StaffDue {
   booking_id: string;
+  formatted_booking_id?: string | null;
   housie_name: string;
   total_amount: number;
   confirmed_at: string;
@@ -1000,7 +1002,12 @@ export function OverflowSection({ me }: { me: AuthUser }) {
                 return (
                   <div key={d.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr" }}>
                     <div>
-                      <b style={{ color: "var(--text)" }}>{d.staff_name}</b>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <b style={{ color: "var(--text)" }}>{d.staff_name}</b>
+                        <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.06)", padding: "2px 6px", borderRadius: "4px", color: "var(--text-mute)" }}>
+                          {d.formatted_booking_id || `#${d.booking_id.substring(0, 8).toUpperCase()}`}
+                        </span>
+                      </div>
                       <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{d.staff_role}</div>
                     </div>
                     <div>
@@ -1196,7 +1203,12 @@ export function OverflowSection({ me }: { me: AuthUser }) {
                 return (
                   <div key={h.booking_id} className="hg-tr" style={{ gridTemplateColumns: "1.5fr 1.5fr 1.5fr 1fr 1fr" }}>
                     <div>
-                      <b style={{ color: "var(--text)" }}>{h.housie_name}</b>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <b style={{ color: "var(--text)" }}>{h.housie_name}</b>
+                        <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.06)", padding: "2px 6px", borderRadius: "4px", color: "var(--text-mute)" }}>
+                          {h.formatted_booking_id || `#${h.booking_id.substring(0, 8).toUpperCase()}`}
+                        </span>
+                      </div>
                       <div className="hg-dim" style={{ fontSize: "10px", marginTop: "2px" }}>{formattedDate}</div>
                     </div>
                     <span className="hg-dim">{h.game_title}</span>

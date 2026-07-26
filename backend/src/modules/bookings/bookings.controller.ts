@@ -1306,7 +1306,7 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
 
   try {
     const result = await pool.query(
-      `SELECT b.booking_id, b.housie_name, b.total_amount, b.booking_status,
+      `SELECT b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.booking_status,
               COALESCE(b.confirmed_at, b.rejected_at, b.locked_at) as processed_at,
               g.title AS game_title,
               array_agg(t.ticket_number ORDER BY t.ticket_number) AS ticket_numbers
@@ -1314,7 +1314,7 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
        JOIN Scheduled_Games g ON b.game_id = g.game_id
        JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
        WHERE b.assigned_agent_id = $1 AND b.booking_status IN ('Sold', 'Cancelled')
-       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.booking_status, b.confirmed_at, b.rejected_at, b.locked_at, g.title
+       GROUP BY b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.booking_status, b.confirmed_at, b.rejected_at, b.locked_at, g.title
        ORDER BY processed_at DESC
        LIMIT 10`,
       [agentId]
@@ -1322,6 +1322,7 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
 
     const history = result.rows.map((row) => ({
       booking_id: row.booking_id,
+      formatted_booking_id: row.formatted_booking_id,
       housie_name: row.housie_name,
       game_title: row.game_title,
       ticket_numbers: row.ticket_numbers as number[],
@@ -1343,7 +1344,7 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
 export async function getStaffDues(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
+      `SELECT b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
               b.player_credit_applied, b.reward_amount_waived,
               g.title AS game_title, g.scheduled_at AS game_time, g.ticket_price,
               u.full_name AS staff_name, r.role_name AS staff_role,
@@ -1355,7 +1356,7 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
        JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
        WHERE b.booking_status = 'Sold'
          AND r.role_name IN ('Superadmin', 'Financial Admin', 'Operator')
-       GROUP BY b.booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
+       GROUP BY b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
                 b.player_credit_applied, b.reward_amount_waived,
                 g.title, g.scheduled_at, g.ticket_price, u.full_name, r.role_name
        ORDER BY b.confirmed_at DESC
@@ -1364,6 +1365,7 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
 
     const dues = result.rows.map((row) => ({
       booking_id: row.booking_id,
+      formatted_booking_id: row.formatted_booking_id,
       housie_name: row.housie_name,
       total_amount: parseFloat(row.total_amount),
       confirmed_at: row.confirmed_at,
