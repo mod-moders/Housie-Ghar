@@ -265,7 +265,10 @@ export function OperatorHudSection() {
         isLastPrize
       };
     }
-  }, [playCelebration, introPlayingRef, delay, numberCallPlaying, revealDraw, muted]);
+    // playCelebration/numberCallPlaying/muted are NOT listed: this callback
+    // never touches them. They belong to revealDraw, which is a dependency
+    // here, so a change to any of them still rebuilds this transitively.
+  }, [introPlayingRef, delay, revealDraw]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {

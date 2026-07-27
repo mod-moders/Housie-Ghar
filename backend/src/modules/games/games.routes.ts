@@ -22,6 +22,7 @@ import {
   getPrizeClaimsDashboard,
 } from './games.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
+import { authenticatePlayer } from '../../middleware/playerAuth';
 import {
   listNumberCalls,
   updateNumberCall,
@@ -32,7 +33,15 @@ import {
   updateBulkMode,
 } from './numberCalls.controller';
 
+import { intParam, uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('game_id', uuidParam('Game'));
+router.param('prize_id', intParam('Prize'));
+
 
 // ==========================================
 // 1. Static Routes (Must be declared first)
@@ -80,8 +89,11 @@ router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Fina
 router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), getGameSalesDetails);
 
 // Prize claim specific parameterized endpoints
-router.post('/:game_id/claim-all', claimAllPrizes);
-router.post('/:game_id/prizes/:prize_id/claim', claimPrize);
+// Both claim routes verified the player token inline before, which meant they
+// also skipped the suspended-account check the middleware performs and trusted
+// the housie name baked into the token. See utils/playerIdentity.ts.
+router.post('/:game_id/claim-all', authenticatePlayer, claimAllPrizes);
+router.post('/:game_id/prizes/:prize_id/claim', authenticatePlayer, claimPrize);
 router.post('/:game_id/prizes/:prize_id/disburse', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disbursePrize);
 router.post('/:game_id/disburse-consolidated', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), disburseConsolidatedClaim);
 

@@ -17,7 +17,14 @@ import {
 } from './bookings.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
+import { uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('booking_id', uuidParam('Booking'));
+
 
 // Player endpoints (Public)
 router.post('/lock', lockTickets);

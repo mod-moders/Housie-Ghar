@@ -12,7 +12,15 @@ import {
 } from './wallet.controller';
 import { authenticateToken, requireRole, requireFinancialOfficer, requireCfoOnly } from '../../middleware/auth';
 
+import { uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('id', uuidParam('Request'));
+router.param('agentId', uuidParam('Agent'));
+
 
 // Financial Admin oversight
 router.get('/agents', authenticateToken, requireRole(['Financial Admin', 'Superadmin']), listAgentWallets);

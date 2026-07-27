@@ -3,7 +3,14 @@ import { signup, login, getProfile, updateProfile, logout, getPlayerStats, getAl
 import { authenticatePlayer } from '../../middleware/playerAuth';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
+import { uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('player_id', uuidParam('Player'));
+
 
 // Player endpoints
 router.post('/signup', signup);

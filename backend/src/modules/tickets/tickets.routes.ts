@@ -2,7 +2,15 @@ import { Router } from 'express';
 import { getGameTicketsGrid, getTicketGridData, getGameMyTickets, searchGameTickets, updateTicketDisplayName } from './tickets.controller';
 import { authenticatePlayer } from '../../middleware/playerAuth';
 
+import { intParam, uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('game_id', uuidParam('Game'));
+router.param('ticket_id', intParam('Ticket'));
+
 
 router.get('/games/:game_id/tickets', getGameTicketsGrid);
 // Alias consumed by the staff manual-booking modal (AdminSections). Same payload

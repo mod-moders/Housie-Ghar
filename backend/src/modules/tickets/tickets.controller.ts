@@ -6,6 +6,11 @@ import { Request, Response } from 'express';
 import pool from '../../db';
 import { normalizeHousieName, validateHousieName } from '../../utils/housieName';
 
+/** Neutralise LIKE wildcards in user input. Pair with `ESCAPE '\'` in the query. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export async function getGameTicketsGrid(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
 
@@ -105,10 +110,16 @@ export async function getGameMyTickets(req: any, res: Response): Promise<void> {
   }
 
   try {
+    // Matched case-insensitively, the same way normalizeHousieName() compares
+    // names everywhere else (including updateTicketDisplayName below). This was
+    // an exact `=` match, so a ticket booked as `monk` was invisible to the
+    // account `Monk` — no Purchased Tickets card, no rename, no claim — while
+    // the rename endpoint right below happily accepted it. Migration 047 made
+    // names case-insensitively unique, so only legacy rows can differ.
     const result = await pool.query(
       `SELECT ticket_id, ticket_number, grid_data, status, owner_housie_name, display_name
        FROM Tickets
-       WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'
+       WHERE game_id = $1 AND LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2)) AND status = 'Sold'
        ORDER BY ticket_number ASC`,
       [game_id, player.housieName]
     );
@@ -140,27 +151,38 @@ export async function searchGameTickets(req: Request, res: Response): Promise<vo
   }
 
   const cleanQuery = String(query).trim();
-  const isNumber = !isNaN(Number(cleanQuery));
+
+  // `!isNaN(Number(q))` also accepted "Infinity", "1e999" and values past
+  // int4 — each of which reached Postgres as a ticket_number comparison and
+  // came back as a 500 on a PUBLIC, unauthenticated endpoint. Only a plain
+  // in-range integer is a ticket number; everything else is a name search.
+  const asInt = /^\d+$/.test(cleanQuery) ? Number(cleanQuery) : NaN;
+  const isTicketNumber = Number.isSafeInteger(asInt) && asInt >= 0 && asInt <= 2147483647;
+
+  // `%` and `_` are LIKE wildcards. Interpolated raw, a query of "%" matched
+  // every sold ticket in the game and dumped every buyer's name — the whole
+  // point of searching by name is that you already know the one you want.
+  const likePattern = `%${escapeLike(cleanQuery)}%`;
 
   try {
     let result;
-    if (isNumber) {
+    if (isTicketNumber) {
       result = await pool.query(
         `SELECT ticket_id, ticket_number, grid_data, status, owner_housie_name, display_name
          FROM Tickets
-         WHERE game_id = $1 AND (ticket_number = $2 OR LOWER(owner_housie_name) LIKE LOWER($3)
-                                 OR LOWER(display_name) LIKE LOWER($3)) AND status = 'Sold'
+         WHERE game_id = $1 AND (ticket_number = $2 OR LOWER(owner_housie_name) LIKE LOWER($3) ESCAPE '\\'
+                                 OR LOWER(display_name) LIKE LOWER($3) ESCAPE '\\') AND status = 'Sold'
          ORDER BY ticket_number ASC`,
-        [game_id, Number(cleanQuery), `%${cleanQuery}%`]
+        [game_id, asInt, likePattern]
       );
     } else {
       result = await pool.query(
         `SELECT ticket_id, ticket_number, grid_data, status, owner_housie_name, display_name
          FROM Tickets
-         WHERE game_id = $1 AND (LOWER(owner_housie_name) LIKE LOWER($2)
-                                 OR LOWER(display_name) LIKE LOWER($2)) AND status = 'Sold'
+         WHERE game_id = $1 AND (LOWER(owner_housie_name) LIKE LOWER($2) ESCAPE '\\'
+                                 OR LOWER(display_name) LIKE LOWER($2) ESCAPE '\\') AND status = 'Sold'
          ORDER BY ticket_number ASC`,
-        [game_id, `%${cleanQuery}%`]
+        [game_id, likePattern]
       );
     }
 

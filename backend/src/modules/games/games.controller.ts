@@ -12,6 +12,8 @@ import { CONSTANTS } from '../../config/constants';
 import { generateTicketsForGame } from '../../db/generateGameTickets';
 import { logAuditEvent } from '../../services/audit.service';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { AuthenticatedPlayerRequest } from '../../middleware/playerAuth';
+import { resolvePlayerIdentity } from '../../utils/playerIdentity';
 import {
   normalizeHousieName,
   parseWinnerNames,
@@ -186,18 +188,7 @@ async function getFinancialOfficerWhatsApp(): Promise<string | null> {
  */
 export async function getGames(req: Request, res: Response): Promise<void> {
   try {
-    let playerHousieName: string | null = null;
-    let authHeader = req.headers['authorization'];
-    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
-    if (!token) {
-      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
-    }
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-        playerHousieName = decoded.housieName || null;
-      } catch {}
-    }
+    const playerHousieName = (await resolvePlayerIdentity(req))?.housieName ?? null;
 
     const result = await pool.query(
       `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
@@ -304,18 +295,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
   const { game_id } = req.params;
 
   try {
-    let playerHousieName: string | null = null;
-    let authHeader = req.headers['authorization'];
-    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
-    if (!token) {
-      token = (req as any).cookies?.['hg_player_token'] || (req as any).cookies?.hg_player_token;
-    }
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-        playerHousieName = decoded.housieName || null;
-      } catch {}
-    }
+    const playerHousieName = (await resolvePlayerIdentity(req))?.housieName ?? null;
 
     const result = await pool.query(
       `SELECT game_id, title, scheduled_at, completed_at, started_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
@@ -986,30 +966,10 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
     return;
   }
 
-  let resolvedName = '';
-
-  // 1. Try player session token (check Authorization header first, then cookies)
-  let playerToken = null;
-  if (req.headers['authorization']) {
-    const authHeader = req.headers['authorization'] as string;
-    if (authHeader.startsWith('Bearer ')) {
-      playerToken = authHeader.substring(7);
-    }
-  }
-  if (!playerToken) {
-    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
-  }
-
-  if (playerToken) {
-    try {
-      const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-      if (decoded && decoded.housieName) {
-        resolvedName = decoded.housieName;
-      }
-    } catch (err) {
-      // Ignored
-    }
-  }
+  // 1. Try player session token (bearer header first, then cookies)
+  const playerIdentity = await resolvePlayerIdentity(req);
+  let resolvedName = playerIdentity?.housieName ?? '';
+  const isPlayer = playerIdentity !== null;
 
   // 2. Try staff session token if not resolved as player (check cookies or Authorization header)
   if (!resolvedName) {
@@ -1041,7 +1001,7 @@ export async function sendEmojiReaction(req: Request, res: Response): Promise<vo
 
   let avatar_url: string | null = null;
   try {
-    if (playerToken) {
+    if (isPlayer) {
       const pRes = await pool.query('SELECT avatar_url FROM Players WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))', [resolvedName]);
       if (pRes.rows && pRes.rows.length > 0) {
         avatar_url = pRes.rows[0].avatar_url;
@@ -1141,35 +1101,11 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
 /**
  * Claim a prize (Player)
  */
-export async function claimPrize(req: Request, res: Response): Promise<void> {
+export async function claimPrize(req: AuthenticatedPlayerRequest, res: Response): Promise<void> {
   const { game_id, prize_id } = req.params;
-
-  // Get player identity from token (check Authorization header first, then cookies)
-  let playerToken = null;
-  if (req.headers['authorization']) {
-    const authHeader = req.headers['authorization'] as string;
-    if (authHeader.startsWith('Bearer ')) {
-      playerToken = authHeader.substring(7);
-    }
-  }
-  if (!playerToken) {
-    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
-  }
-
-  if (!playerToken) {
-    res.status(401).json({ message: 'Player authentication required' });
-    return;
-  }
+  const playerHousieName = req.player!.housieName;
 
   try {
-    const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-    const playerHousieName = decoded.housieName;
-
-    if (!playerHousieName) {
-      res.status(401).json({ message: 'Invalid player token' });
-      return;
-    }
-
     // Verify the game is completed
     const gameRes = await pool.query(
       `SELECT game_status FROM Scheduled_Games WHERE game_id = $1`,
@@ -1347,34 +1283,11 @@ Here is my UPI ID/QR Code for disbursement:`;
 /**
  * Claim ALL prizes won by the player for a game at once
  */
-export async function claimAllPrizes(req: Request, res: Response): Promise<void> {
+export async function claimAllPrizes(req: AuthenticatedPlayerRequest, res: Response): Promise<void> {
   const { game_id } = req.params;
-
-  let playerToken = null;
-  if (req.headers['authorization']) {
-    const authHeader = req.headers['authorization'] as string;
-    if (authHeader.startsWith('Bearer ')) {
-      playerToken = authHeader.substring(7);
-    }
-  }
-  if (!playerToken) {
-    playerToken = req.cookies?.[`hg_player_token_${game_id}`] || req.cookies?.hg_player_token;
-  }
-
-  if (!playerToken) {
-    res.status(401).json({ message: 'Player authentication required' });
-    return;
-  }
+  const playerHousieName = req.player!.housieName;
 
   try {
-    const decoded = jwt.verify(playerToken, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-    const playerHousieName = decoded.housieName;
-
-    if (!playerHousieName) {
-      res.status(401).json({ message: 'Invalid player token' });
-      return;
-    }
-
     const gameRes = await pool.query(
       `SELECT game_status, title, scheduled_at FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]

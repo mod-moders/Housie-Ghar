@@ -2,7 +2,15 @@ import { Router } from 'express';
 import { listUsers, createUser, updateUser, resetUserPassword, deleteUser, designateCfo, getOverflowSettings, updateOverflowSettings, createBookieApplication, listBookiesStats, updateBookieReceiveBookings, getBookieApplications, updateBookieApplicationStatus, getBookiePersonalStats } from './users.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
+import { uuidParam } from '../../middleware/validateParams';
+
 const router = Router();
+
+// Reject malformed ids up front so a bad link 404s instead of surfacing a
+// Postgres type error as a 500. See middleware/validateParams.ts.
+router.param('id', uuidParam('Record'));
+router.param('user_id', uuidParam('User'));
+
 
 // Public Bookie application submission
 router.post('/apply-bookie', createBookieApplication);

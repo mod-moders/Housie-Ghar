@@ -33,7 +33,7 @@ export function TopNav() {
     const playerCheck = apiFetch<{ player: { housie_name: string; avatar_url: string | null } }>(
       "/api/player/me"
     ).catch(() => null);
-    const staffCheck = apiFetch<{ user: { full_name: string; role_name: string } }>("/api/auth/me").catch(() => null);
+    const staffCheck = apiFetch<{ user: { full_name: string; role_name: string; avatar_url: string | null } }>("/api/auth/me").catch(() => null);
 
     Promise.all([playerCheck, staffCheck]).then(([playerRes, staffRes]) => {
       if (cancelled) return;
@@ -41,7 +41,8 @@ export function TopNav() {
         setUser({
           role: "staff",
           name: staffRes.user.full_name,
-          label: `${staffRes.user.full_name} (${staffRes.user.role_name})`
+          label: `${staffRes.user.full_name} (${staffRes.user.role_name})`,
+          avatar: staffRes.user.avatar_url,
         });
       } else if (playerRes) {
         setUser({
@@ -97,13 +98,19 @@ export function TopNav() {
     ["/stats", "STATS", "chart"],
     ["/how-to-play", "HOW TO PLAY", "help"],
   ];
-  // A signed-in player gets their housie name in place of the generic
-  // "PROFILE" label — in the bar as an avatar chip, and in the burger sheet.
-  const player = user?.role === "player" ? user : null;
+  // A signed-in user — player or staff — gets their own name in place of the
+  // generic label: in the bar as an avatar chip, and in the burger sheet.
+  //
+  // Staff used to get "STAFF LOGIN" pointing at /staff/login here even while
+  // signed in, sitting immediately next to a shield that already went to their
+  // dashboard. It read as "you are signed out" to someone who was signed in,
+  // and the burger sheet listed the same dead link above a working
+  // "My Dashboard" row.
+  const account = user;
   const accountItem =
     user?.role === "staff"
-      ? ["/staff/login", "STAFF LOGIN", "shield"]
-      : ["/profile", player ? player.name : "PROFILE", "user"];
+      ? ["/staff", user.name, "shieldCheck"]
+      : ["/profile", user?.role === "player" ? user.name : "PROFILE", "user"];
   const navItems = [...sectionItems, accountItem];
 
   return (
@@ -124,17 +131,17 @@ export function TopNav() {
       </nav>
 
       <div className="hg-nav-right">
-        {player ? (
+        {account ? (
           <button
-            className={`hg-player-chip hg-account-chip${pathname === "/profile" ? " is-active" : ""}`}
-            onClick={() => go("/profile")}
-            title={player.name}
-            aria-label={`Profile — ${player.name}`}
+            className={`hg-player-chip hg-account-chip${pathname === accountItem[0] ? " is-active" : ""}`}
+            onClick={() => go(accountItem[0])}
+            title={account.label}
+            aria-label={account.role === "staff" ? `Staff panel — ${account.label}` : `Profile — ${account.name}`}
           >
             <span className="hg-account-avatar" aria-hidden="true">
-              <PlayerAvatar avatar={player.avatar} name={player.name} />
+              <PlayerAvatar avatar={account.avatar} name={account.name} />
             </span>
-            <span className="hg-account-name">{player.name}</span>
+            <span className="hg-account-name">{account.name}</span>
           </button>
         ) : (
           <button
@@ -162,11 +169,10 @@ export function TopNav() {
                 <Icon name={icon} size={18} /> {lbl}
               </button>
             ))}
-            {user?.role === "staff" ? (
-              <button className="hg-sheet-link" onClick={() => go("/staff")}>
-                <Icon name="shieldCheck" size={18} /> My Dashboard ({user.name})
-              </button>
-            ) : (
+            {/* Signed-in staff already have their dashboard in navItems above
+                (accountItem points at /staff), so only offer the login link to
+                someone who is not signed in as staff. */}
+            {user?.role !== "staff" && (
               <button className="hg-sheet-link" onClick={() => go("/staff/login")}>
                 <Icon name="lock" size={18} /> Staff Login
               </button>

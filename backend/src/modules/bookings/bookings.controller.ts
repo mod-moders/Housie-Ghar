@@ -3,12 +3,11 @@
  */
 
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import pool from '../../db';
-import { env } from '../../config/env';
 import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { validateHousieName, normalizeHousieName, HOUSIE_NAME_MIN_LENGTH, HOUSIE_NAME_MAX_LENGTH } from '../../utils/housieName';
+import { resolvePlayerIdentity } from '../../utils/playerIdentity';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
 import {
@@ -20,27 +19,6 @@ import {
   recordRedemption,
   refundPlayerCreditForBooking,
 } from '../../services/loyalty';
-
-/**
- * Read and verify an optional player bearer token. Returns the token's housie
- * name, or null when absent/invalid. Never throws — callers decide whether an
- * unauthenticated request is acceptable for what they're about to do.
- */
-function readPlayerIdentity(req: Request): { playerId: string; housieName: string } | null {
-  let token: string | null = null;
-  const authHeader = req.headers['authorization'] as string | undefined;
-  if (authHeader?.startsWith('Bearer ')) token = authHeader.substring(7);
-  if (!token) token = (req as any).cookies?.hg_player_token ?? null;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as any;
-    if (!decoded?.playerId || !decoded?.housieName) return null;
-    return { playerId: decoded.playerId, housieName: decoded.housieName };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Lock tickets and initiate the WhatsApp P2P workflow
@@ -55,7 +33,7 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
   }
 
   const cleanBookingName = String(housie_name).trim().replace(/\s+/g, ' ');
-  const identity = readPlayerIdentity(req);
+  const identity = await resolvePlayerIdentity(req);
 
   // Optional label the player wants printed on the tickets. It is NOT the
   // booking identity: housie_name below still decides who the tickets belong

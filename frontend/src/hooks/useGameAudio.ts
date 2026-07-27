@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { apiFetch, resolveAudioUrl } from "@/lib/api";
 import { soundSynthesizer } from "@/lib/soundSynthesizer";
 import { useConfigStore } from "@/lib/stores/configStore";
@@ -16,9 +16,26 @@ interface NumberCallConfig {
   volume?: number;
 }
 
+/**
+ * Every function returned from here is memoised with useCallback.
+ *
+ * They used to be plain closures, which meant a new identity on every single
+ * render. Both consumers (the player live board and the Operator HUD) feed them
+ * into useCallback dependency arrays, so those memos never held: `revealDraw`
+ * and `onEvent` were rebuilt on every render of a screen that re-renders on
+ * every drawn number, every timer tick and every reaction. Keeping the
+ * identities stable is what makes those memos mean anything.
+ */
+type PlayAudioFile = (
+  mp3Path: string,
+  customVolume?: number,
+  fallbackPath?: string,
+  startOffsetSeconds?: number
+) => Promise<void>;
+
 export function useGameAudio(
-  englishCallerEnabled: boolean, 
-  isGameLive: boolean, 
+  englishCallerEnabled: boolean,
+  isGameLive: boolean,
   isMuted: boolean = false,
   gameCallMode?: "TTS" | "Audio" | "Text",
   gameBgMusicEnabled?: boolean,
@@ -32,7 +49,7 @@ export function useGameAudio(
 ) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
   const { config: platformConfig } = useConfigStore();
-  
+
   const activeAudiosRef = useRef<HTMLAudioElement[]>([]);
   const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
   const isMountedRef = useRef<boolean>(true);
@@ -43,7 +60,7 @@ export function useGameAudio(
   // top of whatever legitimately started next, e.g. a Nepali call gets cut off mid-play by the
   // next draw and its orphaned onError then plays the English fallback over the new Nepali call.
   const intentionallyStoppedRef = useRef<WeakSet<HTMLAudioElement>>(new WeakSet());
-  
+
   const isIntroPlayingRef = useRef<boolean>(false);
   const pendingNumbersQueueRef = useRef<number[]>([]);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -78,7 +95,7 @@ export function useGameAudio(
     };
   }, []);
 
-  const loadCallsConfig = () => {
+  const loadCallsConfig = useCallback(() => {
     apiFetch<NumberCallConfig[]>("/api/games/number-calls")
       .then((data) => {
         if (!isMountedRef.current) return;
@@ -89,11 +106,11 @@ export function useGameAudio(
         setCallsConfig(configMap);
       })
       .catch(() => {});
-  };
+  }, []);
 
   useEffect(() => {
     loadCallsConfig();
-  }, [englishCallerEnabled, isGameLive]);
+  }, [englishCallerEnabled, isGameLive, loadCallsConfig]);
 
   useSocket((event) => {
     if (event === "number_calls_update") {
@@ -192,7 +209,7 @@ export function useGameAudio(
     }
   }, [isMuted]);
 
-  const stopAllActiveAudios = () => {
+  const stopAllActiveAudios = useCallback(() => {
     activeAudiosRef.current.forEach((audio) => {
       try {
         intentionallyStoppedRef.current.add(audio);
@@ -203,7 +220,7 @@ export function useGameAudio(
     activeAudiosRef.current = [];
     activeTimersRef.current.forEach((t) => clearTimeout(t));
     activeTimersRef.current = [];
-  };
+  }, []);
 
   // usePauseAudioOnHidden only covers the single looping bgMusicRef <audio> element.
   // The number-call/greeting/outro clips created ad hoc in playAudioFile are NOT a fixed
@@ -221,84 +238,107 @@ export function useGameAudio(
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
+  }, [stopAllActiveAudios]);
 
-  const playGreeting = async (startOffsetSeconds: number = 0): Promise<void> => {
-    if (!englishCallerEnabled || isMuted) return;
-    
-    const introEnabled = platformConfig?.welcome_voice_enabled !== "false";
-    if (!introEnabled) return;
+  // Declared before its callers: playGreeting and playNumberCall both invoke it.
+  //
+  // The fallback-URL retry recurses, and it does so through this inner hoisted
+  // `play` rather than through the memoised `playAudioFile` binding. Recursing
+  // through the outer name would capture whichever memoised copy existed when
+  // the closure was built, so a retry fired after `isMuted` changed would run
+  // the stale one — which is exactly what the react-hooks/immutability rule
+  // catches. `fallback` is passed as undefined on the retry, so this can only
+  // ever go one level deep.
+  const playAudioFile: PlayAudioFile = useCallback((mp3Path: string, customVolume: number = 1.0, fallbackPath?: string, startOffsetSeconds: number = 0): Promise<void> => {
+    function play(mp3Path: string, customVolume: number, fallbackPath: string | undefined, startOffsetSeconds: number): Promise<void> {
+      return new Promise((resolve) => {
+        if (!isMountedRef.current || isMuted || document.hidden) return resolve();
 
-    stopAllActiveAudios();
-    isIntroPlayingRef.current = true;
-    
-    try {
-      if (!isMountedRef.current || isMuted) return;
-
-      const activeLang = platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
-      // welcome_voice_url (the pre-dual-language legacy field) is NEPALI content — migration
-      // 042 mapped the original welcome upload straight into welcome_voice_url_ne, never into
-      // _en. Falling back to it for English would silently play Nepali, so the English branch
-      // only ever uses a dedicated English upload (no intro at all if none exists yet, rather
-      // than the wrong language).
-      const welcomeUrl = activeLang === "ne"
-        ? (platformConfig?.welcome_voice_url_ne || platformConfig?.welcome_voice_url)
-        : platformConfig?.welcome_voice_url_en;
-
-      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
-      const volMultiplier = activeLang === "ne"
-        ? parseFloat(platformConfig?.welcome_voice_volume_ne || platformConfig?.welcome_voice_volume || "1.0")
-        : parseFloat(platformConfig?.welcome_voice_volume_en || platformConfig?.welcome_voice_volume || "1.0");
-
-      if (welcomeUrl) {
-        await playAudioFile(welcomeUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
-      }
-    } finally {
-      isIntroPlayingRef.current = false;
-      if (isMountedRef.current && pendingNumbersQueueRef.current.length > 0) {
-        const nextNum = pendingNumbersQueueRef.current.shift();
-        if (nextNum !== undefined) {
-          playNumberCall(nextNum);
+        if (!mp3Path) {
+          if (fallbackPath) {
+            play(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
+          } else {
+            resolve();
+          }
+          return;
         }
-      }
+
+        const resolvedUrl = resolveAudioUrl(mp3Path);
+        const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
+        audio.src = resolvedUrl;
+        if (!resolvedUrl.startsWith("data:")) {
+          audio.crossOrigin = "anonymous";
+        }
+        activeAudiosRef.current.push(audio);
+
+        // Apply Live Announcement Echo / Reverb filter to uploaded audio announcements
+        soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
+
+        let hasEnded = false;
+        const cleanup = () => {
+          audio.removeEventListener("ended", onEnded);
+          audio.removeEventListener("error", onError);
+          audio.removeEventListener("loadedmetadata", onMetadata);
+          const idx = activeAudiosRef.current.indexOf(audio);
+          if (idx > -1) activeAudiosRef.current.splice(idx, 1);
+        };
+
+        const onMetadata = () => {
+          if (hasEnded) return;
+          if (startOffsetSeconds > 0) {
+            if (startOffsetSeconds < audio.duration) {
+              audio.currentTime = startOffsetSeconds;
+            } else {
+              hasEnded = true;
+              cleanup();
+              resolve();
+              try { audio.pause(); } catch {}
+            }
+          }
+        };
+
+        const onEnded = () => {
+          if (hasEnded) return;
+          hasEnded = true;
+          cleanup();
+          resolve();
+        };
+        // The primary URL existed but failed to actually load (e.g. it points at a file
+        // that no longer exists on disk — a dead-but-truthy audio_url). Try the other
+        // language once before giving up, so one missing upload plays something instead
+        // of silence for that number.
+        const onError = () => {
+          if (hasEnded) return;
+          hasEnded = true;
+          cleanup();
+          // We interrupted this clip ourselves (stopAllActiveAudios clearing .src on a still-
+          // playing element also fires "error") — that's not a real load failure, so don't
+          // chase the cross-language fallback for a call nobody is waiting on anymore.
+          if (intentionallyStoppedRef.current.has(audio)) {
+            resolve();
+            return;
+          }
+          if (fallbackPath && fallbackPath !== mp3Path) {
+            play(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
+          } else {
+            resolve();
+          }
+        };
+
+        audio.addEventListener("loadedmetadata", onMetadata);
+        audio.addEventListener("ended", onEnded);
+        audio.addEventListener("error", onError);
+
+        audio.play().catch(onError);
+      });
     }
-  };
 
-  const playOutro = async (startOffsetSeconds: number = 0): Promise<void> => {
+    return play(mp3Path, customVolume, fallbackPath, startOffsetSeconds);
+  }, [isMuted]);
+
+  const playNumberCall = useCallback(async (num: number): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
-    
-    const outroEnabled = platformConfig?.instruction_voice_enabled !== "false";
-    if (!outroEnabled) return;
 
-    stopAllActiveAudios();
-    
-    try {
-      const activeLang = platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
-      // instruction_voice_url (the pre-dual-language legacy field) is ENGLISH content —
-      // migration 042 mapped the original outro upload straight into instruction_voice_url_en,
-      // never into _ne. Falling back to it for Nepali would silently play English (this was the
-      // actual bug: game ends with audio_language=ne but no dedicated Nepali outro uploaded, so
-      // it fell back to the English legacy file), so the Nepali branch only ever uses a
-      // dedicated Nepali upload (no outro at all if none exists yet, rather than the wrong
-      // language).
-      const instructionUrl = activeLang === "ne"
-        ? platformConfig?.instruction_voice_url_ne
-        : (platformConfig?.instruction_voice_url_en || platformConfig?.instruction_voice_url);
-
-      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
-      const volMultiplier = activeLang === "ne"
-        ? parseFloat(platformConfig?.instruction_voice_volume_ne || platformConfig?.instruction_voice_volume || "1.0")
-        : parseFloat(platformConfig?.instruction_voice_volume_en || platformConfig?.instruction_voice_volume || "1.0");
-
-      if (instructionUrl) {
-        await playAudioFile(instructionUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
-      }
-    } catch {}
-  };
-
-  const playNumberCall = async (num: number): Promise<void> => {
-    if (!englishCallerEnabled || isMuted) return;
-    
     if (isIntroPlayingRef.current) {
       pendingNumbersQueueRef.current = [num];
       return;
@@ -339,95 +379,85 @@ export function useGameAudio(
     if (audioUrl) {
       await playAudioFile(audioUrl, effectiveVol, fallbackUrl);
     }
-  };
+  }, [englishCallerEnabled, isMuted, callsConfig, platformConfig, stopAllActiveAudios, playAudioFile]);
 
-  const playCelebration = () => {
+  const playGreeting = useCallback(async (startOffsetSeconds: number = 0): Promise<void> => {
+    if (!englishCallerEnabled || isMuted) return;
+
+    const introEnabled = platformConfig?.welcome_voice_enabled !== "false";
+    if (!introEnabled) return;
+
+    stopAllActiveAudios();
+    isIntroPlayingRef.current = true;
+
+    try {
+      if (!isMountedRef.current || isMuted) return;
+
+      const activeLang = platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
+      // welcome_voice_url (the pre-dual-language legacy field) is NEPALI content — migration
+      // 042 mapped the original welcome upload straight into welcome_voice_url_ne, never into
+      // _en. Falling back to it for English would silently play Nepali, so the English branch
+      // only ever uses a dedicated English upload (no intro at all if none exists yet, rather
+      // than the wrong language).
+      const welcomeUrl = activeLang === "ne"
+        ? (platformConfig?.welcome_voice_url_ne || platformConfig?.welcome_voice_url)
+        : platformConfig?.welcome_voice_url_en;
+
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = activeLang === "ne"
+        ? parseFloat(platformConfig?.welcome_voice_volume_ne || platformConfig?.welcome_voice_volume || "1.0")
+        : parseFloat(platformConfig?.welcome_voice_volume_en || platformConfig?.welcome_voice_volume || "1.0");
+
+      if (welcomeUrl) {
+        await playAudioFile(welcomeUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
+      }
+    } finally {
+      isIntroPlayingRef.current = false;
+      if (isMountedRef.current && pendingNumbersQueueRef.current.length > 0) {
+        const nextNum = pendingNumbersQueueRef.current.shift();
+        if (nextNum !== undefined) {
+          playNumberCall(nextNum);
+        }
+      }
+    }
+  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile, playNumberCall]);
+
+  const playOutro = useCallback(async (startOffsetSeconds: number = 0): Promise<void> => {
+    if (!englishCallerEnabled || isMuted) return;
+
+    const outroEnabled = platformConfig?.instruction_voice_enabled !== "false";
+    if (!outroEnabled) return;
+
+    stopAllActiveAudios();
+
+    try {
+      const activeLang = platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
+      // instruction_voice_url (the pre-dual-language legacy field) is ENGLISH content —
+      // migration 042 mapped the original outro upload straight into instruction_voice_url_en,
+      // never into _ne. Falling back to it for Nepali would silently play English (this was the
+      // actual bug: game ends with audio_language=ne but no dedicated Nepali outro uploaded, so
+      // it fell back to the English legacy file), so the Nepali branch only ever uses a
+      // dedicated Nepali upload (no outro at all if none exists yet, rather than the wrong
+      // language).
+      const instructionUrl = activeLang === "ne"
+        ? platformConfig?.instruction_voice_url_ne
+        : (platformConfig?.instruction_voice_url_en || platformConfig?.instruction_voice_url);
+
+      const masterVol = platformConfig?.master_calls_volume !== undefined ? parseFloat(platformConfig.master_calls_volume) : 1.0;
+      const volMultiplier = activeLang === "ne"
+        ? parseFloat(platformConfig?.instruction_voice_volume_ne || platformConfig?.instruction_voice_volume || "1.0")
+        : parseFloat(platformConfig?.instruction_voice_volume_en || platformConfig?.instruction_voice_volume || "1.0");
+
+      if (instructionUrl) {
+        await playAudioFile(instructionUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
+      }
+    } catch {}
+  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile]);
+
+  const playCelebration = useCallback(() => {
     if (!englishCallerEnabled || isMuted) return;
     soundSynthesizer.playCelebration();
-  };
-
-  const playAudioFile = (mp3Path: string, customVolume: number = 1.0, fallbackPath?: string, startOffsetSeconds: number = 0): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!isMountedRef.current || isMuted || document.hidden) return resolve();
-
-      if (!mp3Path) {
-        if (fallbackPath) {
-          playAudioFile(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
-        } else {
-          resolve();
-        }
-        return;
-      }
-
-      const resolvedUrl = resolveAudioUrl(mp3Path);
-      const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
-      audio.src = resolvedUrl;
-      if (!resolvedUrl.startsWith("data:")) {
-        audio.crossOrigin = "anonymous";
-      }
-      activeAudiosRef.current.push(audio);
-
-      // Apply Live Announcement Echo / Reverb filter to uploaded audio announcements
-      soundSynthesizer.applyLiveAnnouncementEcho(audio, customVolume);
-
-      let hasEnded = false;
-      const cleanup = () => {
-        audio.removeEventListener("ended", onEnded);
-        audio.removeEventListener("error", onError);
-        audio.removeEventListener("loadedmetadata", onMetadata);
-        const idx = activeAudiosRef.current.indexOf(audio);
-        if (idx > -1) activeAudiosRef.current.splice(idx, 1);
-      };
-
-      const onMetadata = () => {
-        if (hasEnded) return;
-        if (startOffsetSeconds > 0) {
-          if (startOffsetSeconds < audio.duration) {
-            audio.currentTime = startOffsetSeconds;
-          } else {
-            hasEnded = true;
-            cleanup();
-            resolve();
-            try { audio.pause(); } catch {}
-          }
-        }
-      };
-
-      const onEnded = () => {
-        if (hasEnded) return;
-        hasEnded = true;
-        cleanup();
-        resolve();
-      };
-      // The primary URL existed but failed to actually load (e.g. it points at a file
-      // that no longer exists on disk — a dead-but-truthy audio_url). Try the other
-      // language once before giving up, so one missing upload plays something instead
-      // of silence for that number.
-      const onError = () => {
-        if (hasEnded) return;
-        hasEnded = true;
-        cleanup();
-        // We interrupted this clip ourselves (stopAllActiveAudios clearing .src on a still-
-        // playing element also fires "error") — that's not a real load failure, so don't
-        // chase the cross-language fallback for a call nobody is waiting on anymore.
-        if (intentionallyStoppedRef.current.has(audio)) {
-          resolve();
-          return;
-        }
-        if (fallbackPath && fallbackPath !== mp3Path) {
-          playAudioFile(fallbackPath, customVolume, undefined, startOffsetSeconds).then(resolve);
-        } else {
-          resolve();
-        }
-      };
-
-      audio.addEventListener("loadedmetadata", onMetadata);
-      audio.addEventListener("ended", onEnded);
-      audio.addEventListener("error", onError);
-
-      audio.play().catch(onError);
-    });
-  };
+  }, [englishCallerEnabled, isMuted]);
 
   return {
     playGreeting,

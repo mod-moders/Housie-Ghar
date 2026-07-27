@@ -651,7 +651,11 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       useGameStore.getState().setStatus(nextStatus);
       loadGameData();
     }
-  }, [revealDraw, playCelebration, playOutro, introPlayingRef, delay, muted, numberCallPlaying, loadGameData]);
+    // playCelebration/playOutro/muted/numberCallPlaying are NOT listed: this
+    // callback never touches them. They belong to revealDraw, which does, and
+    // which is a dependency here — so a change to any of them still rebuilds
+    // this callback, transitively and exactly once.
+  }, [revealDraw, introPlayingRef, delay, loadGameData]);
 
   useSSE(game_id, onEvent);
 

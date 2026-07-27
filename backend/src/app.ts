@@ -57,8 +57,25 @@ app.use(
 );
 
 // 2. Parsers
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+//
+// The 50mb limit used to apply to EVERY route, which handed any unauthenticated
+// caller a 50mb-per-request memory amplifier on endpoints whose real payload is
+// a few hundred bytes. Only four routes legitimately carry a large body, so they
+// keep the generous limit and everything else drops to 1mb.
+//
+// body-parser marks a request as parsed (`req._body`), so these run first and
+// the global parser below skips whatever they already handled.
+const LARGE_BODY = { limit: '50mb' } as const;
+// Base64 audio uploads (staff only).
+app.use('/api/config/upload', express.json(LARGE_BODY));
+app.use('/api/games/number-calls', express.json(LARGE_BODY));
+// Avatar data: URIs. The UI caps the source file at 5MB, which base64 inflates
+// to roughly 7MB — 1mb would reject a perfectly ordinary profile picture.
+app.use('/api/player/me', express.json({ limit: '12mb' }));
+app.use('/api/auth/me', express.json({ limit: '12mb' }));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 app.use(cookieParser());
 
 // 3. Global Rate Limiter
@@ -195,9 +212,36 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date().toISOString() });
 });
 
+// Unknown route — answer 404 rather than falling through to the error handler.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ message: 'Not found' });
+});
+
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled Server Error:', err);
+
+  // The live-stream route streams SSE, so by the time an error surfaces the
+  // status line and headers are long gone. Writing a 500 body over that throws
+  // ERR_HTTP_HEADERS_SENT and takes down the response instead of the request;
+  // hand it to Express's default handler, which just destroys the socket.
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+
+  // A body larger than the route's configured limit is the caller's mistake.
+  if (err?.type === 'entity.too.large' || err?.status === 413) {
+    res.status(413).json({ message: 'Request body is too large.' });
+    return;
+  }
+
+  // Malformed JSON likewise — body-parser throws a SyntaxError with a 400.
+  if (err instanceof SyntaxError && (err as any).status === 400 && 'body' in err) {
+    res.status(400).json({ message: 'Invalid JSON body.' });
+    return;
+  }
+
   res.status(500).json({ message: 'An internal server error occurred' });
 });
 
