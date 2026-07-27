@@ -170,11 +170,13 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
             if (!userDismissedWinnersRef.current) {
               setShowWinnersOverlay(true);
             }
-            playOutro(startOffset);
-            playCelebration();
-            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-            if (isSoundEnabled && !muted) {
-              soundSynthesizer.playCelebration();
+            if (startOffset < 20) {
+              playOutro(startOffset);
+              playCelebration();
+              const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+              if (isSoundEnabled && !muted) {
+                soundSynthesizer.playCelebration();
+              }
             }
           };
 
@@ -192,8 +194,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           if (!userDismissedWinnersRef.current) {
             setShowWinnersOverlay(true);
           }
-          playOutro(0);
-          playCelebration();
+          // Do not play outro or celebration audio on load if completed_at is not present
         }
       }
     } else {
