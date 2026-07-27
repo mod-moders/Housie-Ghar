@@ -69,7 +69,17 @@ class SoundSynthesizer {
 
   getUnlockedAudio(): HTMLAudioElement | null {
     this.initPool();
-    const audio = this.audioPool.shift();
+    // Look for an audio element in the pool that is paused (not currently playing)
+    const availableIndex = this.audioPool.findIndex((audio) => audio.paused);
+    let audio: HTMLAudioElement | undefined;
+    if (availableIndex > -1) {
+      audio = this.audioPool.splice(availableIndex, 1)[0];
+    } else {
+      audio = new Audio();
+      if (typeof window !== "undefined" && !window.location.host.includes("localhost")) {
+        audio.crossOrigin = "anonymous";
+      }
+    }
     if (audio) {
       try {
         audio.pause();
