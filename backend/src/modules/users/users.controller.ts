@@ -131,12 +131,22 @@ export async function createUser(req: AuthenticatedRequest, res: Response): Prom
   } catch (error: any) {
     if (error.code === '23505') {
       const detail = error.detail || '';
-      if (detail.includes('username')) {
+      const constraint = error.constraint || '';
+      if (detail.includes('username') || constraint.includes('username')) {
         res.status(409).json({ message: 'A user with this username already exists' });
-      } else if (detail.includes('email')) {
+      } else if (detail.includes('email') || constraint.includes('email')) {
         res.status(409).json({ message: 'A user with this email already exists' });
-      } else {
+      } else if (detail.includes('phone') || constraint.includes('phone')) {
         res.status(409).json({ message: 'A user with this phone already exists' });
+      } else if (detail.includes('staff_code') || constraint.includes('staff_code')) {
+        try {
+          await pool.query("SELECT nextval('seq_staff_id')");
+        } catch (seqErr) {
+          console.error('Failed to auto-advance seq_staff_id:', seqErr);
+        }
+        res.status(409).json({ message: 'System staff code sequence conflict. Please click Create Account again.' });
+      } else {
+        res.status(409).json({ message: 'A user with this username, email, or phone already exists' });
       }
       return;
     }
