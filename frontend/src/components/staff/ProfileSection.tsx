@@ -9,6 +9,45 @@ import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { useDialog } from "@/components/DialogProvider";
 
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry"
+];
+
 const inputStyle: React.CSSProperties = {
   padding: "10px 14px",
   borderRadius: 10,
@@ -83,8 +122,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   };
 
   const handleSave = async () => {
-    if (!fullName.trim() || !phone.trim()) {
-      setMessage({ text: "Full name and WhatsApp number are required.", error: true });
+    if (!fullName.trim() || !phone.trim() || !nationality.trim()) {
+      setMessage({ text: "Full name, WhatsApp number, and State are required.", error: true });
       return;
     }
     setSaving(true);
@@ -287,8 +326,18 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           </div>
 
           <div>
-            <label style={labelStyle}>Nationality</label>
-            <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} style={inputStyle} placeholder="e.g. Indian" />
+            <label style={labelStyle}>State <span style={{ color: "#EF4444" }}>*</span></label>
+            <select
+              required
+              value={nationality}
+              onChange={(e) => setNationality(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="" disabled>Select State</option>
+              {INDIAN_STATES.map((state) => (
+                <option key={state} value={state}>{state}</option>
+              ))}
+            </select>
           </div>
 
           <div>

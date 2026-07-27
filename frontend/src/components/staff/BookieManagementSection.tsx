@@ -518,7 +518,7 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
               <div className="hg-table-scroll" style={{ overflowX: "auto" }}>
                 <div className="hg-table" style={{ minWidth: "900px" }}>
                   <div className="hg-tr hg-tr-head" style={{ gridTemplateColumns: "1.8fr 1.5fr 1fr 1fr 1fr 1.8fr" }}>
-                    <span>Name / Country</span>
+                    <span>Name / State</span>
                     <span>Contact Details</span>
                     <span>Occupation</span>
                     <span>Submission Date</span>
@@ -698,7 +698,7 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
                         <td style={{ padding: "6px 0", color: "#111827", fontSize: "14px" }}>{selectedApp.full_name}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>Nationality:</td>
+                        <td style={{ padding: "6px 0", fontWeight: "bold", color: "#4b5563" }}>State:</td>
                         <td style={{ padding: "6px 0", color: "#111827" }}>{selectedApp.nationality}</td>
                       </tr>
                       <tr style={{ borderBottom: "1px solid #f3f4f6" }}>

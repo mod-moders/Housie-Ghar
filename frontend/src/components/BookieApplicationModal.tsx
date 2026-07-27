@@ -3,6 +3,45 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry"
+];
+
 export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [form, setForm] = useState({
     fullName: "",
@@ -38,9 +77,10 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
       return;
     }
     if (!form.nationality.trim()) {
-      setError("Nationality is required.");
+      setError("State is required.");
       return;
     }
+
     if (!form.dob) {
       setError("Date of Birth is required.");
       return;
@@ -132,14 +172,17 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
                 </label>
 
                 <label className="hg-form-field">
-                  <span>Nationality <span style={{ color: "#F43F5E" }}>*</span></span>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="e.g. Indian"
+                  <span>State <span style={{ color: "#F43F5E" }}>*</span></span>
+                  <select
+                    required
                     value={form.nationality}
                     onChange={(e) => setForm({ ...form, nationality: e.target.value })}
-                  />
+                  >
+                    <option value="" disabled>Select State</option>
+                    {INDIAN_STATES.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="hg-form-field">
