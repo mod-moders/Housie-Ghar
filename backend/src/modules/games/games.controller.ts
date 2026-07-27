@@ -415,8 +415,8 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   const price = parseFloat(ticket_price);
   const tickets = parseInt(total_tickets, 10);
 
-  if (isNaN(price) || price <= 0) {
-    res.status(400).json({ message: 'ticket_price must be a positive number' });
+  if (isNaN(price) || price < 0) {
+    res.status(400).json({ message: 'ticket_price must be a non-negative number' });
     return;
   }
   if (isNaN(tickets) || tickets <= 0) {
@@ -451,9 +451,9 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
   }
 
   const grossRevenue = price * tickets;
-  if (totalPrize > grossRevenue) {
+  if (price > 0 && totalPrize > grossRevenue) {
     res.status(400).json({
-      message: `Total prize pool (â‚¹${totalPrize}) exceeds projected collection (â‚¹${grossRevenue.toFixed(2)})`,
+      message: `Total prize pool (₹${totalPrize}) exceeds projected collection (₹${grossRevenue.toFixed(2)})`,
     });
     return;
   }
@@ -841,8 +841,8 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
     const updatedPrice = ticket_price !== undefined ? parseFloat(ticket_price) : parseFloat(game.ticket_price);
     const updatedTickets = total_tickets !== undefined ? parseInt(total_tickets, 10) : parseInt(game.total_tickets, 10);
 
-    if (isNaN(updatedPrice) || updatedPrice <= 0) {
-      res.status(400).json({ message: 'ticket_price must be a positive number' });
+    if (isNaN(updatedPrice) || updatedPrice < 0) {
+      res.status(400).json({ message: 'ticket_price must be a non-negative number' });
       return;
     }
     if (isNaN(updatedTickets) || updatedTickets <= 0) {
@@ -878,9 +878,9 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
       }
 
       const grossRevenue = updatedPrice * updatedTickets;
-      if (totalPrize > grossRevenue) {
+      if (updatedPrice > 0 && totalPrize > grossRevenue) {
         res.status(400).json({
-          message: `Total prize pool (â‚¹${totalPrize}) exceeds projected collection (â‚¹${grossRevenue.toFixed(2)})`,
+          message: `Total prize pool (₹${totalPrize}) exceeds projected collection (₹${grossRevenue.toFixed(2)})`,
         });
         return;
       }

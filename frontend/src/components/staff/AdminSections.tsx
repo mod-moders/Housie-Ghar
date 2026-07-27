@@ -944,7 +944,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             </label>
             <label className="hg-form-field">
               <span>Price of each ticket (₹)</span>
-              <input type="number" min={1} value={form.ticket_price} onChange={(e) => setForm({ ...form, ticket_price: e.target.value })} />
+              <input type="number" min={0} value={form.ticket_price} onChange={(e) => setForm({ ...form, ticket_price: e.target.value })} />
             </label>
             <label className="hg-form-field" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>Booking Restriction</span>
@@ -1146,7 +1146,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
           <p className="hg-sec-sub mt-2" style={{ color: "var(--text-dim)" }}>
             Projected Collection: <strong>{money(gross)}</strong> | Overall Prize Pool: <strong>{money(pool)}</strong>
           </p>
-          {pool > gross && (
+          {parseFloat(form.ticket_price || "0") > 0 && pool > gross && (
             <p className="text-xs font-semibold mt-1" style={{ color: "var(--danger)" }}>⚠️ Warning: Overall prize pool exceeds projected collection!</p>
           )}
 
@@ -1160,7 +1160,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button
               variant="cta"
               size="sm"
-              disabled={!form.title.trim() || !form.scheduled_at || pool > gross || pool <= 0}
+              disabled={!form.title.trim() || !form.scheduled_at || (parseFloat(form.ticket_price || "0") > 0 && pool > gross) || pool <= 0}
               onClick={create}
             >
               {editingGameId ? "Save Changes" : "Create"}
