@@ -573,17 +573,19 @@ export async function confirmBooking(req: any, res: Response): Promise<void> {
       });
     }
 
-    await client.query(
-      `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
-       VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
-      [
-        agentId,
-        amount,
-        newBalance,
-        booking_id,
-        `Approved booking #${booking_id.substring(0, 8).toUpperCase()} for Player ${booking.housie_name}`,
-      ]
-    );
+    if (amount > 0) {
+      await client.query(
+        `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
+         VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
+        [
+          agentId,
+          amount,
+          newBalance,
+          booking_id,
+          `Approved booking #${booking_id.substring(0, 8).toUpperCase()} for Player ${booking.housie_name}`,
+        ]
+      );
+    }
 
     // 5. Update Booking record
     await client.query(
@@ -869,16 +871,18 @@ export async function directSale(req: AuthenticatedRequest, res: Response): Prom
         amountWaived: waived,
       });
     }
-    await client.query(
-      `INSERT INTO Wallet_Ledger (
-         agent_id, transaction_type, amount, balance_after,
-         reference_type, reference_id, description, performed_by
-       ) VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
-      [
-        agentId, totalAmount, newBalance, bookingId,
-        `Direct sale #${bookingId.substring(0, 8).toUpperCase()} for ${housie_name}`,
-      ]
-    );
+    if (totalAmount > 0) {
+      await client.query(
+        `INSERT INTO Wallet_Ledger (
+           agent_id, transaction_type, amount, balance_after,
+           reference_type, reference_id, description, performed_by
+         ) VALUES ($1, 'Debit', $2, $3, 'Booking', $4, $5, $1)`,
+        [
+          agentId, totalAmount, newBalance, bookingId,
+          `Direct sale #${bookingId.substring(0, 8).toUpperCase()} for ${housie_name}`,
+        ]
+      );
+    }
 
     // 6b. Credit Promoter Referral Commission if player is referred
     await handleReferralCommission(client, game_id, bookingId, housie_name, totalAmount);
@@ -1171,31 +1175,33 @@ async function handleReferralCommission(
     const commissionAmount = totalAmount * 0.02; // 2% commission
     const balanceAfter = currentBalance + commissionAmount;
 
-    // 1. Insert promoter commission record
-    await client.query(
-      `INSERT INTO Promoter_Commissions (promoter_id, game_id, booking_id, amount)
-       VALUES ($1, $2, $3, $4)`,
-      [promoterId, gameId, bookingId, commissionAmount]
-    );
+    if (commissionAmount > 0) {
+      // 1. Insert promoter commission record
+      await client.query(
+        `INSERT INTO Promoter_Commissions (promoter_id, game_id, booking_id, amount)
+         VALUES ($1, $2, $3, $4)`,
+        [promoterId, gameId, bookingId, commissionAmount]
+      );
 
-    // 2. Update promoter's balance
-    await client.query(
-      `UPDATE Users SET current_balance = $1 WHERE user_id = $2`,
-      [balanceAfter, promoterId]
-    );
+      // 2. Update promoter's balance
+      await client.query(
+        `UPDATE Users SET current_balance = $1 WHERE user_id = $2`,
+        [balanceAfter, promoterId]
+      );
 
-    // 3. Create wallet ledger entry
-    await client.query(
-      `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
-       VALUES ($1, 'Credit', $2, $3, 'PromoterCommission', $4, $5, $1)`,
-      [
-        promoterId,
-        commissionAmount,
-        balanceAfter,
-        bookingId,
-        `Referral commission for player ${housieName} booking #${bookingId.substring(0, 8).toUpperCase()}`,
-      ]
-    );
+      // 3. Create wallet ledger entry
+      await client.query(
+        `INSERT INTO Wallet_Ledger (agent_id, transaction_type, amount, balance_after, reference_type, reference_id, description, performed_by)
+         VALUES ($1, 'Credit', $2, $3, 'PromoterCommission', $4, $5, $1)`,
+        [
+          promoterId,
+          commissionAmount,
+          balanceAfter,
+          bookingId,
+          `Referral commission for player ${housieName} booking #${bookingId.substring(0, 8).toUpperCase()}`,
+        ]
+      );
+    }
   }
 }
 
