@@ -139,7 +139,10 @@ export function useGameAudio(
       const resolvedBgUrl = resolveAudioUrl(bgUrl);
       if (!bgMusicRef.current || activeBgUrlRef.current !== resolvedBgUrl) {
         if (bgMusicRef.current) {
-          try { bgMusicRef.current.pause(); } catch {}
+          try {
+            bgMusicRef.current.onpause = null;
+            bgMusicRef.current.pause();
+          } catch {}
         }
         activeBgUrlRef.current = resolvedBgUrl;
         const audio = soundSynthesizer.getUnlockedAudio() || new Audio();
@@ -159,9 +162,22 @@ export function useGameAudio(
           bgMusicRef.current.play().catch(() => {});
         }
       }
+
+      // Ensure the pause listener is always bound with current closure values to prevent stale closures.
+      // Auto-resumes background music if paused involuntarily (e.g. mobile browser scroll/resource throttling)
+      // while the tab is still active and visible.
+      if (bgMusicRef.current) {
+        const audio = bgMusicRef.current;
+        audio.onpause = () => {
+          if (!document.hidden && isGameLive && bgEnabled && !isMuted && audio.paused) {
+            audio.play().catch(() => {});
+          }
+        };
+      }
     } else {
       if (bgMusicRef.current) {
         try {
+          bgMusicRef.current.onpause = null;
           bgMusicRef.current.pause();
           bgMusicRef.current.src = "";
         } catch {}
@@ -173,6 +189,7 @@ export function useGameAudio(
     return () => {
       if (bgMusicRef.current) {
         try {
+          bgMusicRef.current.onpause = null;
           bgMusicRef.current.pause();
           bgMusicRef.current.src = "";
         } catch {}

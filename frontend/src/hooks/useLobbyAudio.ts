@@ -56,6 +56,7 @@ export function useLobbyAudio(active: boolean) {
 
       if (audioRef.current) {
         try {
+          audioRef.current.onpause = null;
           audioRef.current.pause();
           audioRef.current.src = "";
         } catch {}
@@ -75,6 +76,12 @@ export function useLobbyAudio(active: boolean) {
         playNext();
       };
 
+      audio.onpause = () => {
+        if (!document.hidden && active && audio.paused) {
+          audio.play().catch(() => {});
+        }
+      };
+
       audio.play().catch(() => {
         // Autoplay blocked by browser. Wait 6 seconds and retry
         if (retryTimeout) clearTimeout(retryTimeout);
@@ -88,6 +95,7 @@ export function useLobbyAudio(active: boolean) {
       if (retryTimeout) clearTimeout(retryTimeout);
       if (audioRef.current) {
         try {
+          audioRef.current.onpause = null;
           audioRef.current.pause();
           audioRef.current.src = "";
         } catch {}
