@@ -705,6 +705,7 @@ export async function generatePosterBlob(kind: PosterKind, game: GameSummary): P
   else if (title.includes("prime time")) bgPath = "/presets/Prime Time.jpg";
   else if (title.includes("snack & stack") || title.includes("snack")) bgPath = "/presets/Snack & Stack.jpg";
   else if (title.includes("sundown")) bgPath = "/presets/Sundown Showdown.jpg";
+  else if (title.includes("bonus")) bgPath = "/presets/Bonus.png";
 
   let bgImage: HTMLImageElement | null = null;
   if (bgPath) {
