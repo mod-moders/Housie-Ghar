@@ -97,6 +97,36 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
     }
   }
 
+  // Check single ticket only limit
+  try {
+    const gameCheck = await pool.query(
+      `SELECT single_ticket_only FROM Scheduled_Games WHERE game_id = $1`,
+      [game_id]
+    );
+    if (gameCheck.rowCount === 0) {
+      res.status(404).json({ message: 'Game not found' });
+      return;
+    }
+    if (gameCheck.rows[0].single_ticket_only) {
+      if (ticket_ids.length > 1) {
+        res.status(400).json({ message: 'You can only buy 1 ticket for this game.' });
+        return;
+      }
+      const existingRes = await pool.query(
+        `SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status IN ('Sold', 'Locked')`,
+        [game_id, cleanBookingName]
+      );
+      if (parseInt(existingRes.rows[0].count, 10) > 0) {
+        res.status(400).json({ message: 'You already have a booked or locked ticket for this game. Limit is 1 ticket per player.' });
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Error checking single_ticket_only constraint:', err);
+    res.status(500).json({ message: 'Internal server error' });
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

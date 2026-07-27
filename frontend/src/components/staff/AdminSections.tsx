@@ -686,6 +686,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
     bg_music_enabled: boolean;
     intro_mode: "TTS" | "Audio";
     outro_mode: "TTS" | "Audio";
+    single_ticket_only: boolean;
   }>({
     title: "",
     scheduled_at: "",
@@ -696,6 +697,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
     bg_music_enabled: true,
     intro_mode: "Audio",
     outro_mode: "TTS",
+    single_ticket_only: false,
   });
 
   const [selectedGame, setSelectedGame] = useState<GameSummary | null>(null);
@@ -759,6 +761,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
         bg_music_enabled: g.bg_music_enabled !== false,
         intro_mode: g.intro_mode === "TTS" ? "TTS" : "Audio",
         outro_mode: g.outro_mode === "Audio" ? "Audio" : "TTS",
+        single_ticket_only: g.single_ticket_only === true,
       });
       setPrizes(PATTERN_DEFAULTS.map((pd) => {
         const matchingPrize = g.prize_pool.find((p) => p.pattern_name === pd.pattern_name || (pd.pattern_name === "1st Full House" && p.pattern_name === "Full House"));
@@ -833,6 +836,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             bg_music_enabled: form.bg_music_enabled,
             intro_mode: form.intro_mode,
             outro_mode: form.outro_mode,
+            single_ticket_only: form.single_ticket_only,
           }),
         });
       } else {
@@ -848,12 +852,13 @@ export function GamesSection({ me }: { me: AuthUser }) {
             bg_music_enabled: form.bg_music_enabled,
             intro_mode: form.intro_mode,
             outro_mode: form.outro_mode,
+            single_ticket_only: form.single_ticket_only,
           }),
         });
       }
       setCreating(false);
       setEditingGameId(null);
-      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+      setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS", single_ticket_only: false });
       setPrizes(PATTERN_DEFAULTS);
       load();
     } catch (e) {
@@ -882,7 +887,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="cta" size="sm" icon="grid" onClick={() => {
               if (creating) {
                 setEditingGameId(null);
-                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+                setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS", single_ticket_only: false });
                 setPrizes(PATTERN_DEFAULTS);
               }
               setCreating(!creating);
@@ -940,6 +945,22 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <label className="hg-form-field">
               <span>Price of each ticket (₹)</span>
               <input type="number" min={1} value={form.ticket_price} onChange={(e) => setForm({ ...form, ticket_price: e.target.value })} />
+            </label>
+            <label className="hg-form-field" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".04em" }}>Booking Restriction</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                <input 
+                  type="checkbox" 
+                  id="single-ticket-toggle"
+                  checked={form.single_ticket_only} 
+                  onChange={(e) => setForm({ ...form, single_ticket_only: e.target.checked })} 
+                  style={{ width: "18px", height: "18px", accentColor: "var(--accent)", cursor: "pointer" }}
+                />
+                <label htmlFor="single-ticket-toggle" style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)", cursor: "pointer", userSelect: "none" }}>Single Ticket Only</label>
+              </div>
+              <span style={{ fontSize: "10px", color: "var(--text-mute)", marginTop: "2px" }}>
+                Limit purchases to 1 ticket per player.
+              </span>
             </label>
           </div>
 
@@ -1133,7 +1154,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             <Button variant="ghost" size="sm" onClick={() => {
               setCreating(false);
               setEditingGameId(null);
-              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS" });
+              setForm({ title: "", scheduled_at: "", ticket_price: "50", total_tickets: "120", audio_language: (config?.audio_language as "en" | "ne") || "en", call_mode: "Audio", bg_music_enabled: true, intro_mode: "Audio", outro_mode: "TTS", single_ticket_only: false });
               setPrizes(PATTERN_DEFAULTS);
             }}>Cancel</Button>
             <Button

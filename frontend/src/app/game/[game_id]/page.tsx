@@ -178,6 +178,16 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
 
   const toggle = (t: TicketListItem) => {
     if (t.status !== "Available") return;
+    if (game?.single_ticket_only) {
+      if (myBoughtTickets.length > 0) return;
+      setSelected((prev) =>
+        prev.includes(t.ticket_number) ? [] : [t.ticket_number]
+      );
+      if (!selected.includes(t.ticket_number)) {
+        fetchMatrix(t.ticket_id, t.ticket_number);
+      }
+      return;
+    }
     setSelected((prev) =>
       prev.includes(t.ticket_number)
         ? prev.filter((x) => x !== t.ticket_number)
@@ -319,7 +329,24 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
             <Icon name="arrowL" size={20} />
           </button>
           <div className="hg-room-titles">
-            <h1>{game?.title ?? "Loading…"}</h1>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {game?.title ?? "Loading…"}
+              {game?.single_ticket_only && (
+                <span style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  background: "rgba(244, 63, 94, 0.15)",
+                  color: "#FB7185",
+                  border: "1px solid rgba(244, 63, 94, 0.3)"
+                }}>
+                  1 Ticket Max
+                </span>
+              )}
+            </h1>
             {game && <span>{when} · {money(game.ticket_price)}/ticket</span>}
           </div>
         </div>
@@ -343,7 +370,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                     key={t.ticket_id}
                     className={`hg-num hg-num-${st}${isSel ? " is-sel" : ""}${isMine ? " is-mine" : ""}`}
                     onClick={() => toggle(t)}
-                    disabled={st !== "available"}
+                    disabled={st !== "available" || (game?.single_ticket_only === true && myBoughtTickets.length > 0)}
                     style={isMine ? {
                       borderColor: "var(--success)",
                       background: "rgba(34, 197, 94, 0.15)",
@@ -484,6 +511,27 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                   <strong>No tickets selected</strong>
                   <span>Select tickets from the grid to customize your booking.</span>
                 </div>
+              </div>
+            )}
+
+            {game?.single_ticket_only && myBoughtTickets.length > 0 && (
+              <div style={{
+                background: "rgba(244, 63, 94, 0.08)",
+                border: "1px solid rgba(244, 63, 94, 0.2)",
+                borderRadius: "var(--radius)",
+                padding: "16px",
+                marginBottom: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#FB7185", fontWeight: 700, fontSize: "14px" }}>
+                  <Icon name="alert" size={16} />
+                  Booking Limit Reached
+                </div>
+                <p style={{ fontSize: "12px", color: "var(--text-dim)", margin: 0, lineHeight: "1.4" }}>
+                  This game is restricted to <strong>1 ticket per player</strong>. You have already purchased your ticket for this game.
+                </p>
               </div>
             )}
 

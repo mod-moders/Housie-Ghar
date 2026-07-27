@@ -49,6 +49,7 @@ export interface GameSummary {
   bg_music_enabled?: boolean;
   intro_mode?: "TTS" | "Audio" | "Text";
   outro_mode?: "TTS" | "Audio" | "Text";
+  single_ticket_only?: boolean;
   prize_pool: Prize[];
 }
 

@@ -191,7 +191,7 @@ export async function getGames(req: Request, res: Response): Promise<void> {
     const playerHousieName = (await resolvePlayerIdentity(req))?.housieName ?? null;
 
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
+      `SELECT game_id, title, scheduled_at, completed_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only
        FROM Scheduled_Games
        ORDER BY scheduled_at ASC`
     );
@@ -298,7 +298,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const playerHousieName = (await resolvePlayerIdentity(req))?.housieName ?? null;
 
     const result = await pool.query(
-      `SELECT game_id, title, scheduled_at, completed_at, started_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode
+      `SELECT game_id, title, scheduled_at, completed_at, started_at, ticket_price, total_tickets, game_status, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only
        FROM Scheduled_Games
        WHERE game_id = $1`,
       [game_id]
@@ -403,7 +403,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
  * Body: { title, scheduled_at, ticket_price, total_tickets, operator_id?, prizes: [{ pattern_name, prize_amount }] }
  */
 export async function createGame(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, operator_id, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only } = req.body;
   const actor = req.user!;
 
   // 1. Validation
@@ -466,12 +466,13 @@ export async function createGame(req: AuthenticatedRequest, res: Response): Prom
     const selectedBgMusic = bg_music_enabled !== false;
     const selectedIntroMode = intro_mode === 'TTS' ? 'TTS' : 'Audio';
     const selectedOutroMode = outro_mode === 'Audio' ? 'Audio' : 'TTS';
+    const selectedSingleTicketOnly = single_ticket_only === true;
     // 3. Insert the game
     const gameRes = await client.query(
-      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by, call_mode, bg_music_enabled, intro_mode, outro_mode)
-       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6, $7, $8, $9, $10)
+      `INSERT INTO Scheduled_Games (title, scheduled_at, total_tickets, ticket_price, game_status, operator_id, created_by, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only)
+       VALUES ($1, $2, $3, $4, 'Scheduled', $5, $6, $7, $8, $9, $10, $11)
        RETURNING game_id`,
-      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId, selectedCallMode, selectedBgMusic, selectedIntroMode, selectedOutroMode]
+      [title.trim(), scheduled_at, tickets, price, operator_id || null, actor.userId, selectedCallMode, selectedBgMusic, selectedIntroMode, selectedOutroMode, selectedSingleTicketOnly]
     );
     const gameId = gameRes.rows[0].game_id;
 
@@ -794,13 +795,13 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
  */
 export async function updateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
   const game_id = req.params.game_id as string;
-  const { title, scheduled_at, ticket_price, total_tickets, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode } = req.body;
+  const { title, scheduled_at, ticket_price, total_tickets, prizes, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only } = req.body;
   const actor = req.user!;
 
   try {
     // 1. Fetch current game state
     const gameRes = await pool.query(
-      `SELECT game_status, title, ticket_price, total_tickets, call_mode, bg_music_enabled, intro_mode, outro_mode FROM Scheduled_Games WHERE game_id = $1`,
+      `SELECT game_status, title, ticket_price, total_tickets, call_mode, bg_music_enabled, intro_mode, outro_mode, single_ticket_only FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
 
@@ -893,12 +894,13 @@ export async function updateGame(req: AuthenticatedRequest, res: Response): Prom
       const updatedBgMusic = bg_music_enabled !== undefined ? bg_music_enabled !== false : game.bg_music_enabled !== false;
       const updatedIntroMode = intro_mode !== undefined ? (intro_mode === 'TTS' ? 'TTS' : 'Audio') : game.intro_mode || 'Audio';
       const updatedOutroMode = outro_mode !== undefined ? (outro_mode === 'Audio' ? 'Audio' : 'TTS') : game.outro_mode || 'TTS';
+      const updatedSingleTicketOnly = single_ticket_only !== undefined ? (single_ticket_only === true) : game.single_ticket_only === true;
       // 4. Update the game details
       await client.query(
         `UPDATE Scheduled_Games
-         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4, call_mode = $5, bg_music_enabled = $6, intro_mode = $7, outro_mode = $8
-         WHERE game_id = $9`,
-        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, updatedCallMode, updatedBgMusic, updatedIntroMode, updatedOutroMode, game_id]
+         SET title = $1, scheduled_at = $2, ticket_price = $3, total_tickets = $4, call_mode = $5, bg_music_enabled = $6, intro_mode = $7, outro_mode = $8, single_ticket_only = $9
+         WHERE game_id = $10`,
+        [updatedTitle, updatedScheduledAt, updatedPrice, updatedTickets, updatedCallMode, updatedBgMusic, updatedIntroMode, updatedOutroMode, updatedSingleTicketOnly, game_id]
       );
 
       // 5. Update prizes if provided
