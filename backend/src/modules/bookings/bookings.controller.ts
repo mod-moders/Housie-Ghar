@@ -112,8 +112,18 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
         res.status(400).json({ message: 'You can only buy 1 ticket for this game.' });
         return;
       }
+      // Case-INSENSITIVE, like every other housie-name comparison on the platform
+      // (see utils/housieName.ts and getGameMyTickets). `cleanBookingName` only
+      // trims and collapses whitespace, so it keeps whatever casing the client
+      // sent, and the identity check above accepts any casing via
+      // normalizeHousieName. A plain `=` therefore let a player registered as
+      // "Monk" book once as "Monk" and again as "monk": the count came back 0
+      // the second time and the one-ticket limit was bypassed entirely.
       const existingRes = await pool.query(
-        `SELECT COUNT(*) FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status IN ('Sold', 'Locked')`,
+        `SELECT COUNT(*) FROM Tickets
+          WHERE game_id = $1
+            AND LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2))
+            AND status IN ('Sold', 'Locked')`,
         [game_id, cleanBookingName]
       );
       if (parseInt(existingRes.rows[0].count, 10) > 0) {

@@ -70,32 +70,44 @@ export function generateAlternatives(rawName: string): string[] {
   cand2 = truncate(cand2);
   cand3 = truncate(cand3);
 
-  // Ensure alternatives are distinct and meet rules (2-16 chars)
-  const results = new Set<string>();
-  
-  // Add first candidate
-  results.add(cand1);
-  
-  // Add second candidate
-  if (cand2 !== cand1) {
-    results.add(cand2);
-  } else {
-    results.add(`${cand1}_1`);
+  // Ensure alternatives are distinct, valid (2-16 chars) and — critically —
+  // never equal to the name that was just rejected.
+  //
+  // This helper has two callers with opposite inputs. The validation path feeds
+  // an INVALID name, so cand1..3 are genuine transformations of it ("John Doe!"
+  // -> John_Doe / John.Doe / JohnDoe42) and none of them collide with the input.
+  // The signup "name already taken" path feeds an ALREADY-VALID name: there is
+  // nothing to transform, so all three candidates collapse back to the input and
+  // the first suggestion used to be the taken name itself — rendered as a
+  // clickable button that just re-triggered the same 409.
+  const rejected = normalizeHousieName(base);
+  const results: string[] = [];
+
+  const push = (candidate: string) => {
+    if (results.length >= 3) return;
+    const c = candidate.substring(0, 16);
+    if (c.length < 2) return;
+    if (!/^[A-Za-z0-9_.]+$/.test(c)) return;
+    if (normalizeHousieName(c) === rejected) return;
+    if (results.some((r) => normalizeHousieName(r) === normalizeHousieName(c))) return;
+    results.push(c);
+  };
+
+  push(cand1);
+  push(cand2);
+  push(`${cand3}${Math.floor(Math.random() * 90) + 10}`);
+
+  // Backfill whatever the candidates above could not supply. Random first so two
+  // users hitting the same taken name are not steered onto the same suggestion,
+  // then a deterministic sweep so this always terminates with three.
+  for (let i = 0; results.length < 3 && i < 40; i++) {
+    push(`${cand3}${Math.floor(Math.random() * 900) + 10}`);
+  }
+  for (let i = 1; results.length < 3 && i < 100; i++) {
+    push(`${cand3}_${i}`);
   }
 
-  // Add third candidate: append a random 2-digit number
-  const num = Math.floor(Math.random() * 90) + 10;
-  results.add(`${cand3}${num}`);
-
-  // Make sure we have exactly 3 alternatives
-  let attempts = 0;
-  while (results.size < 3 && attempts < 10) {
-    const extraNum = Math.floor(Math.random() * 90) + 10;
-    results.add(`${cand3}_${extraNum}`);
-    attempts++;
-  }
-
-  return Array.from(results).slice(0, 3);
+  return results;
 }
 
 /**

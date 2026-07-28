@@ -6,6 +6,7 @@ import {
   parseWinnerNames,
   winnerStringIncludes,
   ticketCountForPlayer,
+  generateAlternatives,
 } from './housieName';
 
 // --- normalization ---------------------------------------------------------
@@ -131,4 +132,40 @@ test('ticketCountForPlayer returns 0 when the player is not credited', () => {
 
 test('ticketCountForPlayer counts a bare name as one ticket', () => {
   assert.strictEqual(ticketCountForPlayer('Alice', 'Alice'), 1);
+});
+
+// --- alternatives ----------------------------------------------------------
+
+test('generateAlternatives never suggests the name that was just rejected', () => {
+  // The signup "name already taken" path feeds an ALREADY-VALID name in here.
+  // Nothing in it needs transforming, so every candidate used to collapse back
+  // to the input and the first suggestion was the taken name itself — rendered
+  // as a clickable button that just re-triggered the same 409.
+  for (const taken of ['aud13605', 'RajaBabu', 'r.k.singh', 'a_b']) {
+    const alts = generateAlternatives(taken);
+    for (const alt of alts) {
+      assert.notStrictEqual(
+        normalizeHousieName(alt),
+        normalizeHousieName(taken),
+        `suggested "${alt}" for taken name "${taken}"`
+      );
+    }
+  }
+});
+
+test('generateAlternatives returns three distinct, valid suggestions', () => {
+  for (const name of ['aud13605', 'John Doe!', 'RajaBabu', '  spaced  name  ']) {
+    const alts = generateAlternatives(name);
+    assert.strictEqual(alts.length, 3, `expected 3 for "${name}", got ${alts.length}`);
+    assert.strictEqual(new Set(alts).size, 3, `duplicates for "${name}": ${alts}`);
+    for (const alt of alts) {
+      assert.ok(validateHousieName(alt).ok, `invalid suggestion "${alt}" for "${name}"`);
+    }
+  }
+});
+
+test('generateAlternatives still transforms an invalid name into a usable one', () => {
+  // The original purpose of this helper must keep working.
+  const alts = generateAlternatives('John Doe!');
+  assert.ok(alts.some((a) => a.includes('_') || a.includes('.')), `got ${alts}`);
 });

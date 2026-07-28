@@ -210,8 +210,15 @@ export async function getGames(req: Request, res: Response): Promise<void> {
 
       let myTicketsCount = 0;
       if (playerHousieName) {
+        // Case-insensitive, to agree with getGameMyTickets — which is what the
+        // player actually sees when they open the game. A plain `=` made the
+        // lobby card report 0 tickets for a player whose stored ticket casing
+        // differs from their account name, while the game page listed them.
         const myCountRes = await pool.query(
-          `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+          `SELECT COUNT(*)::integer FROM Tickets
+            WHERE game_id = $1
+              AND LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2))
+              AND status = 'Sold'`,
           [game.game_id, playerHousieName]
         );
         myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
@@ -324,8 +331,12 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
 
     let myTicketsCount = 0;
     if (playerHousieName) {
+      // Case-insensitive — same reason as in getGames above.
       const myCountRes = await pool.query(
-        `SELECT COUNT(*)::integer FROM Tickets WHERE game_id = $1 AND owner_housie_name = $2 AND status = 'Sold'`,
+        `SELECT COUNT(*)::integer FROM Tickets
+          WHERE game_id = $1
+            AND LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2))
+            AND status = 'Sold'`,
         [game_id, playerHousieName]
       );
       myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
