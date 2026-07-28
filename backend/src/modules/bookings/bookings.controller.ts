@@ -238,7 +238,8 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
       month: 'short',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
     }).replace(', ', ' · ');
 
     const makeBookingWaLink = (phone: string, fullName: string, bookingId: string, formattedBookingId?: string): string => {

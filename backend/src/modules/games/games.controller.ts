@@ -1218,6 +1218,7 @@ export async function claimPrize(req: AuthenticatedPlayerRequest, res: Response)
           hour: '2-digit',
           minute: '2-digit',
           hour12: true,
+          timeZone: 'Asia/Kolkata',
         })
       : '';
 
@@ -1401,6 +1402,7 @@ export async function claimAllPrizes(req: AuthenticatedPlayerRequest, res: Respo
           hour: '2-digit',
           minute: '2-digit',
           hour12: true,
+          timeZone: 'Asia/Kolkata',
         })
       : '';
 
