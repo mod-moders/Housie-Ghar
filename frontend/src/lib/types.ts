@@ -245,6 +245,7 @@ export interface PlayerProfile {
   has_password?: boolean;
   avatar_url?: string | null;
   housie_name_changes?: number;
+  preferred_language?: string | null;
 }
 
 export interface PlayerStats {

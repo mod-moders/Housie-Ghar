@@ -79,6 +79,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [email, setEmail] = useState(me.email ?? "");
   const [nationality, setNationality] = useState(me.nationality ?? "");
   const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? "");
+  const [preferredLanguage, setPreferredLanguage] = useState(me.preferred_language || "en");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -104,7 +105,8 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     upiId.trim() !== (me.upi_id ?? "") ||
     email.trim() !== (me.email ?? "") ||
     nationality.trim() !== (me.nationality ?? "") ||
-    avatarUrl.trim() !== (me.avatar_url ?? "");
+    avatarUrl.trim() !== (me.avatar_url ?? "") ||
+    preferredLanguage !== (me.preferred_language ?? "en");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -139,9 +141,11 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           email: email.trim() || null,
           nationality: nationality.trim() || null,
           avatar_url: avatarUrl.trim() || null,
+          preferred_language: preferredLanguage,
         }),
       });
       onUpdated({ ...me, ...res.user });
+      setPreferredLanguage(res.user.preferred_language || "en");
       setMessage({ text: "Profile details updated successfully." });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Failed to update profile.", error: true });
@@ -344,6 +348,18 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
           <div>
             <label style={labelStyle}>Username (Fixed)</label>
             <input type="text" value={me.username} disabled style={{ ...inputStyle, opacity: 0.5, cursor: "not-allowed" }} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Default Game Language</label>
+            <select
+              value={preferredLanguage}
+              onChange={(e) => setPreferredLanguage(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="en">English</option>
+              <option value="ne">Nepali (नेपाली)</option>
+            </select>
           </div>
 
           <div>

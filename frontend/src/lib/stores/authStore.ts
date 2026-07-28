@@ -16,6 +16,7 @@ export interface AuthUser {
   receive_overflow?: boolean;
   nationality?: string | null;
   avatar_url?: string | null;
+  preferred_language?: string | null;
   created_at?: string | null;
   last_login?: string | null;
 }

@@ -59,6 +59,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [preferredLanguage, setPreferredLanguage] = useState("en");
 
   // Password states
   const [password, setPassword] = useState("");
@@ -80,6 +81,7 @@ export default function ProfilePage() {
           setEmail(res.player.email || "");
           setAvatarUrl(res.player.avatar_url || "");
           setSoundEnabled(res.player.sound_enabled !== false);
+          setPreferredLanguage(res.player.preferred_language || "en");
           setHasPassword(!!res.player.has_password);
           setLoading(false);
         })
@@ -129,6 +131,7 @@ export default function ProfilePage() {
         email: string | null;
         avatar_url: string | null;
         sound_enabled: boolean;
+        preferred_language: string;
         password?: string;
         housie_name?: string;
       } = {
@@ -137,6 +140,7 @@ export default function ProfilePage() {
         email: email || null,
         avatar_url: avatarUrl || null,
         sound_enabled: soundEnabled,
+        preferred_language: preferredLanguage,
         housie_name: housieName,
       };
 
@@ -162,6 +166,7 @@ export default function ProfilePage() {
       setEmail(res.player.email || "");
       setAvatarUrl(res.player.avatar_url || "");
       setSoundEnabled(res.player.sound_enabled !== false);
+      setPreferredLanguage(res.player.preferred_language || "en");
       setHasPassword(!!res.player.has_password);
       setPassword("");
 
@@ -532,6 +537,18 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>Audio voice calls & winning claim sounds.</span>
                   </div>
                 </label>
+
+                <div style={{ marginTop: 8 }}>
+                  <label style={labelStyle}>Default Game Language</label>
+                  <select
+                    value={preferredLanguage}
+                    onChange={(e) => setPreferredLanguage(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="en">English</option>
+                    <option value="ne">Nepali (नेपाली)</option>
+                  </select>
+                </div>
               </div>
 
             </div>

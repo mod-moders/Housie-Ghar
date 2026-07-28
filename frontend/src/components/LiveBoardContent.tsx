@@ -77,12 +77,32 @@ function makeReaction(emoji: string, senderName: string, avatarUrl?: string | nu
 export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; isStaff?: boolean; onBack?: () => void }) {
   const game_id = gameId;
   const router = useRouter();
+  const { config } = useConfigStore();
 
   const [game, setGame] = useState<GameSummary | null>(null);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [revealed, setRevealed] = useState(true);
   const [muted, setMuted] = useState(false);
+  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("en");
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+
+  useEffect(() => {
+    if (config?.audio_language === "ne" || config?.audio_language === "en") {
+      setLiveLanguage(config.audio_language);
+    }
+  }, [config]);
+
+  useEffect(() => {
+    const endpoint = isStaff ? "/api/auth/me" : "/api/player/me";
+    apiFetch<any>(endpoint)
+      .then((res) => {
+        const lang = isStaff ? res.user?.preferred_language : res.player?.preferred_language;
+        if (lang === "en" || lang === "ne") {
+          setLiveLanguage(lang);
+        }
+      })
+      .catch(() => {});
+  }, [isStaff]);
   const [winOverlay, setWinOverlay] = useState<WinOverlay | null>(null);
   const [myTickets, setMyTickets] = useState<{ number: number; matrix: TicketMatrix; owner?: string | null }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -164,7 +184,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   }, []);
 
   const booking = useBookingStore();
-  const { config } = useConfigStore();
   
   const { playGreeting, playOutro, playNumberCall, playCelebration, introPlayingRef } = useGameAudio(
     config?.english_caller_enabled === "true",
@@ -173,7 +192,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     game?.call_mode,
     game?.bg_music_enabled,
     game?.intro_mode,
-    game?.outro_mode
+    game?.outro_mode,
+    liveLanguage
   );
 
   const wasLiveInSessionRef = useRef<boolean>(false);
@@ -920,6 +940,99 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                     <Icon name="trophy" size={16} /> View Winners & Claim Prizes
                   </button>
                 )}
+              </div>
+
+              {/* Language Switch Panel */}
+              <div
+                className="hg-panel"
+                style={{
+                  marginTop: "12px",
+                  padding: isNarrowViewport ? "12px 14px" : "16px 20px",
+                  borderRadius: "16px",
+                  border: "2px solid var(--accent)",
+                  background: "var(--surface)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>
+                    Language Switch
+                  </span>
+                  
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={!muted}
+                      onChange={(e) => setMuted(!e.target.checked)}
+                      style={{ width: "16px", height: "16px", accentColor: "var(--accent)", cursor: "pointer" }}
+                    />
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
+                      Enable Live Audio
+                    </span>
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={() => setLiveLanguage("en")}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      borderRadius: "9999px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      ...(liveLanguage === "en"
+                        ? {
+                            background: "var(--accent)",
+                            color: "var(--accent-ink, #000)",
+                            border: "2px solid #000",
+                            boxShadow: "2.5px 2.5px 0px #000000",
+                            fontWeight: 700
+                          }
+                        : {
+                            background: "transparent",
+                            color: "var(--text-dim)",
+                            border: "2px solid var(--border-2, rgba(255,255,255,0.15))",
+                            boxShadow: "none",
+                            fontWeight: 600
+                          })
+                    }}
+                  >
+                    🇬🇧 GB ENG
+                  </button>
+
+                  <button
+                    onClick={() => setLiveLanguage("ne")}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      borderRadius: "9999px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      ...(liveLanguage === "ne"
+                        ? {
+                            background: "var(--accent)",
+                            color: "var(--accent-ink, #000)",
+                            border: "2px solid #000",
+                            boxShadow: "2.5px 2.5px 0px #000000",
+                            fontWeight: 700
+                          }
+                        : {
+                            background: "transparent",
+                            color: "var(--text-dim)",
+                            border: "2px solid var(--border-2, rgba(255,255,255,0.15))",
+                            boxShadow: "none",
+                            fontWeight: 600
+                          })
+                    }}
+                  >
+                    🇳🇵 NP NEP
+                  </button>
+                </div>
               </div>
 
               {/* Recent numbers called panel — in a separate card just below the cage & call notification */}

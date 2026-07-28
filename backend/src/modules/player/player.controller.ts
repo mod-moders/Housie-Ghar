@@ -273,7 +273,7 @@ export async function getProfile(req: any, res: Response): Promise<void> {
   
   try {
     const result = await pool.query(
-      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
+      'SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, status, avatar_url, preferred_language, housie_name_changes, (password_hash IS NOT NULL) AS has_password FROM Players WHERE player_id = $1',
       [req.player.playerId]
     );
     if ((result.rowCount ?? 0) === 0) {
@@ -298,7 +298,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     return;
   }
 
-  const { full_name, phone, email, theme_preference, sound_enabled, password, avatar_url, housie_name } = req.body;
+  const { full_name, phone, email, theme_preference, sound_enabled, password, avatar_url, housie_name, preferred_language } = req.body;
 
   try {
     let passwordHashUpdate = null;
@@ -382,9 +382,16 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     if (theme_preference !== undefined) setField('theme_preference', theme_preference);
     if (sound_enabled !== undefined) setField('sound_enabled', sound_enabled);
     if (avatar_url !== undefined) setField('avatar_url', avatar_url);
+    if (preferred_language !== undefined) {
+      if (preferred_language !== null && !['en', 'ne'].includes(preferred_language)) {
+        res.status(400).json({ message: 'Preferred language must be English or Nepali' });
+        return;
+      }
+      setField('preferred_language', preferred_language);
+    }
     if (shouldUpdatePassword) setField('password_hash', passwordHashUpdate);
 
-    const returning = `RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password`;
+    const returning = `RETURNING player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, preferred_language, housie_name_changes, (password_hash IS NOT NULL) AS has_password`;
 
     params.push(req.player.playerId);
     const result = sets.length
@@ -393,7 +400,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
           params
         )
       : await pool.query(
-          `SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, housie_name_changes, (password_hash IS NOT NULL) AS has_password
+          `SELECT player_id, player_code, full_name, housie_name, registered_at, phone, email, theme_preference, sound_enabled, avatar_url, preferred_language, housie_name_changes, (password_hash IS NOT NULL) AS has_password
            FROM Players WHERE player_id = $1`,
           [req.player.playerId]
         );

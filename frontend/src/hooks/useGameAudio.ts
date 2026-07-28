@@ -49,7 +49,8 @@ export function useGameAudio(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   gameIntroMode?: "TTS" | "Audio" | "Text",
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  gameOutroMode?: "TTS" | "Audio" | "Text"
+  gameOutroMode?: "TTS" | "Audio" | "Text",
+  currentLanguage?: "en" | "ne"
 ) {
   const [callsConfig, setCallsConfig] = useState<Record<number, NumberCallConfig>>({});
   const { config: platformConfig } = useConfigStore();
@@ -410,7 +411,7 @@ export function useGameAudio(
 
     stopAllActiveAudios();
     const config = callsConfig[num];
-    const activeLang = platformConfig?.audio_language || "en";
+    const activeLang = currentLanguage || platformConfig?.audio_language || "en";
 
     // English had NO fallback at all when a number's audio_url_en was never uploaded: the
     // static `/audio/calls/{num}_en.mp3` guess essentially never exists (no bulk EN convention
@@ -443,7 +444,7 @@ export function useGameAudio(
     if (audioUrl) {
       await playAudioFile(audioUrl, effectiveVol, fallbackUrl);
     }
-  }, [englishCallerEnabled, isMuted, callsConfig, platformConfig, stopAllActiveAudios, playAudioFile]);
+  }, [englishCallerEnabled, isMuted, callsConfig, platformConfig, stopAllActiveAudios, playAudioFile, currentLanguage]);
 
   const playGreeting = useCallback(async (startOffsetSeconds: number = 0): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
@@ -457,7 +458,7 @@ export function useGameAudio(
     try {
       if (!isMountedRef.current || isMuted) return;
 
-      const activeLang = platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
+      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
       // welcome_voice_url (the pre-dual-language legacy field) is NEPALI content — migration
       // 042 mapped the original welcome upload straight into welcome_voice_url_ne, never into
       // _en. Falling back to it for English would silently play Nepali, so the English branch
@@ -484,7 +485,7 @@ export function useGameAudio(
         }
       }
     }
-  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile, playNumberCall]);
+  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile, playNumberCall, currentLanguage]);
 
   const playOutro = useCallback(async (startOffsetSeconds: number = 0): Promise<void> => {
     if (!englishCallerEnabled || isMuted) return;
@@ -495,7 +496,7 @@ export function useGameAudio(
     stopAllActiveAudios();
 
     try {
-      const activeLang = platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
+      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
       // instruction_voice_url (the pre-dual-language legacy field) is ENGLISH content —
       // migration 042 mapped the original outro upload straight into instruction_voice_url_en,
       // never into _ne. Falling back to it for Nepali would silently play English (this was the
@@ -516,7 +517,7 @@ export function useGameAudio(
         await playAudioFile(instructionUrl, masterVol * volMultiplier, undefined, startOffsetSeconds);
       }
     } catch {}
-  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile]);
+  }, [englishCallerEnabled, isMuted, platformConfig, stopAllActiveAudios, playAudioFile, currentLanguage]);
 
   const playCelebration = useCallback(() => {
     if (!englishCallerEnabled || isMuted) return;
