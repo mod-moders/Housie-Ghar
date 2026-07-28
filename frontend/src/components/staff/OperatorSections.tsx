@@ -23,6 +23,12 @@ import dynamic from "next/dynamic";
 const INTRO_AT_MS = 30000;
 const FIRST_DRAW_AT_MS = 53000;
 
+// End-of-game sequence: the winning number is revealed, the winner card holds for
+// WIN_CARD_MS, then the draw-conclusion (outro audio + terminal status).
+const WIN_CARD_MS = 3000;
+// Backstop so a dropped draw event can never strand the HUD on a finished game.
+const FINAL_SEQUENCE_MAX_MS = 16000;
+
 const RealisticBingoCage = dynamic(
   () => import("@/components/RealisticBingoCage").then((mod) => mod.RealisticBingoCage),
   { ssr: false }
@@ -100,6 +106,20 @@ export function OperatorHudSection() {
   const [winOverlay, setWinOverlay] = useState<{ prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number } | null>(null);
   const currentWinnerEventRef = useRef<{ prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number; isLastPrize: boolean } | null>(null);
 
+  // Mirrors `prizes` synchronously so the "was that the last prize?" test does not
+  // depend on React choosing to evaluate a setPrizes updater eagerly — it does not
+  // when the same tick already queued other state, which a draw always does.
+  const prizesRef = useRef<Prize[]>([]);
+  const applyPrizes = useCallback((next: Prize[]) => {
+    prizesRef.current = next;
+    setPrizes(next);
+  }, []);
+
+  // Held while the end-of-game sequence (number -> winner card -> outro) plays out,
+  // so nothing flips the status to a terminal one underneath it. See concludeDraw.
+  const finalSequenceActiveRef = useRef(false);
+  const concludeDrawRef = useRef<() => void>(() => {});
+
   const timersRef = useRef<NodeJS.Timeout[]>([]);
   const delay = useCallback((fn: () => void, ms: number) => {
     const t = setTimeout(() => {
@@ -172,37 +192,46 @@ export function OperatorHudSection() {
           const configObj = useConfigStore.getState().config;
           const isSoundEnabled = configObj?.celebration_sound_enabled !== "false";
 
-          if (w.isLastPrize) {
-            // For the last remaining prize:
-            // Do NOT show the winner card.
-            // Wait 3 seconds, then play outro.
-            delay(() => {
-              if (!outroPlayedRef.current) {
-                outroPlayedRef.current = true;
-                playOutro(0);
-                playCelebration();
-                if (isSoundEnabled && !muted) {
-                  soundSynthesizer.playCelebration();
-                }
-              }
-            }, 3000);
-          } else {
-            // For normal prizes:
-            playCelebration();
-            if (isSoundEnabled && !muted) {
-              soundSynthesizer.playCelebration();
-            }
-            setWinOverlay(w);
-
-            // Winner card stays visible for exactly 3 seconds
-            delay(() => {
-              setWinOverlay(null);
-            }, 3000);
+          // The prize-winning animation, for EVERY prize including the last one.
+          // The final prize used to skip the winner card outright.
+          playCelebration();
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
           }
+          setWinOverlay(w);
+
+          delay(() => {
+            setWinOverlay(null);
+            if (w.isLastPrize) {
+              // Draw-conclusion step: outro audio + the terminal status.
+              concludeDrawRef.current();
+            }
+          }, WIN_CARD_MS);
         }
       }
     }, revealDelay);
-  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted, config?.audio_language]);
+    // playOutro moved to concludeDraw, which is reached through a ref.
+  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, config?.audio_language]);
+
+  // Draw-conclusion step: the outro, plus the terminal status that was held back
+  // while the number and the winner card had their turn.
+  const concludeDraw = useCallback(() => {
+    if (!finalSequenceActiveRef.current) return;
+    finalSequenceActiveRef.current = false;
+
+    // Ref and status written first, synchronously: the delayedGameEnd effect fires
+    // as soon as the status turns terminal and would otherwise start a second outro.
+    const alreadyPlayed = outroPlayedRef.current;
+    outroPlayedRef.current = true;
+    useGameStore.getState().setStatus("Draw_Ended");
+    if (!alreadyPlayed) {
+      playOutro(0);
+    }
+  }, [playOutro]);
+
+  useEffect(() => {
+    concludeDrawRef.current = concludeDraw;
+  }, [concludeDraw]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
@@ -246,19 +275,21 @@ export function OperatorHudSection() {
       delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as { prize: string; housie_name: string; winner_ticket_number: number; amount: number; split_count: number };
-      let isLastPrize = false;
-      setPrizes((prev) => {
-        const next = prev.map((p) =>
-          p.pattern_name === w.prize
-            ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
-            : p
-        );
-        isLastPrize = next.length > 0 && next.every((p) => p.claimed);
-        if (isLastPrize) {
-          useGameStore.getState().setStatus("Draw_Ended");
-        }
-        return next;
-      });
+      const next = prizesRef.current.map((p) =>
+        p.pattern_name === w.prize
+          ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
+          : p
+      );
+      applyPrizes(next);
+      const isLastPrize = next.length > 0 && next.every((p) => p.claimed);
+
+      if (isLastPrize) {
+        // NOT flipping the status here: revealDraw is still ~4s out and bails on a
+        // terminal status, which skipped the number reveal, the winner card and the
+        // outro entirely. concludeDraw() flips it after the sequence.
+        finalSequenceActiveRef.current = true;
+        delay(() => concludeDrawRef.current(), FINAL_SEQUENCE_MAX_MS);
+      }
 
       currentWinnerEventRef.current = {
         ...w,
@@ -268,7 +299,7 @@ export function OperatorHudSection() {
     // playCelebration/numberCallPlaying/muted are NOT listed: this callback
     // never touches them. They belong to revealDraw, which is a dependency
     // here, so a change to any of them still rebuilds this transitively.
-  }, [introPlayingRef, delay, revealDraw]);
+  }, [introPlayingRef, delay, revealDraw, applyPrizes]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -282,6 +313,8 @@ export function OperatorHudSection() {
     gameStartedAnnouncedRef.current = false;
     outroPlayedRef.current = false;
     wasLiveInSessionRef.current = false;
+    finalSequenceActiveRef.current = false;
+    currentWinnerEventRef.current = null;
     setWinOverlay(null);
     setNumberCallPlaying(false);
     activeCallIdRef.current = 0;
@@ -293,10 +326,10 @@ export function OperatorHudSection() {
     if (!selectedId) return;
     apiFetch<GameSummary>(`/api/games/${selectedId}`)
       .then((g) => {
-        setPrizes(g.prize_pool || []);
+        applyPrizes(g.prize_pool || []);
       })
       .catch(() => {});
-  }, [selectedId]);
+  }, [selectedId, applyPrizes]);
 
   useEffect(() => {
     if (activeGameStatus === "Live" || activeGameStatus === "Paused") {

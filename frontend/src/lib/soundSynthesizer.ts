@@ -14,6 +14,10 @@ class SoundSynthesizer {
   private customCageAudio: HTMLAudioElement | null = null;
   private customCelebrationAudio: HTMLAudioElement | null = null;
 
+  // Gesture-unlock state. See armUnlock().
+  private unlockArmed = false;
+  private unlockCallbacks: Array<() => void> = [];
+
   constructor() {
     // Cage-spin/celebration sounds run on a raw AudioContext (or an ad-hoc <audio> element
     // for custom uploads), neither of which is covered by usePauseAudioOnHidden — that hook
@@ -43,6 +47,42 @@ class SoundSynthesizer {
     }
   }
 
+  /**
+   * Wait for the next user gesture, then unlock audio playback and run `onUnlocked`.
+   *
+   * Re-armable on purpose. A page reload clears the page's user-activation state, so
+   * every `<audio>.play()` after a mid-game refresh is rejected with NotAllowedError
+   * until the player next touches the page — which is why number calls went silent
+   * after a refresh. The listener used to be armed exactly once at module load and
+   * torn down after the first gesture, so nothing could ever recover from a block
+   * that happened later. Callers that get blocked re-arm this and replay themselves.
+   */
+  armUnlock(onUnlocked?: () => void) {
+    if (typeof document === "undefined") return;
+    if (onUnlocked) this.unlockCallbacks.push(onUnlocked);
+    if (this.unlockArmed) return;
+    this.unlockArmed = true;
+
+    const handler = () => {
+      document.removeEventListener("click", handler);
+      document.removeEventListener("touchstart", handler);
+      document.removeEventListener("touchend", handler);
+      this.unlockArmed = false;
+      this.unlock();
+      // Splice first: a callback that gets blocked again re-arms and re-queues,
+      // and must not be run twice off this same gesture.
+      this.unlockCallbacks.splice(0).forEach((cb) => {
+        try {
+          cb();
+        } catch {}
+      });
+    };
+
+    document.addEventListener("click", handler);
+    document.addEventListener("touchstart", handler);
+    document.addEventListener("touchend", handler);
+  }
+
   unlock() {
     this.initCtx();
     this.initPool();
@@ -59,6 +99,16 @@ class SoundSynthesizer {
     }
     this.audioPool.forEach((audio) => {
       try {
+        // NEVER prime an element that is already playing. Background and lobby
+        // music autoplay before the first gesture whenever the browser's media
+        // engagement policy allows it, and they hold POOLED elements — priming
+        // one overwrites its src with the silent WAV below, so the music dies
+        // the moment the user first taps or starts a scroll (touchstart fires
+        // this unlock on mobile, click on desktop). The element keeps reporting
+        // `paused === false` while playing the silent clip, so nothing notices
+        // and the auto-resume onpause handler never fires either.
+        // An element that is already playing is by definition already unlocked.
+        if (!audio.paused) return;
         audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
         audio.play().catch(() => {});
       } catch (e) {
@@ -82,6 +132,16 @@ class SoundSynthesizer {
     }
     if (audio) {
       try {
+        // Clear the previous borrower's handlers BEFORE pausing. Background and
+        // lobby music both attach a self-resuming `onpause` (23b02ba) and an
+        // `onended` that starts the next track — bound to the ELEMENT, not to a
+        // ref — so a recycled element that still carries them resurrects itself
+        // the instant its next borrower pauses it. That is what kept the cage
+        // sound looping forever after the cage had stopped spinning.
+        audio.onpause = null;
+        audio.onended = null;
+        audio.onerror = null;
+        audio.onplay = null;
         audio.pause();
         audio.src = "";
         audio.loop = false;
@@ -1028,13 +1088,5 @@ class SoundSynthesizer {
 export const soundSynthesizer = new SoundSynthesizer();
 
 if (typeof window !== "undefined") {
-  const unlockAudio = () => {
-    soundSynthesizer.unlock();
-    document.removeEventListener("click", unlockAudio);
-    document.removeEventListener("touchstart", unlockAudio);
-    document.removeEventListener("touchend", unlockAudio);
-  };
-  document.addEventListener("click", unlockAudio);
-  document.addEventListener("touchstart", unlockAudio);
-  document.addEventListener("touchend", unlockAudio);
+  soundSynthesizer.armUnlock();
 }

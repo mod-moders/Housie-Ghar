@@ -5,6 +5,10 @@ import { useConfigStore } from "@/lib/stores/configStore";
 import { useSocket } from "@/lib/hooks/useSocket";
 import { usePauseAudioOnHidden } from "@/hooks/usePauseAudioOnHidden";
 
+// How stale a gesture-blocked clip may be before replaying it would talk over
+// whatever the game has moved on to. One draw interval is 5-12s; stay under it.
+const BLOCKED_REPLAY_MAX_AGE_MS = 5000;
+
 interface NumberCallConfig {
   number: number;
   call_text: string;
@@ -64,6 +68,10 @@ export function useGameAudio(
   const isIntroPlayingRef = useRef<boolean>(false);
   const pendingNumbersQueueRef = useRef<number[]>([]);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+  // The clip whose play() the browser refused for lack of a user gesture, kept so
+  // it can be replayed the moment the player next touches the page. See the
+  // NotAllowedError branch in playAudioFile.
+  const blockedPlaybackAtRef = useRef<number>(0);
 
   usePauseAudioOnHidden(bgMusicRef);
 
@@ -87,6 +95,12 @@ export function useGameAudio(
 
       if (bgMusicRef.current) {
         try {
+          // This cleanup runs BEFORE the background-music effect's own cleanup
+          // (effects tear down in definition order), so it is the one that
+          // actually releases the element — it must clear the auto-resume
+          // handler itself or the element goes back into the shared pool still
+          // carrying it.
+          bgMusicRef.current.onpause = null;
           bgMusicRef.current.pause();
           bgMusicRef.current.src = "";
         } catch {}
@@ -346,7 +360,40 @@ export function useGameAudio(
         audio.addEventListener("ended", onEnded);
         audio.addEventListener("error", onError);
 
-        audio.play().catch(onError);
+        audio.play().catch((err: unknown) => {
+          const name =
+            err && typeof err === "object" && "name" in err
+              ? String((err as { name?: unknown }).name)
+              : "";
+
+          // Autoplay refused for lack of a user gesture. This is NOT a load
+          // failure — the file is fine, the page just has no user activation.
+          // EVERY mid-game page refresh lands here, because reloading clears
+          // activation, and that is why the number calls went silent after a
+          // refresh. Routing it through onError burned the cross-language
+          // fallback on a retry that could only fail the same way, and nothing
+          // re-armed the gesture listener afterwards, so the call was lost.
+          if (name === "NotAllowedError" || name === "SecurityError") {
+            if (hasEnded) return;
+            hasEnded = true;
+            cleanup();
+            const blockedAt = Date.now();
+            blockedPlaybackAtRef.current = blockedAt;
+            soundSynthesizer.armUnlock(() => {
+              // Replay only the call that is still in flight. A number the game
+              // has already moved past must never be shouted over the current
+              // one, so anything older than one draw interval is dropped.
+              if (!isMountedRef.current || isMuted || document.hidden) return;
+              if (blockedPlaybackAtRef.current !== blockedAt) return;
+              if (Date.now() - blockedAt > BLOCKED_REPLAY_MAX_AGE_MS) return;
+              play(mp3Path, customVolume, fallbackPath, startOffsetSeconds);
+            });
+            resolve();
+            return;
+          }
+
+          onError();
+        });
       });
     }
 

@@ -23,6 +23,8 @@ export function useLobbyAudio(active: boolean) {
     if (!active) {
       if (audioRef.current) {
         try {
+          audioRef.current.onpause = null;
+          audioRef.current.onended = null;
           audioRef.current.pause();
           audioRef.current.src = "";
         } catch {}
@@ -57,6 +59,7 @@ export function useLobbyAudio(active: boolean) {
       if (audioRef.current) {
         try {
           audioRef.current.onpause = null;
+          audioRef.current.onended = null;
           audioRef.current.pause();
           audioRef.current.src = "";
         } catch {}
@@ -96,6 +99,7 @@ export function useLobbyAudio(active: boolean) {
       if (audioRef.current) {
         try {
           audioRef.current.onpause = null;
+          audioRef.current.onended = null;
           audioRef.current.pause();
           audioRef.current.src = "";
         } catch {}

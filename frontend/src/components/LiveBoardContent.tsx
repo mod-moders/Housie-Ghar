@@ -52,6 +52,15 @@ const WELCOME_OUT_MS = 20000;
 const INTRO_AT_MS = 30000;
 const FIRST_DRAW_AT_MS = 53000;
 
+// End-of-game sequence, in order: the winning number is revealed, the winner card
+// holds for WIN_CARD_MS, then the draw-conclusion (winners dashboard + outro audio).
+const WIN_CARD_MS = 3000;
+// Backstop for the conclusion. The sequence is driven by the draw reveal, so a
+// dropped/duplicated draw event would otherwise strand the board on a "Live" game
+// that has actually finished. Must comfortably exceed the reveal delay (4s tease +
+// up to 4s call) plus WIN_CARD_MS.
+const FINAL_SEQUENCE_MAX_MS = 16000;
+
 let reactionSeq = 0;
 function makeReaction(emoji: string, senderName: string, avatarUrl?: string | null): FloatingReaction {
   reactionSeq += 1;
@@ -109,6 +118,28 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [numberRevealed, setNumberRevealed] = useState(true);
   const activeCallIdRef = useRef(0);
   const currentWinnerEventRef = useRef<(WinOverlay & { split_count: number; winner_ticket_number: number; isLastPrize: boolean }) | null>(null);
+
+  // Mirrors `prizes` synchronously. The "was that the last prize?" test used to be
+  // computed inside a setPrizes updater and read on the very next line, which only
+  // works when React happens to evaluate the updater eagerly — it does not when the
+  // same tick already queued other state (which a draw always does). Keeping a ref
+  // in step makes the test deterministic and lets back-to-back winner events on a
+  // single number see each other's writes.
+  const prizesRef = useRef<Prize[]>([]);
+  const applyPrizes = useCallback((next: Prize[]) => {
+    prizesRef.current = next;
+    setPrizes(next);
+  }, []);
+
+  // The final prize ends the game, but the board has to finish showing it first:
+  // number -> winner card -> winners dashboard + outro. While this is set, every
+  // terminal status — the backend's draw_ended (which lands just 4s after the draw),
+  // a staff socket refresh, or loadGameData seeing an all-claimed prize pool — is
+  // held in deferredEndStatusRef instead of being applied, and concludeDraw() applies
+  // it at the end of the sequence.
+  const finalSequenceActiveRef = useRef(false);
+  const deferredEndStatusRef = useRef<"Draw_Ended" | "Completed" | null>(null);
+  const concludeDrawRef = useRef<() => void>(() => {});
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -272,40 +303,29 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
           const configObj = useConfigStore.getState().config;
           const isSoundEnabled = configObj?.celebration_sound_enabled !== "false";
 
-          if (w.isLastPrize) {
-            // For the last remaining prize:
-            // Do NOT show the winner card.
-            // Wait 3 seconds, then show winners list and play outro.
-            delay(() => {
-              if (!outroPlayedRef.current) {
-                outroPlayedRef.current = true;
-                if (!userDismissedWinnersRef.current) {
-                  setShowWinnersOverlay(true);
-                }
-                playOutro(0);
-                playCelebration();
-                if (isSoundEnabled && !muted) {
-                  soundSynthesizer.playCelebration();
-                }
-              }
-            }, 3000);
-          } else {
-            // For normal prizes:
-            playCelebration();
-            if (isSoundEnabled && !muted) {
-              soundSynthesizer.playCelebration();
-            }
-            setWinOverlay(w);
-
-            // Winner card stays visible for exactly 3 seconds
-            delay(() => {
-              setWinOverlay(null);
-            }, 3000);
+          // Step 2 — the prize-winning animation, for EVERY prize including the
+          // last one. The final prize used to skip the winner card outright and
+          // jump to the winners dashboard, so the ticket that actually ended the
+          // game never got its moment on screen.
+          playCelebration();
+          if (isSoundEnabled && !muted) {
+            soundSynthesizer.playCelebration();
           }
+          setWinOverlay(w);
+
+          delay(() => {
+            setWinOverlay(null);
+            if (w.isLastPrize) {
+              // Step 3 — draw-conclusion animation + outro audio.
+              concludeDrawRef.current();
+            }
+          }, WIN_CARD_MS);
         }
       }
     }, revealDelay);
-  }, [beep, addDrawn, playNumberCall, playCelebration, playOutro, delay, muted, config?.audio_language]);
+    // playOutro is no longer listed: the outro belongs to the draw-conclusion step,
+    // which now lives in concludeDraw and is reached through a ref.
+  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, config?.audio_language]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);
@@ -436,22 +456,59 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       .then((g) => {
         setGame(g);
         const pool = g.prize_pool || [];
-        setPrizes(pool);
+        applyPrizes(pool);
         if (g.game_status === "Completed" || g.game_status === "Draw_Ended" || (pool.length > 0 && pool.every((p) => p.claimed))) {
-          if (g.game_status === "Completed" || g.game_status === "Draw_Ended") {
-            useGameStore.getState().setStatus(g.game_status);
+          const terminal = g.game_status === "Completed" ? "Completed" : "Draw_Ended";
+          if (finalSequenceActiveRef.current) {
+            // Same deferral as the SSE terminal events. The staff socket handler
+            // calls this on the very winner event that starts the sequence, so
+            // without the guard the operator HUD still jumps the animation.
+            deferredEndStatusRef.current = terminal;
           } else {
-            useGameStore.getState().setStatus("Draw_Ended");
+            useGameStore.getState().setStatus(terminal);
           }
         }
       })
       .catch(() => {});
-  }, [game_id]);
+  }, [game_id, applyPrizes]);
 
   // Game meta + prize board
   useEffect(() => {
     loadGameData();
   }, [loadGameData]);
+
+  // Step 3 of the end-of-game sequence: the draw-conclusion animation plus the
+  // outro audio, and the terminal status that was held back while the number and
+  // the winner card had their turn. Idempotent — the winner handler also arms a
+  // FINAL_SEQUENCE_MAX_MS backstop that lands here if the reveal never runs.
+  const concludeDraw = useCallback(() => {
+    if (!finalSequenceActiveRef.current) return;
+    finalSequenceActiveRef.current = false;
+
+    const nextStatus = deferredEndStatusRef.current || "Draw_Ended";
+    deferredEndStatusRef.current = null;
+    const alreadyPlayed = outroPlayedRef.current;
+
+    // Order matters. Both the ref and the Zustand status are written synchronously,
+    // BEFORE any React state: the delayedGameEnd effect fires the moment the status
+    // turns terminal and would otherwise start a second outro, and its else-branch
+    // (status not terminal) would otherwise clear the winners overlay right back
+    // off again if React split these into two renders.
+    outroPlayedRef.current = true;
+    useGameStore.getState().setStatus(nextStatus);
+
+    if (!alreadyPlayed) {
+      if (!userDismissedWinnersRef.current) {
+        setShowWinnersOverlay(true);
+      }
+      playOutro(0);
+    }
+    loadGameData();
+  }, [playOutro, loadGameData]);
+
+  useEffect(() => {
+    concludeDrawRef.current = concludeDraw;
+  }, [concludeDraw]);
 
   const handleCloseWinnersOverlay = useCallback(() => {
     userDismissedWinnersRef.current = true;
@@ -625,19 +682,24 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
       const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number };
-      let isLastPrize = false;
-      setPrizes((prev) => {
-        const next = prev.map((p) =>
-          p.pattern_name === w.prize
-            ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
-            : p
-        );
-        isLastPrize = next.length > 0 && next.every((p) => p.claimed);
-        if (isLastPrize && !userDismissedWinnersRef.current) {
-          useGameStore.getState().setStatus("Draw_Ended");
-        }
-        return next;
-      });
+      const next = prizesRef.current.map((p) =>
+        p.pattern_name === w.prize
+          ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
+          : p
+      );
+      applyPrizes(next);
+      const isLastPrize = next.length > 0 && next.every((p) => p.claimed);
+
+      if (isLastPrize) {
+        // Deliberately NOT flipping the status to Draw_Ended here. Doing that was
+        // what killed the whole end sequence: revealDraw is still ~4s out and bails
+        // on a terminal status, so the winning number was never shown, the winner
+        // card never appeared and the outro never played — the board just cut
+        // straight to the winners dashboard. concludeDraw() applies the terminal
+        // status after the sequence instead.
+        finalSequenceActiveRef.current = true;
+        delay(() => concludeDrawRef.current(), FINAL_SEQUENCE_MAX_MS);
+      }
 
       currentWinnerEventRef.current = {
         ...w,
@@ -649,6 +711,14 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
       const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
+      if (finalSequenceActiveRef.current) {
+        // The backend fires draw_ended just 4 seconds after the winning draw —
+        // exactly as the number is being revealed here. Hold it until the
+        // sequence has run, or it cuts the board to the winners dashboard
+        // mid-animation.
+        deferredEndStatusRef.current = nextStatus;
+        return;
+      }
       useGameStore.getState().setStatus(nextStatus);
       loadGameData();
     }
@@ -656,7 +726,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     // callback never touches them. They belong to revealDraw, which does, and
     // which is a dependency here — so a change to any of them still rebuilds
     // this callback, transitively and exactly once.
-  }, [revealDraw, introPlayingRef, delay, loadGameData]);
+  }, [revealDraw, introPlayingRef, delay, loadGameData, applyPrizes]);
 
   useSSE(game_id, onEvent);
 
