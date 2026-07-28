@@ -3028,6 +3028,29 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   background:var(--surface);color:var(--text);font:600 16px var(--font-head);outline:none}
 .hg-form-field input:focus,.hg-form-field select:focus{border-color:var(--ink)}
 
+/* Fix date-time picker contrast and usability in dark/light mode */
+.hg-form-field input[type="datetime-local"] {
+  color-scheme: dark !important;
+  border-radius: var(--radius-sm) !important; /* rectangular pill to avoid cutting content */
+  min-height: 46px;
+  color: var(--text) !important;
+  background: var(--surface) !important;
+}
+.hg-root[data-theme='light'] .hg-form-field input[type="datetime-local"] {
+  color-scheme: light !important;
+}
+.hg-form-field input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) !important;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.hg-root[data-theme='light'] .hg-form-field input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.2) !important;
+}
+.hg-form-field input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 select option {
   background-color: var(--surface) !important;
   color: var(--text) !important;
