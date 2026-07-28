@@ -1171,8 +1171,8 @@ export function GamesSection({ me }: { me: AuthUser }) {
         {pastGames.length === 0 ? (
           <EmptyHint icon="trophy" title="No completed games" sub="Finished games in the last 3 days will show up here." />
         ) : (
-          <div className="hg-table" style={{ minWidth: "760px" }}>
-            <div className="hg-tr hg-tr-history hg-tr-head">
+          <div className="hg-table" style={{ minWidth: me.role_name === "Superadmin" ? "880px" : "760px" }}>
+            <div className="hg-tr hg-tr-history hg-tr-head" style={{ gridTemplateColumns: me.role_name === "Superadmin" ? "2fr 1.2fr 1.2fr 1fr 340px" : undefined }}>
               <span>Game Name</span><span>Date &amp; Time</span><span>Tickets Sold</span><span>Revenue</span><span>Action</span>
             </div>
             {pastGames.map((g) => {
@@ -1181,7 +1181,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
                 ? new Date(g.completed_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
                 : new Date(g.scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
               return (
-                <div key={g.game_id} className="hg-tr hg-tr-history">
+                <div key={g.game_id} className="hg-tr hg-tr-history" style={{ gridTemplateColumns: me.role_name === "Superadmin" ? "2fr 1.2fr 1.2fr 1fr 340px" : undefined }}>
                   <span className="hg-td-name">{g.title}</span>
                   <span className="hg-dim">{dateStr}</span>
                   <span>{g.sold_count} / {g.total_tickets}</span>
