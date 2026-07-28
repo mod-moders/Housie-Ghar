@@ -79,7 +79,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
   const [email, setEmail] = useState(me.email ?? "");
   const [nationality, setNationality] = useState(me.nationality ?? "");
   const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? "");
-  const [preferredLanguage, setPreferredLanguage] = useState(me.preferred_language || "en");
+  const [preferredLanguage, setPreferredLanguage] = useState(me.preferred_language || "ne");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -106,7 +106,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
     email.trim() !== (me.email ?? "") ||
     nationality.trim() !== (me.nationality ?? "") ||
     avatarUrl.trim() !== (me.avatar_url ?? "") ||
-    preferredLanguage !== (me.preferred_language ?? "en");
+    preferredLanguage !== (me.preferred_language ?? "ne");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,7 +145,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
         }),
       });
       onUpdated({ ...me, ...res.user });
-      setPreferredLanguage(res.user.preferred_language || "en");
+      setPreferredLanguage(res.user.preferred_language || "ne");
       setMessage({ text: "Profile details updated successfully." });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Failed to update profile.", error: true });

@@ -59,7 +59,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [preferredLanguage, setPreferredLanguage] = useState("en");
+  const [preferredLanguage, setPreferredLanguage] = useState("ne");
 
   // Password states
   const [password, setPassword] = useState("");
@@ -81,7 +81,7 @@ export default function ProfilePage() {
           setEmail(res.player.email || "");
           setAvatarUrl(res.player.avatar_url || "");
           setSoundEnabled(res.player.sound_enabled !== false);
-          setPreferredLanguage(res.player.preferred_language || "en");
+          setPreferredLanguage(res.player.preferred_language || "ne");
           setHasPassword(!!res.player.has_password);
           setLoading(false);
         })
@@ -166,7 +166,7 @@ export default function ProfilePage() {
       setEmail(res.player.email || "");
       setAvatarUrl(res.player.avatar_url || "");
       setSoundEnabled(res.player.sound_enabled !== false);
-      setPreferredLanguage(res.player.preferred_language || "en");
+      setPreferredLanguage(res.player.preferred_language || "ne");
       setHasPassword(!!res.player.has_password);
       setPassword("");
 

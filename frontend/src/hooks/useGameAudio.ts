@@ -411,7 +411,7 @@ export function useGameAudio(
 
     stopAllActiveAudios();
     const config = callsConfig[num];
-    const activeLang = currentLanguage || platformConfig?.audio_language || "en";
+    const activeLang = currentLanguage || platformConfig?.audio_language || "ne";
 
     // English had NO fallback at all when a number's audio_url_en was never uploaded: the
     // static `/audio/calls/{num}_en.mp3` guess essentially never exists (no bulk EN convention
@@ -458,7 +458,7 @@ export function useGameAudio(
     try {
       if (!isMountedRef.current || isMuted) return;
 
-      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "en";
+      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.welcome_voice_lang || "ne";
       // welcome_voice_url (the pre-dual-language legacy field) is NEPALI content — migration
       // 042 mapped the original welcome upload straight into welcome_voice_url_ne, never into
       // _en. Falling back to it for English would silently play Nepali, so the English branch
@@ -496,7 +496,7 @@ export function useGameAudio(
     stopAllActiveAudios();
 
     try {
-      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "en";
+      const activeLang = currentLanguage || platformConfig?.audio_language || platformConfig?.instruction_voice_lang || "ne";
       // instruction_voice_url (the pre-dual-language legacy field) is ENGLISH content —
       // migration 042 mapped the original outro upload straight into instruction_voice_url_en,
       // never into _ne. Falling back to it for Nepali would silently play English (this was the

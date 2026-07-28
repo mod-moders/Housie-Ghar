@@ -83,7 +83,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [revealed, setRevealed] = useState(true);
   const [muted, setMuted] = useState(false);
-  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("en");
+  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
 
   useEffect(() => {

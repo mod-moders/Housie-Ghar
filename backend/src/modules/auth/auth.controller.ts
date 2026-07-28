@@ -184,7 +184,7 @@ export async function getCurrentProfile(req: any, res: Response): Promise<void> 
         receive_overflow: u.receive_overflow === true,
         nationality: u.nationality,
         avatar_url: u.avatar_url ?? null,
-        preferred_language: u.preferred_language ?? 'en',
+        preferred_language: u.preferred_language ?? 'ne',
         created_at: u.created_at ?? null,
         last_login: u.last_login ?? null,
       },

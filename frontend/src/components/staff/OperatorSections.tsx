@@ -79,7 +79,7 @@ export function OperatorHudSection() {
   }, [effectiveDrawnNumbers, count]);
 
   const [muted, setMuted] = useState(false);
-  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("en");
+  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
   const audioCtx = useRef<AudioContext | null>(null);
 
   const { config } = useConfigStore();
