@@ -75,7 +75,6 @@ function navFor(user: AuthUser): NavItem[] {
     return [
       ["live-hud", "Live HUD & Games", "play"],
       ["bookings", "Bookings", "bell"],
-      ["broadcast", "Share to WhatsApp", "chat"],
       ["wallet", "My Wallet", "wallet"],
       ["rewards", "My Rewards", "star"],
       ["profile", "My Profile", "user"],
