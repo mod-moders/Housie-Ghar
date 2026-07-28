@@ -220,7 +220,22 @@ export async function login(req: Request, res: Response): Promise<void> {
       maxAge: 3650 * 24 * 60 * 60 * 1000, // 10 years
     });
 
-    res.json({ token, player });
+    // `player` is the raw Players row, which SELECTs password_hash so the compare
+    // above can run — it must never go out over the wire. Sending it handed every
+    // caller the account's bcrypt hash to attack offline at their leisure, and it
+    // landed in browser memory, logs and any proxy in between. Signup already
+    // returns only these four columns (its INSERT ... RETURNING never fetches the
+    // hash); this makes login match rather than reaching for a delete on a row the
+    // rest of the handler still uses.
+    res.json({
+      token,
+      player: {
+        player_id: player.player_id,
+        player_code: player.player_code,
+        full_name: player.full_name,
+        housie_name: player.housie_name,
+      },
+    });
   } catch (error) {
     console.error('Player login error:', error);
     res.status(500).json({ message: 'Internal server error' });
