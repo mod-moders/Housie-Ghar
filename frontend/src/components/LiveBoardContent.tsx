@@ -85,14 +85,17 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [muted, setMuted] = useState(false);
   const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const hasUserOverriddenLanguageRef = useRef<boolean>(false);
 
   useEffect(() => {
+    if (hasUserOverriddenLanguageRef.current) return;
     if (config?.audio_language === "ne" || config?.audio_language === "en") {
       setLiveLanguage(config.audio_language);
     }
   }, [config]);
 
   useEffect(() => {
+    if (hasUserOverriddenLanguageRef.current) return;
     const endpoint = isStaff ? "/api/auth/me" : "/api/player/me";
     apiFetch<any>(endpoint)
       .then((res) => {
@@ -869,39 +872,43 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                 <Icon name="arrowL" size={20} />
               </button>
             )}
-            <div className="hg-live-title">
+            <div className="hg-live-title" style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
               {gameStatus === "Live" && (
                 <span className="hg-live-badge"><span className="hg-live-dot" /> LIVE</span>
               )}
               {gameStatus === "Paused" && <span className="hg-live-badge" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#f59e0b" }}>PAUSED</span>}
               {gameStatus === "Draw_Ended" && <span className="hg-live-badge" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308" }}>GAME ENDED</span>}
               {gameStatus === "Completed" && <span className="hg-live-badge" style={{ background: "rgba(34, 197, 94, 0.2)", color: "#22c55e" }}>COMPLETED</span>}
-              {game?.title ?? ""}
-            </div>
-             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ verticalAlign: "middle" }}>{game?.title ?? ""}</span>
+              
               <button
-                onClick={() => setLiveLanguage((lang) => lang === "ne" ? "en" : "ne")}
+                onClick={() => {
+                  hasUserOverriddenLanguageRef.current = true;
+                  setLiveLanguage((lang) => lang === "ne" ? "en" : "ne");
+                }}
                 style={{
                   background: "var(--surface-2)",
                   border: "1.5px solid var(--border-2)",
                   borderRadius: "999px",
-                  padding: "4px 10px",
-                  fontSize: "11px",
+                  padding: "2px 8px",
+                  fontSize: "10px",
                   fontWeight: 700,
                   color: "var(--text)",
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
                   gap: "4px",
                   cursor: "pointer",
-                  height: "32px",
+                  height: "26px",
                   boxShadow: "var(--card-shadow-sm)",
-                  transition: "all 0.15s ease"
+                  transition: "all 0.15s ease",
+                  verticalAlign: "middle"
                 }}
                 title={`Switch language. Current: ${liveLanguage === "en" ? "English" : "Nepali"}`}
               >
                 <span>{liveLanguage === "en" ? "🇬🇧 EN" : "🇳🇵 NE"}</span>
               </button>
-              
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button className="hg-mute" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"}>
                 <Icon name={muted ? "volumeX" : "volume"} size={18} />
               </button>

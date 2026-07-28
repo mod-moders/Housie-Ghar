@@ -81,16 +81,19 @@ export function OperatorHudSection() {
   const [muted, setMuted] = useState(false);
   const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
   const audioCtx = useRef<AudioContext | null>(null);
+  const hasUserOverriddenLanguageRef = useRef<boolean>(false);
 
   const { config } = useConfigStore();
 
   useEffect(() => {
+    if (hasUserOverriddenLanguageRef.current) return;
     if (config?.audio_language === "ne" || config?.audio_language === "en") {
       setLiveLanguage(config.audio_language);
     }
   }, [config]);
 
   useEffect(() => {
+    if (hasUserOverriddenLanguageRef.current) return;
     apiFetch<any>("/api/auth/me")
       .then((res) => {
         const lang = res.user?.preferred_language;
@@ -569,32 +572,36 @@ export function OperatorHudSection() {
             <Icon name={muted ? "volumeX" : "volume"} size={14} />
           </button>
 
-          <button
-            onClick={() => setLiveLanguage((lang) => lang === "ne" ? "en" : "ne")}
-            style={{
-              background: "var(--surface-2)",
-              border: "1.5px solid var(--border-2)",
-              borderRadius: "999px",
-              padding: "4px 10px",
-              fontSize: "11px",
-              fontWeight: 700,
-              color: "var(--text)",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              cursor: "pointer",
-              height: "32px",
-              boxShadow: "var(--card-shadow-sm)",
-              transition: "all 0.15s ease"
-            }}
-            title={`Switch language. Current: ${liveLanguage === "en" ? "English" : "Nepali"}`}
-          >
-            <span>{liveLanguage === "en" ? "🇬🇧 EN" : "🇳🇵 NE"}</span>
-          </button>
-
           <div>
-            <h3 style={{ margin: 0, fontSize: "16px" }}>{game.title} LIVE Deck</h3>
-            <span className="hg-dim" style={{ fontSize: "12px" }}>Operator Console</span>
+            <h3 style={{ margin: 0, fontSize: "16px", display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span>{game.title} LIVE Deck</span>
+              <button
+                onClick={() => {
+                  hasUserOverriddenLanguageRef.current = true;
+                  setLiveLanguage((lang) => lang === "ne" ? "en" : "ne");
+                }}
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1.5px solid var(--border-2)",
+                  borderRadius: "999px",
+                  padding: "2px 8px",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                  height: "26px",
+                  boxShadow: "var(--card-shadow-sm)",
+                  transition: "all 0.15s ease"
+                }}
+                title={`Switch language. Current: ${liveLanguage === "en" ? "English" : "Nepali"}`}
+              >
+                <span>{liveLanguage === "en" ? "🇬🇧 EN" : "🇳🇵 NE"}</span>
+              </button>
+            </h3>
+            <span className="hg-dim" style={{ fontSize: "12px", display: "block" }}>Operator Console</span>
           </div>
         </div>
 
