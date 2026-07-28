@@ -214,3 +214,44 @@ export async function restorePersistedAudioFiles(): Promise<void> {
     console.error('Failed to restore persisted audio files:', error);
   }
 }
+
+export async function fixHistoricalUsernameRenames(): Promise<void> {
+  try {
+    const oldName = 'PoonamPradhan';
+    const newName = 'PAM';
+
+    const tResult = await pool.query(
+      `UPDATE Tickets SET owner_housie_name = $1 WHERE LOWER(TRIM(owner_housie_name)) = LOWER($2)`,
+      [newName, oldName]
+    );
+    if (tResult.rowCount !== null && tResult.rowCount > 0) {
+      console.log(`[Heal] Cascaded ${tResult.rowCount} tickets from ${oldName} to ${newName}`);
+    }
+
+    const bResult = await pool.query(
+      `UPDATE Bookings SET housie_name = $1 WHERE LOWER(TRIM(housie_name)) = LOWER($2)`,
+      [newName, oldName]
+    );
+    if (bResult.rowCount !== null && bResult.rowCount > 0) {
+      console.log(`[Heal] Cascaded ${bResult.rowCount} bookings from ${oldName} to ${newName}`);
+    }
+
+    const pResult = await pool.query(
+      `UPDATE Prize_Pool SET winner_housie_name = REPLACE(winner_housie_name, $1, $2) WHERE winner_housie_name LIKE '%' || $1 || '%'`,
+      [oldName, newName]
+    );
+    if (pResult.rowCount !== null && pResult.rowCount > 0) {
+      console.log(`[Heal] Cascaded ${pResult.rowCount} prize pool claims (exact case) from ${oldName} to ${newName}`);
+    }
+
+    const pResult2 = await pool.query(
+      `UPDATE Prize_Pool SET winner_housie_name = REPLACE(winner_housie_name, LOWER($1), $2) WHERE winner_housie_name LIKE '%' || LOWER($1) || '%'`,
+      [oldName, newName]
+    );
+    if (pResult2.rowCount !== null && pResult2.rowCount > 0) {
+      console.log(`[Heal] Cascaded ${pResult2.rowCount} prize pool claims (lowercase) from ${oldName} to ${newName}`);
+    }
+  } catch (error) {
+    console.error('[Heal] fixHistoricalUsernameRenames failed:', error);
+  }
+}
