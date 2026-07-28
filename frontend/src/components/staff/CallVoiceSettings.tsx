@@ -941,45 +941,7 @@ export function CallVoiceSettings() {
                     </label>
                   </div>
 
-                  {/* Intro Language Toggle */}
-                  <div style={{ display: "flex", gap: "4px", background: "var(--surface)", padding: "3px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
-                    <button
-                      onClick={() => {
-                        setWelcomeVoiceLang("en");
-                        handleSaveConfig({ welcome_voice_lang: "en" });
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "none",
-                        background: welcomeVoiceLang === "en" ? "var(--accent)" : "transparent",
-                        color: welcomeVoiceLang === "en" ? "#000" : "var(--text-dim)",
-                        fontSize: "10.5px",
-                        fontWeight: 700,
-                        cursor: "pointer"
-                      }}
-                    >
-                      🇬🇧 ENG
-                    </button>
-                    <button
-                      onClick={() => {
-                        setWelcomeVoiceLang("ne");
-                        handleSaveConfig({ welcome_voice_lang: "ne" });
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "none",
-                        background: welcomeVoiceLang === "ne" ? "var(--accent)" : "transparent",
-                        color: welcomeVoiceLang === "ne" ? "#000" : "var(--text-dim)",
-                        fontSize: "10.5px",
-                        fontWeight: 700,
-                        cursor: "pointer"
-                      }}
-                    >
-                      🇳🇵 NEP
-                    </button>
-                  </div>
+
                 </div>
 
                 {/* Dual Upload Inputs for Intro */}
@@ -1088,45 +1050,7 @@ export function CallVoiceSettings() {
                     </label>
                   </div>
 
-                  {/* Outro Language Toggle */}
-                  <div style={{ display: "flex", gap: "4px", background: "var(--surface)", padding: "3px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
-                    <button
-                      onClick={() => {
-                        setInstructionVoiceLang("en");
-                        handleSaveConfig({ instruction_voice_lang: "en" });
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "none",
-                        background: instructionVoiceLang === "en" ? "var(--accent)" : "transparent",
-                        color: instructionVoiceLang === "en" ? "#000" : "var(--text-dim)",
-                        fontSize: "10.5px",
-                        fontWeight: 700,
-                        cursor: "pointer"
-                      }}
-                    >
-                      🇬🇧 ENG
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInstructionVoiceLang("ne");
-                        handleSaveConfig({ instruction_voice_lang: "ne" });
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "none",
-                        background: instructionVoiceLang === "ne" ? "var(--accent)" : "transparent",
-                        color: instructionVoiceLang === "ne" ? "#000" : "var(--text-dim)",
-                        fontSize: "10.5px",
-                        fontWeight: 700,
-                        cursor: "pointer"
-                      }}
-                    >
-                      🇳🇵 NEP
-                    </button>
-                  </div>
+
                 </div>
 
                 {/* Dual Upload Inputs for Outro */}
@@ -1230,48 +1154,7 @@ export function CallVoiceSettings() {
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-            {/* Universal Language Switch Toggle for 1-90 Calls */}
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--surface-2)", padding: "4px 8px", borderRadius: "999px", border: "1.5px solid var(--border-2)" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", marginRight: "4px" }}>Universal Language:</span>
-              <button
-                onClick={() => {
-                  setAudioLang("en");
-                  handleSaveConfig({ audio_language: "en" });
-                }}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: "999px",
-                  border: "none",
-                  background: audioLang === "en" ? "var(--accent)" : "transparent",
-                  color: audioLang === "en" ? "#000" : "var(--text-dim)",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.2s"
-                }}
-              >
-                🇬🇧 ENG
-              </button>
-              <button
-                onClick={() => {
-                  setAudioLang("ne");
-                  handleSaveConfig({ audio_language: "ne" });
-                }}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: "999px",
-                  border: "none",
-                  background: audioLang === "ne" ? "var(--accent)" : "transparent",
-                  color: audioLang === "ne" ? "#000" : "var(--text-dim)",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.2s"
-                }}
-              >
-                🇳🇵 NEP
-              </button>
-            </div>
+
 
             <input
               type="text"

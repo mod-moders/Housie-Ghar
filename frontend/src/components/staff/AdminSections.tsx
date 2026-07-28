@@ -964,72 +964,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
             </label>
           </div>
 
-          <div className="hg-form-row" style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Language Switch</span>
-            <div style={{ display: "flex", gap: "12px", maxWidth: "420px" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setForm((prev) => ({ ...prev, audio_language: "en" }));
-                  apiFetch("/api/config", {
-                    method: "PUT",
-                    body: JSON.stringify({ audio_language: "en", welcome_voice_lang: "en", instruction_voice_lang: "en" }),
-                  }).catch(() => {});
-                }}
-                className="hg-btn"
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  padding: "10px 16px",
-                  borderRadius: "999px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: (form.audio_language || config?.audio_language || "en") === "en" ? "var(--accent)" : "var(--surface)",
-                  color: (form.audio_language || config?.audio_language || "en") === "en" ? "var(--accent-ink)" : "var(--text)",
-                  border: (form.audio_language || config?.audio_language || "en") === "en" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
-                  boxShadow: (form.audio_language || config?.audio_language || "en") === "en" ? "0 4px 0 -1px var(--ink)" : "none",
-                  transition: "all 0.2s"
-                }}
-              >
-                <span>🇬🇧 English</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setForm((prev) => ({ ...prev, audio_language: "ne" }));
-                  apiFetch("/api/config", {
-                    method: "PUT",
-                    body: JSON.stringify({ audio_language: "ne", welcome_voice_lang: "ne", instruction_voice_lang: "ne" }),
-                  }).catch(() => {});
-                }}
-                className="hg-btn"
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  padding: "10px 16px",
-                  borderRadius: "999px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: (form.audio_language || config?.audio_language) === "ne" ? "var(--accent)" : "var(--surface)",
-                  color: (form.audio_language || config?.audio_language) === "ne" ? "var(--accent-ink)" : "var(--text)",
-                  border: (form.audio_language || config?.audio_language) === "ne" ? "1.5px solid var(--ink)" : "1.5px solid var(--border-2)",
-                  boxShadow: (form.audio_language || config?.audio_language) === "ne" ? "0 4px 0 -1px var(--ink)" : "none",
-                  transition: "all 0.2s"
-                }}
-              >
-                <span>🇳🇵 Nepali</span>
-              </button>
-            </div>
-          </div>
 
           <div className="mt-4 mb-2">
             <h4 className="font-bold text-sm mb-2 text-dim" style={{ letterSpacing: "0.05em", textTransform: "uppercase" }}>Dividend List</h4>
