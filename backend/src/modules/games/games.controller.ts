@@ -266,6 +266,10 @@ export async function getGames(req: Request, res: Response): Promise<void> {
         bg_music_enabled: game.bg_music_enabled !== false,
         intro_mode: game.intro_mode || 'Audio',
         outro_mode: game.outro_mode || 'TTS',
+        // Selected by the query above but never returned, which left the whole
+        // single-ticket UI branching on `undefined` on the client. Also what the
+        // lobby keys the futuristic bonus banner off.
+        single_ticket_only: game.single_ticket_only === true,
         prize_pool: formattedPrizes.map((row) => ({
           prize_id: row.prize_id,
           formatted_claim_id: (row as any).formatted_claim_id,
@@ -377,6 +381,8 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       bg_music_enabled: game.bg_music_enabled !== false,
       intro_mode: game.intro_mode || 'Audio',
       outro_mode: game.outro_mode || 'TTS',
+      // See the note in getGames above — selected but never returned until now.
+      single_ticket_only: game.single_ticket_only === true,
       prize_pool: formattedPrizes.map((row) => ({
         prize_id: row.prize_id,
         formatted_claim_id: (row as any).formatted_claim_id,

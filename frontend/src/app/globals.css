@@ -4023,6 +4023,70 @@ select option {
   color: oklch(0.85 0.18 90) !important;
 }
 
+/* ── Futuristic preset — bonus / single-ticket games ──────────────────────────
+   Applied by getPresetClass() whenever a game has single_ticket_only set, so it
+   wins over the four title-matched presets and needs no new title convention.
+
+   Built entirely from gradients rather than a photograph: it costs no asset
+   bytes, stays crisp at any card size, and is deliberately unlike the four
+   photographic banners instead of being a poor imitation of them. Layer order
+   below is top-most first, which is how background-image stacks.
+
+   The shared .hg-card-preset::before readability scrim is left completely alone
+   — every decorative layer here lives on the element's own background, so the
+   dark overlay that keeps the title legible still sits on top of all of it. */
+.hg-card-preset--futuristic {
+  background-color: #05070f !important;
+  /* Every value here is tuned to survive the shared .hg-card-preset::before
+     scrim, which lays 35%–75% black over the whole card. Read in isolation these
+     look too hot; through the scrim they land. Do not tone them down without
+     checking the card as rendered. */
+  background-image:
+    /* holographic sheen across the upper left */
+    linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.16) 43%, transparent 60%),
+    /* cyan horizon glow rising from the bottom edge */
+    radial-gradient(130% 90% at 50% 120%, rgba(0, 229, 255, 0.95) 0%, rgba(0, 229, 255, 0) 64%),
+    /* magenta counter-glow so it is not a single flat hue */
+    radial-gradient(100% 80% at 8% -14%, rgba(217, 70, 239, 0.75) 0%, rgba(217, 70, 239, 0) 60%),
+    /* scanline grid */
+    repeating-linear-gradient(0deg, rgba(120, 245, 255, 0.34) 0 1px, transparent 1px 100%),
+    repeating-linear-gradient(90deg, rgba(120, 245, 255, 0.22) 0 1px, transparent 1px 100%),
+    /* deep field underneath everything */
+    linear-gradient(160deg, #16226b 0%, #070c24 55%, #2a0b5e 100%) !important;
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 26px,
+    34px 100%,
+    100% 100% !important;
+  background-position: center !important;
+  background-repeat:
+    no-repeat, no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+  border: 1.5px solid rgba(0, 229, 255, 0.45) !important;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.55),
+    0 0 22px rgba(0, 229, 255, 0.16),
+    inset 0 0 22px rgba(0, 229, 255, 0.12) !important;
+}
+.hg-card-preset--futuristic .hg-prog-pct {
+  color: #6ff2ff !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.hg-card-preset--futuristic .hg-prog-track {
+  background: rgba(0, 229, 255, 0.14) !important;
+}
+.hg-card-preset--futuristic .hg-prog-booked {
+  background: linear-gradient(90deg, #22d3ee, #a855f7) !important;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5) !important;
+}
+.hg-card-preset--futuristic .hg-badge {
+  border-color: rgba(0, 229, 255, 0.5) !important;
+  background: rgba(0, 229, 255, 0.14) !important;
+  color: #6ff2ff !important;
+}
+
 /* Inner elements contrast overrides */
 .hg-card-preset .hg-card-title {
   color: #ffffff !important;

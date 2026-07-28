@@ -485,7 +485,7 @@ export function OperatorHudSection() {
             {games.map((g) => {
               const pct = Math.round((g.sold_count / g.total_tickets) * 100) || 0;
               const dateStr = fmtDateTime(g.scheduled_at);
-              const presetClass = getPresetClass(g.title) || "";
+              const presetClass = getPresetClass(g.title, g.single_ticket_only) || "";
               return (
                 <div 
                   key={g.game_id} 
@@ -1453,7 +1453,7 @@ export function ShareGamesSection() {
       ) : (
         <div className="hg-fill-grid">
           {upcoming.map((g) => {
-            const presetClass = getPresetClass(g.title);
+            const presetClass = getPresetClass(g.title, g.single_ticket_only);
             return (
               <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ display: "flex", flexDirection: "column", minHeight: "128px", position: "relative" }}>
                 <div>
@@ -1500,7 +1500,7 @@ export function ShareGamesSection() {
         <div className="hg-fill-grid">
           {completed.map((g) => {
             const wins = g.prize_pool.filter((p) => p.claimed).length;
-            const presetClass = getPresetClass(g.title);
+            const presetClass = getPresetClass(g.title, g.single_ticket_only);
             return (
               <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ display: "flex", flexDirection: "column", minHeight: "128px", position: "relative" }}>
                 <div>

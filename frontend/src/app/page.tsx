@@ -52,7 +52,7 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
   const myTicketsCount = game.my_tickets_count ?? 0;
   const totalPool = game.prize_pool.reduce((s, p) => s + p.prize_amount, 0);
   const when = formatWhen(game.scheduled_at);
-  const presetClass = getPresetClass(game.title);
+  const presetClass = getPresetClass(game.title, game.single_ticket_only);
 
   return (
     <article className={`hg-card${sold && !isLive ? " is-sold" : ""}${isLive ? " is-live" : ""}${presetClass ? " " + presetClass : ""}${compact ? " hg-card--compact" : ""}`}>
@@ -120,7 +120,7 @@ function PastGameCard({ game }: { game: GameSummary }) {
   const [showWinners, setShowWinners] = useState(false);
   const when = formatWhen(game.completed_at || game.scheduled_at);
   const claimedPrizes = game.prize_pool.filter(p => p.claimed);
-  const presetClass = getPresetClass(game.title);
+  const presetClass = getPresetClass(game.title, game.single_ticket_only);
 
   return (
     <article className={`hg-card${presetClass ? " " + presetClass : ""}`} style={{ opacity: 0.9 }}>

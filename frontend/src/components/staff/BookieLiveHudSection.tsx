@@ -21,7 +21,7 @@ function GameCard({ game, goLive }: { game: GameSummary; goLive: (id: string) =>
   const isLive = game.game_status === "Live" || game.game_status === "Paused" || game.game_status === "Draw_Ended";
   const pct = Math.round((game.sold_count / game.total_tickets) * 100) || 0;
   const dateStr = formatWhen(game.scheduled_at).date + ", " + formatWhen(game.scheduled_at).time;
-  const presetClass = getPresetClass(game.title) || "";
+  const presetClass = getPresetClass(game.title, game.single_ticket_only) || "";
 
   return (
     <div 
@@ -67,7 +67,7 @@ function PastGameCard({ game }: { game: GameSummary }) {
   const [showWinners, setShowWinners] = useState(false);
   const when = formatWhen(game.completed_at || game.scheduled_at);
   const claimedPrizes = game.prize_pool.filter(p => p.claimed);
-  const presetClass = getPresetClass(game.title) || "";
+  const presetClass = getPresetClass(game.title, game.single_ticket_only) || "";
 
   return (
     <div className={`hg-fill-card hg-card ${presetClass}`} style={{ opacity: 0.9 }}>

@@ -1179,7 +1179,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
           <div className="hg-fill-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px", padding: "4px 0" }}>
             {games.map((g) => {
               const pct = fillPct(g);
-              const presetClass = getPresetClass(g.title);
+              const presetClass = getPresetClass(g.title, g.single_ticket_only);
               return (
                 <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`} style={{ margin: 0 }}>
                   <div className="hg-fill-top">
@@ -1926,7 +1926,7 @@ export function FillingSection() {
       <div className="hg-fill-grid">
         {games.map((g) => {
           const pct = fillPct(g);
-          const presetClass = getPresetClass(g.title);
+          const presetClass = getPresetClass(g.title, g.single_ticket_only);
           return (
             <div key={g.game_id} className={`hg-fill-card${presetClass ? " " + presetClass : ""}`}>
               <div className="hg-fill-top">
