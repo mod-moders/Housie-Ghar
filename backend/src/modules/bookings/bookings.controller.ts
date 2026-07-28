@@ -1376,10 +1376,12 @@ export async function getAgentHistory(req: AuthenticatedRequest, res: Response):
        FROM Bookings b
        JOIN Scheduled_Games g ON b.game_id = g.game_id
        JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
-       WHERE b.assigned_agent_id = $1 AND b.booking_status IN ('Sold', 'Cancelled')
+       WHERE b.assigned_agent_id = $1 
+         AND b.booking_status IN ('Sold', 'Cancelled')
+         AND COALESCE(b.confirmed_at, b.rejected_at, b.locked_at) >= NOW() - INTERVAL '7 days'
        GROUP BY b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.booking_status, b.confirmed_at, b.rejected_at, b.locked_at, g.title
        ORDER BY processed_at DESC
-       LIMIT 10`,
+       LIMIT 500`,
       [agentId]
     );
 
@@ -1419,11 +1421,12 @@ export async function getStaffDues(req: AuthenticatedRequest, res: Response): Pr
        JOIN Tickets t ON t.ticket_id = ANY(b.ticket_ids)
        WHERE b.booking_status = 'Sold'
          AND r.role_name IN ('Superadmin', 'Financial Admin', 'Operator')
+         AND (b.due_settled = FALSE OR b.due_settled_at >= NOW() - INTERVAL '7 days')
        GROUP BY b.booking_id, b.formatted_booking_id, b.housie_name, b.total_amount, b.confirmed_at, b.due_settled, b.due_settled_at,
                 b.player_credit_applied, b.reward_amount_waived,
                 g.title, g.scheduled_at, g.ticket_price, u.full_name, r.role_name
        ORDER BY b.confirmed_at DESC
-       LIMIT 200`
+       LIMIT 500`
     );
 
     const dues = result.rows.map((row) => ({
