@@ -2511,7 +2511,23 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
    top/max-height key off --hg-live-top-h, measured at runtime since the nav's height can change
    if a long game title wraps to 2 lines (see LiveBoardContent.tsx's ResizeObserver). */
 .hg-live-sticky{
-  position:sticky;top:var(--hg-live-top-h,60px);z-index:25;background:var(--bg);
+  position:sticky;top:var(--hg-live-top-h,60px);z-index:25;
+  /* A pinned band has to be OPAQUE. --bg carries alpha in EVERY theme on purpose —
+     it is designed to layer over the fixed --bg-image that .hg-root::before paints —
+     so at 0.68 the board scrolled visibly through the cage instead of behind it.
+     Relative colour syntax takes the same token at full opacity, so the band still
+     tracks whatever skin is active instead of hardcoding one theme's black. Every
+     theme's --bg base is already the outer stop of its own --bg-image gradient
+     (dark #0b0b0a, luxury_gold #0a0906), so the flat band meets the page ground
+     without a seam.
+     THE `/ 1` IS LOAD-BEARING: in rgb(from …) an omitted alpha inherits the ORIGIN
+     colour's alpha, it does not default to 1, so `rgb(from var(--bg) r g b)` comes
+     back still 0.68 transparent and changes nothing. Verified in-browser.
+     The plain var(--bg) above is the fallback for engines without relative colour
+     syntax — no worse than the current behaviour.
+     Desktop never sees this: the min-width:900px block makes this display:contents. */
+  background:var(--bg);
+  background:rgb(from var(--bg) r g b / 1);
   max-height:min(58dvh,calc(100dvh - var(--hg-live-top-h,60px) - 16px));overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:thin;scrollbar-color:var(--border-2) transparent;
