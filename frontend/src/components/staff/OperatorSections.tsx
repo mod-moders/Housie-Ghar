@@ -79,7 +79,13 @@ export function OperatorHudSection() {
   }, [effectiveDrawnNumbers, count]);
 
   const [muted, setMuted] = useState(false);
-  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
+  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">(() => {
+    if (typeof window !== "undefined" && selectedId) {
+      const saved = sessionStorage.getItem(`hg_game_lang_${selectedId}`);
+      if (saved === "en" || saved === "ne") return saved;
+    }
+    return "ne";
+  });
   const audioCtx = useRef<AudioContext | null>(null);
   const hasUserOverriddenLanguageRef = useRef<boolean>(false);
 
@@ -344,6 +350,16 @@ export function OperatorHudSection() {
     setWinOverlay(null);
     setNumberCallPlaying(false);
     activeCallIdRef.current = 0;
+
+    // Restore language override for selected game if exists
+    hasUserOverriddenLanguageRef.current = false;
+    if (typeof window !== "undefined" && selectedId) {
+      const saved = sessionStorage.getItem(`hg_game_lang_${selectedId}`);
+      if (saved === "en" || saved === "ne") {
+        hasUserOverriddenLanguageRef.current = true;
+        setLiveLanguage(saved);
+      }
+    }
   }, [selectedId, reset]);
 
   useSSE(selectedId, onEvent);
@@ -577,8 +593,12 @@ export function OperatorHudSection() {
               <span>{game.title} LIVE Deck</span>
               <button
                 onClick={() => {
+                  const next = liveLanguage === "ne" ? "en" : "ne";
                   hasUserOverriddenLanguageRef.current = true;
-                  setLiveLanguage((lang) => lang === "ne" ? "en" : "ne");
+                  if (typeof window !== "undefined" && selectedId) {
+                    sessionStorage.setItem(`hg_game_lang_${selectedId}`, next);
+                  }
+                  setLiveLanguage(next);
                 }}
                 style={{
                   background: "var(--surface-2)",

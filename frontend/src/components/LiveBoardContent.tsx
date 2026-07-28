@@ -83,9 +83,24 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [revealed, setRevealed] = useState(true);
   const [muted, setMuted] = useState(false);
-  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">("ne");
+  const [liveLanguage, setLiveLanguage] = useState<"en" | "ne">(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`hg_game_lang_${gameId}`);
+      if (saved === "en" || saved === "ne") return saved;
+    }
+    return "ne";
+  });
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const hasUserOverriddenLanguageRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`hg_game_lang_${gameId}`);
+      if (saved === "en" || saved === "ne") {
+        hasUserOverriddenLanguageRef.current = true;
+      }
+    }
+  }, [gameId]);
 
   useEffect(() => {
     if (hasUserOverriddenLanguageRef.current) return;
@@ -883,8 +898,12 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               
               <button
                 onClick={() => {
+                  const next = liveLanguage === "ne" ? "en" : "ne";
                   hasUserOverriddenLanguageRef.current = true;
-                  setLiveLanguage((lang) => lang === "ne" ? "en" : "ne");
+                  if (typeof window !== "undefined") {
+                    sessionStorage.setItem(`hg_game_lang_${game_id}`, next);
+                  }
+                  setLiveLanguage(next);
                 }}
                 style={{
                   background: "var(--surface-2)",
