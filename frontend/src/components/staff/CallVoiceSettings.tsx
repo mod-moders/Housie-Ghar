@@ -64,15 +64,15 @@ function SpotifyAudioControl({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface)", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)", marginTop: "6px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface)", padding: "clamp(10px, 2.5vw, 14px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)", marginTop: "6px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>{title}</span>
-          <span className="hg-dim" style={{ fontSize: "10.5px", display: "block" }}>{subtitle}</span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+          <span className="hg-dim" style={{ fontSize: "10.5px", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</span>
         </div>
         
         {/* Play/Pause/Stop Buttons */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
           <button
             onClick={() => {
               if (isPlaying) {
@@ -536,10 +536,18 @@ export function CallVoiceSettings() {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       
-      {/* Premium Tab Navigation Bar */}
+      {/* Hide Scrollbars Styling */}
+      <style>{`
+        .hg-tabs-scroll::-webkit-scrollbar {
+          display: none !important;
+        }
+      `}</style>
+
+      {/* Premium Tab Navigation Bar (Side-scrollable on mobile) */}
       <div 
+        className="hg-tabs-scroll"
         style={{
           display: "flex",
           gap: "8px",
@@ -549,24 +557,29 @@ export function CallVoiceSettings() {
           border: "2px solid var(--border-2)",
           alignSelf: "flex-start",
           width: "100%",
-          maxWidth: "600px",
-          boxShadow: "var(--card-shadow-sm)"
+          maxWidth: "100%",
+          overflowX: "auto",
+          boxShadow: "var(--card-shadow-sm)",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch"
         }}
       >
         <button
           onClick={() => setActiveTab("mixer")}
           style={{
-            flex: 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
-            padding: "12px 16px",
+            padding: "10px 18px",
             borderRadius: "12px",
             fontSize: "13px",
             fontWeight: 700,
             cursor: "pointer",
             transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
             border: activeTab === "mixer" ? "2.5px solid #000" : "none",
             ...(activeTab === "mixer"
               ? {
@@ -587,17 +600,18 @@ export function CallVoiceSettings() {
         <button
           onClick={() => setActiveTab("announcements")}
           style={{
-            flex: 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
-            padding: "12px 16px",
+            padding: "10px 18px",
             borderRadius: "12px",
             fontSize: "13px",
             fontWeight: 700,
             cursor: "pointer",
             transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
             border: activeTab === "announcements" ? "2.5px solid #000" : "none",
             ...(activeTab === "announcements"
               ? {
@@ -618,17 +632,18 @@ export function CallVoiceSettings() {
         <button
           onClick={() => setActiveTab("directory")}
           style={{
-            flex: 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
-            padding: "12px 16px",
+            padding: "10px 18px",
             borderRadius: "12px",
             fontSize: "13px",
             fontWeight: 700,
             cursor: "pointer",
             transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
             border: activeTab === "directory" ? "2.5px solid #000" : "none",
             ...(activeTab === "directory"
               ? {
@@ -657,11 +672,11 @@ export function CallVoiceSettings() {
             </div>
           </div>
 
-          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: "20px" }}>
+          <div style={{ padding: "clamp(12px, 3vw, 24px)", display: "flex", flexDirection: "column", gap: "clamp(12px, 4vw, 20px)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "clamp(12px, 4vw, 20px)" }}>
               
               {/* Master Volume & Live Control */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Master Live Audio Control</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: callerEnabled ? "var(--accent)" : "var(--text-dim)" }}>
@@ -697,7 +712,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* Background Music */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Background Music</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: bgMusicEnabled ? "var(--accent)" : "var(--text-dim)" }}>
@@ -766,7 +781,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* Cage Sound */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Cage Sound</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: cageSound ? "var(--accent)" : "var(--text-dim)" }}>
@@ -859,7 +874,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* Celebration Notification */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>Celebration Notification</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "11px", color: celebrationSound ? "var(--accent)" : "var(--text-dim)" }}>
@@ -966,11 +981,11 @@ export function CallVoiceSettings() {
             </div>
           </div>
           
-          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(400px, 100%), 1fr))", gap: "20px" }}>
+          <div style={{ padding: "clamp(12px, 3vw, 24px)", display: "flex", flexDirection: "column", gap: "clamp(12px, 4vw, 20px)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "clamp(12px, 4vw, 20px)" }}>
               
               {/* 1. English Intro / Welcome Audio */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>1. 🇬🇧 English Intro Audio</span>
@@ -1043,7 +1058,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* 2. Nepali Intro / Welcome Audio */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>2. 🇳🇵 Nepali Intro Audio</span>
@@ -1116,7 +1131,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* 3. English Outro / Instruction Audio */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>3. 🇬🇧 English Outro Audio</span>
@@ -1189,7 +1204,7 @@ export function CallVoiceSettings() {
               </div>
 
               {/* 4. Nepali Outro / Instruction Audio */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--surface-2)", padding: "clamp(12px, 3vw, 16px)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border-2)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text)" }}>4. 🇳🇵 Nepali Outro Audio</span>
