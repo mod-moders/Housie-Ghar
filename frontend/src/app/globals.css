@@ -1210,9 +1210,15 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 .hg-dim{color:var(--text-dim)}
 
 /* ============ NAV ============ */
+/* Opaque for the same reason as .hg-live-top — see the note there. --bg is meant
+   for surfaces sitting ON the fixed --bg-image, not for ones that have to occlude
+   what scrolls under them, and at 0.68 the page was visible straight through the
+   nav on every screen that scrolls. */
 .hg-nav{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
   padding:11px 24px;
-  background:var(--bg);border-bottom:1px solid var(--border-light)}
+  background:var(--bg);
+  background:rgb(from var(--bg) r g b / 1);
+  border-bottom:1px solid var(--border-light)}
 .hg-logo{display:flex;align-items:center;gap:10px;background:none;border:0;cursor:pointer;
   padding:0;color:var(--text)}
 .hg-nav-left{display:flex;align-items:center}
@@ -1989,9 +1995,11 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
 
 /* ============ GAME ROOM ============ */
 .hg-screen-room{padding-bottom:0}
+/* Booking page's pinned header. Opaque for the same reason as .hg-live-top, and
+   backdrop-filter dropped with it — nothing shows through an opaque layer to blur. */
 .hg-room-head{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;padding:12px 16px;
   background:color-mix(in srgb,var(--bg) 88%,transparent);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  background:rgb(from var(--bg) r g b / 1)}
 .hg-back{display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;color:var(--text);cursor:pointer}
 .hg-room-titles h1{font-size:16px;font-weight:700;line-height:1.1}
 .hg-room-titles span{font-size:11.5px;color:var(--text-dim)}
@@ -2040,10 +2048,12 @@ h1,h2,h3{font-family:var(--font-head);margin:0;letter-spacing:-.01em;text-wrap:b
   border:1px solid var(--border);background:var(--elevate);color:var(--text);display:grid;place-items:center;cursor:pointer}
 
 /* ---- action footer ---- */
+/* Booking page's pinned Book Now footer — same treatment as .hg-room-head above. */
 .hg-action-foot{position:sticky;bottom:0;z-index:35;display:flex;flex-direction:column;gap:10px;
   padding:13px 16px calc(14px + env(safe-area-inset-bottom));
-  background:color-mix(in srgb,var(--bg) 94%,transparent);border-top:1.5px solid var(--card-line);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  background:color-mix(in srgb,var(--bg) 94%,transparent);
+  background:rgb(from var(--bg) r g b / 1);
+  border-top:1.5px solid var(--card-line)}
 .hg-name-field{display:flex;flex-direction:column;gap:4px}
 .hg-name-input{width:100%;color:var(--text);font:600 14px var(--font-head);outline:none;
   border-radius:999px;border:1.5px solid var(--border-2);background:var(--surface);padding:13px 18px}
@@ -3284,7 +3294,10 @@ select option {
 .hg-burger:active,.hg-staff-btn:active,.hg-theme-btn:active,.hg-back:active,.hg-mute:active{transform:translateY(2px);box-shadow:none}
 .hg-nav-sheet{border:1.5px solid var(--card-line);border-radius:0 0 var(--radius-lg) var(--radius-lg);
   box-shadow:var(--card-shadow);backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);}
-.hg-nav{background:var(--bg);padding:14px 18px}
+/* Re-states the opaque background from the base .hg-nav rule: this later
+   declaration would otherwise put the translucent token back and let the page
+   scroll through the nav again. */
+.hg-nav{background:var(--bg);background:rgb(from var(--bg) r g b / 1);padding:14px 18px}
 
 /* logo image — intrinsic sizing via height prop, width:auto */
 .hg-logo img{display:block}
@@ -3361,7 +3374,10 @@ select option {
   .hg-reactions{max-width:none}
   .hg-nav{
     padding:16px 40px;
+    /* Re-states the opaque background — a bare var(--bg) here puts the alpha back
+       and the page scrolls through the nav again. See the base .hg-nav rule. */
     background:var(--bg);
+    background:rgb(from var(--bg) r g b / 1);
     border-bottom:1.5px solid var(--card-line);
   }
   .hg-nav-link{font-size:14.5px;padding:8px 14px}
