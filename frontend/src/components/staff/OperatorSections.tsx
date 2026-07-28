@@ -1273,7 +1273,7 @@ export function ShareGamesSection() {
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
   const completed = games
-    .filter((g) => g.game_status === "Completed")
+    .filter((g) => g.game_status === "Completed" || g.game_status === "Draw_Ended")
     .sort((a, b) => new Date(b.completed_at ?? b.scheduled_at).getTime() - new Date(a.completed_at ?? a.scheduled_at).getTime())
     .slice(0, 8);
 

@@ -109,7 +109,7 @@ export function buildScheduledCaption(game: GameSummary): string {
     ``,
     prizeLines,
     ``,
-    `🎟️ Tickets: BUY TICKETS @ ${inr(game.ticket_price)} ONLY`,
+    `🎟️ Tickets: ${game.ticket_price === 0 ? "FREE" : `BUY TICKETS @ ${inr(game.ticket_price)} ONLY`}`,
     ``,
     `Pair your ${seg.label.toLowerCase()} with a winning ticket. Secure your lucky numbers and let the fun begin!`,
     ``,
@@ -602,7 +602,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   ctx.textAlign = "center";
   ctx.fillStyle = INK;
   ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 11);
+  ctx.fillText(game.ticket_price === 0 ? "FREE ENTRY" : `TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 11);
 
   ctx.fillStyle = DIM;
   ctx.font = "italic 500 26px 'DM Sans', system-ui, sans-serif";
