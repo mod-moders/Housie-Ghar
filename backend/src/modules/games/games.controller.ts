@@ -798,31 +798,145 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
   const game_id = req.params.game_id as string;
   const actor = req.user!;
 
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     // Check if game exists and is not Live or Paused
-    const gameRes = await pool.query(
+    const gameRes = await client.query(
       `SELECT game_status, title FROM Scheduled_Games WHERE game_id = $1`,
       [game_id]
     );
 
     if (gameRes.rowCount === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ message: 'Game not found' });
       return;
     }
 
     const game = gameRes.rows[0];
     if (game.game_status === 'Live' || game.game_status === 'Paused') {
+      await client.query('ROLLBACK');
       res.status(400).json({ message: 'Cannot delete a game that is currently live or paused' });
       return;
     }
 
-    // Delete related records manually because foreign keys have NO ACTION
-    await pool.query(`DELETE FROM Bookings WHERE game_id = $1`, [game_id]);
-    await pool.query(`DELETE FROM Game_Logs WHERE game_id = $1`, [game_id]);
-    await pool.query(`DELETE FROM Skip_Alerts WHERE game_id = $1`, [game_id]);
+    // Retrieve all bookings for this game to refund bookies and deduct tickets
+    const bookingsRes = await client.query(
+      `SELECT booking_id, assigned_agent_id, total_amount, booking_status, ticket_ids FROM Bookings WHERE game_id = $1`,
+      [game_id]
+    );
 
-    // Delete the game (cascades to Tickets and Prize_Pool)
-    await pool.query(`DELETE FROM Scheduled_Games WHERE game_id = $1`, [game_id]);
+    const bookingIds: string[] = [];
+    for (const b of bookingsRes.rows) {
+      bookingIds.push(b.booking_id);
+      if (b.booking_status === 'Sold' && b.assigned_agent_id) {
+        // Refund bookie's wallet
+        const refundAmt = parseFloat(b.total_amount);
+        await client.query(
+          `UPDATE Users SET current_balance = current_balance + $1 WHERE user_id = $2`,
+          [refundAmt, b.assigned_agent_id]
+        );
+        // Deduct ticket count from bookie's lifetime tickets sold
+        const ticketCount = Array.isArray(b.ticket_ids) ? b.ticket_ids.length : 0;
+        if (ticketCount > 0) {
+          await client.query(
+            `UPDATE Users SET lifetime_tickets_sold = GREATEST(0, lifetime_tickets_sold - $1) WHERE user_id = $2`,
+            [ticketCount, b.assigned_agent_id]
+          );
+        }
+      }
+    }
+
+    // Find unique players who had sold bookings in this game, check if they qualified in this game, and reset referrals
+    const playersRes = await client.query(
+      `SELECT DISTINCT housie_name FROM Bookings WHERE game_id = $1 AND booking_status = 'Sold'`,
+      [game_id]
+    );
+
+    for (const p of playersRes.rows) {
+      const housieName = p.housie_name;
+      // Check if they have sold bookings in other games
+      const otherBookingsRes = await client.query(
+        `SELECT COUNT(*) FROM Bookings WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1)) AND game_id <> $2 AND booking_status = 'Sold'`,
+        [housieName, game_id]
+      );
+      const otherCount = parseInt(otherBookingsRes.rows[0].count, 10);
+      if (otherCount === 0) {
+        // Qualified only in this deleted game -> reset qualification
+        const resetRes = await client.query(
+          `UPDATE Players
+              SET referral_qualified_at = NULL
+            WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))
+              AND referral_qualified_at IS NOT NULL
+            RETURNING referred_by`,
+          [housieName]
+        );
+        if (resetRes.rows.length > 0 && resetRes.rows[0].referred_by) {
+          const referrerId = resetRes.rows[0].referred_by;
+          // Decrement referrer's qualified referrals count
+          await client.query(
+            `UPDATE Players
+                SET qualified_referrals = GREATEST(0, qualified_referrals - 1)
+              WHERE player_id = $1`,
+            [referrerId]
+          );
+        }
+      }
+    }
+
+    // Retrieve and reverse promoter commissions for this game
+    const commissionsRes = await client.query(
+      `SELECT promoter_id, amount FROM Promoter_Commissions WHERE game_id = $1`,
+      [game_id]
+    );
+
+    for (const c of commissionsRes.rows) {
+      const commAmt = parseFloat(c.amount);
+      await client.query(
+        `UPDATE Users SET current_balance = GREATEST(0, current_balance - $1) WHERE user_id = $2`,
+        [commAmt, c.promoter_id]
+      );
+    }
+
+    // Find spent reward redemptions for this game and refund points/credits
+    const redemptionsRes = await client.query(
+      `SELECT redeemer_type, bookie_id, player_id, units_spent FROM Reward_Redemptions WHERE game_id = $1`,
+      [game_id]
+    );
+
+    for (const r of redemptionsRes.rows) {
+      const units = parseInt(r.units_spent, 10);
+      if (r.redeemer_type === 'Bookie' && r.bookie_id) {
+        await client.query(
+          `UPDATE Users SET reward_points_redeemed = GREATEST(0, reward_points_redeemed - $1) WHERE user_id = $2`,
+          [units, r.bookie_id]
+        );
+      } else if (r.redeemer_type === 'Player' && r.player_id) {
+        await client.query(
+          `UPDATE Players SET reward_credits_redeemed = GREATEST(0, reward_credits_redeemed - $1) WHERE player_id = $2`,
+          [units, r.player_id]
+        );
+      }
+    }
+
+    // Delete Wallet_Ledger entries referencing this game's bookings or promoter commission references
+    if (bookingIds.length > 0) {
+      await client.query(
+        `DELETE FROM Wallet_Ledger
+          WHERE (reference_type = 'Booking' AND reference_id = ANY($1))
+             OR (reference_type = 'PromoterCommission' AND reference_id = ANY($1))`,
+        [bookingIds]
+      );
+    }
+
+    // Delete manual bookings/overflow skip alerts, logs, redemptions, commissions, and scheduled game itself
+    await client.query(`DELETE FROM Reward_Redemptions WHERE game_id = $1`, [game_id]);
+    await client.query(`DELETE FROM Promoter_Commissions WHERE game_id = $1`, [game_id]);
+    await client.query(`DELETE FROM Bookings WHERE game_id = $1`, [game_id]);
+    await client.query(`DELETE FROM Game_Logs WHERE game_id = $1`, [game_id]);
+    await client.query(`DELETE FROM Skip_Alerts WHERE game_id = $1`, [game_id]);
+    await client.query(`DELETE FROM Scheduled_Games WHERE game_id = $1`, [game_id]);
 
     await logAuditEvent({
       userId: actor.userId,
@@ -831,16 +945,21 @@ export async function deleteGame(req: AuthenticatedRequest, res: Response): Prom
       action: 'DELETE_GAME',
       targetType: 'Scheduled_Game',
       targetId: game_id,
-      targetDescription: `Deleted game "${game.title}"`,
+      targetDescription: `Deleted game "${game.title}" and cleanly reverted all associated stats/wallet transactions`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
 
+    await client.query('COMMIT');
+
     io.emit('game_list_update', { action: 'delete', game_id });
     res.json({ message: 'Game deleted successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error deleting game:', error);
     res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
   }
 }
 

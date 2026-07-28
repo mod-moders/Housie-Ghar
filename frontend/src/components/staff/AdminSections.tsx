@@ -1189,6 +1189,16 @@ export function GamesSection({ me }: { me: AuthUser }) {
                   <span className="hg-row-ctrls" style={{ display: "flex", gap: 6, justifyContent: "flex-start", flexWrap: "nowrap" }}>
                     <Button variant="ghost" size="sm" onClick={() => viewResults(g)}>View Results</Button>
                     <Button variant="ghost" size="sm" onClick={() => setSalesGameId(g.game_id)}>View Tickets</Button>
+                    {me.role_name === "Superadmin" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        style={{ color: "var(--danger)", borderColor: "rgba(239, 68, 68, 0.2)" }}
+                        onClick={() => act(g.game_id, "delete")}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </span>
                 </div>
               );
