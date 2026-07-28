@@ -334,6 +334,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     };
 
     let housieNameChanged = false;
+    let oldHousieName: string | null = null;
     if (housie_name !== undefined && housie_name !== null && housie_name !== '') {
       const cleanHousieName = housie_name.trim().replace(/\s+/g, ' ');
       const nameCheck = validateHousieName(cleanHousieName);
@@ -370,6 +371,7 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
           setField('housie_name', cleanHousieName);
           setField('housie_name_changes', (playerRow.housie_name_changes || 0) + 1);
           housieNameChanged = true;
+          oldHousieName = playerRow.housie_name;
         }
       }
     }
@@ -399,6 +401,22 @@ export async function updateProfile(req: any, res: Response): Promise<void> {
     const updatedPlayer = result.rows[0];
 
     if (housieNameChanged) {
+      if (oldHousieName) {
+        const newName = updatedPlayer.housie_name;
+        await pool.query(
+          `UPDATE Tickets SET owner_housie_name = $1 WHERE LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2))`,
+          [newName, oldHousieName]
+        );
+        await pool.query(
+          `UPDATE Bookings SET housie_name = $1 WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($2))`,
+          [newName, oldHousieName]
+        );
+        await pool.query(
+          `UPDATE Prize_Pool SET winner_housie_name = REPLACE(winner_housie_name, $1, $2) WHERE winner_housie_name LIKE '%' || $1 || '%'`,
+          [oldHousieName, newName]
+        );
+      }
+
       const payload = {
         playerId: updatedPlayer.player_id,
         fullName: updatedPlayer.full_name,
