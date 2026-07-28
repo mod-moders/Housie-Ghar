@@ -126,6 +126,29 @@ export async function signup(req: Request, res: Response): Promise<void> {
 
     res.status(201).json({ token, player });
   } catch (error) {
+    // The uniqueness SELECT above is a check-then-act: between it and this INSERT
+    // sits a bcrypt hash at cost factor 12, which takes hundreds of milliseconds.
+    // Two signups for the same name in that window BOTH pass the check, and the
+    // database — which enforces uniqueness for real, via housie_name UNIQUE and
+    // idx_players_housie_name_lower from migration 047 — rejects the loser with
+    // 23505. That was landing here and being reported as "Internal server error",
+    // which is exactly what a player saw when a double-tap sent two requests: one
+    // created the account, the other came back as a server error.
+    //
+    // The constraint is the authoritative gate; the SELECT is only there to
+    // produce friendly `alternatives` without paying for a failed insert. So a
+    // unique violation on the name is the SAME answer as the pre-check: 409.
+    const pgErr = error as { code?: string; constraint?: string; detail?: string };
+    if (
+      pgErr?.code === '23505' &&
+      `${pgErr.constraint ?? ''} ${pgErr.detail ?? ''}`.toLowerCase().includes('housie_name')
+    ) {
+      res.status(409).json({
+        message: 'Housie name is already taken. Please choose another one.',
+        alternatives: generateAlternatives(cleanHousieName),
+      });
+      return;
+    }
     console.error('Player signup error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }

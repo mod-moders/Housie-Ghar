@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,6 +23,14 @@ export default function SignUp() {
   const [showBookieForm, setShowBookieForm] = useState(false);
 
   const [alternatives, setAlternatives] = useState<string[]>([]);
+
+  // `disabled={loading}` on the button is not enough on its own: setLoading is a
+  // React state update, so the button only actually goes disabled on the next
+  // render. A fast double-tap — and on mobile a single tap that produces both a
+  // touch-derived and a real click — fires a second submit inside that window, and
+  // two concurrent signups for the same name mean one wins and the other comes
+  // back as an error. A ref flips synchronously, so it closes the window.
+  const submittingRef = useRef(false);
 
   function localValidateUsername(name: string): { ok: boolean; error?: string } {
     if (!name) return { ok: false };
@@ -76,6 +84,7 @@ export default function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!housieName) {
       setError("Please fill in a Housie Name.");
       return;
@@ -85,6 +94,7 @@ export default function SignUp() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
     setAlternatives([]);
@@ -118,6 +128,7 @@ export default function SignUp() {
         setAlternatives(errorObj.alternatives);
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
