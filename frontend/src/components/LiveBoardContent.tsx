@@ -229,13 +229,13 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
-        const lang = config?.audio_language || "en";
+        const lang = liveLanguage;
 
         // How many seconds ago the outro should have STARTED. Two anchors, because
         // the two terminal statuses record different things:
         //
         //  - Completed  -> completed_at is set, and the outro trails it by the
-        //                  legacy 5.5s/7s gap.
+        //                  legacy 5.5s/6.5s gap.
         //  - Draw_Ended -> endGameDraw never writes completed_at, so the only
         //                  server-side timestamp is Game_Logs.last_draw_at, which
         //                  the live stream sends as since_last_draw_ms. The outro
@@ -249,11 +249,12 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         let secondsSinceOutroStart: number | null = null;
         const completedAt = game?.completed_at;
         if (completedAt) {
-          const target = new Date(completedAt).getTime() + (lang === "ne" ? 7000 : 5500);
+          const target = new Date(completedAt).getTime() + (lang === "ne" ? 6500 : 5500);
           secondsSinceOutroStart = (Date.now() - target) / 1000;
         } else if (sinceLastDrawMsAtSync !== null && sinceLastDrawAt !== null) {
           const sinceLastDraw = sinceLastDrawMsAtSync + (Date.now() - sinceLastDrawAt);
-          const outroTrail = CAGE_TEASE_MS + (lang === "ne" ? 4000 : 2500) + WIN_CARD_MS;
+          const revealDelay = lang === "ne" ? 3500 : 2500;
+          const outroTrail = CAGE_TEASE_MS + revealDelay + WIN_CARD_MS;
           secondsSinceOutroStart = (sinceLastDraw - outroTrail) / 1000;
         }
 
@@ -299,7 +300,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted, config?.audio_language, sinceLastDrawMsAtSync, sinceLastDrawAt]);
+  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted, liveLanguage, sinceLastDrawMsAtSync, sinceLastDrawAt]);
 
   // Track winners for audio celebration
 
@@ -353,7 +354,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       }
     });
 
-    const revealDelay = config?.audio_language === "ne" ? 4000 : 2500;
+    const revealDelay = liveLanguage === "ne" ? 3500 : 2500;
 
     delay(() => {
       if (activeCallIdRef.current === currentCallId) {
@@ -388,7 +389,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     }, revealDelay);
     // playOutro is no longer listed: the outro belongs to the draw-conclusion step,
     // which now lives in concludeDraw and is reached through a ref.
-  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, config?.audio_language]);
+  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, liveLanguage]);
 
   const flushPendingDraws = useCallback(() => {
     const queued = pendingDrawsRef.current.splice(0);

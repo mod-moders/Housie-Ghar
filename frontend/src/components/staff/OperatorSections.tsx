@@ -210,7 +210,7 @@ export function OperatorHudSection() {
       }
     });
 
-    const revealDelay = config?.audio_language === "ne" ? 4000 : 2500;
+    const revealDelay = liveLanguage === "ne" ? 3500 : 2500;
 
     delay(() => {
       if (activeCallIdRef.current === currentCallId) {
@@ -242,7 +242,7 @@ export function OperatorHudSection() {
       }
     }, revealDelay);
     // playOutro moved to concludeDraw, which is reached through a ref.
-  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, config?.audio_language]);
+  }, [beep, addDrawn, playNumberCall, playCelebration, delay, muted, liveLanguage]);
 
   // Draw-conclusion step: the outro, plus the terminal status that was held back
   // while the number and the winner card had their turn.
