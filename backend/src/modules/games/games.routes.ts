@@ -86,7 +86,7 @@ router.post('/:game_id/pause', authenticateToken, requireRole(['Operator', 'Fina
 router.post('/:game_id/resume', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleResumeGame);
 router.post('/:game_id/stop', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleStopGame);
 router.post('/:game_id/speed', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), handleSpeedChange);
-router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin']), getGameSalesDetails);
+router.get('/:game_id/sales-details', authenticateToken, requireRole(['Operator', 'Financial Admin', 'Superadmin', 'Bookie']), getGameSalesDetails);
 
 // Prize claim specific parameterized endpoints
 // Both claim routes verified the player token inline before, which meant they

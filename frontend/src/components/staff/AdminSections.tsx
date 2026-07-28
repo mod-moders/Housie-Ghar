@@ -1565,6 +1565,9 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
 
 // ── Staff Manual Booking Modal ───────────────────────────────────────────────
 export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId: string; onClose: () => void; onSuccess?: () => void }) {
+  const { user } = useAuthStore();
+  const isBookie = user?.role_name === "Bookie";
+
   const [tickets, setTickets] = useState<Array<{ ticket_id: number; ticket_number: number; status: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [housieName, setHousieName] = useState("");
@@ -1624,7 +1627,8 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
     setSaving(true);
     setError(null);
     try {
-      await apiFetch("/api/bookings/staff/manual-book", {
+      const endpoint = isBookie ? "/api/bookings/agent/direct-sale" : "/api/bookings/staff/manual-book";
+      await apiFetch(endpoint, {
         method: "POST",
         body: JSON.stringify({
           game_id: gameId,
@@ -1632,7 +1636,7 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
           housie_name: housieName.trim()
         })
       });
-      alert("Manual booking confirmed!");
+      alert(isBookie ? "Manual booking confirmed and charged from wallet!" : "Manual booking confirmed!");
       onSuccess?.();
       onClose();
     } catch (err) {
@@ -1650,7 +1654,9 @@ export function StaffManualBookingModal({ gameId, onClose, onSuccess }: { gameId
         <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Manual Ticket Booking</h3>
-            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Direct platform booking without wallet deduction</span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
+              {isBookie ? "Direct booking charged from your wallet" : "Direct platform booking without wallet deduction"}
+            </span>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "var(--text-dim)", padding: 4 }}>
             &times;
