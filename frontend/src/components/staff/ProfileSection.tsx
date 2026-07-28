@@ -8,6 +8,7 @@ import { Icon } from "@/components/Icon";
 import { roleAvatar } from "@/lib/roleAvatar";
 import type { AuthUser } from "@/lib/stores/authStore";
 import { useDialog } from "@/components/DialogProvider";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const INDIAN_STATES = [
   "Andhra Pradesh",
@@ -311,7 +312,7 @@ export function ProfileSection({ me, onUpdated }: { me: AuthUser; onUpdated: (u:
 
           <div>
             <label style={labelStyle}>WhatsApp Number <span style={{ color: "#EF4444" }}>*</span></label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="e.g. 9876543210" />
+            <PhoneInput value={phone} onChange={setPhone} style={inputStyle} placeholder="9876543210" />
             <span style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 4, display: "block" }}>
               Used for booking notifications and account recovery.
             </span>

@@ -10,6 +10,7 @@ import type { PlayerProfile, PlayerStats } from "@/lib/types";
 import { announcePlayerUpdated, clearPlayerToken, setPlayerToken } from "@/lib/playerSession";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { useDialog } from "@/components/DialogProvider";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const AVATAR_PRESETS = [
   { id: "crown", label: "Crown", icon: "👑" },
@@ -467,7 +468,7 @@ export default function ProfilePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>WhatsApp Phone</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 9876543210" style={inputStyle} />
+                  <PhoneInput value={phone} onChange={setPhone} placeholder="9876543210" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Email Address</label>

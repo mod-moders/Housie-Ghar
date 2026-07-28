@@ -4,6 +4,7 @@ import { AuthUser } from "@/lib/stores/authStore";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import Image from "next/image";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export function FirstTimeSetup({ user, onCompleted, onLogout }: {
   user: AuthUser;
@@ -238,12 +239,11 @@ export function FirstTimeSetup({ user, onCompleted, onLogout }: {
 
                     <label className="hg-form-field">
                       <span>WhatsApp Number</span>
-                      <input 
-                        type="tel" 
-                        placeholder="e.g. 9876543210"
-                        value={form.phone} 
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })} 
-                        required 
+                      <PhoneInput
+                        required
+                        placeholder="9876543210"
+                        value={form.phone}
+                        onChange={(next) => setForm({ ...form, phone: next })}
                       />
                     </label>
 

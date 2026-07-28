@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const INDIAN_STATES = [
   "Andhra Pradesh",
@@ -209,12 +210,11 @@ export function BookieApplicationModal({ isOpen, onClose }: { isOpen: boolean; o
 
                 <label className="hg-form-field">
                   <span>WhatsApp Number <span style={{ color: "#F43F5E" }}>*</span></span>
-                  <input 
-                    type="tel" 
-                    required 
-                    placeholder="e.g. 9876543210"
+                  <PhoneInput
+                    required
+                    placeholder="9876543210"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(next) => setForm({ ...form, phone: next })}
                   />
                 </label>
 
