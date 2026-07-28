@@ -55,6 +55,12 @@ const FIRST_DRAW_AT_MS = 53000;
 // End-of-game sequence, in order: the winning number is revealed, the winner card
 // holds for WIN_CARD_MS, then the draw-conclusion (winners dashboard + outro audio).
 const WIN_CARD_MS = 3000;
+// How long the cage spins before a drawn number is revealed.
+const CAGE_TEASE_MS = 4000;
+// A player arriving more than this long after the outro should have started is not
+// given one at all. Only a cheap pre-filter — within the window, playAudioFile's
+// loadedmetadata handler makes the exact call against the clip's real duration.
+const OUTRO_RESUME_MAX_S = 20;
 // Backstop for the conclusion. The sequence is driven by the draw reveal, so a
 // dropped/duplicated draw event would otherwise strand the board on a "Live" game
 // that has actually finished. Must comfortably exceed the reveal delay (4s tease +
@@ -111,7 +117,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   });
   const [showAllCalled, setShowAllCalled] = useState(false);
 
-  const { drawnNumbers, lastDrawn, gameStatus, reset, elapsedMsAtSync, elapsedAt } = useGameStore();
+  const { drawnNumbers, lastDrawn, gameStatus, reset, elapsedMsAtSync, elapsedAt, sinceLastDrawMsAtSync, sinceLastDrawAt } = useGameStore();
   const [showWinnersOverlay, setShowWinnersOverlay] = useState(false);
   const [welcomeTextVisible, setWelcomeTextVisible] = useState(false);
   const [numberCallPlaying, setNumberCallPlaying] = useState(false);
@@ -132,13 +138,11 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   }, []);
 
   // The final prize ends the game, but the board has to finish showing it first:
-  // number -> winner card -> winners dashboard + outro. While this is set, every
-  // terminal status — the backend's draw_ended (which lands just 4s after the draw),
-  // a staff socket refresh, or loadGameData seeing an all-claimed prize pool — is
-  // held in deferredEndStatusRef instead of being applied, and concludeDraw() applies
-  // it at the end of the sequence.
+  // number -> winner card -> winners dashboard + outro. The actual holding of the
+  // terminal status is done by the store (see beginEndSequence), because useSSE
+  // applies its own before this component's handler ever runs. This ref only tracks
+  // whether OUR sequence is still owed a conclusion, so concludeDraw is idempotent.
   const finalSequenceActiveRef = useRef(false);
-  const deferredEndStatusRef = useRef<"Draw_Ended" | "Completed" | null>(null);
   const concludeDrawRef = useRef<() => void>(() => {});
 
   const timersRef = useRef<NodeJS.Timeout[]>([]);
@@ -187,45 +191,66 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
   useEffect(() => {
     if (delayedGameEnd) {
       if (!outroPlayedRef.current) {
+        const lang = config?.audio_language || "en";
+
+        // How many seconds ago the outro should have STARTED. Two anchors, because
+        // the two terminal statuses record different things:
+        //
+        //  - Completed  -> completed_at is set, and the outro trails it by the
+        //                  legacy 5.5s/7s gap.
+        //  - Draw_Ended -> endGameDraw never writes completed_at, so the only
+        //                  server-side timestamp is Game_Logs.last_draw_at, which
+        //                  the live stream sends as since_last_draw_ms. The outro
+        //                  trails the final draw by the full live choreography:
+        //                  cage tease + number call + winner card.
+        //
+        // Draw_Ended is the normal state a returning player finds, and it used to
+        // fall through to a branch that played nothing at all — so the outro was
+        // silently unreachable for anyone who came back, whether or not it had
+        // actually finished.
+        let secondsSinceOutroStart: number | null = null;
         const completedAt = game?.completed_at;
         if (completedAt) {
-          const completedMs = new Date(completedAt).getTime();
-          const outroDelay = (config?.audio_language || "en") === "ne" ? 7000 : 5500;
-          const targetStartMs = completedMs + outroDelay;
-          const now = Date.now();
-          const elapsedSinceTarget = (now - targetStartMs) / 1000;
+          const target = new Date(completedAt).getTime() + (lang === "ne" ? 7000 : 5500);
+          secondsSinceOutroStart = (Date.now() - target) / 1000;
+        } else if (sinceLastDrawMsAtSync !== null && sinceLastDrawAt !== null) {
+          const sinceLastDraw = sinceLastDrawMsAtSync + (Date.now() - sinceLastDrawAt);
+          const outroTrail = CAGE_TEASE_MS + (lang === "ne" ? 4000 : 2500) + WIN_CARD_MS;
+          secondsSinceOutroStart = (sinceLastDraw - outroTrail) / 1000;
+        }
 
-          const triggerEndSequence = (startOffset: number) => {
-            if (outroPlayedRef.current) return;
-            outroPlayedRef.current = true;
-            if (!userDismissedWinnersRef.current) {
-              setShowWinnersOverlay(true);
-            }
-            if (startOffset < 20) {
-              playOutro(startOffset);
-              playCelebration();
-              const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
-              if (isSoundEnabled && !muted) {
-                soundSynthesizer.playCelebration();
-              }
-            }
-          };
-
-          if (elapsedSinceTarget >= 0) {
-            triggerEndSequence(elapsedSinceTarget);
-          } else {
-            const delayMs = Math.abs(elapsedSinceTarget) * 1000;
-            const timer = setTimeout(() => {
-              triggerEndSequence(0);
-            }, delayMs);
-            return () => clearTimeout(timer);
-          }
-        } else {
+        const triggerEndSequence = (startOffset: number) => {
+          if (outroPlayedRef.current) return;
           outroPlayedRef.current = true;
           if (!userDismissedWinnersRef.current) {
             setShowWinnersOverlay(true);
           }
-          // Do not play outro or celebration audio on load if completed_at is not present
+          // Cheap pre-filter for a game that ended long ago. Within this window the
+          // exact call is made by playAudioFile's loadedmetadata handler, which
+          // skips playback outright when the offset is past the clip's duration —
+          // so an outro that has already finished is never heard, and one that is
+          // still running is resumed at the right point rather than from the top.
+          if (startOffset < OUTRO_RESUME_MAX_S) {
+            playOutro(startOffset);
+            playCelebration();
+            const isSoundEnabled = useConfigStore.getState().config?.celebration_sound_enabled !== "false";
+            if (isSoundEnabled && !muted) {
+              soundSynthesizer.playCelebration();
+            }
+          }
+        };
+
+        if (secondsSinceOutroStart === null) {
+          // No anchor at all (a game with nothing drawn). Show the dashboard, stay silent.
+          outroPlayedRef.current = true;
+          if (!userDismissedWinnersRef.current) {
+            setShowWinnersOverlay(true);
+          }
+        } else if (secondsSinceOutroStart >= 0) {
+          triggerEndSequence(secondsSinceOutroStart);
+        } else {
+          const timer = setTimeout(() => triggerEndSequence(0), Math.abs(secondsSinceOutroStart) * 1000);
+          return () => clearTimeout(timer);
         }
       }
     } else {
@@ -236,7 +261,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         userDismissedWinnersRef.current = false;
       }
     }
-  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted, config?.audio_language]);
+  }, [delayedGameEnd, gameStatus, game?.completed_at, playOutro, playCelebration, muted, config?.audio_language, sinceLastDrawMsAtSync, sinceLastDrawAt]);
 
   // Track winners for audio celebration
 
@@ -458,15 +483,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         const pool = g.prize_pool || [];
         applyPrizes(pool);
         if (g.game_status === "Completed" || g.game_status === "Draw_Ended" || (pool.length > 0 && pool.every((p) => p.claimed))) {
-          const terminal = g.game_status === "Completed" ? "Completed" : "Draw_Ended";
-          if (finalSequenceActiveRef.current) {
-            // Same deferral as the SSE terminal events. The staff socket handler
-            // calls this on the very winner event that starts the sequence, so
-            // without the guard the operator HUD still jumps the animation.
-            deferredEndStatusRef.current = terminal;
-          } else {
-            useGameStore.getState().setStatus(terminal);
-          }
+          // Held automatically while an end sequence is in flight — the staff socket
+          // handler calls this on the very winner event that starts one.
+          useGameStore.getState().setStatus(g.game_status === "Completed" ? "Completed" : "Draw_Ended");
         }
       })
       .catch(() => {});
@@ -485,8 +504,6 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     if (!finalSequenceActiveRef.current) return;
     finalSequenceActiveRef.current = false;
 
-    const nextStatus = deferredEndStatusRef.current || "Draw_Ended";
-    deferredEndStatusRef.current = null;
     const alreadyPlayed = outroPlayedRef.current;
 
     // Order matters. Both the ref and the Zustand status are written synchronously,
@@ -495,7 +512,9 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
     // (status not terminal) would otherwise clear the winners overlay right back
     // off again if React split these into two renders.
     outroPlayedRef.current = true;
-    useGameStore.getState().setStatus(nextStatus);
+    // Releases the hold and applies whichever terminal status arrived while the
+    // sequence ran (usually the backend's draw_ended), or Draw_Ended if none did.
+    useGameStore.getState().resolveEndSequence("Draw_Ended");
 
     if (!alreadyPlayed) {
       if (!userDismissedWinnersRef.current) {
@@ -698,6 +717,7 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
         // straight to the winners dashboard. concludeDraw() applies the terminal
         // status after the sequence instead.
         finalSequenceActiveRef.current = true;
+        useGameStore.getState().beginEndSequence();
         delay(() => concludeDrawRef.current(), FINAL_SEQUENCE_MAX_MS);
       }
 
@@ -710,15 +730,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       setReactions((r) => [...r, next]);
       delay(() => setReactions((r) => r.filter((x) => x.id !== next.id)), 2600);
     } else if (data.event === "draw_ended" || data.event === "completed" || data.event === "game_completed") {
+      // The backend fires draw_ended just 4 seconds after the winning draw, right
+      // as the number is being revealed. setStatus holds it for the duration of an
+      // active end sequence, so this is safe to apply unconditionally.
       const nextStatus = data.event === "draw_ended" ? "Draw_Ended" : "Completed";
-      if (finalSequenceActiveRef.current) {
-        // The backend fires draw_ended just 4 seconds after the winning draw —
-        // exactly as the number is being revealed here. Hold it until the
-        // sequence has run, or it cuts the board to the winners dashboard
-        // mid-animation.
-        deferredEndStatusRef.current = nextStatus;
-        return;
-      }
       useGameStore.getState().setStatus(nextStatus);
       loadGameData();
     }

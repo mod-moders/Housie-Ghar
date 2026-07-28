@@ -663,7 +663,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       [game_id]
     );
     const gameLogRes = await pool.query(
-      `SELECT drawn_numbers, current_index FROM Game_Logs WHERE game_id = $1`,
+      `SELECT drawn_numbers, current_index, last_draw_at FROM Game_Logs WHERE game_id = $1`,
       [game_id]
     );
     const prizesRes = await pool.query(
@@ -710,6 +710,17 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
       // null when the game has not started yet.
       elapsed_ms: gameRes.rows[0]?.started_at
         ? Math.max(0, Date.now() - new Date(gameRes.rows[0].started_at).getTime())
+        : null,
+      // Same idea as elapsed_ms, for the OTHER end of the game: how long ago the
+      // last number was drawn. A client arriving after the draw finished anchors
+      // its end-of-game choreography (winner card, then the outro at the right
+      // point in the clip) to this. It cannot use completed_at for that, because
+      // endGameDraw only sets game_status = 'Draw_Ended' and leaves completed_at
+      // NULL — that is written solely on the later transition to 'Completed' —
+      // so a Draw_Ended game has no other server-side timestamp to work from.
+      // null when nothing has been drawn yet.
+      since_last_draw_ms: gameLogRes.rows[0]?.last_draw_at
+        ? Math.max(0, Date.now() - new Date(gameLogRes.rows[0].last_draw_at).getTime())
         : null,
       drawn_numbers: gameLogRes.rows[0]?.drawn_numbers || [],
       total_drawn: gameLogRes.rows[0]?.current_index || 0,

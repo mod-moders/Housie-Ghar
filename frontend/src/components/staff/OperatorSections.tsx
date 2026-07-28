@@ -115,8 +115,10 @@ export function OperatorHudSection() {
     setPrizes(next);
   }, []);
 
-  // Held while the end-of-game sequence (number -> winner card -> outro) plays out,
-  // so nothing flips the status to a terminal one underneath it. See concludeDraw.
+  // Tracks whether our end-of-game sequence is still owed a conclusion, so
+  // concludeDraw is idempotent. The holding of the terminal status itself is done
+  // by the store (beginEndSequence), because useSSE applies its own before this
+  // component's handler ever runs.
   const finalSequenceActiveRef = useRef(false);
   const concludeDrawRef = useRef<() => void>(() => {});
 
@@ -223,7 +225,7 @@ export function OperatorHudSection() {
     // as soon as the status turns terminal and would otherwise start a second outro.
     const alreadyPlayed = outroPlayedRef.current;
     outroPlayedRef.current = true;
-    useGameStore.getState().setStatus("Draw_Ended");
+    useGameStore.getState().resolveEndSequence("Draw_Ended");
     if (!alreadyPlayed) {
       playOutro(0);
     }
@@ -288,6 +290,7 @@ export function OperatorHudSection() {
         // terminal status, which skipped the number reveal, the winner card and the
         // outro entirely. concludeDraw() flips it after the sequence.
         finalSequenceActiveRef.current = true;
+        useGameStore.getState().beginEndSequence();
         delay(() => concludeDrawRef.current(), FINAL_SEQUENCE_MAX_MS);
       }
 
