@@ -43,6 +43,14 @@ export interface GameSummary {
   available_count: number;
   player_count?: number; // Optional since it might be missing in older API versions
   my_tickets_count?: number;
+  /**
+   * Tickets this player has reserved but not yet paid for. Only populated by
+   * GET /api/games/:id for single-ticket games — it is what tells the ticket
+   * grid to stop offering a second ticket to someone whose first is still
+   * awaiting staff confirmation. A locked ticket has no owner name yet, so it
+   * appears in neither my_tickets_count nor /my-tickets.
+   */
+  my_pending_tickets_count?: number;
   fill_percentage: number;
   game_status: "Scheduled" | "Live" | "Paused" | "Draw_Ended" | "Completed";
   call_mode?: "TTS" | "Audio" | "Text";

@@ -168,6 +168,24 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
     return () => { alive.current = false; clearInterval(id); };
   }, [game_id, loadTicketsAndBought]);
 
+  // Single-ticket games ONLY: keep my_pending_tickets_count fresh alongside the
+  // grid. Game meta is otherwise loaded once, which is fine everywhere else but
+  // not here — the count has to pick up a reservation the player made moments
+  // ago (the booking modal clears `lock` as soon as it is dismissed, so that
+  // flag cannot carry it), and it has to drop one that has since expired, or a
+  // player whose reservation lapsed would stay locked out of the game.
+  // Every other game keeps fetching its meta exactly once, as before.
+  useEffect(() => {
+    if (game?.single_ticket_only !== true) return;
+    const alive = { current: true };
+    const id = setInterval(() => {
+      apiFetch<GameSummary>(`/api/games/${game_id}`)
+        .then((g) => { if (alive.current) setGame(g); })
+        .catch(() => {});
+    }, 5000);
+    return () => { alive.current = false; clearInterval(id); };
+  }, [game_id, game?.single_ticket_only]);
+
   const fetchMatrix = useCallback((ticketId: number, ticketNumber: number) => {
     if (requestedMatrices.current.has(ticketNumber)) return;
     requestedMatrices.current.add(ticketNumber);
@@ -176,10 +194,28 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
       .catch(() => { requestedMatrices.current.delete(ticketNumber); });
   }, []);
 
+  // On a single-ticket game, the player's one ticket may be in any of three
+  // states, and all three have to close the grid or they get offered a second
+  // ticket and only find out at Book Now:
+  //   - PAID        -> myBoughtTickets (/my-tickets returns Sold only)
+  //   - RESERVED    -> my_pending_tickets_count, read from the server on load.
+  //                    A locked ticket carries no owner name, so it shows up in
+  //                    neither of the other two.
+  //   - JUST NOW    -> `lock`, set by this session's own booking, which closes
+  //                    the grid instantly instead of waiting for the next poll.
+  // Only evaluated for single-ticket games; every other game is untouched.
+  // Expiry is handled by the server (the pending count ignores lapsed locks),
+  // not by comparing clocks here — reading the clock during render is impure.
+  const singleTicketUsed =
+    game?.single_ticket_only === true &&
+    (myBoughtTickets.length > 0 ||
+      (game.my_pending_tickets_count ?? 0) > 0 ||
+      lock !== null);
+
   const toggle = (t: TicketListItem) => {
     if (t.status !== "Available") return;
     if (game?.single_ticket_only) {
-      if (myBoughtTickets.length > 0) return;
+      if (singleTicketUsed) return;
       setSelected((prev) =>
         prev.includes(t.ticket_number) ? [] : [t.ticket_number]
       );
@@ -370,7 +406,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                     key={t.ticket_id}
                     className={`hg-num hg-num-${st}${isSel ? " is-sel" : ""}${isMine ? " is-mine" : ""}`}
                     onClick={() => toggle(t)}
-                    disabled={st !== "available" || (game?.single_ticket_only === true && myBoughtTickets.length > 0)}
+                    disabled={st !== "available" || singleTicketUsed}
                     style={isMine ? {
                       borderColor: "var(--success)",
                       background: "rgba(34, 197, 94, 0.15)",
@@ -514,7 +550,7 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
               </div>
             )}
 
-            {game?.single_ticket_only && myBoughtTickets.length > 0 && (
+            {singleTicketUsed && (
               <div style={{
                 background: "rgba(244, 63, 94, 0.08)",
                 border: "1px solid rgba(244, 63, 94, 0.2)",
@@ -530,7 +566,10 @@ export default function GameRoom({ params }: { params: Promise<{ game_id: string
                   Booking Limit Reached
                 </div>
                 <p style={{ fontSize: "12px", color: "var(--text-dim)", margin: 0, lineHeight: "1.4" }}>
-                  This game is restricted to <strong>1 ticket per player</strong>. You have already purchased your ticket for this game.
+                  This game is restricted to <strong>1 ticket per player</strong>.{" "}
+                  {myBoughtTickets.length > 0
+                    ? "You have already purchased your ticket for this game."
+                    : "You already have a ticket reserved — complete the payment with your bookie to confirm it."}
                 </p>
               </div>
             )}

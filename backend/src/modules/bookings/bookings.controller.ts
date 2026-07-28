@@ -112,18 +112,40 @@ export async function lockTickets(req: Request, res: Response): Promise<void> {
         res.status(400).json({ message: 'You can only buy 1 ticket for this game.' });
         return;
       }
-      // Case-INSENSITIVE, like every other housie-name comparison on the platform
-      // (see utils/housieName.ts and getGameMyTickets). `cleanBookingName` only
-      // trims and collapses whitespace, so it keeps whatever casing the client
-      // sent, and the identity check above accepts any casing via
-      // normalizeHousieName. A plain `=` therefore let a player registered as
-      // "Monk" book once as "Monk" and again as "monk": the count came back 0
-      // the second time and the one-ticket limit was bypassed entirely.
+      // A ticket the player holds is either SOLD (staff confirmed payment, so
+      // owner_housie_name is set) or LOCKED (reserved, awaiting confirmation).
+      //
+      // Those two states identify the holder in DIFFERENT places, and that is the
+      // whole subtlety here. lockTickets sets only status/locked_by_booking/
+      // locked_until — it never writes owner_housie_name, which stays NULL until
+      // confirmBooking fills it in. So matching a locked ticket on
+      // owner_housie_name can never succeed, and the previous
+      // `status IN ('Sold','Locked')` check was silently a Sold-only check: a
+      // player could lock one ticket, lock a second before staff confirmed the
+      // first, and end up with two tickets on a one-ticket game. The locked
+      // holder has to be read through Bookings.housie_name instead.
+      //
+      // Both comparisons are case-insensitive, matching every other housie-name
+      // comparison on the platform (see utils/housieName.ts). cleanBookingName
+      // only trims and collapses whitespace, so it keeps whatever casing the
+      // client sent, and the identity check above accepts any casing via
+      // normalizeHousieName.
+      //
+      // Expired locks are excluded: the sweeper reclaims them every 30s, and
+      // until it does they must not block the player from booking again.
       const existingRes = await pool.query(
-        `SELECT COUNT(*) FROM Tickets
-          WHERE game_id = $1
-            AND LOWER(TRIM(owner_housie_name)) = LOWER(TRIM($2))
-            AND status IN ('Sold', 'Locked')`,
+        `SELECT COUNT(*) AS count
+           FROM Tickets t
+           LEFT JOIN Bookings b ON b.booking_id = t.locked_by_booking
+          WHERE t.game_id = $1
+            AND (
+              (t.status = 'Sold'
+                AND LOWER(TRIM(t.owner_housie_name)) = LOWER(TRIM($2)))
+              OR
+              (t.status = 'Locked'
+                AND t.locked_until > NOW()
+                AND LOWER(TRIM(b.housie_name)) = LOWER(TRIM($2)))
+            )`,
         [game_id, cleanBookingName]
       );
       if (parseInt(existingRes.rows[0].count, 10) > 0) {

@@ -342,6 +342,32 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       myTicketsCount = parseInt(myCountRes.rows[0].count || '0', 10);
     }
 
+    // Tickets this player has RESERVED but not yet paid for.
+    //
+    // Deliberately computed ONLY for single-ticket games — they are the only
+    // place it changes anything, and every other game keeps exactly the query
+    // path it had before. The board needs this because a locked ticket carries
+    // no owner_housie_name yet (lockTickets leaves it NULL until staff confirm),
+    // so it is invisible to my_tickets_count and to /my-tickets. Without it the
+    // page offered a second ticket to a player who already had one in flight,
+    // and the rejection only arrived at Book Now.
+    //
+    // Expired locks are excluded so a swept reservation stops blocking at once.
+    let myPendingTicketsCount = 0;
+    if (playerHousieName && game.single_ticket_only === true) {
+      const pendingRes = await pool.query(
+        `SELECT COUNT(*)::integer AS count
+           FROM Tickets t
+           JOIN Bookings b ON b.booking_id = t.locked_by_booking
+          WHERE t.game_id = $1
+            AND t.status = 'Locked'
+            AND t.locked_until > NOW()
+            AND LOWER(TRIM(b.housie_name)) = LOWER(TRIM($2))`,
+        [game_id, playerHousieName]
+      );
+      myPendingTicketsCount = pendingRes.rows[0]?.count ?? 0;
+    }
+
     const prizesRes = await pool.query(
       `SELECT p.prize_id, p.formatted_claim_id, p.pattern_name, p.prize_amount, p.claimed, p.winner_housie_name, p.claimed_at, p.split_count, p.amount_per_winner,
               p.player_claimed, p.disbursed,
@@ -386,6 +412,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       available_count: totalCount - (soldCount + lockedCount),
       player_count: playerCount,
       my_tickets_count: myTicketsCount,
+      my_pending_tickets_count: myPendingTicketsCount,
       fill_percentage: totalCount > 0 ? parseFloat(((soldCount / totalCount) * 100).toFixed(1)) : 0,
       game_status: game.game_status,
       call_mode: game.call_mode || 'Audio',
