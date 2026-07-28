@@ -896,7 +896,8 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
               {gameStatus === "Draw_Ended" && <span className="hg-live-badge" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308" }}>GAME ENDED</span>}
               {gameStatus === "Completed" && <span className="hg-live-badge" style={{ background: "rgba(34, 197, 94, 0.2)", color: "#22c55e" }}>COMPLETED</span>}
               <span style={{ verticalAlign: "middle" }}>{game?.title ?? ""}</span>
-              
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button
                 onClick={() => {
                   const next = liveLanguage === "ne" ? "en" : "ne";
@@ -920,15 +921,13 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                   cursor: "pointer",
                   height: "26px",
                   boxShadow: "var(--card-shadow-sm)",
-                  transition: "all 0.15s ease",
-                  verticalAlign: "middle"
+                  transition: "all 0.15s ease"
                 }}
                 title={`Switch language. Current: ${liveLanguage === "en" ? "English" : "Nepali"}`}
               >
                 <span>{liveLanguage === "en" ? "🇬🇧 EN" : "🇳🇵 NE"}</span>
               </button>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+
               <button className="hg-mute" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"}>
                 <Icon name={muted ? "volumeX" : "volume"} size={18} />
               </button>
