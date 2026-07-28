@@ -569,6 +569,29 @@ export function OperatorHudSection() {
             <Icon name={muted ? "volumeX" : "volume"} size={14} />
           </button>
 
+          <button
+            onClick={() => setLiveLanguage((lang) => lang === "ne" ? "en" : "ne")}
+            style={{
+              background: "var(--surface-2)",
+              border: "1.5px solid var(--border-2)",
+              borderRadius: "999px",
+              padding: "4px 10px",
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "var(--text)",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              cursor: "pointer",
+              height: "32px",
+              boxShadow: "var(--card-shadow-sm)",
+              transition: "all 0.15s ease"
+            }}
+            title={`Switch language. Current: ${liveLanguage === "en" ? "English" : "Nepali"}`}
+          >
+            <span>{liveLanguage === "en" ? "🇬🇧 EN" : "🇳🇵 NE"}</span>
+          </button>
+
           <div>
             <h3 style={{ margin: 0, fontSize: "16px" }}>{game.title} LIVE Deck</h3>
             <span className="hg-dim" style={{ fontSize: "12px" }}>Operator Console</span>
@@ -648,98 +671,7 @@ export function OperatorHudSection() {
             </div>
           </div>
 
-          {/* Language Switch Panel */}
-          <div
-            className="hg-panel"
-            style={{
-              marginTop: "12px",
-              padding: "16px 20px",
-              borderRadius: "16px",
-              border: "2px solid var(--accent)",
-              background: "var(--surface)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>
-                Language Switch
-              </span>
-              
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={!muted}
-                  onChange={(e) => setMuted(!e.target.checked)}
-                  style={{ width: "16px", height: "16px", accentColor: "var(--accent)", cursor: "pointer" }}
-                />
-                <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
-                  Enable Live Audio
-                </span>
-              </label>
-            </div>
 
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button
-                onClick={() => setLiveLanguage("en")}
-                style={{
-                  flex: 1,
-                  padding: "8px 0",
-                  borderRadius: "9999px",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  ...(liveLanguage === "en"
-                    ? {
-                        background: "var(--accent)",
-                        color: "var(--accent-ink, #000)",
-                        border: "2px solid #000",
-                        boxShadow: "2.5px 2.5px 0px #000000",
-                        fontWeight: 700
-                      }
-                    : {
-                        background: "transparent",
-                        color: "var(--text-dim)",
-                        border: "2px solid var(--border-2, rgba(255,255,255,0.15))",
-                        boxShadow: "none",
-                        fontWeight: 600
-                      })
-                }}
-              >
-                🇬🇧 GB ENG
-              </button>
-
-              <button
-                onClick={() => setLiveLanguage("ne")}
-                style={{
-                  flex: 1,
-                  padding: "8px 0",
-                  borderRadius: "9999px",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  ...(liveLanguage === "ne"
-                    ? {
-                        background: "var(--accent)",
-                        color: "var(--accent-ink, #000)",
-                        border: "2px solid #000",
-                        boxShadow: "2.5px 2.5px 0px #000000",
-                        fontWeight: 700
-                      }
-                    : {
-                        background: "transparent",
-                        color: "var(--text-dim)",
-                        border: "2px solid var(--border-2, rgba(255,255,255,0.15))",
-                        boxShadow: "none",
-                        fontWeight: 600
-                      })
-                }}
-              >
-                🇳🇵 NP NEP
-              </button>
-            </div>
-          </div>
 
           {/* Recent numbers called panel */}
           <div className="hg-numbers-area" style={{ padding: "16px 20px" }}>
