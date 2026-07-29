@@ -1220,7 +1220,8 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
     const ticketsRes = await pool.query(
       `SELECT t.ticket_number, t.status, t.owner_housie_name,
               u.email as bookie_username, u.full_name as bookie_name,
-              r.role_name as bookie_role
+              r.role_name as bookie_role,
+              b.booking_id
        FROM Tickets t
        LEFT JOIN Bookings b ON (b.booking_id = t.locked_by_booking) OR (t.status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = t.game_id AND b.booking_status = 'Sold')
        LEFT JOIN Users u ON u.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
@@ -1236,7 +1237,8 @@ export async function getGameSalesDetails(req: Request, res: Response): Promise<
       owner_housie_name: row.owner_housie_name,
       bookie_username: row.bookie_username || 'System/Operator',
       bookie_name: row.bookie_name || 'System/Operator',
-      bookie_role: row.bookie_role || 'System'
+      bookie_role: row.bookie_role || 'System',
+      booking_id: row.booking_id || null
     }));
 
     // Aggregate Agent Total Sales count

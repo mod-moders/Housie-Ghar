@@ -8,6 +8,7 @@ import { io } from '../../server';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { validateHousieName, normalizeHousieName, HOUSIE_NAME_MIN_LENGTH, HOUSIE_NAME_MAX_LENGTH } from '../../utils/housieName';
 import { resolvePlayerIdentity } from '../../utils/playerIdentity';
+import { logAuditEvent } from '../../services/audit.service';
 import { selectAgentForBooking } from '../../services/bookingRouter';
 import { buildWaLink } from '../../utils/waLink';
 import {
@@ -1483,5 +1484,203 @@ export async function settleStaffDue(req: AuthenticatedRequest, res: Response): 
   } catch (error) {
     console.error('Error settling staff due:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Cancel Booking (Superadmin only) - completely rolls back wallet, stats, referrals and commissions.
+ */
+export async function cancelBooking(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const booking_id = req.params.booking_id as string;
+  const actor = req.user!;
+
+  if (actor.roleName !== 'Superadmin') {
+    res.status(403).json({ message: 'Forbidden: Superadmin only' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Fetch booking with lock
+    const bookingRes = await client.query(
+      `SELECT booking_id, game_id, ticket_ids, booking_status, total_amount, assigned_agent_id, housie_name, is_overflow
+       FROM Bookings
+       WHERE booking_id = $1
+       FOR UPDATE`,
+      [booking_id]
+    );
+
+    if (bookingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ message: 'Booking not found' });
+      return;
+    }
+
+    const booking = bookingRes.rows[0];
+
+    if (booking.booking_status === 'Cancelled') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ message: 'Booking is already cancelled' });
+      return;
+    }
+
+    const refundAmt = parseFloat(booking.total_amount);
+    const agentId = booking.assigned_agent_id;
+    const ticketIds: number[] = booking.ticket_ids;
+    const gameId = booking.game_id;
+    const housieName = booking.housie_name;
+
+    // 2. Revert wallet changes and stats if the booking was Sold/Confirmed
+    if (booking.booking_status === 'Sold') {
+      // If it was assigned to a Bookie, refund their wallet and deduct lifetime tickets sold
+      if (agentId) {
+        const agentRes = await client.query(`SELECT r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id WHERE u.user_id = $1`, [agentId]);
+        const isBookie = agentRes.rows.length > 0 && agentRes.rows[0].role_name === 'Bookie';
+
+        if (isBookie) {
+          // Refund Bookie's wallet
+          await client.query(
+            `UPDATE Users SET current_balance = current_balance + $1 WHERE user_id = $2`,
+            [refundAmt, agentId]
+          );
+          // Deduct from lifetime_tickets_sold
+          const ticketCount = ticketIds.length;
+          await client.query(
+            `UPDATE Users SET lifetime_tickets_sold = GREATEST(0, lifetime_tickets_sold - $1) WHERE user_id = $2`,
+            [ticketCount, agentId]
+          );
+        }
+      }
+
+      // Revert player referral status if they qualified only because of this booking
+      if (housieName) {
+        const otherBookingsRes = await client.query(
+          `SELECT COUNT(*) FROM Bookings WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1)) AND booking_id <> $2 AND booking_status = 'Sold'`,
+          [housieName, booking_id]
+        );
+        const otherCount = parseInt(otherBookingsRes.rows[0].count, 10);
+        if (otherCount === 0) {
+          // Qualified only in this cancelled booking -> reset qualification
+          const resetRes = await client.query(
+            `UPDATE Players
+                SET referral_qualified_at = NULL
+              WHERE LOWER(TRIM(housie_name)) = LOWER(TRIM($1))
+                AND referral_qualified_at IS NOT NULL
+              RETURNING referred_by`,
+            [housieName]
+          );
+          if (resetRes.rows.length > 0 && resetRes.rows[0].referred_by) {
+            const referrerId = resetRes.rows[0].referred_by;
+            // Decrement referrer's qualified referrals count
+            await client.query(
+              `UPDATE Players
+                  SET qualified_referrals = GREATEST(0, qualified_referrals - 1)
+                WHERE player_id = $1`,
+              [referrerId]
+            );
+          }
+        }
+      }
+
+      // Reverse promoter commissions for this booking
+      const commissionsRes = await client.query(
+        `SELECT promoter_id, amount FROM Promoter_Commissions WHERE booking_id = $1`,
+        [booking_id]
+      );
+      for (const c of commissionsRes.rows) {
+        const commAmt = parseFloat(c.amount);
+        await client.query(
+          `UPDATE Users SET current_balance = GREATEST(0, current_balance - $1) WHERE user_id = $2`,
+          [commAmt, c.promoter_id]
+        );
+      }
+      await client.query(`DELETE FROM Promoter_Commissions WHERE booking_id = $1`, [booking_id]);
+
+      // Reverse reward redemptions for this booking
+      const redemptionsRes = await client.query(
+        `SELECT redeemer_type, bookie_id, player_id, units_spent FROM Reward_Redemptions WHERE booking_id = $1`,
+        [booking_id]
+      );
+      for (const r of redemptionsRes.rows) {
+        const units = parseInt(r.units_spent, 10);
+        if (r.redeemer_type === 'Bookie' && r.bookie_id) {
+          await client.query(
+            `UPDATE Users SET reward_points_redeemed = GREATEST(0, reward_points_redeemed - $1) WHERE user_id = $2`,
+            [units, r.bookie_id]
+          );
+        } else if (r.redeemer_type === 'Player' && r.player_id) {
+          await client.query(
+            `UPDATE Players SET reward_credits_redeemed = GREATEST(0, reward_credits_redeemed - $1) WHERE player_id = $2`,
+            [units, r.player_id]
+          );
+        }
+      }
+      await client.query(`DELETE FROM Reward_Redemptions WHERE booking_id = $1`, [booking_id]);
+
+      // Delete Wallet_Ledger entries referencing this booking
+      await client.query(
+        `DELETE FROM Wallet_Ledger
+          WHERE (reference_type = 'Booking' AND reference_id = $1)
+             OR (reference_type = 'PromoterCommission' AND reference_id = $1)`,
+        [booking_id]
+      );
+    } else if (booking.booking_status === 'Locked') {
+      // Release player spent credit
+      await refundPlayerCreditForBooking(client, booking_id as string);
+    }
+
+    // 3. Update booking status to Cancelled
+    await client.query(
+      `UPDATE Bookings
+       SET booking_status = 'Cancelled', rejected_at = NOW()
+       WHERE booking_id = $1`,
+      [booking_id]
+    );
+
+    // 4. Set tickets back to Available
+    await client.query(
+      `UPDATE Tickets
+       SET status = 'Available',
+           owner_housie_name = NULL,
+           confirmed_at = NULL,
+           locked_by_booking = NULL,
+           locked_until = NULL
+       WHERE locked_by_booking = $1 OR (status = 'Sold' AND ticket_id = ANY($2))`,
+      [booking_id, ticketIds]
+    );
+
+    await logAuditEvent({
+      userId: actor.userId,
+      userName: actor.fullName,
+      userRole: actor.roleName,
+      action: 'CANCEL_BOOKING',
+      targetType: 'Booking',
+      targetId: booking_id,
+      targetDescription: `Superadmin cancelled booking #${booking_id.substring(0, 8).toUpperCase()} for player ${housieName}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    await client.query('COMMIT');
+
+    // Notify ticket updates
+    for (const ticketId of ticketIds) {
+      io.emit('ticket_status_change', {
+        event: 'ticket_status_change',
+        ticket_id: ticketId,
+        new_status: 'Available',
+      });
+    }
+    io.emit('game_list_update', { action: 'cancel_booking', game_id: gameId });
+
+    res.json({ message: 'Booking successfully cancelled.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error cancelling booking:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
   }
 }

@@ -1340,6 +1340,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
 export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose: () => void }) {
   const { user } = useAuthStore();
   const isOperator = user?.role_name === "Operator";
+  const isSuperadmin = user?.role_name === "Superadmin";
 
   const [data, setData] = useState<{
     title: string;
@@ -1350,6 +1351,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
       bookie_username: string;
       bookie_name: string;
       bookie_role?: string;
+      booking_id: string | null;
     }>;
     agents: Array<{
       bookie_username: string;
@@ -1361,6 +1363,22 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"tickets" | "agents">("tickets");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleCancelBooking = async (bookingId: string, ticketNumber: number) => {
+    if (!window.confirm(`Are you sure you want to cancel the booking for Ticket #${ticketNumber}? This will release the tickets, refund the bookie, and deduct related commissions/referrals.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await apiFetch(`/api/bookings/operator/${bookingId}/cancel`, { method: "POST" });
+      const res = await apiFetch<NonNullable<typeof data>>(`/api/games/${gameId}/sales-details?_=${Date.now()}`);
+      setData(res);
+      setLoading(false);
+    } catch (err: any) {
+      setLoading(false);
+      alert(err.message || "Failed to cancel booking");
+    }
+  };
 
   useEffect(() => {
     // Mount/param fetch: sets the loading flag then resolves async — the effect
@@ -1414,7 +1432,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
 
   return (
     <div className="hg-modal-scrim" onClick={onClose}>
-      <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ width: "90%", maxWidth: "680px", background: "var(--surface)", color: "var(--text)" }}>
+      <div className="hg-modal" onClick={(e) => e.stopPropagation()} style={{ width: "90%", maxWidth: isSuperadmin ? "760px" : "680px", background: "var(--surface)", color: "var(--text)" }}>
         
         {/* Header */}
         <div className="hg-panel-head" style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1509,6 +1527,7 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                     <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Name</th>
                     {!isOperator && <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700 }}>Bookie</th>}
                     <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Status</th>
+                    {isSuperadmin && <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1528,6 +1547,22 @@ export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose:
                           {t.status}
                         </span>
                       </td>
+                      {isSuperadmin && (
+                        <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                          {t.booking_id && t.status !== "Available" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              style={{ color: "var(--danger)", borderColor: "rgba(239, 68, 68, 0.2)", fontSize: "11px", padding: "4px 8px" }}
+                              onClick={() => handleCancelBooking(t.booking_id!, t.ticket_number)}
+                            >
+                              Cancel
+                            </Button>
+                          ) : (
+                            <span style={{ fontSize: 11, color: "var(--text-mute)" }}>-</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

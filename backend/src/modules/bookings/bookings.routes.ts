@@ -14,6 +14,7 @@ import {
   getAgentHistory,
   getStaffDues,
   settleStaffDue,
+  cancelBooking,
 } from './bookings.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -44,6 +45,7 @@ router.get('/operator/overflow-queue', authenticateToken, requireRole(['Superadm
 router.get('/operator/overflow-history', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), getAgentHistory);
 router.post('/operator/:booking_id/force-confirm', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), forceConfirmBooking);
 router.post('/operator/:booking_id/force-reject', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), rejectBooking);
+router.post('/operator/:booking_id/cancel', authenticateToken, requireRole(['Superadmin']), cancelBooking);
 router.post('/staff/manual-book', authenticateToken, requireRole(['Superadmin', 'Financial Admin', 'Operator']), staffManualBooking);
 
 // Staff Dues financial tracking
