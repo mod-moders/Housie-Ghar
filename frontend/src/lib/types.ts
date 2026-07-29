@@ -14,6 +14,7 @@ export interface Prize {
   player_claimed_at?: string | null;
   disbursed?: boolean;
   disbursed_at?: string | null;
+  winner_is_registered?: boolean;
 }
 
 export interface ClaimPrizeResponse {

@@ -306,6 +306,10 @@ async function processNextDraw(gameId: string): Promise<void> {
   const winners = await checkWins(game);
 
   if (winners.length > 0) {
+    // Fetch registered players list
+    const playersRes = await pool.query('SELECT LOWER(TRIM(housie_name)) AS name FROM Players');
+    const registeredSet = new Set(playersRes.rows.map(r => r.name));
+
     // There are winner(s) on this tick!
     // Broadcast win announcements
     for (const win of winners) {
@@ -330,6 +334,7 @@ async function processNextDraw(gameId: string): Promise<void> {
         amount: win.amountPerWinner,
         split_count: win.splitCount,
         avatar_url: avatarUrl || null,
+        winner_is_registered: isWinnerRegistered(win.housieName, registeredSet),
       };
       await publishGameEvent(gameId, winnerEvent);
     }
@@ -733,4 +738,27 @@ export async function resumeInterruptedGames(): Promise<void> {
       console.error(`⚠️  Could not resume game ${row.game_id}:`, err);
     }
   }
+}
+
+function isWinnerRegistered(winnerHousieName: string | null | undefined, registeredSet: Set<string>): boolean {
+  if (!winnerHousieName) return true;
+
+  const segments = winnerHousieName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
+  let hasUnregistered = false;
+
+  for (const seg of segments) {
+    const trimmed = seg.trim();
+    if (!trimmed) continue;
+
+    const match = trimmed.match(/^([^(]+)/);
+    if (match) {
+      const pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim().toLowerCase();
+      if (!pName || ["and", "or", "system", "operator", "no winner"].includes(pName)) continue;
+      if (!registeredSet.has(pName)) {
+        hasUnregistered = true;
+      }
+    }
+  }
+
+  return !hasUnregistered;
 }

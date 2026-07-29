@@ -739,10 +739,10 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
       // Step 2 — After 4 rolls (4s, ~1s/roll), show badge + play audio together (number set in same tick)
       delay(() => revealDraw(num), 4000);
     } else if (data.event === "winner" || data.event === "prize_won") {
-      const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number };
+      const w = data as unknown as WinOverlay & { split_count: number; winner_ticket_number: number; winner_is_registered?: boolean };
       const next = prizesRef.current.map((p) =>
         p.pattern_name === w.prize
-          ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count }
+          ? { ...p, claimed: true, winner_housie_name: w.housie_name, winner_ticket_number: w.winner_ticket_number, amount_per_winner: w.amount, split_count: w.split_count, winner_is_registered: w.winner_is_registered }
           : p
       );
       applyPrizes(next);
@@ -1415,6 +1415,19 @@ export function LiveBoardContent({ gameId, isStaff, onBack }: { gameId: string; 
                                 letterSpacing: '0.5px',
                               }}>
                                 {p.disbursed ? 'Disbursed' : 'Claimed'}
+                              </span>
+                            ) : p.winner_is_registered === false ? (
+                              <span style={{
+                                background: 'rgba(234, 179, 8, 0.15)',
+                                color: '#eab308',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                Pending Payment
                               </span>
                             ) : (
                               <span style={{

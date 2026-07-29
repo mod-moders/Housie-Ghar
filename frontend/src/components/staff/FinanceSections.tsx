@@ -75,6 +75,7 @@ interface ConsolidatedClaimItem {
   disbursed_at?: string | null;
   bookie_name: string;
   bookie_phone: string;
+  winner_is_registered?: boolean;
 }
 
 interface PrizeClaimsResponse {
@@ -748,9 +749,8 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: "12px" }}>
                     {activeClaims.map((c) => (
-                      <button
+                      <div
                         key={c.claim_key}
-                        onClick={() => setSelClaimKey(c.claim_key)}
                         style={{
                           width: "100%",
                           padding: "14px 16px",
@@ -758,30 +758,67 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
                           border: "1px solid var(--border-light)",
                           borderRadius: "12px",
                           textAlign: "left",
-                          cursor: "pointer",
                           transition: "all 0.15s ease",
                           display: "flex",
-                          flexDirection: "column",
-                          gap: "8px"
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "12px"
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                          <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.winner_housie_name}</b>
-                          <span style={{ background: "rgba(234, 179, 8, 0.15)", color: "#eab308", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
-                            {c.formatted_claim_id}
-                          </span>
-                        </div>
-                        <b style={{ color: "var(--accent)", fontWeight: 800, fontSize: "20px" }}>{money(c.total_amount)}</b>
-                        <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", flexDirection: "column", gap: "2px" }}>
-                          <div style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {c.pattern_details.join(", ")}
+                        <div 
+                          onClick={() => setSelClaimKey(c.claim_key)}
+                          style={{ flex: 1, cursor: "pointer", display: "flex", flexDirection: "column", gap: "8px" }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <b style={{ color: "var(--text)", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.winner_housie_name}</b>
+                              {!c.winner_is_registered && (
+                                <span style={{ fontSize: "9px", color: "#eab308", fontWeight: 800, textTransform: "uppercase", background: "rgba(234, 179, 8, 0.1)", padding: "1px 5px", borderRadius: "3px" }}>
+                                  Manual Booking
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ background: "rgba(234, 179, 8, 0.15)", color: "#eab308", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", flexShrink: 0 }}>
+                              {c.formatted_claim_id}
+                            </span>
                           </div>
-                          <div style={{ color: "var(--text-mute)", fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
-                            <span>{c.game_title}</span>
-                            <span>{c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}</span>
+                          <b style={{ color: "var(--accent)", fontWeight: 800, fontSize: "20px" }}>{money(c.total_amount)}</b>
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <div style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {c.pattern_details.join(", ")}
+                            </div>
+                            <div style={{ color: "var(--text-mute)", fontSize: "10px", display: "flex", justifyContent: "space-between" }}>
+                              <span>{c.game_title}</span>
+                              <span>{c.player_claimed_at ? new Date(c.player_claimed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}</span>
+                            </div>
                           </div>
                         </div>
-                      </button>
+
+                        <button
+                          disabled={disbursingKey === c.claim_key}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDisburseConsolidated(c.game_id, c.winner_housie_name, c.prize_ids);
+                          }}
+                          style={{
+                            background: "linear-gradient(135deg, var(--accent) 0%, #ffe600 100%)",
+                            color: "#000",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "8px 12px",
+                            fontSize: "12px",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            boxShadow: "0 2px 8px var(--accent-soft)",
+                            flexShrink: 0,
+                            transition: "transform 0.1s ease"
+                          }}
+                          onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.95)"}
+                          onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+                        >
+                          {disbursingKey === c.claim_key ? "Paying..." : "Disburse"}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1183,9 +1220,13 @@ export function RechargeHubSection({ onResolved }: { me: AuthUser; onResolved?: 
 
             {!selectedClaim.disbursed ? (
               <>
-                <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
-                  💡 Check your WhatsApp or UPI app for the player&rsquo;s payment QR/UPI message, send the consolidated payout of <b>{money(selectedClaim.total_amount)}</b>, then click <b>Confirm Disbursal</b> below to complete payout.
-                </div>
+                 <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)", color: "var(--text-dim)", padding: "14px", borderRadius: "10px", fontSize: "13px", marginBottom: "20px" }}>
+                   {selectedClaim.winner_is_registered === false ? (
+                     <>💡 This win is from a <b>Manual Booking (Unregistered Player)</b>. Pay the player/bookie the consolidated payout of <b>{money(selectedClaim.total_amount)}</b>, then click <b>Confirm Disbursal</b> below.</>
+                   ) : (
+                     <>💡 Check your WhatsApp or UPI app for the player&rsquo;s payment QR/UPI message, send the consolidated payout of <b>{money(selectedClaim.total_amount)}</b>, then click <b>Confirm Disbursal</b> below to complete payout.</>
+                   )}
+                 </div>
 
                 {disburseError && <p className="hg-sec-err">{disburseError}</p>}
 

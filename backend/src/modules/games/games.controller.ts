@@ -149,6 +149,29 @@ function formatPrizes(
   });
 }
 
+function isWinnerRegistered(winnerHousieName: string | null | undefined, registeredSet: Set<string>): boolean {
+  if (!winnerHousieName) return true;
+
+  const segments = winnerHousieName.split(/\s*(?:&|,|\band\b)\s*(?![^()]*\))/i);
+  let hasUnregistered = false;
+
+  for (const seg of segments) {
+    const trimmed = seg.trim();
+    if (!trimmed) continue;
+
+    const match = trimmed.match(/^([^(]+)/);
+    if (match) {
+      const pName = match[1].replace(/[^a-zA-Z0-9_\s-]/g, "").trim().toLowerCase();
+      if (!pName || ["and", "or", "system", "operator", "no winner"].includes(pName)) continue;
+      if (!registeredSet.has(pName)) {
+        hasUnregistered = true;
+      }
+    }
+  }
+
+  return !hasUnregistered;
+}
+
 /**
  * Get Financial Officer's WhatsApp number from config
  */
@@ -399,6 +422,9 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     const drawnNumbers = logRes.rows[0]?.drawn_numbers || [];
     const formattedPrizes = formatPrizes(prizesRes.rows, game_id as string, drawnNumbers, ticketsRows);
 
+    const registeredRes = await pool.query('SELECT LOWER(TRIM(housie_name)) AS name FROM Players');
+    const registeredSet = new Set(registeredRes.rows.map(r => r.name));
+
     res.json({
       game_id: game.game_id,
       title: game.title,
@@ -434,6 +460,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
         amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
         player_claimed: row.player_claimed,
         disbursed: row.disbursed,
+        winner_is_registered: isWinnerRegistered(row.winner_housie_name, registeredSet),
       })),
     });
   } catch (error) {
@@ -738,6 +765,9 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
 
     const formattedPrizes = formatPrizes(prizesRes.rows, game_id, gameLogRes.rows[0]?.drawn_numbers || [], ticketsRows);
 
+    const playersRes = await pool.query('SELECT LOWER(TRIM(housie_name)) AS name FROM Players');
+    const registeredSet = new Set(playersRes.rows.map(r => r.name));
+
     const initialPayload = {
       event: 'initial_state',
       title: gameRes.rows[0]?.title || '',
@@ -776,6 +806,7 @@ export async function liveStream(req: Request, res: Response): Promise<void> {
         amount_per_winner: row.amount_per_winner ? parseFloat(row.amount_per_winner) : null,
         player_claimed: row.player_claimed,
         disbursed: row.disbursed,
+        winner_is_registered: isWinnerRegistered(row.winner_housie_name, registeredSet),
       })),
     };
 
@@ -1625,6 +1656,9 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    const registeredRes = await pool.query('SELECT LOWER(TRIM(housie_name)) AS name FROM Players');
+    const registeredSet = new Set(registeredRes.rows.map(r => r.name));
+
     const fetchClaims = async (isDisbursed: boolean) => {
       const query = `
         SELECT 
@@ -1637,8 +1671,9 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
           p.formatted_claim_id,
           t.ticket_number,
           COALESCE(p.amount_per_winner, p.prize_amount)::float AS amount,
-          p.player_claimed_at,
+          COALESCE(p.player_claimed_at, p.claimed_at) AS player_claimed_at,
           p.disbursed_at,
+          p.player_claimed,
           COALESCE(bu.full_name, 'System/Operator') AS bookie_name,
           COALESCE(bu.phone, '') AS bookie_phone
          FROM Prize_Pool p
@@ -1646,9 +1681,9 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
          LEFT JOIN Scheduled_Games sg ON p.game_id = sg.game_id
          LEFT JOIN Bookings b ON (b.booking_status = 'Sold' AND t.ticket_id = ANY(b.ticket_ids) AND b.game_id = p.game_id)
          LEFT JOIN Users bu ON bu.user_id = COALESCE(b.confirmed_by, b.assigned_agent_id)
-         WHERE p.player_claimed = TRUE
+         WHERE p.claimed = TRUE
            AND ${isDisbursed ? "p.disbursed = TRUE AND p.disbursed_at >= NOW() - INTERVAL '7 days'" : "(p.disbursed = FALSE OR p.disbursed IS NULL)"}
-         ORDER BY p.prize_id ASC, p.player_claimed_at DESC`;
+         ORDER BY p.prize_id ASC, COALESCE(p.player_claimed_at, p.claimed_at) DESC`;
 
       const res = await pool.query(query);
 
@@ -1697,6 +1732,11 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
 
         for (const entry of parsedEntries) {
           const playerNameStr = entry.playerName;
+          const isRegistered = registeredSet.has(playerNameStr.toLowerCase().trim());
+          if (!isDisbursed && isRegistered && !row.player_claimed) {
+            continue;
+          }
+
           const mapKey = `${row.game_id}-${playerNameStr.toLowerCase().trim()}`;
           let claimObj = claimMap.get(mapKey);
 
@@ -1719,6 +1759,7 @@ export async function getClaimRequests(req: AuthenticatedRequest, res: Response)
               disbursed_at: row.disbursed_at || null,
               bookie_name: row.bookie_name || 'System/Operator',
               bookie_phone: row.bookie_phone || '',
+              winner_is_registered: isRegistered,
             };
             claimMap.set(mapKey, claimObj);
           }
