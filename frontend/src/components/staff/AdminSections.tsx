@@ -1339,7 +1339,7 @@ export function GamesSection({ me }: { me: AuthUser }) {
 // ── Ticket Sales details Modal ───────────────────────────────────────────────
 export function TicketSalesModal({ gameId, onClose }: { gameId: string; onClose: () => void }) {
   const { user } = useAuthStore();
-  const isOperator = user?.role_name === "Operator";
+  const isOperator = user?.role_name === "Operator" || user?.role_name === "Bookie";
   const isSuperadmin = user?.role_name === "Superadmin";
 
   const [data, setData] = useState<{
