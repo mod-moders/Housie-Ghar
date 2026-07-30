@@ -878,6 +878,7 @@ export function OverflowSection({ me }: { me: AuthUser }) {
   const [updatingSettings, setUpdatingSettings] = useState(false);
   const [dues, setDues] = useState<StaffDue[]>([]);
   const [settlingBookingId, setSettlingBookingId] = useState<string | null>(null);
+  const [duesHistoryExpanded, setDuesHistoryExpanded] = useState(false);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -985,6 +986,7 @@ export function OverflowSection({ me }: { me: AuthUser }) {
 
   const pendingDues = dues.filter((d) => !d.due_settled);
   const settledDues = dues.filter((d) => d.due_settled);
+  const visibleSettledDues = duesHistoryExpanded ? settledDues : settledDues.slice(0, 5);
 
   return (
     <div className="hg-sec">
@@ -1209,7 +1211,7 @@ export function OverflowSection({ me }: { me: AuthUser }) {
                 <span>Settled At</span>
                 <span style={{ textAlign: "right" }}>Status</span>
               </div>
-              {settledDues.map((d) => {
+              {visibleSettledDues.map((d) => {
                 const formattedSettled = d.due_settled_at
                   ? new Date(d.due_settled_at).toLocaleString("en-IN", {
                       day: "numeric", month: "short", hour: "numeric", minute: "2-digit"
@@ -1284,6 +1286,38 @@ export function OverflowSection({ me }: { me: AuthUser }) {
               })}
             </div>
           </div>
+          {settledDues.length > 5 && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "16px", borderTop: "1px solid var(--border-light)", paddingTop: "16px" }}>
+              <button
+                onClick={() => setDuesHistoryExpanded(!duesHistoryExpanded)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid var(--border-light)",
+                  color: "var(--text-dim)",
+                  padding: "6px 14px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                  e.currentTarget.style.color = "var(--text)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                  e.currentTarget.style.color = "var(--text-dim)";
+                }}
+              >
+                <Icon name={duesHistoryExpanded ? "chevU" : "chevD"} size={12} />
+                {duesHistoryExpanded ? "Show Less" : `Show More (${settledDues.length - 5} more)`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
