@@ -116,9 +116,27 @@ function GameCard({ game, go, goLive, compact }: { game: GameSummary; go: (id: s
   );
 }
 
+function formatCompletedDateTime(isoDate: string): string {
+  const d = new Date(isoDate);
+  const day = d.getDate();
+  let suffix = "th";
+  if (day === 1 || day === 21 || day === 31) suffix = "st";
+  else if (day === 2 || day === 22) suffix = "nd";
+  else if (day === 3 || day === 23) suffix = "rd";
+
+  const month = d.toLocaleDateString("en-US", { month: "long" });
+  const year = d.getFullYear();
+  const timeStr = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `Completed, ${day}${suffix} ${month} ${year}, ${timeStr}`;
+}
+
 function PastGameCard({ game }: { game: GameSummary }) {
   const [showWinners, setShowWinners] = useState(false);
-  const when = formatWhen(game.completed_at || game.scheduled_at);
   const claimedPrizes = game.prize_pool.filter(p => p.claimed);
   const presetClass = getPresetClass(game.title, game.single_ticket_only);
 
@@ -129,7 +147,7 @@ function PastGameCard({ game }: { game: GameSummary }) {
           <h3 className="hg-card-title">{game.title}</h3>
           <div className="hg-card-when">
             <Icon name="check" size={13} strokeWidth={2} />
-            Completed: {when.date}
+            {formatCompletedDateTime(game.scheduled_at)}
           </div>
         </div>
         <Badge tone="gray">Completed</Badge>
