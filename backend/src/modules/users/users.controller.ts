@@ -558,7 +558,7 @@ export async function listBookiesStats(req: Request, res: Response): Promise<voi
   try {
     const result = await pool.query(
       `SELECT 
-         u.user_id, u.full_name, u.phone, u.email, u.upi_id, u.town, u.status, u.current_balance, u.receive_overflow, u.temp_password_required,
+         u.user_id, u.full_name, u.phone, u.email, u.upi_id, u.town, u.nationality, u.status, u.current_balance, u.receive_overflow, u.temp_password_required,
          (SELECT COUNT(*)::int FROM Bookings b WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Sold') as confirmed_bookings,
          (SELECT COUNT(*)::int FROM Bookings b WHERE b.assigned_agent_id = u.user_id AND b.booking_status = 'Cancelled') as cancelled_bookings,
          (SELECT COUNT(*)::int FROM Wallet_Ledger l WHERE l.agent_id = u.user_id AND l.transaction_type = 'Credit') as credit_transactions_count,

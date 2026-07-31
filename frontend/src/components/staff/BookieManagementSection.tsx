@@ -15,6 +15,7 @@ interface BookieStats {
   email: string;
   upi_id: string;
   town: string;
+  nationality?: string | null;
   status: string;
   current_balance: number;
   receive_overflow: boolean;
@@ -23,6 +24,25 @@ interface BookieStats {
   cancelled_bookings: number;
   credit_transactions_count: number;
   credit_transactions_amount: number;
+}
+
+function getBookieRegion(b: BookieStats): string {
+  const nationality = b.nationality?.trim();
+  const town = b.town?.trim();
+
+  const isNat = (val?: string) => {
+    if (!val) return false;
+    const lower = val.toLowerCase();
+    return lower === "indian" || lower === "nepali" || lower === "nepalese" || lower === "nationality";
+  };
+
+  if (nationality && !isNat(nationality)) {
+    return nationality;
+  }
+  if (town && !isNat(town)) {
+    return town;
+  }
+  return "Pending Setup";
 }
 
 interface BookieApplication {
@@ -403,7 +423,7 @@ export function BookieManagementSection({ me, goSection }: { me: AuthUser; goSec
                       <div key={b.user_id} className="hg-tr" style={{ gridTemplateColumns: "1.8fr 1.3fr 1.2fr 1.2fr 1fr 1.5fr" }}>
                         <div>
                           <b style={{ color: "var(--text)" }}>{b.full_name}</b>
-                          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>{b.town || "Pending Setup"}</div>
+                          <div className="hg-dim" style={{ fontSize: "11px", marginTop: "2px" }}>{getBookieRegion(b)}</div>
                         </div>
                         <div>
                           <div style={{ color: "var(--text)" }}>{b.phone || "Pending Setup"}</div>
