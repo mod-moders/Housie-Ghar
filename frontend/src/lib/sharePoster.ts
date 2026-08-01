@@ -548,27 +548,32 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
-  const seg = timeSegment(new Date(game.scheduled_at));
-
-  y += 10;
+  // 1. Title of the game above
+  y += 26;
   ctx.textAlign = "center";
-  ctx.fillStyle = PINK;
-  ctx.font = "700 24px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText(`GET READY — ${seg.label.toUpperCase()} GAME`, W / 2, y);
-  y += 44;
-
-  ctx.fillStyle = GOLD;
-  ctx.font = "800 54px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillStyle = WHITE;
+  ctx.font = "800 62px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 64;
+    y += 72;
   }
-  y += 8;
+  y += 12;
 
+  // 2. Scheduled date and time of the game below that
+  ctx.fillStyle = CYAN;
+  ctx.font = "600 28px 'JetBrains Mono', ui-monospace, monospace";
   const dateText = `${fmtDateTime(game.scheduled_at)}   ·   ${game.total_tickets} TICKETS ONLY`;
-  y = paintDateTimeBadge(ctx, dateText, y);
-  y += 28;
+  ctx.fillText(dateText, W / 2, y);
+  y += 56;
+
+  // 3. Name of that particular card below that: "Prize Pool"
+  ctx.fillStyle = PINK;
+  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText("PRIZE POOL", W / 2, y);
+  drawIcon(ctx, "ticket", W / 2 - 145, y - 10, 32, PINK);
+  drawIcon(ctx, "ticket", W / 2 + 145, y - 10, 32, PINK);
+  y += 48;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -617,31 +622,32 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   paintBackground(ctx, bgImage);
   let y = await paintHeader(ctx);
 
-  y += 10;
-  drawIcon(ctx, "trophy", W / 2 - 150, y - 12, 34, GOLD);
-  drawIcon(ctx, "trophy", W / 2 + 150, y - 12, 34, GOLD);
+  // 1. Title of the game above
+  y += 26;
   ctx.textAlign = "center";
-  ctx.fillStyle = GOLD;
-  ctx.font = "700 34px 'Space Grotesk', system-ui, sans-serif";
-  ctx.fillText("WINNERS", W / 2, y);
-  y += 48;
-
   ctx.fillStyle = WHITE;
-  ctx.font = "800 54px 'Space Grotesk', system-ui, sans-serif";
+  ctx.font = "800 62px 'Space Grotesk', system-ui, sans-serif";
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 64;
+    y += 72;
   }
-  y += 8;
+  y += 12;
 
+  // 2. Scheduled date and time of the game below that
+  ctx.fillStyle = CYAN;
+  ctx.font = "600 28px 'JetBrains Mono', ui-monospace, monospace";
   const gameDateStr = fmtDateTime(game.scheduled_at ?? game.completed_at);
-  if (gameDateStr) {
-    y = paintDateTimeBadge(ctx, gameDateStr, y);
-    y += 26;
-  } else {
-    y += 14;
-  }
+  ctx.fillText(gameDateStr, W / 2, y);
+  y += 56;
+
+  // 3. Name of that particular card below that: "Winners List"
+  ctx.fillStyle = GOLD;
+  ctx.font = "700 32px 'Space Grotesk', system-ui, sans-serif";
+  ctx.fillText("WINNERS LIST", W / 2, y);
+  drawIcon(ctx, "trophy", W / 2 - 170, y - 10, 32, GOLD);
+  drawIcon(ctx, "trophy", W / 2 + 170, y - 10, 32, GOLD);
+  y += 48;
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
   const rows: PrizeRowSpec[] = claimed.map((p) => {
