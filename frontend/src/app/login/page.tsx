@@ -31,6 +31,12 @@ export default function Login() {
     // the lobby instead of being asked to sign in again.
     if (getPlayerToken()) {
       router.push("/");
+      return;
+    }
+    const visited = localStorage.getItem("hg_visited_before");
+    if (visited !== "true") {
+      localStorage.setItem("hg_visited_before", "true");
+      router.push("/signup");
     }
   }, [router]);
 

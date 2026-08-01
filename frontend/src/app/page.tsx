@@ -262,7 +262,13 @@ export default function Lobby() {
 
     const token = getPlayerToken();
     if (!token) {
-      router.push("/login");
+      const visited = localStorage.getItem("hg_visited_before");
+      if (visited === "true") {
+        router.push("/login");
+      } else {
+        localStorage.setItem("hg_visited_before", "true");
+        router.push("/signup");
+      }
       return;
     }
     // A stored token exists — only a real 401/403 means it's actually invalid.
