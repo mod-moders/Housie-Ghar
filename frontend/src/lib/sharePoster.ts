@@ -29,18 +29,10 @@ let bodyFont = "'DM Sans', system-ui, sans-serif";
 let monoFont = "'JetBrains Mono', ui-monospace, monospace";
 
 function resolveCanvasFonts() {
-  if (typeof window === "undefined") return;
-  const html = document.documentElement;
-  const style = window.getComputedStyle(html);
-  
-  const h = style.getPropertyValue("--font-space-grotesk");
-  if (h) headFont = h.trim();
-  
-  const b = style.getPropertyValue("--font-dm-sans");
-  if (b) bodyFont = b.trim();
-  
-  const m = style.getPropertyValue("--font-jetbrains");
-  if (m) monoFont = m.trim();
+  // Use globally imported Google Fonts directly to ensure high-fidelity web typography
+  headFont = "'Space Grotesk', sans-serif";
+  bodyFont = "'DM Sans', sans-serif";
+  monoFont = "'JetBrains Mono', monospace";
 }
 
 /* ── shared helpers ──────────────────────────────────────────────────── */
@@ -270,8 +262,8 @@ function paintBackground(ctx: CanvasRenderingContext2D, bgImage: HTMLImageElemen
 
 async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
   const logo = await loadLogo();
-  const logoSize = 220;
-  const logoY = 40;
+  const logoSize = 180;
+  const logoY = 56;
   if (logo) {
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
@@ -280,7 +272,7 @@ async function paintHeader(ctx: CanvasRenderingContext2D): Promise<number> {
     ctx.drawImage(logo, W / 2 - logoSize / 2, logoY, logoSize, logoSize);
     ctx.restore();
 
-    return logoY + logoSize + 16;
+    return logoY + logoSize + 40;
   }
 
   // fallback if the logo fails to load: plain wordmark, still on-brand
@@ -571,28 +563,28 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   y += 24;
   ctx.textAlign = "center";
   ctx.fillStyle = WHITE;
-  ctx.font = `800 60px ${headFont}`;
+  ctx.font = `800 64px ${headFont}`;
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 68;
+    y += 76;
   }
-  y += 8;
+  y += 16;
 
   // 2. Scheduled date and time of the game below that
   ctx.fillStyle = CYAN;
   ctx.font = `600 26px ${monoFont}`;
   const dateText = `${fmtDateTime(game.scheduled_at)}   ·   ${game.total_tickets} TICKETS ONLY`;
   ctx.fillText(dateText, W / 2, y);
-  y += 48;
+  y += 56;
 
   // 3. Name of that particular card below that: "Prize Pool"
   ctx.fillStyle = PINK;
-  ctx.font = `700 28px ${headFont}`;
+  ctx.font = `700 30px ${headFont}`;
   ctx.fillText("PRIZE POOL", W / 2, y);
-  drawIcon(ctx, "ticket", W / 2 - 145, y - 10, 32, PINK);
-  drawIcon(ctx, "ticket", W / 2 + 145, y - 10, 32, PINK);
-  y += 42;
+  drawIcon(ctx, "ticket", W / 2 - 150, y - 10, 32, PINK);
+  drawIcon(ctx, "ticket", W / 2 + 150, y - 10, 32, PINK);
+  y += 56;
 
   const rows: PrizeRowSpec[] = game.prize_pool.map((p) => ({
     kind: prizeIconKind(p.pattern_name),
@@ -603,7 +595,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
 
   const rowHeight = rows.length > 5 ? 60 : 70;
 
-  const cardBottom = paintPrizeCard(ctx, {
+  paintPrizeCard(ctx, {
     top: y,
     heading: "TODAY'S PRIZE POOL",
     headingColor: PINK,
@@ -611,9 +603,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
     rowHeight,
   });
 
-  const footerY = H - 52;
-  const subtextY = Math.min(cardBottom + 110, footerY - 44);
-  const pillY = Math.min(cardBottom + 28, subtextY - 96);
+  const pillY = H - 210;
   const pillH = 76;
   const grad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
   grad.addColorStop(0, GOLD);
@@ -628,6 +618,7 @@ async function drawScheduledPoster(ctx: CanvasRenderingContext2D, game: GameSumm
   ctx.font = `700 30px ${headFont}`;
   ctx.fillText(game.ticket_price === 0 ? "FREE ENTRY" : `TICKETS @ ${inr(game.ticket_price)} ONLY`, W / 2 + 24, pillY + pillH / 2 + 10);
 
+  const subtextY = H - 106;
   ctx.fillStyle = DIM;
   ctx.font = `italic 500 24px ${bodyFont}`;
   ctx.fillText("The entire town is playing! Are you?", W / 2, subtextY);
@@ -645,28 +636,28 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
   y += 24;
   ctx.textAlign = "center";
   ctx.fillStyle = WHITE;
-  ctx.font = `800 60px ${headFont}`;
+  ctx.font = `800 64px ${headFont}`;
   const titleLines = wrapText(ctx, game.title, W - 160);
   for (const line of titleLines) {
     ctx.fillText(line, W / 2, y);
-    y += 68;
+    y += 76;
   }
-  y += 8;
+  y += 16;
 
   // 2. Scheduled date and time of the game below that
   ctx.fillStyle = CYAN;
   ctx.font = `600 26px ${monoFont}`;
   const gameDateStr = fmtDateTime(game.scheduled_at ?? game.completed_at);
   ctx.fillText(gameDateStr, W / 2, y);
-  y += 48;
+  y += 56;
 
   // 3. Name of that particular card below that: "Winners List"
   ctx.fillStyle = GOLD;
-  ctx.font = `700 28px ${headFont}`;
+  ctx.font = `700 30px ${headFont}`;
   ctx.fillText("WINNERS LIST", W / 2, y);
-  drawIcon(ctx, "trophy", W / 2 - 170, y - 10, 32, GOLD);
-  drawIcon(ctx, "trophy", W / 2 + 170, y - 10, 32, GOLD);
-  y += 42;
+  drawIcon(ctx, "trophy", W / 2 - 180, y - 10, 32, GOLD);
+  drawIcon(ctx, "trophy", W / 2 + 180, y - 10, 32, GOLD);
+  y += 56;
 
   const claimed = game.prize_pool.filter((p) => p.claimed);
   const rows: PrizeRowSpec[] = claimed.map((p) => {
@@ -683,7 +674,7 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
 
   const rowHeight = claimed.length > 5 ? 70 : 80;
 
-  const cardBottom = paintPrizeCard(ctx, {
+  paintPrizeCard(ctx, {
     top: y,
     heading: "WINNING TICKETS",
     headingColor: GOLD,
@@ -692,9 +683,8 @@ async function drawWinnersPoster(ctx: CanvasRenderingContext2D, game: GameSummar
     emptyMessage: "No prizes were claimed this round.",
   });
 
-  const footerY = H - 52;
-  const subtextY = Math.min(cardBottom + 84, footerY - 44);
-  const congratsY = subtextY - 38;
+  const subtextY = H - 106;
+  const congratsY = H - 150;
 
   ctx.textAlign = "center";
   ctx.fillStyle = PINK;
